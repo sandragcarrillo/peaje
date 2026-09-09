@@ -3,7 +3,7 @@ import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import { NETWORK_IDS } from '@peaje/shared'
 import { Hono } from 'hono'
 import { generate } from 'mppx/discovery'
-import { creditReceipt } from './charge.js'
+import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
@@ -156,6 +156,7 @@ app.get('/:slug/r/:rslug', async (c) => {
   if (result && result.status === 402) return result.challenge
 
   let respuesta: Response
+  let originFallo = false
   try {
     const upstream = await fetch(resource.url, { redirect: 'follow' })
     const headers = new Headers(upstream.headers)
@@ -164,10 +165,11 @@ app.get('/:slug/r/:rslug', async (c) => {
     respuesta = new Response(upstream.body, { status: upstream.status, headers })
   } catch (err) {
     console.error('[gateway] no se pudo traer el recurso', { tenant: tenant.slug, resource: resource.slug, err })
+    originFallo = true
     respuesta = c.json(
       {
         error: 'No pudimos traer el recurso ya pagado.',
-        hint: 'Guarda el receipt de esta respuesta y contacta al negocio o a soporte.',
+        hint: 'El pago se devuelve automáticamente a tu wallet (mira el header Payment-Refund). Si no llega, guarda el receipt y contacta a soporte.',
       },
       502,
     )
@@ -175,12 +177,24 @@ app.get('/:slug/r/:rslug', async (c) => {
   if (!result) return respuesta
   const sealed = result.withReceipt(respuesta)
 
-  await creditReceipt(sealed, {
+  const payment = await creditReceipt(sealed, {
     tenantId: tenant.id,
     routeId: null,
     path: `/r/${resource.slug}`,
     priceUsd: resource.priceUsd,
   })
+
+  // Pago condicionado: origin caído = plata de vuelta al agente.
+  if (originFallo && payment) {
+    const refund = await refundOriginFailure(payment)
+    if (refund) {
+      try {
+        sealed.headers.set('Payment-Refund', refund)
+      } catch {
+        // headers inmutables: el refund igual quedó registrado y on-chain
+      }
+    }
+  }
 
   return sealed
 })
@@ -234,28 +248,41 @@ app.all('/:slug/*', async (c) => {
 
   // El pago ya se validó/liquidó arriba: si el origin falla de acá en más, el
   // agente ya pagó. Sellamos el receipt igual (sobre una respuesta de error)
-  // para que el pago quede acreditado y el agente tenga con qué reclamar.
+  // para que el pago quede acreditado, y devolvemos la plata (Payment-Refund).
   let upstream: Response
+  let originFallo = false
   try {
     upstream = await proxyToOrigin(c.req.raw, tenant, path)
   } catch (err) {
     console.error('[gateway] origin no respondió', { tenant: tenant.slug, path, err })
+    originFallo = true
     upstream = c.json(
       {
         error: 'El origin del negocio no respondió a esta request ya pagada.',
-        hint: 'Guarda el receipt de esta respuesta y contacta al negocio o a soporte.',
+        hint: 'El pago se devuelve automáticamente a tu wallet (mira el header Payment-Refund). Si no llega, guarda el receipt y contacta a soporte.',
       },
       502,
     )
   }
   const sealed = result.withReceipt(upstream)
 
-  await creditReceipt(sealed, {
+  const payment = await creditReceipt(sealed, {
     tenantId: tenant.id,
     routeId: match.route.id,
     path,
     priceUsd: match.route.priceUsd,
   })
+
+  if (originFallo && payment) {
+    const refund = await refundOriginFailure(payment)
+    if (refund) {
+      try {
+        sealed.headers.set('Payment-Refund', refund)
+      } catch {
+        // headers inmutables: el refund igual quedó registrado y on-chain
+      }
+    }
+  }
 
   return sealed
 })

@@ -1,9 +1,11 @@
 'use server'
 
+import { isNetworkId, explorerTxUrl } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
 import { getWithdrawal, requestWithdrawal } from '@/lib/gateway'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
+import { sendFromMerchantWallet } from '@/lib/walletops'
 
 export async function crearRuta(slug: string, formData: FormData) {
   const tenant = await requireTenant(slug)
@@ -73,6 +75,47 @@ export async function estadoRetiro(slug: string, id: string): Promise<RetiroEsta
     amount: result.withdrawal.amount,
     toWallet: result.withdrawal.toWallet,
     explorerUrl: result.explorerUrl,
+  }
+}
+
+export type EnvioResultado =
+  | { ok: true; tx: string; explorerUrl: string }
+  | { ok: false; error: string }
+
+/** Envía fondos desde la wallet Peaje (Privy) del merchant a una address externa. */
+export async function enviarFondos(slug: string, formData: FormData): Promise<EnvioResultado> {
+  const tenant = await requireTenant(slug)
+  if (!tenant.payoutWallet) return { ok: false, error: 'Este negocio no tiene wallet.' }
+
+  const to = String(formData.get('to') ?? '').trim()
+  const network = String(formData.get('network') ?? '').trim()
+  const amount = Number(String(formData.get('amount') ?? '').replace(',', '.').trim())
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) return { ok: false, error: 'La address de destino no es válida.' }
+  if (!isNetworkId(network)) return { ok: false, error: 'Red inválida.' }
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: 'Monto inválido.' }
+  if (to.toLowerCase() === tenant.payoutWallet.toLowerCase()) {
+    return { ok: false, error: 'Ese es el destino de tu propia wallet.' }
+  }
+
+  try {
+    const tx = await sendFromMerchantWallet(
+      tenant.payoutWallet as `0x${string}`,
+      network,
+      to as `0x${string}`,
+      amount.toFixed(6),
+    )
+    revalidatePath(`/t/${slug}/wallet`)
+    return { ok: true, tx, explorerUrl: explorerTxUrl(network, tx) }
+  } catch (error) {
+    console.error('[wallet] fallo el envío', error)
+    const msg = error instanceof Error ? error.message : ''
+    return {
+      ok: false,
+      error: msg.includes('custodia')
+        ? msg
+        : 'No se pudo enviar. Revisa el saldo (el gas sale del mismo token) y reintenta.',
+    }
   }
 }
 

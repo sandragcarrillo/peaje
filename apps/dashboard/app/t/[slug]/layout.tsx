@@ -1,12 +1,12 @@
 import Link from 'next/link'
-import { currentTenant } from '@/lib/session'
+import { tenantIfMine } from '@/lib/session'
 import { Sidebar } from './sidebar'
 
 export default async function TenantLayout({ children, params }: LayoutProps<'/t/[slug]'>) {
   const { slug } = await params
-  const tenant = await currentTenant()
+  const tenant = await tenantIfMine(slug)
 
-  if (!tenant || tenant.slug !== slug) {
+  if (!tenant) {
     return (
       <div className="max-w-md">
         <h1 className="text-2xl font-medium">Necesitas entrar</h1>

@@ -8,7 +8,9 @@ const ITEMS = [
   { href: '/score', label: 'Score' },
   { href: '/rutas', label: 'Agregar rutas' },
   { href: '/kit', label: 'Haz que te encuentren' },
+  { href: '/clientes', label: 'Clientes' },
   { href: '/retirar', label: 'Retirar' },
+  { href: '/wallet', label: 'Mi wallet' },
 ] as const
 
 export function Sidebar({ slug, name }: { slug: string; name: string }) {
@@ -19,6 +21,9 @@ export function Sidebar({ slug, name }: { slug: string; name: string }) {
     <aside className="w-52 shrink-0">
       <p className="font-mono text-xs text-muted">{slug}</p>
       <p className="mt-1 font-medium">{name}</p>
+      <Link href="/negocios" className="mt-1 block text-xs text-muted hover:text-text">
+        cambiar de negocio →
+      </Link>
       <nav className="mt-6 flex flex-col gap-1">
         {ITEMS.map((item) => {
           const href = `${base}${item.href}`

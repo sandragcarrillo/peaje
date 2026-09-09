@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import { gatewayUrl } from '@/lib/config'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
-import { currentTenant } from '@/lib/session'
+import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
 import { ToggleBlock, VerificadorIntegracion } from './partes'
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
-  const tenant = await currentTenant()
-  if (!tenant || tenant.slug !== slug) {
+  const tenant = await tenantIfMine(slug)
+  if (!tenant) {
     return (
       <p className="text-sm text-muted">
         Necesitás iniciar sesión.{' '}

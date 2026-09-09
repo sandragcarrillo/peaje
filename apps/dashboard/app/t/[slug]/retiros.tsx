@@ -2,23 +2,31 @@
 
 import type { Withdrawal } from '@peaje/db'
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
+import { estadoRetiro, retirar, type RetiroEstado } from './actions'
 
 export function RetirosPanel({
+  slug,
   disponible,
   porRed,
   wallet,
   historial,
 }: {
+  slug: string
   disponible: string
   porRed: { network: string; available: string }[]
   wallet: string | null
   historial: Withdrawal[]
 }) {
-  const [comingSoon, setComingSoon] = useState(false)
+  const router = useRouter()
   const [copiado, setCopiado] = useState(false)
-  const puedeRetirar = Number(disponible) > 0 && Boolean(wallet)
+  const [enCurso, setEnCurso] = useState<string | null>(null) // red del retiro en curso
+  const [estado, setEstado] = useState<RetiroEstado | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const redesConSaldo = porRed.filter((b) => Number(b.available) > 0)
 
   async function copiarWallet() {
     if (!wallet) return
@@ -27,22 +35,34 @@ export function RetirosPanel({
     setTimeout(() => setCopiado(false), 1500)
   }
 
+  async function retirarDe(network: string) {
+    setError(null)
+    setEnCurso(network)
+    setEstado(null)
+    try {
+      const fd = new FormData()
+      fd.set('network', network)
+      let actual = await retirar(slug, fd)
+      setEstado(actual)
+      // Polling hasta confirmación on-chain (el gateway consulta la chain).
+      for (let i = 0; i < 20 && actual.status === 'pending'; i++) {
+        await new Promise((r) => setTimeout(r, 3000))
+        actual = await estadoRetiro(slug, actual.id)
+        setEstado(actual)
+      }
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo procesar el retiro. Reintenta.')
+    } finally {
+      setEnCurso(null)
+    }
+  }
+
   return (
     <section>
       <div className="rounded-lg border border-accent/40 bg-accent/5 p-5">
         <p className="text-xs tracking-wide text-accent uppercase">Saldo disponible</p>
         <p className="mt-3 text-3xl font-medium tabular-nums">{money(disponible)}</p>
-        {porRed.some((b) => Number(b.available) > 0) ? (
-          <p className="mt-1 text-xs text-muted">
-            {porRed
-              .filter((b) => Number(b.available) > 0)
-              .map(
-                (b) =>
-                  `${money(b.available)} en ${isNetworkId(b.network) ? NETWORKS[b.network].label : b.network}`,
-              )
-              .join(' · ')}
-          </p>
-        ) : null}
 
         {wallet ? (
           <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
@@ -63,27 +83,63 @@ export function RetirosPanel({
           </p>
         )}
 
-        <button
-          type="button"
-          disabled={!puedeRetirar}
-          onClick={() => setComingSoon(true)}
-          className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40"
-        >
-          Retirar
-        </button>
-
-        {comingSoon ? (
-          <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-panel p-3 text-sm">
-            <span className="text-muted">
-              Los retiros llegan pronto. Tu saldo sigue seguro y acumulándose.
-            </span>
-            <button
-              onClick={() => setComingSoon(false)}
-              className="ml-auto text-xs text-muted hover:text-text"
-            >
-              Cerrar
-            </button>
+        {redesConSaldo.length === 0 ? (
+          <button
+            type="button"
+            disabled
+            className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black opacity-40"
+          >
+            Retirar
+          </button>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {redesConSaldo.map((b) => {
+              const label = isNetworkId(b.network) ? NETWORKS[b.network].label : b.network
+              const symbol = isNetworkId(b.network) ? NETWORKS[b.network].tokenSymbol : ''
+              return (
+                <button
+                  key={b.network}
+                  type="button"
+                  disabled={!wallet || enCurso !== null}
+                  onClick={() => retirarDe(b.network)}
+                  className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40"
+                >
+                  {enCurso === b.network
+                    ? 'Enviando…'
+                    : `Retirar ${money(b.available)} (${symbol} en ${label})`}
+                </button>
+              )
+            })}
           </div>
+        )}
+
+        {estado ? (
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-panel p-3 text-sm">
+            <Badge status={estado.status} />
+            <span className="text-muted">
+              {estado.status === 'pending'
+                ? 'Transferencia enviada, esperando confirmación on-chain…'
+                : estado.status === 'confirmed'
+                  ? `${money(estado.amount)} enviados a ${shortWallet(estado.toWallet)}`
+                  : 'La transferencia falló. Tu saldo sigue intacto, reintenta.'}
+            </span>
+            {estado.explorerUrl ? (
+              <a
+                href={estado.explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-auto text-xs text-accent hover:underline"
+              >
+                ver tx
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className="mt-3 rounded-lg border border-red-400/40 bg-panel p-3 text-sm text-red-400">
+            {error}
+          </p>
         ) : null}
       </div>
 

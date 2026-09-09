@@ -4,7 +4,10 @@ import { verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
 import { store } from '@/lib/store'
 
-export type EntrarResultado = { ok: true; slug: string } | { ok: false; error: string }
+export type EntrarResultado =
+  /** slug null = el usuario tiene varios negocios: va al selector. */
+  | { ok: true; slug: string | null }
+  | { ok: false; error: string }
 
 export async function entrarConPrivy(accessToken: string): Promise<EntrarResultado> {
   let privyUserId: string
@@ -14,11 +17,15 @@ export async function entrarConPrivy(accessToken: string): Promise<EntrarResulta
     return { ok: false, error: 'No pudimos verificar tu sesión. Intenta de nuevo.' }
   }
 
-  const tenant = await store.getTenantByPrivyUserId(privyUserId)
-  if (!tenant) {
-    return { ok: false, error: 'No hay ningún negocio registrado con ese email.' }
+  try {
+    const tenants = await store.listTenantsByPrivyUserId(privyUserId)
+    if (tenants.length === 0) {
+      return { ok: false, error: 'No hay ningún negocio registrado con ese email.' }
+    }
+    await setSession(privyUserId)
+    return { ok: true, slug: tenants.length === 1 ? tenants[0]!.slug : null }
+  } catch (error) {
+    console.error('[acceder] fallo el login', error)
+    return { ok: false, error: 'Error del servidor al entrar. Intenta de nuevo.' }
   }
-
-  await setSession(tenant.id)
-  return { ok: true, slug: tenant.slug }
 }

@@ -107,6 +107,8 @@ export interface Store {
   getTenantById(id: string): Promise<Tenant | null>
   getTenantByApiKeyHash(hash: string): Promise<Tenant | null>
   getTenantByPrivyUserId(privyUserId: string): Promise<Tenant | null>
+  /** Todos los negocios de un usuario, más reciente primero. */
+  listTenantsByPrivyUserId(privyUserId: string): Promise<Tenant[]>
   listTenants(): Promise<Tenant[]>
   setPayoutWallet(tenantId: string, wallet: string): Promise<void>
 

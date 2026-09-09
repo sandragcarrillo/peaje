@@ -71,8 +71,13 @@ export class MemoryStore implements Store {
   }
 
   async getTenantByPrivyUserId(privyUserId: string) {
-    const id = this.#privyUserIds.get(privyUserId)
-    return id ? (this.#tenants.get(id) ?? null) : null
+    return (await this.listTenantsByPrivyUserId(privyUserId))[0] ?? null
+  }
+
+  async listTenantsByPrivyUserId(privyUserId: string) {
+    return [...this.#tenants.values()]
+      .filter((t) => t.privyUserId === privyUserId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }
 
   async listTenants() {

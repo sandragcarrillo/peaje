@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Route, Tenant } from '@peaje/db'
 import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
-import { creditPayment } from './charge.js'
+import { creditPayment, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { chargeMethods } from './methods.js'
 import { proxyToOrigin } from './proxy.js'
@@ -115,16 +115,18 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
 
         // El pago ya se validó/liquidó arriba: si el origin falla de acá en
         // más, el agente ya pagó. Sellamos el receipt igual, sobre un texto
-        // de error, para que el pago quede acreditado y quede reclamable.
+        // de error, y devolvemos la plata al agente (refund on-chain).
         let body: string
+        let originFallo = false
         try {
           const upstream = await proxyToOrigin(new Request(url, { method: route.method }), tenant, path)
           body = await upstream.text()
         } catch (err) {
           console.error('[mcp] origin no respondió', { tenant: tenant.slug, tool: toolName(route), err })
+          originFallo = true
           body = JSON.stringify({
             error: 'El origin del negocio no respondió a esta tool call ya pagada.',
-            hint: 'Guarda la referencia del receipt y contacta al negocio o a soporte.',
+            hint: 'El pago se devuelve automáticamente a tu wallet on-chain. Si no llega, guarda la referencia del receipt y contacta a soporte.',
           })
         }
 
@@ -138,7 +140,7 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
           method?: string
         }
         if (receipt.reference) {
-          await creditPayment(
+          const payment = await creditPayment(
             {
               tenantId: tenant.id,
               routeId: route.id,
@@ -147,6 +149,7 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
             },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
+          if (originFallo) await refundOriginFailure(payment)
         }
 
         return sealed

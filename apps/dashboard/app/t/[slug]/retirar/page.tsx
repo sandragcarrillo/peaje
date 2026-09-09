@@ -20,6 +20,7 @@ export default async function Retirar({ params }: PageProps<'/t/[slug]/retirar'>
       </header>
       <div className="space-y-3">
         <RetirosPanel
+          slug={tenant.slug}
           disponible={balance.available}
           porRed={porRed}
           wallet={tenant.payoutWallet}

@@ -39,12 +39,8 @@ export async function registrarNegocio(
     return { ok: false, error: 'No pudimos verificar tu sesión. Intenta de nuevo.' }
   }
 
-  const existente = await store.getTenantByPrivyUserId(privyUserId)
-  if (existente) {
-    await setSession(existente.id)
-    return { ok: true, slug: existente.slug, payoutWallet: existente.payoutWallet ?? '' }
-  }
-
+  // Un usuario puede tener varios negocios: no hay shortcut por usuario
+  // existente, solo el guard de slug repetido de abajo.
   const slug = slugify(name)
   if (!slug) return { ok: false, error: 'El nombre no genera un identificador válido.' }
   if (await store.getTenantBySlug(slug)) {
@@ -65,7 +61,7 @@ export async function registrarNegocio(
   })
 
   await store.addAllowedOrigin(tenant.id, origin.origin)
-  await setSession(tenant.id)
+  await setSession(privyUserId)
 
   return { ok: true, slug: tenant.slug, payoutWallet: wallet.address }
 }

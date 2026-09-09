@@ -33,7 +33,7 @@ export default function NuevoNegocio() {
   const [pending, setPending] = useState(false)
   const [resultado, setResultado] = useState<AltaResultado | null>(null)
 
-  const { getAccessToken } = usePrivy()
+  const { getAccessToken, authenticated, logout } = usePrivy()
   const { sendCode, loginWithCode } = useLoginWithEmail()
 
   async function enviarCodigo(e: FormEvent) {
@@ -46,6 +46,9 @@ export default function NuevoNegocio() {
     if (!email.trim()) return setError('Falta tu email.')
     setPending(true)
     try {
+      // Sesión Privy vieja → loginWithCode intentaría vincular en vez de
+      // loguear. Se limpia antes (mismo fix que en /acceder).
+      if (authenticated) await logout().catch(() => {})
       await sendCode({ email })
       setStep('code')
     } catch {
@@ -73,8 +76,15 @@ export default function NuevoNegocio() {
         return
       }
       setResultado(r)
-    } catch {
-      setError('Código inválido. Intenta de nuevo.')
+    } catch (err) {
+      console.error('[nuevo] loginWithCode falló:', err)
+      if (err instanceof Error && err.message.includes('already has one email')) {
+        await logout().catch(() => {})
+        setError('Había una sesión vieja de Privy. La limpiamos: pide un código nuevo.')
+        setStep('form')
+      } else {
+        setError('Código inválido o vencido. Intenta de nuevo.')
+      }
     } finally {
       setPending(false)
     }

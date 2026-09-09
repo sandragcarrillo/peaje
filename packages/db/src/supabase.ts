@@ -125,7 +125,19 @@ export class SupabaseStore implements Store {
   getTenantBySlug = (slug: string) => this.#tenantWhere('slug', slug)
   getTenantById = (id: string) => this.#tenantWhere('id', id)
   getTenantByApiKeyHash = (hash: string) => this.#tenantWhere('api_key_hash', hash)
-  getTenantByPrivyUserId = (privyUserId: string) => this.#tenantWhere('privy_user_id', privyUserId)
+  // Con multi-negocio puede haber varios: devuelve el más reciente.
+  getTenantByPrivyUserId = async (privyUserId: string) =>
+    (await this.listTenantsByPrivyUserId(privyUserId))[0] ?? null
+
+  async listTenantsByPrivyUserId(privyUserId: string): Promise<Tenant[]> {
+    const { data, error } = await this.#db
+      .from('tenants')
+      .select()
+      .eq('privy_user_id', privyUserId)
+      .order('created_at', { ascending: false })
+    this.#fail('listTenantsByPrivyUserId', error)
+    return (data ?? []).map(tenantFrom)
+  }
 
   async listTenants(): Promise<Tenant[]> {
     const { data, error } = await this.#db
