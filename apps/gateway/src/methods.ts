@@ -1,6 +1,7 @@
 import { NETWORKS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
 import { settleArcAuthorization } from './arc.js'
+import { usdcStatus } from './chainlink.js'
 import { env } from './env.js'
 
 /**
@@ -24,7 +25,15 @@ export function chargeMethods() {
       recipient: env.treasuryAddress,
       // Sin facilitator externo: el gateway broadcastea la autorización
       // EIP-3009 él mismo (ver arc.ts) y la referencia es el hash de la tx.
-      settle: async ({ payload }) => settleArcAuthorization(payload),
+      // El depeg guard corta acá también: cubre el MCP (que no tiene
+      // selectOffers) y la ventana entre challenge emitido y pago.
+      settle: async ({ payload }) => {
+        const { depegged, price } = await usdcStatus()
+        if (depegged) {
+          throw new Error(`Rail de Arc pausado: USDC despegado ($${price}). Paga por Tempo.`)
+        }
+        return settleArcAuthorization(payload)
+      },
     }),
   ] as const
 }

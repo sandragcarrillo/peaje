@@ -3,6 +3,7 @@ import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import { NETWORK_IDS } from '@peaje/shared'
 import { Hono } from 'hono'
 import { generate } from 'mppx/discovery'
+import { usdcStatus } from './chainlink.js'
 import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { mppx } from './mpp.js'
@@ -15,9 +16,16 @@ import { withdrawals } from './withdrawals.js'
 
 const app = new Hono<{ Bindings: HttpBindings }>()
 
-app.get('/health', (c) =>
-  c.json({ ok: true, network: env.testnet ? 'testnet' : 'mainnet', settlementNetworks: NETWORK_IDS }),
-)
+app.get('/health', async (c) => {
+  const usdc = await usdcStatus()
+  return c.json({
+    ok: true,
+    network: env.testnet ? 'testnet' : 'mainnet',
+    settlementNetworks: NETWORK_IDS,
+    // Depeg guard (Chainlink USDC/USD): con depeg, el rail de Arc se pausa.
+    usdcPeg: { price: usdc.price, depegged: usdc.depegged, checkedAt: usdc.checkedAt },
+  })
+})
 
 /**
  * Discovery MPP por tenant. Un agente lee esto y sabe qué rutas cobran

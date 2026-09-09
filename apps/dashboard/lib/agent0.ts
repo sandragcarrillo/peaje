@@ -12,7 +12,7 @@ import 'server-only'
  * Docs: https://thegraph.com/docs/en/subgraphs/existing-subgraphs/agent0/
  */
 
-const DEPLOYMENTS = [
+export const DEPLOYMENTS = [
   { chain: 'Ethereum', id: 'FV6RR6y13rsnCxBAicKuQEwDp8ioEGiNaWaZUmvr1F8k' },
   { chain: 'Base', id: '43s9hQRurMGjuYnC1r2ZwS6xSQktbFyXMPMqGKUFJojb' },
   { chain: 'Polygon', id: '9q16PZv1JudvtnCAf44cBoxg82yK9SSsFvrjCY9xnneF' },

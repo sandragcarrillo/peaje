@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import Link from 'next/link'
+import { WalletPopover } from '@/components/wallet-popover'
 import { currentTenant } from '@/lib/session'
 import { Logo } from './components/logo'
 import './globals.css'
@@ -33,6 +34,13 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
               </Link>
               {tenant ? (
                 <nav className="flex items-center gap-3 text-sm">
+                  <Link href="/mercado" className="text-muted hover:text-text">
+                    Mercado
+                  </Link>
+                  <Link href="/negocios" className="text-muted hover:text-text">
+                    Mis negocios
+                  </Link>
+                  <WalletPopover slug={tenant.slug} />
                   <span className="text-muted">{tenant.email ?? tenant.name}</span>
                   <Link
                     href="/salir"

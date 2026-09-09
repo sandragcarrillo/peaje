@@ -119,6 +119,42 @@ export async function enviarFondos(slug: string, formData: FormData): Promise<En
   }
 }
 
+export type ResumenWallet = {
+  address: string
+  balances: { network: string; symbol: string; amount: string }[]
+  retiros: {
+    id: string
+    amount: string
+    status: 'pending' | 'confirmed' | 'failed'
+    network: string
+    txRef: string | null
+    createdAt: string
+  }[]
+}
+
+/** Datos del popover de wallet del navbar: saldos live + últimos retiros. */
+export async function resumenWallet(slug: string): Promise<ResumenWallet | null> {
+  const tenant = await requireTenant(slug)
+  if (!tenant.payoutWallet) return null
+  const { walletBalances } = await import('@/lib/walletops')
+  const [balances, retiros] = await Promise.all([
+    walletBalances(tenant.payoutWallet as `0x${string}`),
+    store.listWithdrawals(tenant.id, 5),
+  ])
+  return {
+    address: tenant.payoutWallet,
+    balances,
+    retiros: retiros.map((w) => ({
+      id: w.id,
+      amount: w.amount,
+      status: w.status,
+      network: w.network,
+      txRef: w.txRef,
+      createdAt: w.createdAt,
+    })),
+  }
+}
+
 // ---- links con precio ----
 
 function slugDeUrl(url: URL): string {

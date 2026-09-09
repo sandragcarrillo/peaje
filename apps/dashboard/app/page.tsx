@@ -51,10 +51,10 @@ export default async function Landing() {
                   Registrar mi negocio
                 </Link>
                 <Link
-                  href="/acceder"
+                  href="/mercado"
                   className="inline-flex items-center gap-1.5 border-b border-current pb-0.5 text-sm font-medium text-muted hover:text-text"
                 >
-                  Ya tengo cuenta <span aria-hidden>→</span>
+                  Ver el mercado agéntico <span aria-hidden>→</span>
                 </Link>
               </>
             )}
