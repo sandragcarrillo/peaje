@@ -1,4 +1,5 @@
 import type { Route, Tenant } from '@peaje/db'
+import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
 
 /**
  * Archivos de agent-readiness servidos por tenant. Cada uno mapea a un check
@@ -8,12 +9,15 @@ import type { Route, Tenant } from '@peaje/db'
 
 type Ctx = { tenant: Tenant; routes: Route[]; base: string }
 
+/** "pathUSD en Tempo o USDC en Arc" — para prosa de discovery. */
+const REDES = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} en ${NETWORKS[id].label}`).join(' o ')
+
 /** llms.txt (llms-txt-exists, llms-txt-formatting, agent-instruction) */
 export function llmsTxt({ tenant, routes, base }: Ctx): string {
   return [
     `# ${tenant.name}`,
     '',
-    `> API con pagos por request para agentes (MPP sobre HTTP 402). Sin API keys ni registro: el agente recibe un 402, paga en stablecoin y recibe el recurso. Úsala cuando necesites ${tenant.name} de forma programática pagando solo por lo que consumes.`,
+    `> API con pagos por request para agentes (MPP sobre HTTP 402). Sin API keys ni registro: el agente recibe un 402, paga en stablecoin (${REDES}) y recibe el recurso. Úsala cuando necesites ${tenant.name} de forma programática pagando solo por lo que consumes.`,
     '',
     '## Recursos',
     '',
@@ -39,7 +43,7 @@ export function pricingMd({ tenant, routes, base }: Ctx): string {
   return [
     `# Precios de ${tenant.name}`,
     '',
-    'Pago por request vía MPP (HTTP 402). Sin suscripción, sin API key, sin mínimos.',
+    `Pago por request vía MPP (HTTP 402). Sin suscripción, sin API key, sin mínimos. Se paga en ${REDES}: el challenge trae una oferta por red y el agente elige.`,
     '',
     '| Endpoint | Precio |',
     '|---|---|',
@@ -65,9 +69,16 @@ export function authMd({ tenant, base }: Ctx): string {
     '```bash',
     `curl -i ${base}/<ruta>`,
     '```',
-    '2. Recibes `402 Payment Required` con un header `WWW-Authenticate: Payment` que incluye el Challenge (monto, token, destinatario, chain).',
+    '2. Recibes `402 Payment Required` con un header `WWW-Authenticate: Payment` que incluye el Challenge (monto, token, destinatario, chain). Trae una oferta por red soportada: elige la que tu wallet pueda pagar.',
     '3. Paga el Challenge y reintenta con el header `Authorization: Payment <credential>`.',
     '4. Recibes el recurso con un header `Payment-Receipt` como comprobante.',
+    '',
+    '## Redes de pago',
+    '',
+    ...NETWORK_IDS.map((id) => {
+      const n = NETWORKS[id]
+      return `- **${n.label}** (testnet): ${n.tokenSymbol} · chainId ${n.testnet.chainId} · token \`${n.token}\``
+    }),
     '',
     '## La vía fácil',
     '',
@@ -93,7 +104,7 @@ export function agentsMd({ tenant, routes, base }: Ctx): string {
     '',
     '## Qué es',
     '',
-    `${tenant.name} expone datos vía API paga por request. Pagas por llamada en stablecoin (MPP/HTTP 402), sin registro previo.`,
+    `${tenant.name} expone datos vía API paga por request. Pagas por llamada en stablecoin (${REDES}) vía MPP/HTTP 402, sin registro previo.`,
     '',
     '## Cuándo usarla',
     '',
@@ -123,6 +134,12 @@ export function aiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown
         spec: `${base}/openapi.json`,
         auth: 'mpp',
         pricing: `${base}/pricing.md`,
+        networks: NETWORK_IDS.map((id) => ({
+          id,
+          chainId: NETWORKS[id].testnet.chainId,
+          token: NETWORKS[id].token,
+          symbol: NETWORKS[id].tokenSymbol,
+        })),
       },
       {
         type: 'mcp-server',

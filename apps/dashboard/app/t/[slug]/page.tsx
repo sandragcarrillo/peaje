@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { txExplorerUrl } from '@peaje/shared'
+import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { gatewayUrl, money, shortWallet } from '@/lib/config'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -90,6 +90,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
                 <th className="pb-2 font-normal">Hora</th>
                 <th className="pb-2 font-normal">Ruta</th>
                 <th className="pb-2 font-normal">Agente</th>
+                <th className="pb-2 font-normal">Red</th>
                 <th className="pb-2 text-right font-normal">Monto</th>
                 <th className="pb-2 text-right font-normal">Tx</th>
               </tr>
@@ -105,16 +106,21 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
                   </td>
                   <td className="py-2">{p.path}</td>
                   <td className="py-2 text-muted">{shortWallet(p.agentWallet)}</td>
+                  <td className="py-2 text-muted">
+                    {isNetworkId(p.network) ? NETWORKS[p.network].label : p.network}
+                  </td>
                   <td className="py-2 text-right">{money(p.amount)}</td>
                   <td className="py-2 text-right">
-                    <a
-                      href={txExplorerUrl(p.receiptRef)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-accent hover:underline"
-                    >
-                      ver
-                    </a>
+                    {isNetworkId(p.network) ? (
+                      <a
+                        href={explorerTxUrl(p.network, p.receiptRef)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent hover:underline"
+                      >
+                        ver
+                      </a>
+                    ) : null}
                   </td>
                 </tr>
               ))}

@@ -1,4 +1,4 @@
-import { DEFAULT_CURRENCY, tempoConfig } from '@peaje/shared'
+import { DEFAULT_CURRENCY, NETWORKS, tempoConfig } from '@peaje/shared'
 
 function required(name: string): string {
   const value = process.env[name]
@@ -19,6 +19,8 @@ export const env = {
   /** Secreto compartido entre dashboard y gateway para la API interna. */
   internalSecret: required('INTERNAL_API_SECRET'),
   rpcUrl: tempoConfig((process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet').rpcUrl,
+  /** RPC de Arc. Solo testnet: Arc no publica mainnet todavía. */
+  arcRpcUrl: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
 }

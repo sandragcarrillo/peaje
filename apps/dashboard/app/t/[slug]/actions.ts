@@ -51,7 +51,8 @@ export type RetiroEstado = {
 export async function retirar(slug: string, formData: FormData): Promise<RetiroEstado> {
   await requireTenant(slug)
   const amount = String(formData.get('amount') ?? '').trim()
-  const result = await requestWithdrawal(slug, amount ? { amount } : {})
+  const network = String(formData.get('network') ?? 'tempo').trim()
+  const result = await requestWithdrawal(slug, { network, ...(amount ? { amount } : {}) })
   revalidatePath(`/t/${slug}`)
   return {
     id: result.withdrawal.id,

@@ -1,6 +1,6 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
-import { TOKEN_DECIMALS, txExplorerUrl } from '@peaje/shared'
+import { NETWORK_IDS } from '@peaje/shared'
 import { Hono } from 'hono'
 import { generate } from 'mppx/discovery'
 import { creditReceipt } from './charge.js'
@@ -15,7 +15,9 @@ import { withdrawals } from './withdrawals.js'
 
 const app = new Hono<{ Bindings: HttpBindings }>()
 
-app.get('/health', (c) => c.json({ ok: true, network: env.testnet ? 'testnet' : 'mainnet' }))
+app.get('/health', (c) =>
+  c.json({ ok: true, network: env.testnet ? 'testnet' : 'mainnet', settlementNetworks: NETWORK_IDS }),
+)
 
 /**
  * Discovery MPP por tenant. Un agente lee esto y sabe qué rutas cobran
@@ -27,20 +29,18 @@ app.get('/:slug/openapi.json', async (c) => {
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
 
   // El discovery de pagos solo lista lo que cobra; lo gratis va en llms.txt.
+  // La forma `handler` toma la metadata compuesta de la instancia MPP: emite
+  // una oferta por red (Tempo y Arc) en `x-payment-info.offers`.
   const routes = (await sellableRoutes(tenant.id)).filter((r) => Number(r.priceUsd) > 0)
   const doc = generate(mppx, {
       info: { title: `${tenant.name} · Peaje`, version: '1.0.0' },
       routes: routes.map((route) => ({
-        intent: 'charge',
+        handler: mppx.charge({
+          amount: route.priceUsd,
+          description: route.description ?? `${route.method} ${route.pathPattern}`,
+        }),
         method: route.method,
         path: route.pathPattern,
-        options: {
-          amount: route.priceUsd,
-          currency: env.currency,
-          decimals: TOKEN_DECIMALS,
-          recipient: env.treasuryAddress,
-          description: route.description ?? `${route.method} ${route.pathPattern}`,
-        },
         summary: route.description ?? undefined,
       })),
     })
@@ -49,18 +49,9 @@ app.get('/:slug/openapi.json', async (c) => {
   return c.json(doc)
 })
 
+// El ledger interno vive dentro del router de withdrawals: comparte su
+// middleware de auth (antes estaba acá afuera y quedaba expuesto sin token).
 app.route('/_internal', withdrawals)
-
-/** Ledger interno del tenant. Lo consume el dashboard. */
-app.get('/_internal/:slug/ledger', async (c) => {
-  const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
-  const payments = await store.listPayments(tenant.id)
-  return c.json({
-    balance: await store.balance(tenant.id),
-    payments: payments.map((p) => ({ ...p, explorer: txExplorerUrl(p.receiptRef, env.testnet) })),
-  })
-})
 
 /**
  * Link headers (RFC 8288) en todas las respuestas de tenant: los agentes

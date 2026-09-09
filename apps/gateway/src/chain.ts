@@ -1,5 +1,6 @@
-import { tempoConfig } from '@peaje/shared'
+import { tempoConfig, type NetworkId } from '@peaje/shared'
 import { createPublicClient, http } from 'viem'
+import { resolveArcPayer } from './arc.js'
 import { env } from './env.js'
 
 const config = tempoConfig(env.testnet)
@@ -11,9 +12,12 @@ export const publicClient = createPublicClient({
 
 /**
  * El Receipt de MPP no trae la wallet del agente, solo el hash de la tx.
- * La resolvemos leyendo la transacción on-chain.
+ * En Tempo el agente broadcastea él mismo: el pagador es `tx.from`. En Arc
+ * broadcastea nuestra treasury (relayer), así que se resuelve por el evento
+ * Transfer (ver arc.ts).
  */
-export async function resolvePayer(txHash: string): Promise<string | null> {
+export async function resolvePayer(network: NetworkId, txHash: string): Promise<string | null> {
+  if (network === 'arc') return resolveArcPayer(txHash)
   try {
     const tx = await publicClient.getTransaction({ hash: txHash as `0x${string}` })
     return tx.from ?? null

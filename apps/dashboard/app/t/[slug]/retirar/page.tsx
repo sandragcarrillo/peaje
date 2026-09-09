@@ -6,8 +6,9 @@ import { WalletForm } from '../wallet'
 export default async function Retirar({ params }: PageProps<'/t/[slug]/retirar'>) {
   const { slug } = await params
   const tenant = await requireTenant(slug)
-  const [balance, retiros] = await Promise.all([
+  const [balance, porRed, retiros] = await Promise.all([
     store.balance(tenant.id),
+    store.balanceByNetwork(tenant.id),
     store.listWithdrawals(tenant.id, 10),
   ])
 
@@ -20,6 +21,7 @@ export default async function Retirar({ params }: PageProps<'/t/[slug]/retirar'>
       <div className="space-y-3">
         <RetirosPanel
           disponible={balance.available}
+          porRed={porRed}
           wallet={tenant.payoutWallet}
           historial={retiros}
         />

@@ -30,6 +30,10 @@ export type Payment = {
   amount: string
   receiptRef: string
   method: string
+  /** Red de settlement ('tempo' | 'arc'). */
+  network: string
+  /** Hash del refund al agente si el origin falló. No-null = no cuenta para el balance. */
+  refundTx: string | null
   createdAt: string
 }
 
@@ -40,6 +44,8 @@ export type Withdrawal = {
   toWallet: string
   txRef: string | null
   status: WithdrawalStatus
+  /** Red de la que sale el payout. */
+  network: string
   createdAt: string
 }
 
@@ -51,6 +57,9 @@ export type Balance = {
   available: string
   requestCount: number
 }
+
+/** Balance de un tenant en una red concreta. */
+export type NetworkBalance = Balance & { network: string }
 
 export type NewTenant = {
   slug: string
@@ -118,14 +127,17 @@ export interface Store {
   deleteResource(tenantId: string, resourceId: string): Promise<void>
 
   // ledger
-  recordPayment(payment: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment>
+  recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>): Promise<Payment>
   setPaymentWallet(paymentId: string, wallet: string): Promise<void>
+  markPaymentRefunded(paymentId: string, txRef: string): Promise<void>
   listPayments(tenantId: string, limit?: number): Promise<Payment[]>
   balance(tenantId: string): Promise<Balance>
+  /** Balance separado por red. Solo redes con actividad o soportadas. */
+  balanceByNetwork(tenantId: string): Promise<NetworkBalance[]>
   dailyRevenue(tenantId: string, days: number): Promise<{ date: string; amount: string; count: number }[]>
 
   // retiros
-  createWithdrawal(input: { tenantId: string; amount: string; toWallet: string }): Promise<Withdrawal>
+  createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }): Promise<Withdrawal>
   updateWithdrawal(id: string, patch: { txRef?: string; status?: WithdrawalStatus }): Promise<Withdrawal>
   listWithdrawals(tenantId: string, limit?: number): Promise<Withdrawal[]>
   getWithdrawal(id: string): Promise<Withdrawal | null>

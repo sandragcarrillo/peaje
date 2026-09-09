@@ -1,5 +1,6 @@
 import type {
   Balance,
+  NetworkBalance,
   NewResource,
   NewRoute,
   NewTenant,
@@ -162,10 +163,17 @@ export class MemoryStore implements Store {
     if (row) row.active = false
   }
 
-  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt'>) {
-    const existing = this.#payments.find((p) => p.receiptRef === payment.receiptRef)
+  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>) {
+    const existing = this.#payments.find(
+      (p) => p.receiptRef === payment.receiptRef && p.network === payment.network,
+    )
     if (existing) return existing
-    const row: Payment = { ...payment, id: this.#id('pay'), createdAt: new Date().toISOString() }
+    const row: Payment = {
+      ...payment,
+      id: this.#id('pay'),
+      refundTx: null,
+      createdAt: new Date().toISOString(),
+    }
     this.#payments.push(row)
     return row
   }
@@ -173,6 +181,11 @@ export class MemoryStore implements Store {
   async setPaymentWallet(paymentId: string, wallet: string) {
     const row = this.#payments.find((p) => p.id === paymentId)
     if (row) row.agentWallet = wallet
+  }
+
+  async markPaymentRefunded(paymentId: string, txRef: string) {
+    const row = this.#payments.find((p) => p.id === paymentId)
+    if (row) row.refundTx = txRef
   }
 
   async listPayments(tenantId: string, limit = 50) {
@@ -183,7 +196,7 @@ export class MemoryStore implements Store {
   }
 
   async balance(tenantId: string): Promise<Balance> {
-    const payments = this.#payments.filter((p) => p.tenantId === tenantId)
+    const payments = this.#payments.filter((p) => p.tenantId === tenantId && !p.refundTx)
     const revenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
     const withdrawn = this.#withdrawals
       .filter((w) => w.tenantId === tenantId && w.status !== 'failed')
@@ -196,11 +209,33 @@ export class MemoryStore implements Store {
     }
   }
 
+  async balanceByNetwork(tenantId: string): Promise<NetworkBalance[]> {
+    const networks = new Set<string>(['tempo', 'arc'])
+    for (const p of this.#payments) if (p.tenantId === tenantId) networks.add(p.network)
+    for (const w of this.#withdrawals) if (w.tenantId === tenantId) networks.add(w.network)
+    return [...networks].sort().map((network) => {
+      const payments = this.#payments.filter(
+        (p) => p.tenantId === tenantId && p.network === network && !p.refundTx,
+      )
+      const revenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
+      const withdrawn = this.#withdrawals
+        .filter((w) => w.tenantId === tenantId && w.network === network && w.status !== 'failed')
+        .reduce((acc, w) => acc + Number(w.amount), 0)
+      return {
+        network,
+        revenue: revenue.toFixed(6),
+        withdrawn: withdrawn.toFixed(6),
+        available: (revenue - withdrawn).toFixed(6),
+        requestCount: payments.length,
+      }
+    })
+  }
+
   async dailyRevenue(tenantId: string, days: number) {
     const buckets = new Map<string, { amount: number; count: number }>()
     const since = Date.now() - days * 86_400_000
     for (const p of this.#payments) {
-      if (p.tenantId !== tenantId) continue
+      if (p.tenantId !== tenantId || p.refundTx) continue
       const time = new Date(p.createdAt).getTime()
       if (time < since) continue
       const date = p.createdAt.slice(0, 10)
@@ -214,7 +249,7 @@ export class MemoryStore implements Store {
       .map(([date, b]) => ({ date, amount: b.amount.toFixed(6), count: b.count }))
   }
 
-  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string }) {
+  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }) {
     const row: Withdrawal = {
       id: this.#id('wdr'),
       tenantId: input.tenantId,
@@ -222,6 +257,7 @@ export class MemoryStore implements Store {
       toWallet: input.toWallet,
       txRef: null,
       status: 'pending',
+      network: input.network,
       createdAt: new Date().toISOString(),
     }
     this.#withdrawals.push(row)

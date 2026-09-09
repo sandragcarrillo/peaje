@@ -2,27 +2,23 @@ import { randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { Route, Tenant } from '@peaje/db'
-import { Mppx, tempo, Transport } from 'mppx/server'
+import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
-import { resolvePayer } from './chain.js'
+import { creditPayment } from './charge.js'
 import { env } from './env.js'
+import { chargeMethods } from './methods.js'
 import { proxyToOrigin } from './proxy.js'
 import { store } from './store.js'
 import { llmsTxt, pricingMd } from './wellknown.js'
 
 /**
  * Instancia MPP con transporte MCP: los Challenges viajan como error JSON-RPC
- * -32042 y los Receipts en `_meta`, en vez de headers HTTP.
+ * -32042 y los Receipts en `_meta`, en vez de headers HTTP. Mismos métodos de
+ * cobro (Tempo + Arc) que la instancia HTTP: ver methods.ts.
  */
 const mcpMppx = Mppx.create({
   secretKey: env.mppSecretKey,
-  methods: [
-    tempo.charge({
-      testnet: env.testnet,
-      currency: env.currency,
-      recipient: env.treasuryAddress,
-    }),
-  ],
+  methods: chargeMethods(),
   transport: Transport.mcpSdk(),
 })
 
@@ -94,7 +90,7 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
     server.registerTool(
       toolName(route),
       {
-        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Cuesta $${Number(route.priceUsd)} por llamada (MPP).`,
+        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Cuesta $${Number(route.priceUsd)} por llamada (MPP; paga en Tempo con pathUSD o en Arc con USDC).`,
         inputSchema: shape,
         annotations: {
           title: route.description ?? `${route.method} ${route.pathPattern}`,
@@ -136,21 +132,21 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
           content: [{ type: 'text' as const, text: body }],
         })
 
-        // Acredita el pago al ledger, mismo tratamiento que el flujo HTTP.
-        const receipt = (sealed._meta?.['org.paymentauth/receipt'] ?? {}) as { reference?: string }
+        // Acredita el pago al ledger por el mismo camino que el flujo HTTP.
+        const receipt = (sealed._meta?.['org.paymentauth/receipt'] ?? {}) as {
+          reference?: string
+          method?: string
+        }
         if (receipt.reference) {
-          const payment = await store.recordPayment({
-            tenantId: tenant.id,
-            routeId: route.id,
-            path: `mcp:${toolName(route)}`,
-            agentWallet: null,
-            amount: route.priceUsd,
-            receiptRef: receipt.reference,
-            method: 'tempo',
-          })
-          void resolvePayer(receipt.reference).then((wallet) => {
-            if (wallet) void store.setPaymentWallet(payment.id, wallet).catch(() => {})
-          })
+          await creditPayment(
+            {
+              tenantId: tenant.id,
+              routeId: route.id,
+              path: `mcp:${toolName(route)}`,
+              priceUsd: route.priceUsd,
+            },
+            { reference: receipt.reference, method: receipt.method ?? 'tempo' },
+          )
         }
 
         return sealed

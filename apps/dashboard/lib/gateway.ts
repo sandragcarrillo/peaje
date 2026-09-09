@@ -26,7 +26,10 @@ async function internal<T>(path: string, init?: RequestInit): Promise<T> {
   return data
 }
 
-export function requestWithdrawal(slug: string, body: { amount?: string; toWallet?: string }) {
+export function requestWithdrawal(
+  slug: string,
+  body: { amount?: string; toWallet?: string; network?: string },
+) {
   return internal<WithdrawalResponse>(`/${slug}/withdraw`, {
     method: 'POST',
     body: JSON.stringify(body),

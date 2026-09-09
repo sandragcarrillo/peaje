@@ -23,10 +23,85 @@ export const DEFAULT_CURRENCY = TOKENS.pathUsd
 /** Los TIP-20 de Tempo usan 6 decimales. */
 export const TOKEN_DECIMALS = 6
 
+// ---- redes de settlement ----
+
+/** Redes donde el gateway acepta pagos. La clave es la que se persiste en la DB. */
+export type NetworkId = 'tempo' | 'arc'
+
+type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string }
+
+export type NetworkDef = {
+  id: NetworkId
+  label: string
+  /** Token con el que se cobra y del que salen los retiros en esta red. */
+  token: `0x${string}`
+  tokenSymbol: string
+  decimals: number
+  /** Domain EIP-712 del token, para autorizaciones EIP-3009 (redes EVM genéricas). */
+  eip3009?: { name: string; version: string }
+  mainnet: ChainInfo | null
+  testnet: ChainInfo
+}
+
+export const NETWORKS: Record<NetworkId, NetworkDef> = {
+  tempo: {
+    id: 'tempo',
+    label: 'Tempo',
+    token: TOKENS.pathUsd,
+    tokenSymbol: 'pathUSD',
+    decimals: 6,
+    mainnet: TEMPO.mainnet,
+    testnet: TEMPO.testnet,
+  },
+  arc: {
+    id: 'arc',
+    label: 'Arc',
+    // Interfaz ERC-20 del USDC nativo de Arc; el gas de la red se paga en ese mismo USDC.
+    token: '0x3600000000000000000000000000000000000000',
+    tokenSymbol: 'USDC',
+    decimals: 6,
+    // Leído on-chain del contrato: name() = "USDC", version() = "2".
+    eip3009: { name: 'USDC', version: '2' },
+    // Arc no publica direcciones de mainnet todavía (sept 2026).
+    mainnet: null,
+    testnet: {
+      chainId: 5042002,
+      rpcUrl: 'https://rpc.testnet.arc.io',
+      explorerUrl: 'https://testnet.arcscan.app',
+    },
+  },
+}
+
+export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
+
+export function isNetworkId(value: string): value is NetworkId {
+  return value in NETWORKS
+}
+
+export function networkChain(id: NetworkId, testnet: boolean): ChainInfo {
+  const def = NETWORKS[id]
+  const chain = testnet ? def.testnet : def.mainnet
+  if (!chain) throw new Error(`La red ${id} no tiene mainnet todavía`)
+  return chain
+}
+
+export function explorerTxUrl(network: NetworkId, hash: string, testnet = true): string {
+  return `${networkChain(network, testnet).explorerUrl}/tx/${hash}`
+}
+
+/**
+ * El Receipt de MPP trae el método de pago (`tempo`, `evm`), no la red.
+ * Mientras la única red EVM genérica sea Arc, el mapeo es directo.
+ */
+export function networkFromReceiptMethod(method: string | undefined): NetworkId {
+  return method === 'evm' ? 'arc' : 'tempo'
+}
+
 export function tempoConfig(testnet: boolean) {
   return testnet ? TEMPO.testnet : TEMPO.mainnet
 }
 
+/** @deprecated Usar `explorerTxUrl(network, hash, testnet)`: asume Tempo. */
 export function txExplorerUrl(hash: string, testnet = true): string {
   return `${tempoConfig(testnet).explorerUrl}/tx/${hash}`
 }

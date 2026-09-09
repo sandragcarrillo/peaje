@@ -1,16 +1,18 @@
 'use client'
 
 import type { Withdrawal } from '@peaje/db'
-import { txExplorerUrl } from '@peaje/shared'
+import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
 
 export function RetirosPanel({
   disponible,
+  porRed,
   wallet,
   historial,
 }: {
   disponible: string
+  porRed: { network: string; available: string }[]
   wallet: string | null
   historial: Withdrawal[]
 }) {
@@ -30,6 +32,17 @@ export function RetirosPanel({
       <div className="rounded-lg border border-accent/40 bg-accent/5 p-5">
         <p className="text-xs tracking-wide text-accent uppercase">Saldo disponible</p>
         <p className="mt-3 text-3xl font-medium tabular-nums">{money(disponible)}</p>
+        {porRed.some((b) => Number(b.available) > 0) ? (
+          <p className="mt-1 text-xs text-muted">
+            {porRed
+              .filter((b) => Number(b.available) > 0)
+              .map(
+                (b) =>
+                  `${money(b.available)} en ${isNetworkId(b.network) ? NETWORKS[b.network].label : b.network}`,
+              )
+              .join(' · ')}
+          </p>
+        ) : null}
 
         {wallet ? (
           <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
@@ -80,10 +93,13 @@ export function RetirosPanel({
             <li key={w.id} className="flex items-center gap-3 font-mono text-xs text-muted">
               <Badge status={w.status} />
               <span>{money(w.amount)}</span>
+              <span className="text-muted">
+                {isNetworkId(w.network) ? NETWORKS[w.network].label : w.network}
+              </span>
               <span>→ {shortWallet(w.toWallet)}</span>
-              {w.txRef ? (
+              {w.txRef && isNetworkId(w.network) ? (
                 <a
-                  href={txExplorerUrl(w.txRef)}
+                  href={explorerTxUrl(w.network, w.txRef)}
                   target="_blank"
                   rel="noreferrer"
                   className="text-accent hover:underline"

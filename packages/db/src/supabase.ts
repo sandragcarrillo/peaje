@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
   Balance,
+  NetworkBalance,
   NewResource,
   NewRoute,
   NewTenant,
@@ -64,6 +65,8 @@ function paymentFrom(row: Row): Payment {
     amount: String(row.amount),
     receiptRef: row.receipt_ref,
     method: row.method,
+    network: row.network ?? 'tempo',
+    refundTx: row.refund_tx ?? null,
     createdAt: row.created_at,
   }
 }
@@ -76,6 +79,7 @@ function withdrawalFrom(row: Row): Withdrawal {
     toWallet: row.to_wallet,
     txRef: row.tx_ref,
     status: row.status,
+    network: row.network ?? 'tempo',
     createdAt: row.created_at,
   }
 }
@@ -253,8 +257,8 @@ export class SupabaseStore implements Store {
     this.#fail('deleteResource', error)
   }
 
-  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment> {
-    // receipt_ref es único: si el Receipt ya se acreditó, devolvemos el existente.
+  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>): Promise<Payment> {
+    // (network, receipt_ref) es único: si el Receipt ya se acreditó, devolvemos el existente.
     const { data, error } = await this.#db
       .from('payments')
       .upsert(
@@ -266,8 +270,9 @@ export class SupabaseStore implements Store {
           amount: payment.amount,
           receipt_ref: payment.receiptRef,
           method: payment.method,
+          network: payment.network,
         },
-        { onConflict: 'receipt_ref' },
+        { onConflict: 'network,receipt_ref' },
       )
       .select()
       .single()
@@ -281,6 +286,14 @@ export class SupabaseStore implements Store {
       .update({ agent_wallet: wallet })
       .eq('id', paymentId)
     this.#fail('setPaymentWallet', error)
+  }
+
+  async markPaymentRefunded(paymentId: string, txRef: string) {
+    const { error } = await this.#db
+      .from('payments')
+      .update({ refund_tx: txRef })
+      .eq('id', paymentId)
+    this.#fail('markPaymentRefunded', error)
   }
 
   async listPayments(tenantId: string, limit = 50): Promise<Payment[]> {
@@ -310,6 +323,22 @@ export class SupabaseStore implements Store {
     }
   }
 
+  async balanceByNetwork(tenantId: string): Promise<NetworkBalance[]> {
+    const { data, error } = await this.#db
+      .from('tenant_network_balances')
+      .select()
+      .eq('tenant_id', tenantId)
+      .order('network', { ascending: true })
+    this.#fail('balanceByNetwork', error)
+    return ((data ?? []) as Row[]).map((row) => ({
+      network: row.network,
+      revenue: String(row.revenue ?? '0'),
+      withdrawn: String(row.withdrawn ?? '0'),
+      available: String(row.available ?? '0'),
+      requestCount: Number(row.request_count ?? 0),
+    }))
+  }
+
   async dailyRevenue(tenantId: string, days: number) {
     const since = new Date(Date.now() - days * 86_400_000).toISOString()
     const { data, error } = await this.#db
@@ -331,10 +360,15 @@ export class SupabaseStore implements Store {
       .map(([date, b]) => ({ date, amount: b.amount.toFixed(6), count: b.count }))
   }
 
-  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string }) {
+  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }) {
     const { data, error } = await this.#db
       .from('withdrawals')
-      .insert({ tenant_id: input.tenantId, amount: input.amount, to_wallet: input.toWallet })
+      .insert({
+        tenant_id: input.tenantId,
+        amount: input.amount,
+        to_wallet: input.toWallet,
+        network: input.network,
+      })
       .select()
       .single()
     this.#fail('createWithdrawal', error)
