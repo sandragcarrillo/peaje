@@ -1,14 +1,17 @@
+import { getDict } from '@/lib/i18n'
+
 /**
  * Gráfica de revenue diario, server-rendered como SVG puro.
  * Sin librería de charts: son barras, no hace falta.
  */
-export function GraficaRevenue({
+export async function GraficaRevenue({
   datos,
   dias,
 }: {
   datos: { date: string; amount: string; count: number }[]
   dias: number
 }) {
+  const dict = await getDict()
   const porDia = new Map(datos.map((d) => [d.date, d]))
   const hoy = new Date()
   const serie: { fecha: string; label: string; amount: number; count: number }[] = []
@@ -19,7 +22,7 @@ export function GraficaRevenue({
     const row = porDia.get(clave)
     serie.push({
       fecha: clave,
-      label: d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }),
+      label: d.toLocaleDateString(dict.panel.formatoFecha, { day: '2-digit', month: 'short' }),
       amount: row ? Number(row.amount) : 0,
       count: row?.count ?? 0,
     })
@@ -34,17 +37,19 @@ export function GraficaRevenue({
   return (
     <section>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-medium">Últimos {dias} días</h2>
+        <h2 className="text-lg font-medium">{dict.panel.ultimosDias(dias)}</h2>
         <p className="text-xs text-muted">
-          {serie.reduce((a, s) => a + s.count, 0)} pagos · $
-          {serie.reduce((a, s) => a + s.amount, 0).toFixed(2)}
+          {dict.panel.resumenPagos(
+            serie.reduce((a, s) => a + s.count, 0),
+            serie.reduce((a, s) => a + s.amount, 0).toFixed(2),
+          )}
         </p>
       </div>
       <svg
         viewBox={`0 0 ${W} ${H + 18}`}
         className="mt-3 w-full rounded-lg border border-border bg-panel p-2"
         role="img"
-        aria-label={`Revenue de los últimos ${dias} días`}
+        aria-label={dict.panel.graficaAria(dias)}
       >
         {serie.map((s, i) => {
           const h = s.amount === 0 ? 2 : Math.max((s.amount / max) * H, 3)
@@ -59,7 +64,7 @@ export function GraficaRevenue({
                 rx={2}
                 fill={s.amount === 0 ? 'var(--border)' : 'var(--accent)'}
               >
-                <title>{`${s.label}: $${s.amount.toFixed(2)} (${s.count} pagos)`}</title>
+                <title>{dict.panel.graficaBarra(s.label, s.amount.toFixed(2), s.count)}</title>
               </rect>
               {serie.length <= 14 || i % 5 === 0 ? (
                 <text

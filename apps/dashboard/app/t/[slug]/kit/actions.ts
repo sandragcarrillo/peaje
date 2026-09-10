@@ -1,18 +1,20 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { getDict } from '@/lib/i18n'
 import { freshScan, scannableDomain } from '@/lib/ora'
 import { requireTenant } from '@/lib/session'
 
 /** Corre (o re-corre) el scan de Ora sobre el dominio del tenant. ~30 s. */
 export async function correrScore(slug: string): Promise<{ ok: boolean; error?: string }> {
+  const { kit: d } = await getDict()
   const tenant = await requireTenant(slug)
   const domain = scannableDomain(tenant.originUrl)
   if (!domain) {
-    return { ok: false, error: 'Ora solo escanea dominios públicos; tu origin es local.' }
+    return { ok: false, error: d.errorOriginLocal }
   }
   const result = await freshScan(domain)
-  if (!result) return { ok: false, error: 'El scan de Ora falló. Reintenta en un rato.' }
+  if (!result) return { ok: false, error: d.errorScan }
   revalidatePath(`/t/${slug}/kit`)
   return { ok: true }
 }
@@ -44,6 +46,7 @@ async function fetchCorto(url: string): Promise<{ ok: boolean; text: string }> {
  * real; verde solo si el archivo existe Y referencia al gateway de Peaje.
  */
 export async function verificarIntegracion(slug: string): Promise<ChequeoIntegracion[]> {
+  const { kit: d } = await getDict()
   const tenant = await requireTenant(slug)
   const { scannableDomain } = await import('@/lib/ora')
   const domain = scannableDomain(tenant.originUrl)
@@ -51,9 +54,9 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
     return [
       {
         id: 'dominio',
-        label: 'Dominio público',
+        label: d.chequeoDominio,
         ok: false,
-        detalle: 'Tu origin es local: no hay dominio público que verificar.',
+        detalle: d.chequeoDominioDetalle,
       },
     ]
   }
@@ -80,84 +83,84 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
   return [
     {
       id: 'llms',
-      label: 'llms.txt',
+      label: d.chequeoLlms,
       ok: refiere(llms),
       detalle: llms.ok
         ? refiere(llms)
-          ? 'Existe y apunta a tu gateway.'
-          : 'Existe pero no menciona tu gateway: falta el bloque de Peaje.'
-        : 'No hay /llms.txt en tu dominio.',
+          ? d.chequeoLlmsOk
+          : d.chequeoLlmsSinGateway
+        : d.chequeoLlmsFalta,
     },
     {
       id: 'link-discovery',
-      label: 'Link de discovery en el HTML',
+      label: d.chequeoLink,
       ok: home.ok && home.text.includes('payment-discovery'),
       detalle: home.ok
         ? home.text.includes('payment-discovery')
-          ? 'La home tiene el <link rel="payment-discovery">.'
-          : 'La home carga pero no tiene el link de discovery.'
-        : 'No pude leer tu home.',
+          ? d.chequeoLinkOk
+          : d.chequeoLinkFalta
+        : d.chequeoLinkSinHome,
     },
     {
       id: 'json-ld',
-      label: 'JSON-LD',
+      label: d.chequeoJsonLd,
       ok: home.ok && home.text.includes('application/ld+json'),
       detalle:
         home.ok && home.text.includes('application/ld+json')
-          ? 'La home tiene datos estructurados.'
-          : 'La home no tiene el bloque JSON-LD.',
+          ? d.chequeoJsonLdOk
+          : d.chequeoJsonLdFalta,
     },
     {
       id: 'pricing',
-      label: 'pricing.md',
+      label: d.chequeoPricing,
       ok: refiere(pricing),
       detalle: pricing.ok
         ? refiere(pricing)
-          ? 'Existe con tus precios.'
-          : 'Existe pero no es el de Peaje.'
-        : 'No hay /pricing.md.',
+          ? d.chequeoPricingOk
+          : d.chequeoPricingOtro
+        : d.chequeoPricingFalta,
     },
     {
       id: 'mcp-json',
-      label: '.well-known/mcp.json',
+      label: d.chequeoMcp,
       ok: refiere(mcpJson),
-      detalle: refiere(mcpJson) ? 'Anuncia tu MCP pago.' : 'Falta o no apunta a tu MCP.',
+      detalle: refiere(mcpJson) ? d.chequeoMcpOk : d.chequeoMcpFalta,
     },
     {
       id: 'ai-catalog',
-      label: '.well-known/ai-catalog.json',
+      label: d.chequeoAiCatalog,
       ok: refiere(aiCatalog),
-      detalle: refiere(aiCatalog) ? 'Catálogo ARD publicado.' : 'Falta el catálogo ARD.',
+      detalle: refiere(aiCatalog) ? d.chequeoAiCatalogOk : d.chequeoAiCatalogFalta,
     },
     {
       id: 'agent-card',
-      label: '.well-known/agent-card.json',
+      label: d.chequeoAgentCard,
       ok: refiere(agentCard),
-      detalle: refiere(agentCard) ? 'Agent card A2A publicada.' : 'Falta la agent card.',
+      detalle: refiere(agentCard) ? d.chequeoAgentCardOk : d.chequeoAgentCardFalta,
     },
     {
       id: 'api-catalog',
-      label: '.well-known/api-catalog',
+      label: d.chequeoApiCatalog,
       ok: refiere(apiCatalog),
-      detalle: refiere(apiCatalog) ? 'Catálogo RFC 9727 publicado.' : 'Falta el api-catalog.',
+      detalle: refiere(apiCatalog) ? d.chequeoApiCatalogOk : d.chequeoApiCatalogFalta,
     },
     {
       id: 'auth-md',
-      label: 'auth.md',
+      label: d.chequeoAuthMd,
       ok: refiere(authMd),
-      detalle: refiere(authMd) ? 'Walkthrough de pago publicado.' : 'Falta /auth.md.',
+      detalle: refiere(authMd) ? d.chequeoAuthMdOk : d.chequeoAuthMdFalta,
     },
     {
       id: 'agents-md',
-      label: 'agents.md',
+      label: d.chequeoAgentsMd,
       ok: refiere(agentsMd),
-      detalle: refiere(agentsMd) ? 'Guía para agentes publicada.' : 'Falta /agents.md.',
+      detalle: refiere(agentsMd) ? d.chequeoAgentsMdOk : d.chequeoAgentsMdFalta,
     },
     {
       id: 'robots',
-      label: 'robots.txt',
+      label: d.chequeoRobots,
       ok: robots.ok,
-      detalle: robots.ok ? 'Existe (revisa que no bloquee bots).' : 'No hay /robots.txt.',
+      detalle: robots.ok ? d.chequeoRobotsOk : d.chequeoRobotsFalta,
     },
   ]
 }

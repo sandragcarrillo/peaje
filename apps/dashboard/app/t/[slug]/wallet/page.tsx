@@ -1,3 +1,4 @@
+import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { findMerchantWalletId } from '@/lib/privy'
 import { walletBalances } from '@/lib/walletops'
@@ -10,11 +11,11 @@ import { EnviarPanel } from './enviar'
  */
 export default async function Wallet({ params }: PageProps<'/t/[slug]/wallet'>) {
   const { slug } = await params
-  const tenant = await requireTenant(slug)
+  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const address = tenant.payoutWallet as `0x${string}` | null
 
   if (!address) {
-    return <p className="text-sm text-muted">Este negocio no tiene wallet configurada.</p>
+    return <p className="text-sm text-muted">{d.dinero.sinWalletNegocio}</p>
   }
 
   const [balances, walletId] = await Promise.all([
@@ -25,11 +26,9 @@ export default async function Wallet({ params }: PageProps<'/t/[slug]/wallet'>) 
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-medium">Mi wallet</h1>
+        <h1 className="text-2xl font-medium">{d.dinero.miWallet}</h1>
         <p className="mt-2 text-sm text-muted">
-          {walletId
-            ? 'Tu cuenta Peaje. Acá llegan tus retiros; desde acá mandas fondos a donde quieras.'
-            : 'Tu wallet de retiro es externa: los fondos ya llegan a una cuenta que manejas tú.'}
+          {walletId ? d.dinero.walletCustodiada : d.dinero.walletExterna}
         </p>
       </header>
 

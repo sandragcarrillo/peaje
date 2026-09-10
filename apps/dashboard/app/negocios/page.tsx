@@ -1,17 +1,18 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 
 /** Selector de negocios: un usuario puede tener varios tenants. */
 export default async function Negocios() {
-  const tenants = await listMyTenants()
+  const [tenants, d] = await Promise.all([listMyTenants(), getDict()])
   if (tenants.length === 0) redirect('/acceder')
 
   return (
     <div className="mx-auto max-w-md space-y-6 py-8">
       <header>
-        <h1 className="text-2xl font-medium">Tus negocios</h1>
-        <p className="mt-2 text-sm text-muted">Elige a cuál entrar.</p>
+        <h1 className="text-2xl font-medium">{d.acceso.tusNegocios}</h1>
+        <p className="mt-2 text-sm text-muted">{d.acceso.eligeNegocio}</p>
       </header>
       <ul className="space-y-2">
         {tenants.map((t) => (
@@ -29,7 +30,7 @@ export default async function Negocios() {
         ))}
       </ul>
       <Link href="/nuevo" className="inline-block text-sm text-accent hover:underline">
-        + Registrar otro negocio
+        {d.acceso.registrarOtro}
       </Link>
     </div>
   )

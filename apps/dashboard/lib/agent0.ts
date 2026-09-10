@@ -1,4 +1,5 @@
 import 'server-only'
+import { reputationAverage } from '@peaje/shared'
 
 /**
  * Identidad y reputación de agentes vía los Subgraphs de Agent0 (ERC-8004)
@@ -111,7 +112,7 @@ export async function lookupAgentIdentities(wallets: string[]): Promise<Map<stri
     for (const a of r.value.agents) {
       const wallet = a.agentWallet.toLowerCase()
       if (found.has(wallet)) continue // primera identidad encontrada gana
-      const values = a.feedback.map((f) => Number(f.value)).filter(Number.isFinite)
+      const reputacion = reputationAverage(a.feedback.map((f) => f.value))
       found.set(wallet, {
         wallet,
         name: a.registrationFile?.name ?? `Agente #${a.agentId}`,
@@ -122,9 +123,7 @@ export async function lookupAgentIdentities(wallets: string[]): Promise<Map<stri
         skills: a.registrationFile?.oasfSkills ?? [],
         domains: a.registrationFile?.oasfDomains ?? [],
         feedbackCount: Number(a.totalFeedback) || a.feedback.length,
-        feedbackAvg: values.length
-          ? Math.round(values.reduce((s, v) => s + v, 0) / values.length)
-          : null,
+        feedbackAvg: reputacion,
       })
     }
   }

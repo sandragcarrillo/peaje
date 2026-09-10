@@ -5,6 +5,7 @@ import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
+import { useDict } from '@/lib/i18n/client'
 import { estadoRetiro, retirar, type RetiroEstado } from './actions'
 
 export function RetirosPanel({
@@ -20,6 +21,7 @@ export function RetirosPanel({
   wallet: string | null
   historial: Withdrawal[]
 }) {
+  const d = useDict()
   const router = useRouter()
   const [copiado, setCopiado] = useState(false)
   const [enCurso, setEnCurso] = useState<string | null>(null) // red del retiro en curso
@@ -52,7 +54,7 @@ export function RetirosPanel({
       }
       router.refresh()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo procesar el retiro. Reintenta.')
+      setError(e instanceof Error ? e.message : d.dinero.errorRetiro)
     } finally {
       setEnCurso(null)
     }
@@ -61,25 +63,25 @@ export function RetirosPanel({
   return (
     <section>
       <div className="rounded-lg border border-accent/40 bg-accent/5 p-5">
-        <p className="text-xs tracking-wide text-accent uppercase">Saldo disponible</p>
+        <p className="text-xs tracking-wide text-accent uppercase">{d.dinero.saldoDisponible}</p>
         <p className="mt-3 text-3xl font-medium tabular-nums">{money(disponible)}</p>
 
         {wallet ? (
           <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
             <span className="text-xs text-muted">
-              Cuenta: <span className="font-mono">{shortWallet(wallet)}</span>
+              {d.dinero.cuenta}: <span className="font-mono">{shortWallet(wallet)}</span>
             </span>
             <button
               type="button"
               onClick={copiarWallet}
               className="text-xs text-accent hover:underline"
             >
-              {copiado ? 'Copiado' : 'Copiar'}
+              {copiado ? d.dinero.copiado : d.dinero.copiar}
             </button>
           </div>
         ) : (
           <p className="mt-5 border-t border-border pt-4 text-xs text-muted">
-            Configura tu wallet de retiro aquí abajo para poder retirar.
+            {d.dinero.configuraWallet}
           </p>
         )}
 
@@ -89,7 +91,7 @@ export function RetirosPanel({
             disabled
             className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black opacity-40"
           >
-            Retirar
+            {d.dinero.retirar}
           </button>
         ) : (
           <div className="mt-4 space-y-2">
@@ -105,8 +107,8 @@ export function RetirosPanel({
                   className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40"
                 >
                   {enCurso === b.network
-                    ? 'Enviando…'
-                    : `Retirar ${money(b.available)} (${symbol} en ${label})`}
+                    ? d.dinero.enviando
+                    : d.dinero.retirarMonto(money(b.available), symbol, label)}
                 </button>
               )
             })}
@@ -118,10 +120,10 @@ export function RetirosPanel({
             <Badge status={estado.status} />
             <span className="text-muted">
               {estado.status === 'pending'
-                ? 'Transferencia enviada, esperando confirmación on-chain…'
+                ? d.dinero.esperandoConfirmacion
                 : estado.status === 'confirmed'
-                  ? `${money(estado.amount)} enviados a ${shortWallet(estado.toWallet)}`
-                  : 'La transferencia falló. Tu saldo sigue intacto, reintenta.'}
+                  ? d.dinero.enviadosA(money(estado.amount), shortWallet(estado.toWallet))
+                  : d.dinero.transferenciaFallo}
             </span>
             {estado.explorerUrl ? (
               <a
@@ -130,7 +132,7 @@ export function RetirosPanel({
                 rel="noreferrer"
                 className="ml-auto text-xs text-accent hover:underline"
               >
-                ver tx
+                {d.dinero.verTx}
               </a>
             ) : null}
           </div>
@@ -164,7 +166,7 @@ export function RetirosPanel({
                 </a>
               ) : null}
               <span className="ml-auto">
-                {new Date(w.createdAt).toLocaleString('es-CO', {
+                {new Date(w.createdAt).toLocaleString(d.dinero.fechaLocale, {
                   day: '2-digit',
                   month: 'short',
                   hour: '2-digit',
@@ -180,12 +182,17 @@ export function RetirosPanel({
 }
 
 function Badge({ status }: { status: Withdrawal['status'] }) {
+  const d = useDict()
   const styles = {
     pending: 'text-yellow-400 border-yellow-400/40',
     confirmed: 'text-accent border-accent/40',
     failed: 'text-red-400 border-red-400/40',
   } as const
-  const labels = { pending: 'pendiente', confirmed: 'confirmado', failed: 'falló' } as const
+  const labels = {
+    pending: d.dinero.estadoPendiente,
+    confirmed: d.dinero.estadoConfirmado,
+    failed: d.dinero.estadoFallo,
+  } as const
   return (
     <span className={`rounded border px-1.5 py-0.5 text-[10px] uppercase ${styles[status]}`}>
       {labels[status]}

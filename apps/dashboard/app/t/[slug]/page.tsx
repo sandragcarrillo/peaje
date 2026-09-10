@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { gatewayUrl, money, shortWallet } from '@/lib/config'
+import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { cachedScore, prevision, scannableDomain } from '@/lib/ora'
@@ -12,12 +13,13 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   const tenant = await requireTenant(slug)
 
   const domain = scannableDomain(tenant.originUrl)
-  const [balance, payments, porDia, resources, score] = await Promise.all([
+  const [balance, payments, porDia, resources, score, d] = await Promise.all([
     store.balance(tenant.id),
     store.listPayments(tenant.id, 10),
     store.dailyRevenue(tenant.id, 7),
     store.listResources(tenant.id).catch(() => []),
     domain ? cachedScore(domain) : Promise.resolve(null),
+    getDict(),
   ])
 
   const base = `${gatewayUrl}/${tenant.slug}`
@@ -25,22 +27,22 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   const pasos = [
     {
       n: 1,
-      titulo: 'Mira tu score',
-      descripcion: 'Qué tan listo está tu sitio para agentes, y a cuánto llega con Peaje.',
+      titulo: d.panel.paso1Titulo,
+      descripcion: d.panel.paso1Descripcion,
       href: `/t/${tenant.slug}/score`,
       hecho: domain === null || score !== null,
     },
     {
       n: 2,
-      titulo: 'Ponle precio a tus links',
-      descripcion: 'Agrega links o importa tu sitemap. Los agentes pagan por request.',
+      titulo: d.panel.paso2Titulo,
+      descripcion: d.panel.paso2Descripcion,
       href: `/t/${tenant.slug}/rutas`,
       hecho: resources.length > 0,
     },
     {
       n: 3,
-      titulo: 'Haz que te encuentren',
-      descripcion: 'Aplica el kit en tu web y verifica la integración.',
+      titulo: d.panel.paso3Titulo,
+      descripcion: d.panel.paso3Descripcion,
       href: `/t/${tenant.slug}/kit`,
       hecho: kitAplicado,
     },
@@ -49,37 +51,39 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-medium">Dashboard</h1>
+        <h1 className="text-2xl font-medium">{d.panel.dashboardTitulo}</h1>
         <p className="mt-2 text-sm text-muted">
-          Los agentes consumen por <code className="font-mono text-text">{base}</code>
+          {d.panel.consumenPor} <code className="font-mono text-text">{base}</code>
         </p>
       </header>
 
       <SetupChecklist pasos={pasos} />
 
       <div className="grid grid-cols-3 gap-4">
-        <Metric label="Disponible" value={money(balance.available)} destacado />
-        <Metric label="Requests pagados" value={String(balance.requestCount)} />
-        <Metric label="Revenue total" value={money(balance.revenue)} />
+        <Metric label={d.panel.metricaDisponible} value={money(balance.available)} destacado />
+        <Metric label={d.panel.metricaRequests} value={String(balance.requestCount)} />
+        <Metric label={d.panel.metricaRevenue} value={money(balance.revenue)} />
       </div>
 
       <GraficaRevenue datos={porDia} dias={7} />
 
       <section>
-        <h2 className="font-medium">Últimos pagos</h2>
+        <h2 className="font-medium">{d.panel.ultimosPagos}</h2>
         {payments.length === 0 ? (
           <p className="mt-3 text-sm text-muted">
-            Todavía nadie paga.{' '}
+            {d.panel.nadiePaga}{' '}
             {resources.length === 0 ? (
               <>
                 <Link href={`/t/${tenant.slug}/rutas`} className="text-accent underline">
-                  Agrega tu primer link con precio
+                  {d.panel.agregaPrimerLink}
                 </Link>{' '}
-                y pruébalo con <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
+                {d.panel.yPruebaCon}{' '}
+                <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
               </>
             ) : (
               <>
-                Pruébalo con <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
+                {d.panel.pruebaCon}{' '}
+                <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
               </>
             )}
           </p>
@@ -87,19 +91,19 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
           <table className="mt-4 w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="pb-2 font-normal">Hora</th>
-                <th className="pb-2 font-normal">Ruta</th>
-                <th className="pb-2 font-normal">Agente</th>
-                <th className="pb-2 font-normal">Red</th>
-                <th className="pb-2 text-right font-normal">Monto</th>
-                <th className="pb-2 text-right font-normal">Tx</th>
+                <th className="pb-2 font-normal">{d.panel.colHora}</th>
+                <th className="pb-2 font-normal">{d.panel.colRuta}</th>
+                <th className="pb-2 font-normal">{d.panel.colAgente}</th>
+                <th className="pb-2 font-normal">{d.panel.colRed}</th>
+                <th className="pb-2 text-right font-normal">{d.panel.colMonto}</th>
+                <th className="pb-2 text-right font-normal">{d.panel.colTx}</th>
               </tr>
             </thead>
             <tbody className="font-mono text-xs">
               {payments.map((p) => (
                 <tr key={p.id} className="border-t border-border">
                   <td className="py-2 text-muted">
-                    {new Date(p.createdAt).toLocaleTimeString('es-CO', {
+                    {new Date(p.createdAt).toLocaleTimeString(d.panel.formatoFecha, {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -118,7 +122,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
                         rel="noreferrer"
                         className="text-accent hover:underline"
                       >
-                        ver
+                        {d.panel.verTx}
                       </a>
                     ) : null}
                   </td>

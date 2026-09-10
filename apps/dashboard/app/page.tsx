@@ -1,12 +1,14 @@
 import Link from 'next/link'
+import { getDict } from '@/lib/i18n'
 import { currentTenant } from '@/lib/session'
 
-const TICKER_ITEMS = ['Protocolo MPP', 'Pagos vía HTTP 402', 'Sin API key para agentes']
+async function TickerRow() {
+  const d = await getDict()
+  const items = [d.landing.tickerMpp, d.landing.tickerPagos, d.landing.tickerSinApiKey]
 
-function TickerRow() {
   return (
     <div className="flex shrink-0 items-center">
-      {TICKER_ITEMS.map((item) => (
+      {items.map((item) => (
         <span key={item} className="mx-4 flex items-center gap-4">
           {item}
           <span aria-hidden className="text-border">
@@ -19,28 +21,24 @@ function TickerRow() {
 }
 
 export default async function Landing() {
-  const tenant = await currentTenant()
+  const [tenant, d] = await Promise.all([currentTenant(), getDict()])
 
   return (
     <div className="space-y-20 py-8">
       <section className="grid gap-14 lg:grid-cols-[1.05fr_1fr] lg:items-center">
         <div className="max-w-xl">
           <h1 className="text-4xl leading-tight font-medium lg:text-5xl">
-            Los agentes ya están usando tu API.{' '}
-            <span className="text-muted">Todavía no te pagan.</span>
+            {d.landing.heroTitulo}{' '}
+            <span className="text-muted">{d.landing.heroTituloTenue}</span>
           </h1>
-          <p className="mt-5 text-lg text-muted">
-            Peaje es el riel de pagos para agentes de IA. Se suma a tu sitio o tu API sin
-            reemplazar nada: el agente pide, recibe un 402, paga solo y sigue. Cualquier agente
-            que hable el protocolo ya puede pagarte.
-          </p>
+          <p className="mt-5 text-lg text-muted">{d.landing.heroTexto}</p>
           <div className="mt-8 flex items-center gap-6">
             {tenant ? (
               <Link
                 href={`/t/${tenant.slug}`}
                 className="rounded-full bg-text px-5 py-3 text-sm font-medium text-bg"
               >
-                Ir a mi dashboard →
+                {d.landing.ctaDashboard} →
               </Link>
             ) : (
               <>
@@ -48,13 +46,13 @@ export default async function Landing() {
                   href="/nuevo"
                   className="rounded-full bg-text px-5 py-3 text-sm font-medium text-bg"
                 >
-                  Registrar mi negocio
+                  {d.landing.ctaRegistrar}
                 </Link>
                 <Link
                   href="/mercado"
                   className="inline-flex items-center gap-1.5 border-b border-current pb-0.5 text-sm font-medium text-muted hover:text-text"
                 >
-                  Ver el mercado agéntico <span aria-hidden>→</span>
+                  {d.landing.ctaMercado} <span aria-hidden>→</span>
                 </Link>
               </>
             )}
@@ -78,19 +76,9 @@ export default async function Landing() {
           aria-hidden
           className="absolute top-[7px] right-0 left-0 hidden h-px bg-border sm:block"
         />
-        <SequenceStep
-          titulo="Conectas tu sitio"
-          texto="Nombre y la URL de tu web o API. Te damos un gateway y acceso a tu panel. Los agentes pagan solo, sin API key ni tocar tu código."
-        />
-        <SequenceStep
-          titulo="Pones precios"
-          texto="Eliges qué rutas cobran y cuánto. El resto pasa gratis."
-        />
-        <SequenceStep
-          titulo="Cobras y retiras"
-          texto="Cada pago queda en tu panel, con la wallet del agente y la tx. Retiras cuando quieres."
-          last
-        />
+        <SequenceStep titulo={d.landing.paso1Titulo} texto={d.landing.paso1Texto} />
+        <SequenceStep titulo={d.landing.paso2Titulo} texto={d.landing.paso2Texto} />
+        <SequenceStep titulo={d.landing.paso3Titulo} texto={d.landing.paso3Texto} last />
       </section>
     </div>
   )
@@ -119,20 +107,25 @@ function SequenceStep({
   )
 }
 
-const FLOW_STEPS = [
-  { label: 'GET /precio', tone: 'text' as const },
-  { label: '402 Payment Required', tone: 'muted' as const },
-  { label: 'Agente paga con su wallet', tone: 'muted' as const },
-  { label: '200 OK', tone: 'accent' as const },
-]
+const WALLET_DEMO = '0x71…4f2'
+const MONTO_DEMO = '$0.002'
 
-function RequestFlow() {
+async function RequestFlow() {
+  const d = await getDict()
+
+  const flowSteps = [
+    { label: 'GET /precio', tone: 'text' as const },
+    { label: '402 Payment Required', tone: 'muted' as const },
+    { label: d.landing.flujoPagaConWallet, tone: 'muted' as const },
+    { label: '200 OK', tone: 'accent' as const },
+  ]
+
   return (
     <div className="relative isolate overflow-hidden rounded-2xl border border-border bg-panel p-8">
       <div className="dot-grid pointer-events-none absolute inset-0 text-border opacity-60" />
 
       <div className="relative flex flex-col font-mono text-xs">
-        {FLOW_STEPS.map((step, i) => (
+        {flowSteps.map((step, i) => (
           <div key={step.label}>
             {i > 0 && <div aria-hidden className="ml-[5px] h-5 w-px bg-border" />}
             <div className="flex items-center gap-3">
@@ -166,8 +159,8 @@ function RequestFlow() {
           $
         </span>
         <div className="font-mono text-xs leading-tight">
-          <p className="text-text">0x71…4f2 pagó $0.002</p>
-          <p className="mt-0.5 text-muted">tx confirmada</p>
+          <p className="text-text">{d.landing.flujoPago(WALLET_DEMO, MONTO_DEMO)}</p>
+          <p className="mt-0.5 text-muted">{d.landing.flujoTxConfirmada}</p>
         </div>
       </div>
     </div>

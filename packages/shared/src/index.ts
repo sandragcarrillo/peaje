@@ -123,6 +123,72 @@ export function formatAmount(amount: number | string): string {
   return fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed
 }
 
+// ---- reputación ERC-8004 ----
+
+/**
+ * Promedio de feedback del registro ERC-8004.
+ *
+ * La spec define un score de 0 a 100, pero hay agentes publicando valores
+ * fuera de rango (se ven hasta 924). Descartamos los malformados en vez de
+ * recortarlos: recortar premiaría al que infla. Si a un agente no le queda
+ * ningún valor válido, se trata como "sin reputación".
+ */
+export function reputationAverage(values: (string | number)[]): number | null {
+  const validos = values
+    .map((v) => (typeof v === 'number' ? v : Number(v)))
+    .filter((v) => Number.isFinite(v) && v >= 0 && v <= 100)
+  if (validos.length === 0) return null
+  return Math.round(validos.reduce((s, v) => s + v, 0) / validos.length)
+}
+
+// ---- frecuencias de agentes compradores ----
+
+export type AgentFrequencyId = 'once' | 'hourly' | 'daily' | 'biweekly' | 'monthly'
+
+export type UiLocale = 'en' | 'es'
+
+export const AGENT_FREQUENCIES: {
+  id: AgentFrequencyId
+  labels: Record<UiLocale, string>
+  /** @deprecated Usar `labels[locale]`. Se mantiene por compatibilidad. */
+  label: string
+}[] = [
+  { id: 'once', labels: { en: 'Once', es: 'Una vez' }, label: 'Una vez' },
+  { id: 'hourly', labels: { en: 'Hourly', es: 'Cada hora' }, label: 'Cada hora' },
+  { id: 'daily', labels: { en: 'Daily', es: 'Diaria' }, label: 'Diaria' },
+  { id: 'biweekly', labels: { en: 'Every 15 days', es: 'Cada 15 días' }, label: 'Cada 15 días' },
+  { id: 'monthly', labels: { en: 'Monthly', es: 'Mensual' }, label: 'Mensual' },
+]
+
+export function frequencyLabel(id: string, locale: UiLocale = 'en'): string {
+  return AGENT_FREQUENCIES.find((f) => f.id === id)?.labels[locale] ?? id
+}
+
+/**
+ * Próxima corrida según la frecuencia. `null` para 'once': el agente corre una
+ * sola vez y queda 'done'. Mensual usa el mismo día del mes siguiente (el
+ * clamp del Date resuelve el 31 en meses cortos).
+ */
+export function nextRunAt(frequency: AgentFrequencyId, from = new Date()): Date | null {
+  const d = new Date(from)
+  switch (frequency) {
+    case 'once':
+      return null
+    case 'hourly':
+      d.setHours(d.getHours() + 1)
+      return d
+    case 'daily':
+      d.setDate(d.getDate() + 1)
+      return d
+    case 'biweekly':
+      d.setDate(d.getDate() + 15)
+      return d
+    case 'monthly':
+      d.setMonth(d.getMonth() + 1)
+      return d
+  }
+}
+
 // ---- credenciales de tenant ----
 
 const KEY_PREFIX = 'peaje_live_'

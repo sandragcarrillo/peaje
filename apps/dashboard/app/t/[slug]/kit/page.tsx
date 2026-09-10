@@ -1,19 +1,25 @@
 import Link from 'next/link'
 import { gatewayUrl } from '@/lib/config'
+import { getDict, type Dict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
 import { ToggleBlock, VerificadorIntegracion } from './partes'
+import { BloqueProxy } from './proxy'
+import { generarProxy } from '@/lib/proxy-kit'
+
+type Kit = Dict['kit']
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
+  const { kit: d } = await getDict()
   const tenant = await tenantIfMine(slug)
   if (!tenant) {
     return (
       <p className="text-sm text-muted">
-        Necesitás iniciar sesión.{' '}
+        {d.necesitasSesion}{' '}
         <Link href="/acceder" className="text-accent underline">
-          Entrar
+          {d.entrar}
         </Link>
       </p>
     )
@@ -39,34 +45,36 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   )
 
   const bloques = construirBloques({
+    d,
     tenant: { name: tenant.name, slug: tenant.slug },
     base,
     routes,
     tieneLlms,
     tieneJsonLd,
-    desdeGateway: desdeGateway.filter((d): d is { path: string; contenido: string } => d.contenido !== null),
+    desdeGateway: desdeGateway.filter(
+      (g): g is { path: string; contenido: string } => g.contenido !== null,
+    ),
   })
 
   return (
     <div className="max-w-3xl space-y-8">
       <header>
-        <h1 className="text-2xl font-medium">Haz que los agentes puedan encontrarte</h1>
+        <h1 className="text-2xl font-medium">{d.titulo}</h1>
         <p className="mt-2 text-sm text-muted">
-          Los bloques exactos para <strong>{originHost}</strong>, en el orden que más score suma.
-          Aplícalos por partes, o todo de una con el prompt.
+          {d.subtituloInicio}
+          <strong>{originHost}</strong>
+          {d.subtituloFin}
         </p>
       </header>
 
       <VerificadorIntegracion slug={tenant.slug} />
 
       <section className="rounded-lg border border-border bg-panel p-4">
-        <h2 className="font-medium">Ya activo, sin que hagas nada</h2>
-        <p className="mt-1 text-xs text-muted">
-          La capa Payments para Agentes (checks de MPP y x402) ya está cubierta.
-        </p>
+        <h2 className="font-medium">{d.yaActivoTitulo}</h2>
+        <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
         <ul className="mt-3 grid grid-cols-3 gap-3 text-sm">
           <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">Discovery</p>
+            <p className="text-xs uppercase tracking-wide text-muted">{d.yaActivoDiscovery}</p>
             <a
               href={`${base}/openapi.json`}
               target="_blank"
@@ -94,7 +102,14 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         </ul>
       </section>
 
-      <PromptTodoDeUna bloques={bloques} base={base} originHost={originHost} domain={domain} />
+      <BloqueProxy base={base} />
+
+      <div className="space-y-1">
+        <h2 className="font-medium">{d.proxyManual}</h2>
+        <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
+      </div>
+
+      <PromptTodoDeUna d={d} bloques={bloques} base={base} originHost={originHost} domain={domain} />
 
       <div className="space-y-3">
         {bloques.map((b) => (
@@ -104,9 +119,11 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
 
       <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm">
         <p>
-          ¿Ya aplicaste el kit en tu web? Usa "Verificar integración" arriba, y después{' '}
+          {d.verificaInicio}
+          {d.verificar}
+          {d.verificaFin}
           <Link href={`/t/${tenant.slug}/score`} className="text-accent underline">
-            vuelve a correr el score →
+            {d.verificaLink}
           </Link>
         </p>
       </div>
@@ -119,6 +136,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
 type Bloque = { titulo: string; detalle: string; contenido: string }
 
 function construirBloques({
+  d,
   tenant,
   base,
   routes,
@@ -126,6 +144,7 @@ function construirBloques({
   tieneJsonLd,
   desdeGateway,
 }: {
+  d: Kit
   tenant: { name: string; slug: string }
   base: string
   routes: { method: string; pathPattern: string; priceUsd: string; description: string | null }[]
@@ -193,76 +212,88 @@ Allow: /
 
   return [
     {
-      titulo: '1 · llms.txt',
-      detalle: tieneLlms
-        ? 'Ya tienes llms.txt: agrega este bloque al final del que existe.'
-        : 'No tienes llms.txt. Crea el archivo /llms.txt en la raíz de tu dominio con esto.',
+      titulo: d.bloqueLlms,
+      detalle: tieneLlms ? d.bloqueLlmsExiste : d.bloqueLlmsFalta,
       contenido: tieneLlms ? llmsBloque : llmsCompleto,
     },
     {
-      titulo: '2 · Link de discovery en tu HTML',
-      detalle: 'En el <head> de tu página principal.',
+      titulo: d.bloqueLink,
+      detalle: d.bloqueLinkDetalle,
       contenido: `<link rel="payment-discovery" href="${base}/openapi.json">`,
     },
     {
-      titulo: '3 · JSON-LD con tu oferta',
-      detalle: tieneJsonLd
-        ? 'Ya tienes JSON-LD: suma este bloque WebAPI junto al que existe.'
-        : 'No tienes datos estructurados. Pega esto en el <head> de tu home.',
+      titulo: d.bloqueJsonLd,
+      detalle: tieneJsonLd ? d.bloqueJsonLdExiste : d.bloqueJsonLdFalta,
       contenido: jsonLd,
     },
     {
-      titulo: '4 · pricing.md',
-      detalle: 'Precios en un archivo que los agentes leen directo. Sirve /pricing.md en tu dominio.',
+      titulo: d.bloquePricing,
+      detalle: d.bloquePricingDetalle,
       contenido: pricingMd,
     },
     {
-      titulo: '5 · .well-known/mcp.json',
-      detalle: 'Anuncia tu MCP pago donde los clientes MCP lo buscan.',
+      titulo: d.bloqueMcp,
+      detalle: d.bloqueMcpDetalle,
       contenido: wellKnownMcp,
     },
     {
-      titulo: '6 · robots.txt que no espanta agentes',
-      detalle: 'Si tu robots.txt bloquea bots, los agentes no llegan ni a ver el 402.',
+      titulo: d.bloqueRobots,
+      detalle: d.bloqueRobotsDetalle,
       contenido: robots,
     },
-    ...desdeGateway.map((d, i) => ({
-      titulo: `${7 + i} · ${d.path}`,
-      detalle: `Sube este archivo a tu dominio en /${d.path}. Se genera solo desde tus rutas; cuando cambies precios, vuelve al kit y copia la versión nueva.`,
-      contenido: d.contenido,
+    ...desdeGateway.map((g, i) => ({
+      titulo: `${7 + i} · ${g.path}`,
+      detalle: d.bloqueGatewayDetalle(g.path),
+      contenido: g.contenido,
     })),
   ]
 }
 
 function PromptTodoDeUna({
+  d,
   bloques,
   base,
   originHost,
   domain,
 }: {
+  d: Kit
   bloques: Bloque[]
   base: string
   originHost: string
   domain: string | null
 }) {
-  const prompt = `Haz mi sitio (${originHost}) agent-ready. Mi API ya cobra por request a agentes vía MPP con Peaje; el gateway es ${base}.
+  // El prompt sigue el idioma de la UI: sus secciones son los títulos y
+  // detalles traducidos de los bloques, así que dejar el marco en otro idioma
+  // lo dejaría a medias.
+  const proxy = generarProxy('next', base, {
+    titulo: d.proxyComentarioTitulo,
+    sub: d.proxyComentarioSub,
+    rutaPaga: d.proxyComentarioRutaPaga,
+  })
 
-Aplica estos cambios en el repo del sitio:
+  const prompt = `${d.promptIntro(originHost, base)}
+
+## ${d.promptProxyTitulo}
+${d.promptProxyDetalle}
+
+\`\`\`ts
+${proxy}
+\`\`\`
+
+${d.promptProxyNota}
 
 ${bloques.map((b) => `## ${b.titulo}\n${b.detalle}\n\n\`\`\`\n${b.contenido}\n\`\`\``).join('\n\n')}
 
-Al terminar, verifica:
-1. npx mppx@latest validate ${base}  (el flujo de pago, debe pasar todo)
-2. ${domain ? `npx @ora-ai/ax@0.4 audit ${domain}  (el score de agent-readiness, compara contra el anterior)` : 'cuando el sitio tenga dominio público: npx @ora-ai/ax@0.4 audit <dominio>'}
+${d.promptVerifica(base)}
+${domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio}
 
-Referencia completa del estándar de auditoría: https://ora.ai/skill.md`
+${d.promptReferencia}`
 
   return (
     <ToggleBlock
-      titulo="Todo de una · prompt para tu coding agent"
-      detalle="Pégalo en Claude Code, Cursor o el agente que uses sobre el repo de tu sitio: aplica todos los bloques, valida el flujo de pago y re-corre el score."
+      titulo={d.promptTitulo}
+      detalle={d.promptDetalle}
       contenido={prompt}
-      abierto
     />
   )
 }

@@ -3,6 +3,7 @@
 import { isNetworkId, explorerTxUrl } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
 import { getWithdrawal, requestWithdrawal } from '@/lib/gateway'
+import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { sendFromMerchantWallet } from '@/lib/walletops'
@@ -14,9 +15,10 @@ export async function crearRuta(slug: string, formData: FormData) {
   const method = String(formData.get('method') ?? 'GET').toUpperCase()
   const description = String(formData.get('description') ?? '').trim()
 
-  if (!pathPattern.startsWith('/')) throw new Error('La ruta tiene que empezar con /')
+  const d = await getDict()
+  if (!pathPattern.startsWith('/')) throw new Error(d.panel.errorRutaSlash)
   const price = Number(priceUsd)
-  if (!Number.isFinite(price) || price <= 0) throw new Error('El precio tiene que ser mayor a 0')
+  if (!Number.isFinite(price) || price <= 0) throw new Error(d.panel.errorPrecioMayorCero)
 
   await store.createRoute({
     tenantId: tenant.id,
@@ -37,7 +39,9 @@ export async function borrarRuta(slug: string, routeId: string) {
 export async function guardarWallet(slug: string, formData: FormData) {
   const tenant = await requireTenant(slug)
   const wallet = String(formData.get('wallet') ?? '').trim()
-  if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) throw new Error('Esa no parece una wallet válida')
+  if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
+    throw new Error((await getDict()).panel.errorWalletInvalida)
+  }
   await store.setPayoutWallet(tenant.id, wallet)
   revalidatePath(`/t/${slug}`)
 }
@@ -84,18 +88,18 @@ export type EnvioResultado =
 
 /** Envía fondos desde la wallet Peaje (Privy) del merchant a una address externa. */
 export async function enviarFondos(slug: string, formData: FormData): Promise<EnvioResultado> {
-  const tenant = await requireTenant(slug)
-  if (!tenant.payoutWallet) return { ok: false, error: 'Este negocio no tiene wallet.' }
+  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
+  if (!tenant.payoutWallet) return { ok: false, error: d.panel.errorNegocioSinWallet }
 
   const to = String(formData.get('to') ?? '').trim()
   const network = String(formData.get('network') ?? '').trim()
   const amount = Number(String(formData.get('amount') ?? '').replace(',', '.').trim())
 
-  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) return { ok: false, error: 'La address de destino no es válida.' }
-  if (!isNetworkId(network)) return { ok: false, error: 'Red inválida.' }
-  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: 'Monto inválido.' }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) return { ok: false, error: d.panel.errorDestinoInvalido }
+  if (!isNetworkId(network)) return { ok: false, error: d.panel.errorRedInvalida }
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: d.panel.errorMontoInvalido }
   if (to.toLowerCase() === tenant.payoutWallet.toLowerCase()) {
-    return { ok: false, error: 'Ese es el destino de tu propia wallet.' }
+    return { ok: false, error: d.panel.errorMismoDestino }
   }
 
   try {
@@ -112,9 +116,7 @@ export async function enviarFondos(slug: string, formData: FormData): Promise<En
     const msg = error instanceof Error ? error.message : ''
     return {
       ok: false,
-      error: msg.includes('custodia')
-        ? msg
-        : 'No se pudo enviar. Revisa el saldo (el gas sale del mismo token) y reintenta.',
+      error: msg.includes('custodia') ? msg : d.panel.errorEnvio,
     }
   }
 }
@@ -175,15 +177,16 @@ export async function crearLink(slug: string, formData: FormData) {
   const title = String(formData.get('title') ?? '').trim()
   const rawPrecio = String(formData.get('priceUsd') ?? '').replace(',', '.').trim()
   const priceUsd = rawPrecio === '' ? 0 : Number(rawPrecio)
+  const d = await getDict()
 
   let url: URL
   try {
     url = new URL(rawUrl)
   } catch {
-    throw new Error('La URL no es válida. Incluye https://')
+    throw new Error(d.panel.errorUrlInvalida)
   }
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Solo http(s)')
-  if (!Number.isFinite(priceUsd) || priceUsd < 0) throw new Error('Precio inválido (0 = gratis)')
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error(d.panel.errorSoloHttp)
+  if (!Number.isFinite(priceUsd) || priceUsd < 0) throw new Error(d.panel.errorPrecioInvalido)
 
   await store.createResources([
     {
@@ -211,16 +214,17 @@ export type UrlImportable = { url: string; slug: string }
  */
 export async function leerSitemap(slug: string, rawUrl: string): Promise<UrlImportable[]> {
   await requireTenant(slug)
+  const d = await getDict()
   let target: URL
   try {
     target = new URL(rawUrl.includes('://') ? rawUrl : `https://${rawUrl}`)
   } catch {
-    throw new Error('URL inválida')
+    throw new Error(d.panel.errorUrlSitemapInvalida)
   }
   if (!target.pathname.endsWith('.xml')) target = new URL('/sitemap.xml', target.origin)
 
   const res = await fetch(target, { cache: 'no-store', signal: AbortSignal.timeout(10_000) })
-  if (!res.ok) throw new Error(`No pude leer ${target} (${res.status})`)
+  if (!res.ok) throw new Error(d.panel.errorSitemapIlegible(String(target), res.status))
   const xml = await res.text()
 
   const locs = [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)].map((m) => m[1]!)
@@ -247,7 +251,7 @@ export async function leerSitemap(slug: string, rawUrl: string): Promise<UrlImpo
       // loc inválido: se ignora
     }
   }
-  if (items.length === 0) throw new Error('El sitemap no tiene URLs legibles')
+  if (items.length === 0) throw new Error(d.panel.errorSitemapVacio)
   return items
 }
 
@@ -256,8 +260,8 @@ export async function importarLinks(
   items: { url: string; slug: string }[],
   priceUsd: number,
 ) {
-  const tenant = await requireTenant(slug)
-  if (!Number.isFinite(priceUsd) || priceUsd < 0) throw new Error('Precio inválido (0 = gratis)')
+  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
+  if (!Number.isFinite(priceUsd) || priceUsd < 0) throw new Error(d.panel.errorPrecioInvalido)
   const created = await store.createResources(
     items.slice(0, 100).map((i) => ({
       tenantId: tenant.id,

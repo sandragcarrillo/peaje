@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDict } from '@/lib/i18n/client'
 import type { ChequeoIntegracion } from './actions'
 
 /** Bloque colapsable del kit: título + detalle visibles, contenido bajo toggle. */
@@ -15,6 +16,7 @@ export function ToggleBlock({
   contenido: string
   abierto?: boolean
 }) {
+  const { kit: d } = useDict()
   const [copiado, setCopiado] = useState(false)
   return (
     <details
@@ -36,7 +38,7 @@ export function ToggleBlock({
             }}
             className="shrink-0 text-xs text-accent hover:underline"
           >
-            {copiado ? 'copiado ✓' : 'copiar'}
+            {copiado ? d.copiado : d.copiar}
           </button>
         </div>
         <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-bg p-3 font-mono text-xs leading-relaxed">
@@ -48,6 +50,7 @@ export function ToggleBlock({
 }
 
 export function BotonScore({ slug, label }: { slug: string; label: string }) {
+  const { kit: d } = useDict()
   const [estado, setEstado] = useState<'idle' | 'corriendo' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   return (
@@ -61,14 +64,14 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
           const result = await correrScore(slug)
           if (!result.ok) {
             setEstado('error')
-            setError(result.error ?? 'Falló el scan')
+            setError(result.error ?? d.scanFallo)
           } else {
             setEstado('idle')
           }
         }}
         className="shrink-0 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-black disabled:opacity-50"
       >
-        {estado === 'corriendo' ? 'Escaneando (~30 s)…' : label}
+        {estado === 'corriendo' ? d.escaneando : label}
       </button>
       {error ? <p className="text-xs text-red-400">{error}</p> : null}
     </div>
@@ -77,6 +80,7 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
 
 /** "Ya lo integré" → Peaje verifica bloque por bloque contra el dominio real. */
 export function VerificadorIntegracion({ slug }: { slug: string }) {
+  const { kit: d } = useDict()
   const [resultados, setResultados] = useState<ChequeoIntegracion[] | null>(null)
   const [corriendo, setCorriendo] = useState(false)
 
@@ -86,10 +90,8 @@ export function VerificadorIntegracion({ slug }: { slug: string }) {
     <section className="rounded-lg border border-accent/40 bg-accent/5 p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="font-medium">¿Ya lo integraste?</h2>
-          <p className="mt-1 text-xs text-muted">
-            Verificamos tu dominio bloque por bloque: qué está publicado y qué falta.
-          </p>
+          <h2 className="font-medium">{d.verificadorTitulo}</h2>
+          <p className="mt-1 text-xs text-muted">{d.verificadorNota}</p>
         </div>
         <button
           disabled={corriendo}
@@ -104,15 +106,13 @@ export function VerificadorIntegracion({ slug }: { slug: string }) {
           }}
           className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
         >
-          {corriendo ? 'Verificando…' : 'Verificar integración'}
+          {corriendo ? d.verificando : d.verificar}
         </button>
       </div>
 
       {resultados ? (
         <div className="mt-4">
-          <p className="text-xs text-muted">
-            {ok} de {resultados.length} bloques publicados
-          </p>
+          <p className="text-xs text-muted">{d.publicados(ok, resultados.length)}</p>
           <ul className="mt-2 space-y-1.5">
             {resultados.map((r) => (
               <li key={r.id} className="flex items-center gap-2 text-sm">

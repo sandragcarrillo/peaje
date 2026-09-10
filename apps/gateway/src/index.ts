@@ -3,6 +3,9 @@ import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import { NETWORK_IDS } from '@peaje/shared'
 import { Hono } from 'hono'
 import { generate } from 'mppx/discovery'
+import { agentCard } from './agents/erc8004.js'
+import { agentsRouter } from './agents/router.js'
+import { iniciarScheduler } from './agents/scheduler.js'
 import { usdcStatus } from './chainlink.js'
 import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
@@ -34,7 +37,7 @@ app.get('/health', async (c) => {
 app.get('/:slug/openapi.json', async (c) => {
   const slug = c.req.param('slug')
   const tenant = await store.getTenantBySlug(slug)
-  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
 
   // El discovery de pagos solo lista lo que cobra; lo gratis va en llms.txt.
   // La forma `handler` toma la metadata compuesta de la instancia MPP: emite
@@ -60,6 +63,7 @@ app.get('/:slug/openapi.json', async (c) => {
 // El ledger interno vive dentro del router de withdrawals: comparte su
 // middleware de auth (antes estaba acá afuera y quedaba expuesto sin token).
 app.route('/_internal', withdrawals)
+app.route('/_internal', agentsRouter)
 
 /**
  * Link headers (RFC 8288) en todas las respuestas de tenant: los agentes
@@ -80,7 +84,10 @@ const WELL_KNOWN: Record<string, { builder: (ctx: { tenant: Parameters<typeof wk
   'auth.md': { builder: wk.authMd, contentType: 'text/markdown; charset=utf-8' },
   'agents.md': { builder: wk.agentsMd, contentType: 'text/markdown; charset=utf-8' },
   'pricing.md': { builder: wk.pricingMd, contentType: 'text/markdown; charset=utf-8' },
-  '.well-known/ai-catalog.json': { builder: wk.aiCatalog, contentType: 'application/json' },
+  // ard.json es el path canónico de ARD v0.91; ai-catalog.json queda como
+  // alias legacy, que la spec mantiene como fuente equivalente.
+  '.well-known/ard.json': { builder: wk.aiCatalog, contentType: 'application/ai-catalog+json' },
+  '.well-known/ai-catalog.json': { builder: wk.aiCatalog, contentType: 'application/ai-catalog+json' },
   '.well-known/agent-card.json': { builder: wk.agentCard, contentType: 'application/json' },
   '.well-known/api-catalog': { builder: wk.apiCatalog, contentType: 'application/linkset+json' },
   '.well-known/mcp/server-card.json': { builder: wk.mcpServerCard, contentType: 'application/json' },
@@ -109,7 +116,7 @@ async function sellableRoutes(tenantId: string) {
 for (const [path, def] of Object.entries(WELL_KNOWN)) {
   app.get(`/:slug/${path}`, async (c) => {
     const tenant = await store.getTenantBySlug(c.req.param('slug'))
-    if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+    if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
     const routes = await sellableRoutes(tenant.id)
     const base = `${env.publicUrl}/${tenant.slug}`
     const body = def.builder({ tenant, routes, base })
@@ -126,12 +133,19 @@ for (const [path, def] of Object.entries(WELL_KNOWN)) {
  */
 app.get('/:slug/llms.txt', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.text('Tenant no encontrado', 404)
+  if (!tenant) return c.text('Tenant not found', 404)
   const routes = await sellableRoutes(tenant.id)
   const base = `${env.publicUrl}/${tenant.slug}`
-  return c.text(wk.llmsTxt({ tenant, routes, base }), 200, {
-    'content-type': 'text/markdown; charset=utf-8',
-  })
+
+  // Si el negocio ya tenía su propio llms.txt, lo respetamos y le pegamos la
+  // sección de pagos debajo. Reemplazarlo perdía su contenido, que es
+  // justamente lo que un agente necesita para saber cuándo usarlo.
+  const propio = await wk.llmsDelOrigen(tenant.originUrl)
+  const cuerpo = propio
+    ? `${propio}\n\n${wk.seccionPagos({ tenant, routes, base })}`
+    : wk.llmsTxt({ tenant, routes, base })
+
+  return c.text(cuerpo, 200, { 'content-type': 'text/markdown; charset=utf-8' })
 })
 /**
  * Links con precio: /{slug}/r/{resource}. La URL destino es absoluta (no
@@ -140,13 +154,13 @@ app.get('/:slug/llms.txt', async (c) => {
  */
 app.get('/:slug/r/:rslug', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
 
   const resource = await store.getResource(tenant.id, c.req.param('rslug'))
   if (!resource) {
     const disponibles = (await store.listResources(tenant.id)).map((r) => r.slug)
     return c.json(
-      { error: 'Recurso no encontrado', hint: 'Revisa el discovery del tenant.', disponibles },
+      { error: 'Resource not found', hint: 'Check the tenant discovery doc.', available: disponibles },
       404,
     )
   }
@@ -176,8 +190,8 @@ app.get('/:slug/r/:rslug', async (c) => {
     originFallo = true
     respuesta = c.json(
       {
-        error: 'No pudimos traer el recurso ya pagado.',
-        hint: 'El pago se devuelve automáticamente a tu wallet (mira el header Payment-Refund). Si no llega, guarda el receipt y contacta a soporte.',
+        error: 'We could not fetch the resource you already paid for.',
+        hint: 'The payment is refunded to your wallet automatically (see the Payment-Refund header). If it does not arrive, keep the receipt and contact support.',
       },
       502,
     )
@@ -208,13 +222,26 @@ app.get('/:slug/r/:rslug', async (c) => {
 })
 
 /**
+ * Agent card de un agente comprador (ERC-8004). Es el `agentURI` del registro:
+ * pública a propósito, la leen el registro y cualquier agente que quiera saber
+ * quién es el que le está comprando.
+ */
+app.get('/:slug/agents/:id/card.json', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
+  const agent = await store.getAgent(c.req.param('id'))
+  if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
+  return c.json(agentCard(tenant, agent))
+})
+
+/**
  * MCP por tenant: las rutas con precio del tenant expuestas como tools pagas
  * sobre Streamable HTTP. Un agente MCP las descubre, paga por JSON-RPC y
  * recibe el recurso, sin conocer la API HTTP.
  */
 app.post('/:slug/mcp', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
   const body = await c.req.json().catch(() => undefined)
   await handleMcpRequest(tenant, c.env.incoming, c.env.outgoing, body)
   return RESPONSE_ALREADY_SENT
@@ -233,8 +260,8 @@ app.all('/:slug/*', async (c) => {
   if (!tenant) {
     return c.json(
       {
-        error: `Tenant "${slug}" no encontrado`,
-        hint: 'El primer segmento del path es el slug del negocio. Revisa el gateway URL en tu discovery.',
+        error: `Tenant "${slug}" not found`,
+        hint: 'The first path segment is the business slug. Check the gateway URL in your discovery doc.',
       },
       404,
     )
@@ -266,8 +293,8 @@ app.all('/:slug/*', async (c) => {
     originFallo = true
     upstream = c.json(
       {
-        error: 'El origin del negocio no respondió a esta request ya pagada.',
-        hint: 'El pago se devuelve automáticamente a tu wallet (mira el header Payment-Refund). Si no llega, guarda el receipt y contacta a soporte.',
+        error: 'The business origin did not respond to this already-paid request.',
+        hint: 'The payment is refunded to your wallet automatically (see the Payment-Refund header). If it does not arrive, keep the receipt and contact support.',
       },
       502,
     )
@@ -298,4 +325,5 @@ app.all('/:slug/*', async (c) => {
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[gateway] escuchando en http://localhost:${info.port}`)
   console.log(`[gateway] treasury ${env.treasuryAddress} · currency ${env.currency}`)
+  iniciarScheduler()
 })

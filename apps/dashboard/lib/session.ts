@@ -82,6 +82,6 @@ export async function tenantIfMine(slug: string): Promise<Tenant | null> {
 /** Igual que tenantIfMine pero lanza si no corresponde. Para server actions. */
 export async function requireTenant(slug: string): Promise<Tenant> {
   const tenant = await tenantIfMine(slug)
-  if (!tenant) throw new Error('Sesión inválida para este negocio. Entra con tu email.')
+  if (!tenant) throw new Error('This session does not have access to that business. Sign in with your email.')
   return tenant
 }

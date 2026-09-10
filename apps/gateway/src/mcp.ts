@@ -50,8 +50,8 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
     {
       name: `${tenant.slug}-peaje`,
       version: '1.0.0',
-      title: `${tenant.name} · tools pagas`,
-      description: `Tools de ${tenant.name} con pago por llamada vía MPP. Sin API keys: cada tool cobra el precio que anuncia y devuelve un receipt.`,
+      title: `${tenant.name} · paid tools`,
+      description: `Tools from ${tenant.name}, paid per call via MPP. No API keys: each tool charges the price it advertises and returns a receipt.`,
     },
     { capabilities: { tools: {}, resources: {} } },
   )
@@ -60,7 +60,7 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
   server.registerResource(
     'pricing',
     `${base}/pricing.md`,
-    { description: `Precios por endpoint de ${tenant.name}`, mimeType: 'text/markdown' },
+    { description: `Per-endpoint pricing for ${tenant.name}`, mimeType: 'text/markdown' },
     async () => ({
       contents: [
         { uri: `${base}/pricing.md`, mimeType: 'text/markdown', text: pricingMd({ tenant, routes, base }) },
@@ -70,7 +70,7 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
   server.registerResource(
     'guia',
     `${base}/llms.txt`,
-    { description: `Guía de uso de ${tenant.name} para agentes`, mimeType: 'text/markdown' },
+    { description: `How to use ${tenant.name} as an agent`, mimeType: 'text/markdown' },
     async () => ({
       contents: [
         { uri: `${base}/llms.txt`, mimeType: 'text/markdown', text: llmsTxt({ tenant, routes, base }) },
@@ -81,16 +81,16 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
   for (const route of routes) {
     const params = pathParams(route)
     const shape: Record<string, z.ZodType> = {}
-    for (const p of params) shape[p] = z.string().describe(`Segmento :${p} de la ruta`)
+    for (const p of params) shape[p] = z.string().describe(`Path segment :${p}`)
     shape.query = z
       .record(z.string(), z.string())
       .optional()
-      .describe('Query params opcionales para el endpoint')
+      .describe('Optional query params for the endpoint')
 
     server.registerTool(
       toolName(route),
       {
-        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Cuesta $${Number(route.priceUsd)} por llamada (MPP; paga en Tempo con pathUSD o en Arc con USDC).`,
+        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Costs $${Number(route.priceUsd)} per call (MPP; pay in pathUSD on Tempo or USDC on Arc).`,
         inputSchema: shape,
         annotations: {
           title: route.description ?? `${route.method} ${route.pathPattern}`,
@@ -125,8 +125,8 @@ function buildServer(tenant: Tenant, routes: Route[], base: string): McpServer {
           console.error('[mcp] origin no respondió', { tenant: tenant.slug, tool: toolName(route), err })
           originFallo = true
           body = JSON.stringify({
-            error: 'El origin del negocio no respondió a esta tool call ya pagada.',
-            hint: 'El pago se devuelve automáticamente a tu wallet on-chain. Si no llega, guarda la referencia del receipt y contacta a soporte.',
+            error: 'The business origin did not respond to this already-paid tool call.',
+            hint: 'The payment is refunded to your wallet on-chain automatically. If it does not arrive, keep the receipt reference and contact support.',
           })
         }
 

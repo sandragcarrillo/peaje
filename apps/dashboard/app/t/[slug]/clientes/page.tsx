@@ -1,6 +1,7 @@
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { lookupAgentIdentities, skillLabel, type AgentIdentity } from '@/lib/agent0'
 import { money, shortWallet } from '@/lib/config'
+import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 
@@ -23,7 +24,7 @@ type Cliente = {
 export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes'>) {
   const { slug } = await params
   const tenant = await requireTenant(slug)
-  const payments = await store.listPayments(tenant.id, 500)
+  const [payments, d] = await Promise.all([store.listPayments(tenant.id, 500), getDict()])
 
   const porWallet = new Map<string, Cliente>()
   for (const p of payments) {
@@ -65,27 +66,27 @@ export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-medium">Tus clientes agente</h1>
-        <p className="mt-2 text-sm text-muted">
-          Quiénes son los agentes que pagan por tu contenido. Identidad y reputación del registro
-          ERC-8004, vía The Graph.
-        </p>
+        <h1 className="text-2xl font-medium">{d.panel.clientesTitulo}</h1>
+        <p className="mt-2 text-sm text-muted">{d.panel.clientesDescripcion}</p>
       </header>
 
       {clientes.length === 0 ? (
-        <p className="text-sm text-muted">Todavía no hay pagos con wallet identificada.</p>
+        <p className="text-sm text-muted">{d.panel.clientesVacio}</p>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4">
-            <Metric label="Agentes únicos" value={String(clientes.length)} />
+            <Metric label={d.panel.metricaAgentesUnicos} value={String(clientes.length)} />
             <Metric
-              label="Con identidad on-chain"
-              value={`${verificados.length} (${revenueTotal > 0 ? Math.round((revenueVerificado / revenueTotal) * 100) : 0}% del revenue)`}
+              label={d.panel.metricaConIdentidad}
+              value={d.panel.valorConIdentidad(
+                verificados.length,
+                revenueTotal > 0 ? Math.round((revenueVerificado / revenueTotal) * 100) : 0,
+              )}
               destacado
             />
             <Metric
-              label="Enfoque dominante"
-              value={skillsTop.length ? skillsTop.map(([s]) => s).join(' · ') : 'sin datos'}
+              label={d.panel.metricaEnfoque}
+              value={skillsTop.length ? skillsTop.map(([s]) => s).join(' · ') : d.panel.sinDatos}
             />
           </div>
 
@@ -102,7 +103,7 @@ export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes
                         </span>
                         {c.identidad.feedbackAvg !== null ? (
                           <span className="ml-2 text-xs text-muted">
-                            reputación {c.identidad.feedbackAvg}/100 ({c.identidad.feedbackCount})
+                            {d.panel.reputacion(c.identidad.feedbackAvg, c.identidad.feedbackCount)}
                           </span>
                         ) : null}
                       </p>
@@ -110,7 +111,7 @@ export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes
                       <p className="font-mono text-sm text-muted">
                         {shortWallet(c.wallet)}
                         <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase">
-                          sin identidad
+                          {d.panel.sinIdentidad}
                         </span>
                       </p>
                     )}
@@ -120,9 +121,7 @@ export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-lg tabular-nums">{money(c.total)}</p>
-                    <p className="text-xs text-muted">
-                      {c.requests} request{c.requests === 1 ? '' : 's'}
-                    </p>
+                    <p className="text-xs text-muted">{d.panel.conteoRequests(c.requests)}</p>
                   </div>
                 </div>
 
@@ -133,12 +132,12 @@ export default async function Clientes({ params }: PageProps<'/t/[slug]/clientes
                     </span>
                   ))}
                   <span className="ml-auto font-mono">
-                    paga por{' '}
+                    {d.panel.pagaPor}{' '}
                     {[...c.redes]
                       .map((r) => (isNetworkId(r) ? NETWORKS[r].label : r))
-                      .join(' y ')}{' '}
-                    · {shortWallet(c.wallet)} · visto{' '}
-                    {new Date(c.ultimaVez).toLocaleDateString('es-CO', {
+                      .join(d.panel.unionRedes)}{' '}
+                    · {shortWallet(c.wallet)} · {d.panel.vistoPorUltimaVez}{' '}
+                    {new Date(c.ultimaVez).toLocaleDateString(d.panel.formatoFecha, {
                       day: '2-digit',
                       month: 'short',
                     })}

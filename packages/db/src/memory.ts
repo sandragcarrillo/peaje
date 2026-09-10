@@ -1,6 +1,10 @@
 import type {
+  Agent,
+  AgentRun,
   Balance,
   NetworkBalance,
+  NewAgent,
+  NewAgentRun,
   NewResource,
   NewRoute,
   NewTenant,
@@ -286,5 +290,98 @@ export class MemoryStore implements Store {
 
   async getWithdrawal(id: string) {
     return this.#withdrawals.find((w) => w.id === id) ?? null
+  }
+
+  // ---- agentes compradores ----
+
+  #agents: Agent[] = []
+  #agentRuns: AgentRun[] = []
+
+  async createAgent(input: NewAgent): Promise<Agent> {
+    const row: Agent = {
+      id: this.#id('agt'),
+      tenantId: input.tenantId,
+      name: input.name,
+      mission: input.mission,
+      walletAddress: input.walletAddress,
+      privyWalletId: input.privyWalletId ?? null,
+      network: input.network,
+      maxPerRun: input.maxPerRun,
+      deliveryKind: input.deliveryKind ?? 'dashboard',
+      deliveryTarget: input.deliveryTarget ?? null,
+      frequency: input.frequency,
+      status: 'idle',
+      runsMax: input.runsMax ?? null,
+      runsCount: 0,
+      nextRunAt: input.nextRunAt ?? null,
+      lastRunAt: null,
+      erc8004AgentId: null,
+      erc8004ChainId: null,
+      erc8004Tx: null,
+      createdAt: new Date().toISOString(),
+    }
+    this.#agents.push(row)
+    return row
+  }
+
+  async listAgents(tenantId: string) {
+    return this.#agents.filter((a) => a.tenantId === tenantId).reverse()
+  }
+
+  async getAgent(id: string) {
+    return this.#agents.find((a) => a.id === id) ?? null
+  }
+
+  async updateAgent(id: string, patch: Parameters<Store['updateAgent']>[1]) {
+    const row = this.#agents.find((a) => a.id === id)
+    if (!row) throw new Error(`Agente ${id} no existe`)
+    Object.assign(row, patch)
+    return row
+  }
+
+  async deleteAgent(tenantId: string, agentId: string) {
+    this.#agents = this.#agents.filter((a) => !(a.id === agentId && a.tenantId === tenantId))
+  }
+
+  async listDueAgents(now: string, limit = 20) {
+    return this.#agents
+      .filter((a) => a.status === 'idle' && a.nextRunAt !== null && a.nextRunAt <= now)
+      .sort((a, b) => (a.nextRunAt ?? '').localeCompare(b.nextRunAt ?? ''))
+      .slice(0, limit)
+  }
+
+  async claimAgent(id: string) {
+    const row = this.#agents.find((a) => a.id === id)
+    if (!row || row.status !== 'idle') return null
+    row.status = 'running'
+    row.nextRunAt = null
+    return row
+  }
+
+  async recordAgentRun(input: NewAgentRun): Promise<AgentRun> {
+    const row: AgentRun = {
+      ...input,
+      id: this.#id('run'),
+      deliveredAt: null,
+      deliveryError: null,
+      createdAt: new Date().toISOString(),
+    }
+    this.#agentRuns.push(row)
+    return row
+  }
+
+  async markRunDelivered(runId: string, error?: string | null) {
+    const row = this.#agentRuns.find((r) => r.id === runId)
+    if (row) {
+      row.deliveredAt = error ? null : new Date().toISOString()
+      row.deliveryError = error ?? null
+    }
+  }
+
+  async listAgentRuns(agentId: string, limit = 20) {
+    return this.#agentRuns
+      .filter((r) => r.agentId === agentId)
+      .slice(-limit)
+      .reverse()
   }
 }

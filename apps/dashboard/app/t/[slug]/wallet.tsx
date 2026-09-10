@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useDict } from '@/lib/i18n/client'
 import { guardarWallet } from './actions'
 
 export function WalletForm({ slug, wallet }: { slug: string; wallet: string | null }) {
   const [abierto, setAbierto] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const d = useDict()
 
   if (!abierto) {
     return (
@@ -15,17 +17,15 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
         onClick={() => setAbierto(true)}
         className="text-xs text-muted hover:text-text hover:underline"
       >
-        Cambiar wallet de retiro
+        {d.panel.cambiarWalletRetiro}
       </button>
     )
   }
 
   return (
     <section>
-      <h2 className="text-sm font-medium">Wallet de retiro</h2>
-      <p className="mt-1 text-xs text-muted">
-        A dónde te enviamos el dinero cuando retiras. Puedes cambiarla cuando quieras.
-      </p>
+      <h2 className="text-sm font-medium">{d.panel.walletRetiroTitulo}</h2>
+      <p className="mt-1 text-xs text-muted">{d.panel.walletRetiroDescripcion}</p>
       <form
         action={(formData) => {
           setError(null)
@@ -33,7 +33,7 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
             try {
               await guardarWallet(slug, formData)
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'No se pudo guardar')
+              setError(e instanceof Error ? e.message : d.panel.errorGuardarWallet)
             }
           })
         }}
@@ -49,7 +49,7 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
           disabled={pending}
           className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
         >
-          Guardar
+          {d.panel.guardar}
         </button>
       </form>
       {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}

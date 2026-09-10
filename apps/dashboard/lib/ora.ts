@@ -72,7 +72,7 @@ export const PEAJE_FIXABLE: Record<string, { bloque: string; viaGateway?: boolea
   'llms-txt-formatting': { bloque: 'llms.txt' },
   'json-ld': { bloque: 'JSON-LD' },
   'json-ld-entity-linking': { bloque: 'JSON-LD' },
-  'openapi-spec': { bloque: 'link de discovery' },
+  'openapi-spec': { bloque: 'discovery link' },
   'mcp-well-known-discovery': { bloque: '.well-known/mcp.json' },
   'pricing-md': { bloque: 'pricing.md' },
   'pricing-info': { bloque: 'pricing.md' },

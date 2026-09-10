@@ -1,6 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
+  Agent,
+  AgentRun,
   Balance,
+  NewAgent,
+  NewAgentRun,
   NetworkBalance,
   NewResource,
   NewRoute,
@@ -80,6 +84,50 @@ function withdrawalFrom(row: Row): Withdrawal {
     txRef: row.tx_ref,
     status: row.status,
     network: row.network ?? 'tempo',
+    createdAt: row.created_at,
+  }
+}
+
+function agentFrom(row: Row): Agent {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    name: row.name,
+    mission: row.mission,
+    walletAddress: row.wallet_address,
+    privyWalletId: row.privy_wallet_id,
+    network: row.network,
+    maxPerRun: String(row.max_per_run),
+    deliveryKind: row.delivery_kind ?? 'dashboard',
+    deliveryTarget: row.delivery_target ?? null,
+    frequency: row.frequency,
+    status: row.status,
+    runsMax: row.runs_max,
+    runsCount: row.runs_count ?? 0,
+    nextRunAt: row.next_run_at,
+    lastRunAt: row.last_run_at,
+    erc8004AgentId: row.erc8004_agent_id ?? null,
+    erc8004ChainId: row.erc8004_chain_id ?? null,
+    erc8004Tx: row.erc8004_tx ?? null,
+    createdAt: row.created_at,
+  }
+}
+
+function agentRunFrom(row: Row): AgentRun {
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    status: row.status,
+    decision: row.decision,
+    targetUrl: row.target_url,
+    amount: row.amount === null || row.amount === undefined ? null : String(row.amount),
+    network: row.network,
+    receiptRef: row.receipt_ref,
+    resultExcerpt: row.result_excerpt,
+    result: row.result ?? null,
+    error: row.error,
+    deliveredAt: row.delivered_at ?? null,
+    deliveryError: row.delivery_error ?? null,
     createdAt: row.created_at,
   }
 }
@@ -419,5 +467,147 @@ export class SupabaseStore implements Store {
     const { data, error } = await this.#db.from('withdrawals').select().eq('id', id).maybeSingle()
     this.#fail('getWithdrawal', error)
     return data ? withdrawalFrom(data as Row) : null
+  }
+
+  // ---- agentes compradores ----
+
+  async createAgent(input: NewAgent): Promise<Agent> {
+    const { data, error } = await this.#db
+      .from('agents')
+      .insert({
+        tenant_id: input.tenantId,
+        name: input.name,
+        mission: input.mission,
+        wallet_address: input.walletAddress,
+        privy_wallet_id: input.privyWalletId ?? null,
+        network: input.network,
+        max_per_run: input.maxPerRun,
+        delivery_kind: input.deliveryKind ?? 'dashboard',
+        delivery_target: input.deliveryTarget ?? null,
+        frequency: input.frequency,
+        runs_max: input.runsMax ?? null,
+        next_run_at: input.nextRunAt ?? null,
+      })
+      .select()
+      .single()
+    this.#fail('createAgent', error)
+    return agentFrom(data as Row)
+  }
+
+  async listAgents(tenantId: string): Promise<Agent[]> {
+    const { data, error } = await this.#db
+      .from('agents')
+      .select()
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+    this.#fail('listAgents', error)
+    return (data ?? []).map(agentFrom)
+  }
+
+  async getAgent(id: string): Promise<Agent | null> {
+    const { data, error } = await this.#db.from('agents').select().eq('id', id).maybeSingle()
+    this.#fail('getAgent', error)
+    return data ? agentFrom(data as Row) : null
+  }
+
+  async updateAgent(id: string, patch: Parameters<Store['updateAgent']>[1]): Promise<Agent> {
+    const update: Row = {}
+    if (patch.status !== undefined) update.status = patch.status
+    if (patch.frequency !== undefined) update.frequency = patch.frequency
+    if (patch.maxPerRun !== undefined) update.max_per_run = patch.maxPerRun
+    if (patch.nextRunAt !== undefined) update.next_run_at = patch.nextRunAt
+    if (patch.lastRunAt !== undefined) update.last_run_at = patch.lastRunAt
+    if (patch.runsCount !== undefined) update.runs_count = patch.runsCount
+    if (patch.runsMax !== undefined) update.runs_max = patch.runsMax
+    if (patch.privyWalletId !== undefined) update.privy_wallet_id = patch.privyWalletId
+    if (patch.erc8004AgentId !== undefined) update.erc8004_agent_id = patch.erc8004AgentId
+    if (patch.erc8004ChainId !== undefined) update.erc8004_chain_id = patch.erc8004ChainId
+    if (patch.erc8004Tx !== undefined) update.erc8004_tx = patch.erc8004Tx
+    if (patch.deliveryKind !== undefined) update.delivery_kind = patch.deliveryKind
+    if (patch.deliveryTarget !== undefined) update.delivery_target = patch.deliveryTarget
+    const { data, error } = await this.#db
+      .from('agents')
+      .update(update)
+      .eq('id', id)
+      .select()
+      .single()
+    this.#fail('updateAgent', error)
+    return agentFrom(data as Row)
+  }
+
+  async deleteAgent(tenantId: string, agentId: string): Promise<void> {
+    const { error } = await this.#db
+      .from('agents')
+      .delete()
+      .eq('tenant_id', tenantId)
+      .eq('id', agentId)
+    this.#fail('deleteAgent', error)
+  }
+
+  async listDueAgents(now: string, limit = 20): Promise<Agent[]> {
+    const { data, error } = await this.#db
+      .from('agents')
+      .select()
+      .eq('status', 'idle')
+      .not('next_run_at', 'is', null)
+      .lte('next_run_at', now)
+      .order('next_run_at', { ascending: true })
+      .limit(limit)
+    this.#fail('listDueAgents', error)
+    return (data ?? []).map(agentFrom)
+  }
+
+  async claimAgent(id: string): Promise<Agent | null> {
+    // El .eq('status','idle') hace el claim atómico: si otro worker ya lo
+    // tomó, la condición no matchea y no vuelve ninguna fila.
+    const { data, error } = await this.#db
+      .from('agents')
+      .update({ status: 'running', next_run_at: null })
+      .eq('id', id)
+      .eq('status', 'idle')
+      .select()
+      .maybeSingle()
+    this.#fail('claimAgent', error)
+    return data ? agentFrom(data as Row) : null
+  }
+
+  async recordAgentRun(input: NewAgentRun): Promise<AgentRun> {
+    const { data, error } = await this.#db
+      .from('agent_runs')
+      .insert({
+        agent_id: input.agentId,
+        status: input.status,
+        decision: input.decision ?? null,
+        target_url: input.targetUrl,
+        amount: input.amount,
+        network: input.network,
+        receipt_ref: input.receiptRef,
+        result_excerpt: input.resultExcerpt,
+        result: input.result,
+        error: input.error,
+      })
+      .select()
+      .single()
+    this.#fail('recordAgentRun', error)
+    return agentRunFrom(data as Row)
+  }
+
+  async markRunDelivered(runId: string, error?: string | null): Promise<void> {
+    const { error: err } = await this.#db
+      .from('agent_runs')
+      .update({ delivered_at: error ? null : new Date().toISOString(), delivery_error: error ?? null })
+      .eq('id', runId)
+    this.#fail('markRunDelivered', err)
+  }
+
+  async listAgentRuns(agentId: string, limit = 20): Promise<AgentRun[]> {
+    const { data, error } = await this.#db
+      .from('agent_runs')
+      .select()
+      .eq('agent_id', agentId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    this.#fail('listAgentRuns', error)
+    return (data ?? []).map(agentRunFrom)
   }
 }

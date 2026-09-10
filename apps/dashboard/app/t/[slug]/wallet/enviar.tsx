@@ -4,6 +4,7 @@ import { NETWORKS, isNetworkId } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
+import { useDict } from '@/lib/i18n/client'
 import { enviarFondos, type EnvioResultado } from '../actions'
 import type { WalletBalance } from '@/lib/walletops'
 
@@ -18,6 +19,7 @@ export function EnviarPanel({
   balances: WalletBalance[]
   custodiada: boolean
 }) {
+  const d = useDict()
   const router = useRouter()
   const [network, setNetwork] = useState(balances.find((b) => Number(b.amount) > 0)?.network ?? 'tempo')
   const [to, setTo] = useState('')
@@ -59,7 +61,7 @@ export function EnviarPanel({
         <div className="flex items-center justify-between">
           <span className="font-mono text-sm">{shortWallet(address)}</span>
           <button type="button" onClick={copiar} className="text-xs text-accent hover:underline">
-            {copiado ? 'Copiada' : 'Copiar address'}
+            {copiado ? d.dinero.copiada : d.dinero.copiarAddress}
           </button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -78,9 +80,9 @@ export function EnviarPanel({
 
       {custodiada ? (
         <form onSubmit={enviar} className="space-y-4 rounded-lg border border-border bg-panel p-5">
-          <p className="text-sm font-medium">Enviar a otra wallet</p>
+          <p className="text-sm font-medium">{d.dinero.enviarAOtraWallet}</p>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">Red</span>
+            <span className="text-xs uppercase tracking-wide text-muted">{d.dinero.red}</span>
             <select
               value={network}
               onChange={(e) => {
@@ -96,7 +98,9 @@ export function EnviarPanel({
             </select>
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">Address de destino</span>
+            <span className="text-xs uppercase tracking-wide text-muted">
+              {d.dinero.addressDestino}
+            </span>
             <input
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -106,7 +110,7 @@ export function EnviarPanel({
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">Monto</span>
+            <span className="text-xs uppercase tracking-wide text-muted">{d.dinero.monto}</span>
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -116,23 +120,21 @@ export function EnviarPanel({
               className="mt-1.5 w-full rounded-lg border border-border bg-bg px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
             />
           </label>
-          <p className="text-xs text-muted">
-            El gas sale del mismo token de la red (no necesitas otro token para pagar fees).
-          </p>
+          <p className="text-xs text-muted">{d.dinero.notaGas}</p>
           <button
             type="submit"
             disabled={pending}
             className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
           >
-            {pending ? 'Enviando…' : 'Enviar'}
+            {pending ? d.dinero.enviando : d.dinero.enviar}
           </button>
 
           {resultado ? (
             resultado.ok ? (
               <p className="text-sm text-accent">
-                Enviado.{' '}
+                {d.dinero.enviado}{' '}
                 <a href={resultado.explorerUrl} target="_blank" rel="noreferrer" className="underline">
-                  ver tx
+                  {d.dinero.verTx}
                 </a>
               </p>
             ) : (

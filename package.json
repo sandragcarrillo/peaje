@@ -12,6 +12,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@peaje/db": "workspace:*",
     "@peaje/shared": "workspace:*",
+    "@privy-io/node": "0.30.0",
     "mppx": "^0.8.19",
     "tsx": "^4.23.12",
     "typescript": "^5.9.3"

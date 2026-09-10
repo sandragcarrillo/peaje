@@ -1,5 +1,6 @@
 'use server'
 
+import { getDict } from '@/lib/i18n'
 import { verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -10,22 +11,24 @@ export type EntrarResultado =
   | { ok: false; error: string }
 
 export async function entrarConPrivy(accessToken: string): Promise<EntrarResultado> {
+  const d = await getDict()
+
   let privyUserId: string
   try {
     privyUserId = await verifyPrivyAccessToken(accessToken)
   } catch {
-    return { ok: false, error: 'No pudimos verificar tu sesión. Intenta de nuevo.' }
+    return { ok: false, error: d.acceso.errorSesionNoVerificada }
   }
 
   try {
     const tenants = await store.listTenantsByPrivyUserId(privyUserId)
     if (tenants.length === 0) {
-      return { ok: false, error: 'No hay ningún negocio registrado con ese email.' }
+      return { ok: false, error: d.acceso.errorSinNegocio }
     }
     await setSession(privyUserId)
     return { ok: true, slug: tenants.length === 1 ? tenants[0]!.slug : null }
   } catch (error) {
     console.error('[acceder] fallo el login', error)
-    return { ok: false, error: 'Error del servidor al entrar. Intenta de nuevo.' }
+    return { ok: false, error: d.acceso.errorServidorEntrar }
   }
 }

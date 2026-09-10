@@ -5,50 +5,116 @@ import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
  * Archivos de agent-readiness servidos por tenant. Cada uno mapea a un check
  * del auditor de Ora (id en el comentario). El tenant no configura nada:
  * todo se genera de la DB.
+ *
+ * El CONTENIDO va en inglés a propósito: lo consumen agentes de IA y
+ * herramientas de terceros, donde el inglés es la lingua franca. La UI del
+ * dashboard sí es bilingüe.
  */
 
 type Ctx = { tenant: Tenant; routes: Route[]; base: string }
 
-/** "pathUSD en Tempo o USDC en Arc" — para prosa de discovery. */
-const REDES = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} en ${NETWORKS[id].label}`).join(' o ')
+/** "pathUSD on Tempo or USDC on Arc" — para prosa de discovery. */
+const RAILS = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${NETWORKS[id].label}`).join(' or ')
+
+/**
+ * Header con el que leemos el origen sin que el proxy del negocio nos
+ * reenvíe de vuelta a nosotros. Ver lib/proxy-kit.ts en el dashboard.
+ */
+export const PEAJE_FETCH_HEADER = 'x-peaje-fetch'
+
+/**
+ * llms.txt del negocio, si ya tenía uno propio. Devuelve null si no hay, si
+ * es el nuestro (evita duplicar al re-proxear) o si el origen no responde.
+ */
+export async function llmsDelOrigen(originUrl: string): Promise<string | null> {
+  try {
+    const url = new URL('/llms.txt', originUrl)
+    const res = await fetch(url, {
+      headers: { [PEAJE_FETCH_HEADER]: '1' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(6_000),
+    })
+    if (!res.ok) return null
+    const texto = (await res.text()).trim()
+    if (!texto || texto.length > 100_000) return null
+    // Si ya es el nuestro, no lo fusionamos con sí mismo.
+    if (texto.includes('## Payments for agents')) return null
+    return texto
+  } catch {
+    return null
+  }
+}
+
+/**
+ * La sección de pagos que Peaje agrega. Se emite sola o pegada al llms.txt
+ * que el negocio ya tenía: reemplazar el suyo perdía su contenido y hacía
+ * fallar el check de "cuándo usarme".
+ */
+export function seccionPagos({ tenant, routes, base }: Ctx): string {
+  return [
+    '## Payments for agents',
+    '',
+    `> ${tenant.name} charges per request via MPP (HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource.`,
+    '',
+    '### When to use this',
+    '',
+    `Reach for ${tenant.name} when you need its data or content programmatically and only want to pay for what you consume. There is no plan to sign up for and no key to rotate: the payment is the credential.`,
+    '',
+    '### Priced routes',
+    '',
+    ...routes.map(
+      (r) =>
+        `- ${r.method} ${r.pathPattern} — ${Number(r.priceUsd) > 0 ? `$${Number(r.priceUsd)} USD` : 'Free'} · ${r.description ?? ''}`,
+    ),
+    '',
+    '### Where to look',
+    '',
+    `- [OpenAPI discovery with prices](${base}/openapi.json)`,
+    `- [Pricing](${base}/pricing.md)`,
+    `- [How to pay](${base}/auth.md)`,
+    `- [MCP with paid tools](${base}/mcp)`,
+    '',
+    'Reference client: `npx mppx@latest <url>` (creates a wallet, pays and retries on its own).',
+  ].join('\n')
+}
 
 /** llms.txt (llms-txt-exists, llms-txt-formatting, agent-instruction) */
 export function llmsTxt({ tenant, routes, base }: Ctx): string {
   return [
     `# ${tenant.name}`,
     '',
-    `> API con pagos por request para agentes (MPP sobre HTTP 402). Sin API keys ni registro: el agente recibe un 402, paga en stablecoin (${REDES}) y recibe el recurso. Úsala cuando necesites ${tenant.name} de forma programática pagando solo por lo que consumes.`,
+    `> Pay-per-request API for agents (MPP over HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource. Use it when you need ${tenant.name} programmatically and only want to pay for what you consume.`,
     '',
-    '## Recursos',
+    '## Resources',
     '',
-    `- [Discovery OpenAPI con precios](${base}/openapi.json): rutas, ofertas y montos`,
-    `- [Precios](${base}/pricing.md): tabla simple por endpoint`,
-    `- [Cómo autenticarse y pagar](${base}/auth.md): walkthrough para agentes`,
-    `- [Guía para agentes](${base}/agents.md): qué es y cuándo usarla`,
-    `- [MCP con tools pagas](${base}/mcp): mismo catálogo por JSON-RPC`,
+    `- [OpenAPI discovery with prices](${base}/openapi.json): routes, offers and amounts`,
+    `- [Pricing](${base}/pricing.md): plain table per endpoint`,
+    `- [How to authenticate and pay](${base}/auth.md): walkthrough for agents`,
+    `- [Agent guide](${base}/agents.md): what this is and when to use it`,
+    `- [MCP with paid tools](${base}/mcp): same catalog over JSON-RPC`,
     '',
-    '## Rutas con precio',
+    '## Priced routes',
     '',
     ...routes.map(
       (r) =>
-        `- ${r.method} ${r.pathPattern} — ${Number(r.priceUsd) > 0 ? `$${Number(r.priceUsd)} USD` : 'Gratis'} · ${r.description ?? ''}`,
+        `- ${r.method} ${r.pathPattern} — ${Number(r.priceUsd) > 0 ? `$${Number(r.priceUsd)} USD` : 'Free'} · ${r.description ?? ''}`,
     ),
     '',
-    'Cliente de referencia: `npx mppx@latest <url>` (crea wallet, paga y reintenta solo).',
+    'Reference client: `npx mppx@latest <url>` (creates a wallet, pays and retries on its own).',
   ].join('\n')
 }
 
 /** pricing.md (pricing-md, pricing-info) */
 export function pricingMd({ tenant, routes, base }: Ctx): string {
   return [
-    `# Precios de ${tenant.name}`,
+    `# ${tenant.name} pricing`,
     '',
-    `Pago por request vía MPP (HTTP 402). Sin suscripción, sin API key, sin mínimos. Se paga en ${REDES}: el challenge trae una oferta por red y el agente elige.`,
+    `Pay per request via MPP (HTTP 402). No subscription, no API key, no minimums. Payable in ${RAILS}: the challenge carries one offer per network and the agent picks.`,
     '',
-    '| Endpoint | Precio |',
+    '| Endpoint | Price |',
     '|---|---|',
     ...routes.map(
-      (r) => `| ${r.method} ${r.pathPattern} | ${Number(r.priceUsd) > 0 ? `$${Number(r.priceUsd)} USD` : 'Gratis'} |`,
+      (r) => `| ${r.method} ${r.pathPattern} | ${Number(r.priceUsd) > 0 ? `$${Number(r.priceUsd)} USD` : 'Free'} |`,
     ),
     '',
     `Gateway: ${base} · Discovery: ${base}/openapi.json · MCP: ${base}/mcp`,
@@ -58,112 +124,197 @@ export function pricingMd({ tenant, routes, base }: Ctx): string {
 /** auth.md (auth-md-exists, auth-md-structure) — el "auth" acá es el pago. */
 export function authMd({ tenant, base }: Ctx): string {
   return [
-    `# Autenticación de ${tenant.name}`,
+    `# ${tenant.name} authentication`,
     '',
-    'Esta API no usa API keys ni OAuth. El acceso se compra por request con MPP',
-    '(Machine Payments Protocol, HTTP 402). La credencial ES el pago.',
+    'This API uses no API keys and no OAuth. Access is bought per request with MPP',
+    '(Machine Payments Protocol, HTTP 402). The credential IS the payment.',
     '',
-    '## Cómo obtener acceso (walkthrough)',
+    '## How to get access (walkthrough)',
     '',
-    '1. Haz el request sin credenciales:',
+    '1. Make the request with no credentials:',
     '```bash',
-    `curl -i ${base}/<ruta>`,
+    `curl -i ${base}/<route>`,
     '```',
-    '2. Recibes `402 Payment Required` con un header `WWW-Authenticate: Payment` que incluye el Challenge (monto, token, destinatario, chain). Trae una oferta por red soportada: elige la que tu wallet pueda pagar.',
-    '3. Paga el Challenge y reintenta con el header `Authorization: Payment <credential>`.',
-    '4. Recibes el recurso con un header `Payment-Receipt` como comprobante.',
+    '2. You get `402 Payment Required` with a `WWW-Authenticate: Payment` header carrying the Challenge (amount, token, recipient, chain). It includes one offer per supported network: pick the one your wallet can pay.',
+    '3. Pay the Challenge and retry with the `Authorization: Payment <credential>` header.',
+    '4. You get the resource plus a `Payment-Receipt` header as proof.',
     '',
-    '## Redes de pago',
+    '## Payment networks',
     '',
     ...NETWORK_IDS.map((id) => {
       const n = NETWORKS[id]
       return `- **${n.label}** (testnet): ${n.tokenSymbol} · chainId ${n.testnet.chainId} · token \`${n.token}\``
     }),
     '',
-    '## La vía fácil',
+    '## The easy way',
     '',
     '```bash',
-    '# el cliente mppx hace los 4 pasos solo (crea wallet en testnet incluida)',
-    `npx mppx@latest ${base}/<ruta>`,
+    '# the mppx client does all four steps for you (testnet wallet included)',
+    `npx mppx@latest ${base}/<route>`,
     '```',
     '',
-    '## Errores',
+    '## Errors',
     '',
-    '- `402` sin credential: no es error, es el precio. Incluye siempre un Challenge fresco.',
-    '- Credential inválida o expirada: `402` de nuevo, con nuevo Challenge. Reintenta pagando.',
-    '- Ruta inexistente: `404` con JSON `{ error, hint }`.',
+    '- `402` with no credential: not an error, it is the price. Always includes a fresh Challenge.',
+    '- Invalid or expired credential: `402` again, with a new Challenge. Retry by paying.',
+    '- Unknown route: `404` with JSON `{ error, hint }`.',
     '',
-    `Spec del protocolo: https://mpp.dev · Discovery: ${base}/openapi.json`,
+    `Protocol spec: https://mpp.dev · Discovery: ${base}/openapi.json`,
   ].join('\n')
 }
 
 /** agents.md (agent-discovery-file, agent-instruction) */
 export function agentsMd({ tenant, routes, base }: Ctx): string {
   return [
-    `# ${tenant.name} para agentes`,
+    `# ${tenant.name} for agents`,
     '',
-    '## Qué es',
+    '## What this is',
     '',
-    `${tenant.name} expone datos vía API paga por request. Pagas por llamada en stablecoin (${REDES}) vía MPP/HTTP 402, sin registro previo.`,
+    `${tenant.name} exposes data through a pay-per-request API. You pay per call in stablecoin (${RAILS}) via MPP/HTTP 402, with no prior signup.`,
     '',
-    '## Cuándo usarla',
+    '## When to use it',
     '',
     ...routes.map((r) => `- ${r.description ?? `${r.method} ${r.pathPattern}`}: \`${r.method} ${base}${r.pathPattern}\` ($${Number(r.priceUsd)})`),
     '',
-    '## Cómo empezar',
+    '## How to start',
     '',
-    `1. Lee el discovery: ${base}/openapi.json`,
-    `2. Paga y consume: \`npx mppx@latest ${base}<ruta>\``,
-    `3. O usa MCP: ${base}/mcp (Streamable HTTP, tools pagas por JSON-RPC)`,
+    `1. Read the discovery doc: ${base}/openapi.json`,
+    `2. Pay and consume: \`npx mppx@latest ${base}<route>\``,
+    `3. Or use MCP: ${base}/mcp (Streamable HTTP, paid tools over JSON-RPC)`,
     '',
-    `Autenticación (= pago): ${base}/auth.md`,
+    `Authentication (= payment): ${base}/auth.md`,
   ].join('\n')
 }
 
-/** .well-known/ai-catalog.json (ard-catalog, ard-entries-valid) */
+/**
+ * .well-known/ai-catalog.json — ARD (ard-catalog, ard-entries-valid).
+ *
+ * El formato lo verificamos contra catálogos reales que pasan validación
+ * (ora.ai, vercel.com): raíz con `specVersion` + `host` + `entries`, y cada
+ * entrada con un identificador `urn:air:{dominio}:{clase}:{nombre}`, un
+ * `displayName` y un **media type** en `type` (no una categoría suelta).
+ *
+ * El `trustManifest` es opcional en la spec pero Ora lo puntúa aparte: acá va
+ * la versión sin firmar, que es la mínima que declara identidad y de dónde
+ * sale la atestación.
+ */
 export function aiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown> {
+  // La identidad se ancla al dominio del NEGOCIO, no al del gateway: es su
+  // catálogo y, con el proxy instalado, se sirve desde su dominio. Las URLs
+  // sí apuntan al gateway, que funciona con o sin proxy.
+  const host = hostDe(tenant.originUrl)
+  const urn = (clase: string, nombre: string) => `urn:air:${host}:${clase}:${slugSeguro(nombre)}`
+
+  // El dominio del `identity` tiene que coincidir con el publisher del URN
+  // (publisher-authority binding), o el manifiesto no vale.
+  const identidad = { identity: `did:web:${host}`, identityType: 'did' as const }
+
+  const trustManifest = {
+    ...identidad,
+    attestations: [
+      {
+        type: 'payment-rail',
+        uri: `${base}/auth.md`,
+        mediaType: 'text/markdown',
+      },
+    ],
+  }
+
   return {
-    $schema: 'https://ard.dev/schema/v1',
-    name: tenant.name,
-    description: `API paga por request de ${tenant.name} (MPP sobre HTTP 402)`,
+    specVersion: '1.0',
+    host: {
+      displayName: tenant.name,
+      identifier: `did:web:${host}`,
+      documentationUrl: `${base}/llms.txt`,
+      trustManifest,
+    },
+    trustManifest,
     entries: [
       {
-        type: 'api',
-        name: `${tenant.name} API`,
-        url: base,
-        spec: `${base}/openapi.json`,
-        auth: 'mpp',
-        pricing: `${base}/pricing.md`,
-        networks: NETWORK_IDS.map((id) => ({
-          id,
-          chainId: NETWORKS[id].testnet.chainId,
-          token: NETWORKS[id].token,
-          symbol: NETWORKS[id].tokenSymbol,
-        })),
+        identifier: urn('api', tenant.slug),
+        displayName: `${tenant.name} API`,
+        type: 'application/vnd.oai.openapi+json;version=3.1',
+        url: `${base}/openapi.json`,
+        description: `Pay-per-request API from ${tenant.name} (MPP over HTTP 402). No API keys.`,
+        tags: ['api', 'openapi', 'pay-per-request', 'x402', 'mpp'],
+        representativeQueries: [
+          `buy data from ${tenant.name} without an API key`,
+          `pay per request for ${tenant.name}`,
+          `what does ${tenant.name} charge per call`,
+        ],
+        trustManifest: identidad,
       },
       {
-        type: 'mcp-server',
-        name: `${tenant.slug}-peaje`,
-        url: `${base}/mcp`,
-        transport: 'streamable-http',
-        description: `Tools pagas de ${tenant.name}`,
+        identifier: urn('mcp', tenant.slug),
+        displayName: `${tenant.name} MCP server`,
+        type: 'application/mcp-server-card+json',
+        url: `${base}/.well-known/mcp/server-card.json`,
+        description: `Paid tools from ${tenant.name} over Streamable HTTP: each tool charges the price it advertises and returns a receipt.`,
+        tags: ['mcp', 'tools', 'paid', 'streamable-http'],
+        representativeQueries: [
+          `use ${tenant.name} tools from an MCP client`,
+          `call ${tenant.name} and pay per tool call`,
+        ],
+        trustManifest: identidad,
+      },
+      {
+        identifier: urn('agent', tenant.slug),
+        displayName: `${tenant.name} agent card`,
+        type: 'application/a2a-agent-card+json',
+        url: `${base}/.well-known/agent-card.json`,
+        description: `A2A agent card for ${tenant.name}.`,
+        tags: ['a2a', 'agent-card'],
+        trustManifest: identidad,
       },
       ...routes.map((r) => ({
-        type: 'capability',
-        name: r.description ?? `${r.method} ${r.pathPattern}`,
+        identifier: urn('capability', r.description ?? r.pathPattern),
+        displayName: r.description ?? `${r.method} ${r.pathPattern}`,
+        type: 'application/json',
         url: `${base}${r.pathPattern}`,
-        method: r.method,
-        price: { amount: Number(r.priceUsd), currency: 'USD', model: 'per-request' },
+        description: `${r.method} ${r.pathPattern} — $${Number(r.priceUsd)} USD per request via MPP (HTTP 402).`,
+        tags: ['capability', 'paid'],
+        // `pricing` no es un miembro del esquema; los escalares van en metadata.
+        metadata: {
+          priceUsd: Number(r.priceUsd),
+          currency: 'USD',
+          pricingModel: 'per-request',
+          method: r.method,
+        },
+        trustManifest: identidad,
       })),
     ],
   }
+}
+
+/** Dominio que ancla los `urn:air` y el `did:web`. */
+function hostDe(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    // La spec exige un FQDN como publisher: `localhost` está prohibido.
+    return host.includes('.') ? host : `${host}.localhost`
+  } catch {
+    return 'invalid.localhost'
+  }
+}
+
+/** Segmento seguro para un urn:air (sin espacios ni dos puntos). */
+function slugSeguro(texto: string): string {
+  return (
+    texto
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'item'
+  )
 }
 
 /** .well-known/agent-card.json (a2a-agent-card) */
 export function agentCard({ tenant, routes, base }: Ctx): Record<string, unknown> {
   return {
     name: tenant.name,
-    description: `API paga por request (MPP/HTTP 402). ${routes.map((r) => r.description).filter(Boolean).join(' · ')}`,
+    description: `Pay-per-request API (MPP/HTTP 402). ${routes.map((r) => r.description).filter(Boolean).join(' · ')}`,
     url: base,
     version: '1.0.0',
     capabilities: { streaming: false, pushNotifications: false },
@@ -172,7 +323,7 @@ export function agentCard({ tenant, routes, base }: Ctx): Record<string, unknown
     skills: routes.map((r) => ({
       id: `${r.method.toLowerCase()}${r.pathPattern.replace(/[/:*]/g, '_')}`,
       name: r.description ?? `${r.method} ${r.pathPattern}`,
-      description: `${r.description ?? ''} — $${Number(r.priceUsd)} por llamada vía MPP`.trim(),
+      description: `${r.description ?? ''} — $${Number(r.priceUsd)} per call via MPP`.trim(),
     })),
   }
 }
@@ -195,13 +346,13 @@ export function apiCatalog({ tenant, base }: Ctx): Record<string, unknown> {
 export function mcpServerCard({ tenant, routes, base }: Ctx): Record<string, unknown> {
   return {
     name: `${tenant.slug}-peaje`,
-    description: `Tools pagas de ${tenant.name}: paga por llamada vía MPP, sin API keys`,
+    description: `Paid tools from ${tenant.name}: pay per call via MPP, no API keys`,
     url: `${base}/mcp`,
     transport: { type: 'streamable-http' },
     version: '1.0.0',
     tools: routes.map((r) => ({
       name: `${r.method.toLowerCase()}_${r.pathPattern.split('/').filter(Boolean).map((s) => (s.startsWith(':') ? `by_${s.slice(1)}` : s === '*' ? 'any' : s)).join('_').replace(/[^a-zA-Z0-9_]/g, '_')}`.slice(0, 60),
-      description: `${r.description ?? `${r.method} ${r.pathPattern}`} — $${Number(r.priceUsd)}/llamada`,
+      description: `${r.description ?? `${r.method} ${r.pathPattern}`} — $${Number(r.priceUsd)}/call`,
     })),
   }
 }

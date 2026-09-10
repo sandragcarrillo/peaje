@@ -61,6 +61,79 @@ export type Balance = {
 /** Balance de un tenant en una red concreta. */
 export type NetworkBalance = Balance & { network: string }
 
+// ---- agentes compradores (lado demanda) ----
+
+export type AgentFrequency = 'once' | 'hourly' | 'daily' | 'biweekly' | 'monthly'
+export type AgentDelivery = 'dashboard' | 'webhook' | 'email'
+export type AgentStatus = 'idle' | 'running' | 'paused' | 'done'
+
+export type Agent = {
+  id: string
+  tenantId: string
+  name: string
+  /** Objetivo en lenguaje natural. */
+  mission: string
+  walletAddress: string
+  /** Id de la wallet en Privy: sin esto no se puede firmar. */
+  privyWalletId: string | null
+  network: string
+  /** Tope blando por corrida; el techo duro es el saldo de la wallet. */
+  maxPerRun: string
+  /** Cómo le llega el resultado a la persona. */
+  deliveryKind: AgentDelivery
+  /** URL del webhook o dirección de correo, según deliveryKind. */
+  deliveryTarget: string | null
+  frequency: AgentFrequency
+  status: AgentStatus
+  runsMax: number | null
+  runsCount: number
+  nextRunAt: string | null
+  lastRunAt: string | null
+  /** Id del NFT en el IdentityRegistry de ERC-8004; null si no está registrado. */
+  erc8004AgentId: string | null
+  erc8004ChainId: number | null
+  erc8004Tx: string | null
+  createdAt: string
+}
+
+export type NewAgent = {
+  tenantId: string
+  name: string
+  mission: string
+  walletAddress: string
+  privyWalletId?: string | null
+  network: string
+  maxPerRun: string
+  frequency: AgentFrequency
+  deliveryKind?: AgentDelivery
+  deliveryTarget?: string | null
+  runsMax?: number | null
+  nextRunAt?: string | null
+}
+
+export type AgentRunStatus = 'success' | 'failed' | 'skipped'
+
+export type AgentRun = {
+  id: string
+  agentId: string
+  status: AgentRunStatus
+  /** Candidatos evaluados, elegido y por qué. Evidencia de la decisión. */
+  decision: unknown
+  targetUrl: string | null
+  amount: string | null
+  network: string | null
+  receiptRef: string | null
+  resultExcerpt: string | null
+  /** Resultado completo; el panel es donde la persona lo lee. */
+  result: string | null
+  error: string | null
+  deliveredAt: string | null
+  deliveryError: string | null
+  createdAt: string
+}
+
+export type NewAgentRun = Omit<AgentRun, 'id' | 'createdAt' | 'deliveredAt' | 'deliveryError'>
+
 export type NewTenant = {
   slug: string
   name: string
@@ -143,4 +216,42 @@ export interface Store {
   updateWithdrawal(id: string, patch: { txRef?: string; status?: WithdrawalStatus }): Promise<Withdrawal>
   listWithdrawals(tenantId: string, limit?: number): Promise<Withdrawal[]>
   getWithdrawal(id: string): Promise<Withdrawal | null>
+
+  // agentes compradores
+  createAgent(input: NewAgent): Promise<Agent>
+  listAgents(tenantId: string): Promise<Agent[]>
+  getAgent(id: string): Promise<Agent | null>
+  updateAgent(
+    id: string,
+    patch: Partial<
+      Pick<
+        Agent,
+        | 'status'
+        | 'frequency'
+        | 'maxPerRun'
+        | 'nextRunAt'
+        | 'lastRunAt'
+        | 'runsCount'
+        | 'runsMax'
+        | 'privyWalletId'
+        | 'erc8004AgentId'
+        | 'erc8004ChainId'
+        | 'erc8004Tx'
+        | 'deliveryKind'
+        | 'deliveryTarget'
+      >
+    >,
+  ): Promise<Agent>
+  deleteAgent(tenantId: string, agentId: string): Promise<void>
+  /** Agentes ociosos con corrida vencida. Lo usa el scheduler del gateway. */
+  listDueAgents(now: string, limit?: number): Promise<Agent[]>
+  /**
+   * Toma el agente para ejecutarlo: pasa de 'idle' a 'running' solo si nadie
+   * más lo tomó. Devuelve null si ya estaba tomado. Evita que el scheduler y
+   * el botón "correr ahora" ejecuten la misma misión a la vez y gasten doble.
+   */
+  claimAgent(id: string): Promise<Agent | null>
+  recordAgentRun(input: NewAgentRun): Promise<AgentRun>
+  markRunDelivered(runId: string, error?: string | null): Promise<void>
+  listAgentRuns(agentId: string, limit?: number): Promise<AgentRun[]>
 }

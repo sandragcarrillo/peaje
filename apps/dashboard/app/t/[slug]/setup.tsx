@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getDict } from '@/lib/i18n'
 
 export type PasoSetup = {
   n: number
@@ -12,17 +13,18 @@ export type PasoSetup = {
  * Checklist de configuración. Aparece en el Dashboard mientras falte algo;
  * cuando los tres pasos están, desaparece solo.
  */
-export function SetupChecklist({ pasos }: { pasos: PasoSetup[] }) {
+export async function SetupChecklist({ pasos }: { pasos: PasoSetup[] }) {
   const pendientes = pasos.filter((p) => !p.hecho)
   if (pendientes.length === 0) return null
 
   const actual = pendientes[0]!.n
+  const d = await getDict()
 
   return (
     <section className="rounded-lg border border-accent/40 bg-accent/5 p-4">
-      <h2 className="font-medium">Termina de configurar Peaje</h2>
+      <h2 className="font-medium">{d.panel.setupTitulo}</h2>
       <p className="mt-1 text-xs text-muted">
-        {pasos.length - pendientes.length} de {pasos.length} pasos listos
+        {d.panel.setupProgreso(pasos.length - pendientes.length, pasos.length)}
       </p>
       <ol className="mt-4 space-y-3">
         {pasos.map((p) => (
@@ -51,7 +53,7 @@ export function SetupChecklist({ pasos }: { pasos: PasoSetup[] }) {
                     : 'border border-border text-muted hover:text-text'
                 }`}
               >
-                {p.n === actual ? 'Continuar →' : 'Ir'}
+                {p.n === actual ? d.panel.setupContinuar : d.panel.setupIr}
               </Link>
             ) : null}
           </li>

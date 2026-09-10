@@ -2,30 +2,32 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-const ITEMS = [
-  { href: '', label: 'Dashboard' },
-  { href: '/score', label: 'Score' },
-  { href: '/rutas', label: 'Agregar rutas' },
-  { href: '/kit', label: 'Haz que te encuentren' },
-  { href: '/clientes', label: 'Clientes' },
-  { href: '/retirar', label: 'Retirar' },
-  { href: '/wallet', label: 'Mi wallet' },
-] as const
+import { useDict } from '@/lib/i18n/client'
 
 export function Sidebar({ slug, name }: { slug: string; name: string }) {
   const pathname = usePathname()
+  const d = useDict()
   const base = `/t/${slug}`
+
+  const items = [
+    { href: '', label: d.panel.navDashboard },
+    { href: '/score', label: d.panel.navScore },
+    { href: '/rutas', label: d.panel.navRutas },
+    { href: '/kit', label: d.panel.navKit },
+    { href: '/clientes', label: d.panel.navClientes },
+    { href: '/retirar', label: d.panel.navRetirar },
+    { href: '/wallet', label: d.panel.navWallet },
+  ]
 
   return (
     <aside className="w-52 shrink-0">
       <p className="font-mono text-xs text-muted">{slug}</p>
       <p className="mt-1 font-medium">{name}</p>
       <Link href="/negocios" className="mt-1 block text-xs text-muted hover:text-text">
-        cambiar de negocio →
+        {d.panel.cambiarNegocio}
       </Link>
       <nav className="mt-6 flex flex-col gap-1">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const href = `${base}${item.href}`
           const activo = pathname === href
           return (

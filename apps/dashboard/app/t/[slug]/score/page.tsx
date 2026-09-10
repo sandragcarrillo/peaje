@@ -1,34 +1,33 @@
+import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { cachedScore, gradeDe, prevision, scannableDomain, type OraScore } from '@/lib/ora'
 import { BotonScore } from '../kit/partes'
 
 export default async function Score({ params }: PageProps<'/t/[slug]/score'>) {
   const { slug } = await params
-  const tenant = await requireTenant(slug)
+  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const domain = scannableDomain(tenant.originUrl)
   const score = domain ? await cachedScore(domain) : null
 
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-2xl font-medium">Score</h1>
-        <p className="mt-2 text-sm text-muted">
-          Qué tan listo está tu sitio para agentes, medido con Ora (ora.ai).
-        </p>
+        <h1 className="text-2xl font-medium">{d.panel.scoreTitulo}</h1>
+        <p className="mt-2 text-sm text-muted">{d.panel.scoreDescripcion}</p>
       </header>
 
       {!domain ? (
         <p className="rounded-lg border border-border bg-panel p-4 text-sm text-muted">
-          Tu origin es local y Ora solo escanea dominios públicos. Cuando tu API tenga dominio,
-          aquí aparece el score.
+          {d.panel.scoreOriginLocal}
         </p>
       ) : !score ? (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-panel p-4">
           <p className="text-sm text-muted">
-            Todavía no hay score de <strong className="text-text">{domain}</strong>. El scan tarda
-            ~30 segundos.
+            {d.panel.scorePendientePre}
+            <strong className="text-text">{domain}</strong>
+            {d.panel.scorePendientePost}
           </p>
-          <BotonScore slug={tenant.slug} label="Correr score" />
+          <BotonScore slug={tenant.slug} label={d.panel.correrScore} />
         </div>
       ) : (
         <Resultado slug={tenant.slug} score={score} />
@@ -37,7 +36,8 @@ export default async function Score({ params }: PageProps<'/t/[slug]/score'>) {
   )
 }
 
-function Resultado({ slug, score }: { slug: string; score: OraScore }) {
+async function Resultado({ slug, score }: { slug: string; score: OraScore }) {
+  const d = await getDict()
   const p = prevision(score)
 
   const bien: { id: string; name: string }[] = []
@@ -64,16 +64,16 @@ function Resultado({ slug, score }: { slug: string; score: OraScore }) {
                 {gradeDe(p.estimado)}
               </span>
             </p>
-            <p className="mt-2 text-xs text-muted">hoy vs. con Peaje y el kit aplicado</p>
+            <p className="mt-2 text-xs text-muted">{d.panel.scoreComparativa}</p>
           </div>
-          <BotonScore slug={slug} label="Volver a correr" />
+          <BotonScore slug={slug} label={d.panel.volverACorrerScore} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
         <section>
-          <h2 className="font-medium text-green-400">Lo que ya tienes bien</h2>
-          <p className="mt-1 text-xs text-muted">{bien.length} checks pasando</p>
+          <h2 className="font-medium text-green-400">{d.panel.scoreBien}</h2>
+          <p className="mt-1 text-xs text-muted">{d.panel.scoreChecksPasando(bien.length)}</p>
           <div className="relative mt-3">
             <ul className="scroll-thin max-h-96 space-y-1.5 overflow-y-auto pr-2">
               {bien.map((c) => (
@@ -88,9 +88,9 @@ function Resultado({ slug, score }: { slug: string; score: OraScore }) {
         </section>
 
         <section>
-          <h2 className="font-medium text-red-400">Lo que mejoras con Peaje</h2>
+          <h2 className="font-medium text-red-400">{d.panel.scoreMejoras}</h2>
           <p className="mt-1 text-xs text-muted">
-            {p.arreglables.length} checks que el kit y el gateway atacan
+            {d.panel.scoreChecksAtacados(p.arreglables.length)}
           </p>
           <div className="relative mt-3">
             <ul className="scroll-thin max-h-96 space-y-1.5 overflow-y-auto pr-2">
@@ -118,9 +118,7 @@ function Resultado({ slug, score }: { slug: string; score: OraScore }) {
             ) : null}
           </div>
           {p.arreglables.length === 0 ? (
-            <p className="mt-3 text-sm text-accent">
-              Todos los checks que Peaje ataca ya pasan.
-            </p>
+            <p className="mt-3 text-sm text-accent">{d.panel.scoreTodoPasa}</p>
           ) : null}
         </section>
       </div>

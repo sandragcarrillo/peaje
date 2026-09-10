@@ -4,6 +4,7 @@ import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
+import { useDict } from '@/lib/i18n/client'
 import { entrarConPrivy } from './actions'
 
 type Step = 'email' | 'code'
@@ -18,6 +19,7 @@ export default function Acceder() {
   const [pending, setPending] = useState(false)
   const [restaurando, setRestaurando] = useState(true)
 
+  const d = useDict()
   const { ready, getAccessToken, authenticated, logout } = usePrivy()
   const { sendCode, loginWithCode } = useLoginWithEmail()
 
@@ -52,7 +54,7 @@ export default function Acceder() {
     e.preventDefault()
     setError(null)
     setNoRegistrado(false)
-    if (!email.trim()) return setError('Falta tu email.')
+    if (!email.trim()) return setError(d.acceso.errorFaltaEmail)
     setPending(true)
     try {
       // Una sesión Privy vieja (p.ej. restaurada de otra visita) hace que
@@ -62,7 +64,7 @@ export default function Acceder() {
       await sendCode({ email })
       setStep('code')
     } catch {
-      setError('No pudimos enviar el código. Revisa el email.')
+      setError(d.acceso.errorEnvioCodigo)
     } finally {
       setPending(false)
     }
@@ -83,10 +85,10 @@ export default function Acceder() {
       if (err instanceof Error && err.message.includes('already has one email')) {
         // Sesión zombie detectada tarde: limpiar y pedir código de nuevo.
         await logout().catch(() => {})
-        setError('Había una sesión vieja de Privy. La limpiamos: pide un código nuevo.')
+        setError(d.acceso.errorSesionVieja)
         setStep('email')
       } else {
-        setError('Código inválido o vencido. Pide uno nuevo e intenta de nuevo.')
+        setError(d.acceso.errorCodigoInvalidoPideOtro)
       }
       setPending(false)
       return
@@ -104,7 +106,7 @@ export default function Acceder() {
       router.push(r.slug ? `/t/${r.slug}` : '/negocios')
     } catch (err) {
       console.error('[acceder]', err)
-      setError('El código era válido pero falló el ingreso. Intenta de nuevo.')
+      setError(d.acceso.errorIngresoFallo)
     } finally {
       setPending(false)
     }
@@ -113,7 +115,7 @@ export default function Acceder() {
   if (restaurando) {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
-        <p className="text-sm text-muted">Entrando…</p>
+        <p className="text-sm text-muted">{d.acceso.entrando}</p>
       </div>
     )
   }
@@ -122,25 +124,27 @@ export default function Acceder() {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
         <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-medium">Revisa tu email</h1>
+          <h1 className="text-2xl font-medium">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
-            Te mandamos un código a <span className="text-text">{email}</span>.
+            {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
           </p>
           <form onSubmit={verificar} className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-xs tracking-wide text-muted uppercase">Código</span>
+              <span className="text-xs tracking-wide text-muted uppercase">
+                {d.acceso.campoCodigo}
+              </span>
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 required
-                placeholder="123456"
+                placeholder={d.acceso.placeholderCodigo}
                 className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
               />
             </label>
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
             {noRegistrado ? (
               <Link href="/nuevo" className="block text-sm text-accent hover:underline">
-                Registrar este negocio →
+                {d.acceso.registrarEsteNegocio} →
               </Link>
             ) : null}
             <button
@@ -148,7 +152,7 @@ export default function Acceder() {
               disabled={pending}
               className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
             >
-              {pending ? 'Verificando…' : 'Entrar'}
+              {pending ? d.acceso.verificando : d.acceso.botonEntrar}
             </button>
           </form>
         </div>
@@ -159,17 +163,17 @@ export default function Acceder() {
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-medium">Entrar</h1>
-        <p className="mt-2 text-sm text-muted">Con tu email. No hay usuarios ni contraseñas.</p>
+        <h1 className="text-2xl font-medium">{d.acceso.tituloEntrar}</h1>
+        <p className="mt-2 text-sm text-muted">{d.acceso.subtituloEntrar}</p>
         <form onSubmit={enviarCodigo} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs tracking-wide text-muted uppercase">Email</span>
+            <span className="text-xs tracking-wide text-muted uppercase">{d.acceso.campoEmail}</span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="tu@tunegocio.com"
+              placeholder={d.acceso.placeholderEmail}
               className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-sm outline-none focus:border-accent"
             />
           </label>
@@ -178,7 +182,7 @@ export default function Acceder() {
             disabled={pending}
             className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
           >
-            {pending ? 'Enviando…' : 'Enviar código'}
+            {pending ? d.acceso.enviando : d.acceso.enviarCodigo}
           </button>
         </form>
       </div>

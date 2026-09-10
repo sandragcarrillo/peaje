@@ -74,7 +74,7 @@ export async function sendFromMerchantWallet(
 ): Promise<`0x${string}`> {
   const walletId = await findMerchantWalletId(walletAddress)
   if (!walletId) {
-    throw new Error('Esa wallet no la custodia Peaje: muévela desde tu propia app de wallet.')
+    throw new Error('Peaje does not custody that wallet: move the funds from your own wallet app.')
   }
   // El cast aplaca la inferencia de TS (la firma doble tempo+EVM del account de
   // Privy revienta el checker); en runtime firma ambos tipos de tx igual.

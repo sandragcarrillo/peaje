@@ -1,6 +1,7 @@
 'use server'
 
 import { generateEmbedSecret, slugify } from '@peaje/shared'
+import { getDict } from '@/lib/i18n'
 import { createMerchantWallet, getPrivyUserEmail, verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -17,34 +18,35 @@ export async function registrarNegocio(
   _previo: AltaResultado | null,
   formData: FormData,
 ): Promise<AltaResultado> {
+  const d = await getDict()
   const name = String(formData.get('name') ?? '').trim()
   const originUrl = String(formData.get('originUrl') ?? '').trim()
   const accessToken = String(formData.get('privyAccessToken') ?? '').trim()
 
-  if (!name) return { ok: false, error: 'Falta el nombre del negocio.' }
-  if (!originUrl) return { ok: false, error: 'Falta la URL de tu sitio web.' }
-  if (!accessToken) return { ok: false, error: 'Verifica tu email antes de continuar.' }
+  if (!name) return { ok: false, error: d.acceso.errorFaltaNombre }
+  if (!originUrl) return { ok: false, error: d.acceso.errorFaltaUrl }
+  if (!accessToken) return { ok: false, error: d.acceso.errorVerificaEmail }
 
   let origin: URL
   try {
     origin = new URL(originUrl)
   } catch {
-    return { ok: false, error: 'Esa URL no parece válida. Ejemplo: https://tunegocio.com' }
+    return { ok: false, error: d.acceso.errorUrlInvalida }
   }
 
   let privyUserId: string
   try {
     privyUserId = await verifyPrivyAccessToken(accessToken)
   } catch {
-    return { ok: false, error: 'No pudimos verificar tu sesión. Intenta de nuevo.' }
+    return { ok: false, error: d.acceso.errorSesionNoVerificada }
   }
 
   // Un usuario puede tener varios negocios: no hay shortcut por usuario
   // existente, solo el guard de slug repetido de abajo.
   const slug = slugify(name)
-  if (!slug) return { ok: false, error: 'El nombre no genera un identificador válido.' }
+  if (!slug) return { ok: false, error: d.acceso.errorNombreSinIdentificador }
   if (await store.getTenantBySlug(slug)) {
-    return { ok: false, error: `Ya hay un negocio registrado como "${slug}".` }
+    return { ok: false, error: d.acceso.errorSlugTomado(slug) }
   }
 
   const email = await getPrivyUserEmail(privyUserId)
