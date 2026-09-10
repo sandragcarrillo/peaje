@@ -239,6 +239,25 @@ app.get('/:slug/agents/:id/card.json', async (c) => {
  * sobre Streamable HTTP. Un agente MCP las descubre, paga por JSON-RPC y
  * recibe el recurso, sin conocer la API HTTP.
  */
+/**
+ * Sonda GET al MCP: el transporte Streamable HTTP habla por POST, pero los
+ * detectores (y Ora) tantean con GET. Un 404 les dice "acá no hay nada"; un
+ * 405 con Allow y un puntero al server card les dice "existe, hablá POST".
+ */
+app.get('/:slug/mcp', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
+  return c.json(
+    {
+      error: 'This MCP endpoint speaks Streamable HTTP over POST.',
+      transport: 'streamable-http',
+      serverCard: `${env.publicUrl}/${tenant.slug}/.well-known/mcp/server-card.json`,
+    },
+    405,
+    { allow: 'POST' },
+  )
+})
+
 app.post('/:slug/mcp', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
