@@ -78,7 +78,16 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
       fetchCorto(`${site}/robots.txt`),
     ])
 
-  const refiere = (r: { ok: boolean; text: string }) => r.ok && r.text.includes(gatewayMark)
+  /**
+   * Un bloque cuenta como publicado si el archivo existe y apunta a Peaje.
+   *
+   * "Apunta a Peaje" son DOS cosas válidas: la URL del gateway, o el propio
+   * dominio del negocio cuando instaló el proxy. Antes solo aceptábamos la
+   * primera y marcábamos como faltantes archivos correctos servidos desde el
+   * origen, que es justamente la forma que recomendamos.
+   */
+  const refiere = (r: { ok: boolean; text: string }) =>
+    r.ok && (r.text.includes(gatewayMark) || r.text.includes(domain))
 
   return [
     {

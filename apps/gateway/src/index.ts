@@ -1,7 +1,7 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import { NETWORK_IDS } from '@peaje/shared'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
 import { agentCard } from './agents/erc8004.js'
 import { agentsRouter } from './agents/router.js'
@@ -244,8 +244,26 @@ app.get('/:slug/agents/:id/card.json', async (c) => {
  * detectores (y Ora) tantean con GET. Un 404 les dice "acá no hay nada"; un
  * 405 con Allow y un puntero al server card les dice "existe, hablá POST".
  */
-app.get('/:slug/mcp', async (c) => {
+/**
+ * Ora pide el MCP también en `/.well-known/mcp` ("Serve your MCP server at
+ * /.well-known/mcp"), así que el endpoint vive en las dos rutas.
+ */
+app.post('/:slug/.well-known/mcp', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
+  const body = await c.req.json().catch(() => undefined)
+  await handleMcpRequest(tenant, c.env.incoming, c.env.outgoing, body)
+  return RESPONSE_ALREADY_SENT
+})
+
+app.get('/:slug/.well-known/mcp', async (c) => sondaMcp(c))
+
+app.get('/:slug/mcp', async (c) => sondaMcp(c))
+
+/** Respuesta a una sonda GET sobre un endpoint MCP. */
+async function sondaMcp(c: Context<{ Bindings: HttpBindings }>) {
+  const slug = c.req.param('slug')
+  const tenant = slug ? await store.getTenantBySlug(slug) : null
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
   return c.json(
     {
@@ -256,7 +274,7 @@ app.get('/:slug/mcp', async (c) => {
     405,
     { allow: 'POST' },
   )
-})
+}
 
 app.post('/:slug/mcp', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))

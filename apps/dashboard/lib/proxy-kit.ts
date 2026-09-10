@@ -18,6 +18,7 @@ export const RUTAS_PROXY = [
   { path: '/agents.md', nota: 'qué es y cuándo usarte' },
   { path: '/openapi.json', nota: 'discovery con precios' },
   { path: '/mcp', nota: 'MCP server con tools pagas, en TU dominio' },
+  { path: '/.well-known/mcp', nota: 'el MCP también acá: es donde lo buscan los auditores' },
   { path: '/.well-known/ard.json', nota: 'catálogo ARD (path canónico)' },
   { path: '/.well-known/ai-catalog.json', nota: 'catálogo ARD (alias legacy)' },
   { path: '/.well-known/api-catalog', nota: 'linkset RFC 9727' },
