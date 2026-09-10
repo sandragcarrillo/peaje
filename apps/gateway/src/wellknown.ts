@@ -330,10 +330,14 @@ export function agentCard({ tenant, routes, base }: Ctx): Record<string, unknown
 
 /** .well-known/api-catalog (api-catalog-rfc9727, formato linkset RFC 9264) */
 export function apiCatalog({ tenant, base }: Ctx): Record<string, unknown> {
+  // El ancla es el ORIGEN del negocio, no el gateway: quien audita este archivo
+  // lo pide en el dominio del negocio y espera que el linkset hable de ese
+  // dominio. Los href siguen apuntando al gateway, que responde con o sin proxy.
+  const origen = new URL(tenant.originUrl).origin
   return {
     linkset: [
       {
-        anchor: base,
+        anchor: origen,
         'service-desc': [{ href: `${base}/openapi.json`, type: 'application/openapi+json' }],
         'service-doc': [{ href: `${base}/llms.txt`, type: 'text/plain' }],
         'service-meta': [{ href: `${base}/pricing.md`, type: 'text/markdown' }],
