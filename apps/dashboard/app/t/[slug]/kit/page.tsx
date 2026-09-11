@@ -4,6 +4,13 @@ import { getDict, type Dict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
+import {
+  construirBloques,
+  primeraRutaPaga,
+  rutasDelProxy,
+  type Bloque,
+  type Oferta,
+} from './bloques'
 import { ToggleBlock, VerificadorIntegracion } from './partes'
 import { BloqueProxy } from './proxy'
 import { generarProxy } from '@/lib/proxy-kit'
@@ -25,35 +32,34 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
     )
   }
 
-  const routes = await store.listRoutes(tenant.id)
   const base = `${gatewayUrl}/${tenant.slug}`
   const domain = scannableDomain(tenant.originUrl)
   // El kit se aplica en el WEBSITE del negocio (dominio raíz), no en el host de la API.
   const originHost = domain ?? new URL(tenant.originUrl).hostname
   const score = domain ? await cachedScore(domain) : null
 
-  const tieneLlms = checkStatus(score, 'llms-txt-exists') === 'pass'
   const tieneJsonLd = checkStatus(score, 'json-ld') === 'pass'
 
-  const desdeGateway = await Promise.all(
-    ['auth.md', 'agents.md', '.well-known/ai-catalog.json', '.well-known/agent-card.json', '.well-known/api-catalog'].map(
-      async (path) => {
-        const res = await fetch(`${base}/${path}`, { cache: 'no-store' })
-        return { path, contenido: res.ok ? await res.text() : null }
-      },
-    ),
-  )
+  // Las ofertas salen del catálogo canónico del gateway, no de un armado
+  // paralelo: así el JSON-LD dice lo mismo que el 402 cobra.
+  const ofertas: Oferta[] = await fetch(`${base}/discovery/resources`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : { items: [] }))
+    .then((b: { items?: { resource: string; extensions?: { bazaar?: { info?: { title?: string; priceUsd?: number } } } }[] }) =>
+      (b.items ?? []).map((i) => ({
+        titulo: i.extensions?.bazaar?.info?.title ?? i.resource,
+        priceUsd: i.extensions?.bazaar?.info?.priceUsd ?? 0,
+        url: i.resource,
+      })),
+    )
+    .catch(() => [])
 
   const bloques = construirBloques({
     d,
     tenant: { name: tenant.name, slug: tenant.slug },
     base,
-    routes,
-    tieneLlms,
+    originHost,
+    ofertas,
     tieneJsonLd,
-    desdeGateway: desdeGateway.filter(
-      (g): g is { path: string; contenido: string } => g.contenido !== null,
-    ),
   })
 
   return (
@@ -109,7 +115,14 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
       </div>
 
-      <PromptTodoDeUna d={d} bloques={bloques} base={base} originHost={originHost} domain={domain} />
+      <PromptTodoDeUna
+        d={d}
+        bloques={bloques}
+        base={base}
+        originHost={originHost}
+        domain={domain}
+        rutaPaga={primeraRutaPaga(ofertas)}
+      />
 
       <div className="space-y-3">
         {bloques.map((b) => (
@@ -133,134 +146,20 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   )
 }
 
-type Bloque = { titulo: string; detalle: string; contenido: string }
-
-function construirBloques({
-  d,
-  tenant,
-  base,
-  routes,
-  tieneLlms,
-  tieneJsonLd,
-  desdeGateway,
-}: {
-  d: Kit
-  tenant: { name: string; slug: string }
-  base: string
-  routes: { method: string; pathPattern: string; priceUsd: string; description: string | null }[]
-  tieneLlms: boolean
-  tieneJsonLd: boolean
-  desdeGateway: { path: string; contenido: string }[]
-}): Bloque[] {
-  const llmsBloque = `## Pagos para agentes (MPP)
-
-- API paga por request: ${base}
-- Discovery (OpenAPI + precios): ${base}/openapi.json
-- MCP (tools pagas): ${base}/mcp
-- Precios: ${base}/llms.txt`
-
-  const llmsCompleto = `# ${tenant.name}
-
-> API con pagos por request para agentes (MPP sobre HTTP 402). Sin API keys ni registro.
-
-${llmsBloque}`
-
-  const jsonLd = `<script type="application/ld+json">
-${JSON.stringify(
-    {
-      '@context': 'https://schema.org',
-      '@type': 'WebAPI',
-      name: tenant.name,
-      documentation: `${base}/openapi.json`,
-      offers: routes.map((r) => ({
-        '@type': 'Offer',
-        price: Number(r.priceUsd),
-        priceCurrency: 'USD',
-        description: r.description ?? `${r.method} ${r.pathPattern}`,
-      })),
-    },
-    null,
-    2,
-  )}
-</script>`
-
-  const pricingMd = `# Precios de la API de ${tenant.name}
-
-Pago por request vía MPP (HTTP 402). Sin suscripción, sin API key: el agente paga y consume.
-
-| Endpoint | Precio |
-|---|---|
-${routes.map((r) => `| ${r.method} ${r.pathPattern} | $${Number(r.priceUsd)} USD |`).join('\n')}
-
-Gateway: ${base} · Discovery: ${base}/openapi.json`
-
-  const wellKnownMcp = `{
-  "servers": [
-    {
-      "name": "${tenant.slug}",
-      "url": "${base}/mcp",
-      "transport": "streamable-http",
-      "description": "Tools pagas de ${tenant.name} (MPP por JSON-RPC)"
-    }
-  ]
-}`
-
-  const robots = `# Agentes bienvenidos: la API cobra por request vía MPP (HTTP 402)
-User-agent: *
-Allow: /
-# Payment discovery: ${base}/openapi.json`
-
-  return [
-    {
-      titulo: d.bloqueLlms,
-      detalle: tieneLlms ? d.bloqueLlmsExiste : d.bloqueLlmsFalta,
-      contenido: tieneLlms ? llmsBloque : llmsCompleto,
-    },
-    {
-      titulo: d.bloqueLink,
-      detalle: d.bloqueLinkDetalle,
-      contenido: `<link rel="payment-discovery" href="${base}/openapi.json">`,
-    },
-    {
-      titulo: d.bloqueJsonLd,
-      detalle: tieneJsonLd ? d.bloqueJsonLdExiste : d.bloqueJsonLdFalta,
-      contenido: jsonLd,
-    },
-    {
-      titulo: d.bloquePricing,
-      detalle: d.bloquePricingDetalle,
-      contenido: pricingMd,
-    },
-    {
-      titulo: d.bloqueMcp,
-      detalle: d.bloqueMcpDetalle,
-      contenido: wellKnownMcp,
-    },
-    {
-      titulo: d.bloqueRobots,
-      detalle: d.bloqueRobotsDetalle,
-      contenido: robots,
-    },
-    ...desdeGateway.map((g, i) => ({
-      titulo: `${7 + i} · ${g.path}`,
-      detalle: d.bloqueGatewayDetalle(g.path),
-      contenido: g.contenido,
-    })),
-  ]
-}
-
 function PromptTodoDeUna({
   d,
   bloques,
   base,
   originHost,
   domain,
+  rutaPaga,
 }: {
   d: Kit
   bloques: Bloque[]
   base: string
   originHost: string
   domain: string | null
+  rutaPaga: string | null
 }) {
   // El prompt sigue el idioma de la UI: sus secciones son los títulos y
   // detalles traducidos de los bloques, así que dejar el marco en otro idioma
@@ -282,9 +181,18 @@ ${proxy}
 
 ${d.promptProxyNota}
 
+## ${d.promptNoCrearTitulo}
+${d.promptNoCrearDetalle}
+
+${rutasDelProxy()
+  .map((r) => `- ${r}`)
+  .join('\n')}
+
+${d.promptNoCrearCierre}
+
 ${bloques.map((b) => `## ${b.titulo}\n${b.detalle}\n\n\`\`\`\n${b.contenido}\n\`\`\``).join('\n\n')}
 
-${d.promptVerifica(base)}
+${d.promptVerifica(originHost, rutaPaga)}
 ${domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio}
 
 ${d.promptReferencia}`

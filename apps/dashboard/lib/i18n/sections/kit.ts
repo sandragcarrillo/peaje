@@ -16,30 +16,17 @@ export const kit = {
     verificaLink: 'vuelve a correr el score →',
 
     // Bloques del kit (solo el texto explicativo: el contenido copiable no se traduce)
-    bloqueLlms: '1 · llms.txt',
-    bloqueLlmsExiste: 'Ya tienes llms.txt: agrega este bloque al final del que existe.',
-    bloqueLlmsFalta: 'No tienes llms.txt. Crea el archivo /llms.txt en la raíz de tu dominio con esto.',
-
-    bloqueLink: '2 · Link de discovery en tu HTML',
-    bloqueLinkDetalle: 'En el <head> de tu página principal.',
-
-    bloqueJsonLd: '3 · JSON-LD con tu oferta',
+    bloqueJsonLd: '1 · JSON-LD con tu oferta',
     bloqueJsonLdExiste: 'Ya tienes JSON-LD: suma este bloque WebAPI junto al que existe.',
     bloqueJsonLdFalta: 'No tienes datos estructurados. Pega esto en el <head> de tu home.',
 
-    bloquePricing: '4 · pricing.md',
-    bloquePricingDetalle:
-      'Precios en un archivo que los agentes leen directo. Sirve /pricing.md en tu dominio.',
+    bloqueLink: '2 · Links de discovery en tu HTML',
+    bloqueLinkDetalle:
+      'En el <head> de tu página principal. Apuntan a rutas de tu propio dominio: las sirve el proxy del paso 1.',
 
-    bloqueMcp: '5 · .well-known/mcp.json',
-    bloqueMcpDetalle: 'Anuncia tu MCP pago donde los clientes MCP lo buscan.',
-
-    bloqueRobots: '6 · robots.txt que no espanta agentes',
+    bloqueRobots: '3 · robots.txt que no espanta agentes',
     bloqueRobotsDetalle:
       'Si tu robots.txt bloquea bots, los agentes no llegan ni a ver el 402.',
-
-    bloqueGatewayDetalle: (path: string) =>
-      `Sube este archivo a tu dominio en /${path}. Se genera solo desde tus rutas; cuando cambies precios, vuelve al kit y copia la versión nueva.`,
 
     // Prompt "todo de una"
     promptTitulo: 'Todo de una · prompt para tu coding agent',
@@ -49,12 +36,41 @@ export const kit = {
       `Haz mi sitio (${originHost}) agent-ready. Mi API ya cobra por request a agentes vía MPP con Peaje; el gateway es ${base}.
 
 Aplica estos cambios en el repo del sitio:`,
-    promptVerifica: (base: string) => `Al terminar, verifica:
-1. npx mppx@latest validate ${base}  (el flujo de pago, debe pasar todo)`,
+    promptNoCrearTitulo: 'No crees estos archivos a mano',
+    promptNoCrearDetalle:
+      'El paso 1 ya los sirve desde tu dominio. Si además dejas una copia estática, la copia gana sobre el proxy, se congela el día que la copiaste y el auditor termina leyendo una versión vieja. Si alguno ya existe en tu repo (public/, static/, o como ruta), bórralo:',
+    promptNoCrearCierre:
+      'Tampoco toques tu llms.txt: el gateway lee el tuyo y le agrega la sección de pagos solo.',
+
+    promptVerifica: (originHost: string, rutaPaga: string | null) =>
+      `Al terminar, verifica contra TU dominio (no contra el gateway: el auditor mide tu origen). Cada línea tiene que dar el código que dice al lado:
+
+\`\`\`bash
+curl -sL -o /dev/null -w "%{http_code} ard\\n" https://${originHost}/.well-known/ard.json          # 200
+curl -sL -o /dev/null -w "%{http_code} openapi\\n" https://${originHost}/openapi.json              # 200
+curl -sL -o /dev/null -w "%{http_code} bazaar\\n" https://${originHost}/discovery/resources        # 200
+curl -sL -o /dev/null -w "%{http_code} mcp-get\\n" https://${originHost}/mcp                       # 405
+curl -sL -o /dev/null -w "%{http_code} mcp-post\\n" -X POST https://${originHost}/mcp \\
+  -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'                                        # 200${
+        rutaPaga
+          ? `
+curl -sL -o /dev/null -w "%{http_code} pago\\n" https://${originHost}${rutaPaga}                   # 402`
+          : ''
+      }
+\`\`\`
+
+El \`-L\` importa: si tu apex redirige a www (o al revés), sin él curl te muestra el 308 del redirect y parece que todo está roto.
+
+Si alguna da 404, falta esa regla en la config del paso 1. Si alguna da 200 pero con contenido viejo, quedó una copia estática tapándola: bórrala.`,
     promptAuditConDominio: (domain: string) =>
-      `2. npx @ora-ai/ax@0.4 audit ${domain}  (el score de agent-readiness, compara contra el anterior)`,
+      `Después corre el score y compáralo con el anterior:
+
+\`\`\`bash
+npx @ora-ai/ax@latest audit ${domain}
+\`\`\``,
     promptAuditSinDominio:
-      '2. cuando el sitio tenga dominio público: npx @ora-ai/ax@0.4 audit <dominio>',
+      'Cuando el sitio tenga dominio público, corre el score: `npx @ora-ai/ax@latest audit <dominio>`.',
     promptReferencia:
       'Referencia completa del estándar de auditoría: https://ora.ai/skill.md',
 
@@ -175,31 +191,17 @@ Aplica estos cambios en el repo del sitio:`,
     verificaLink: 'run the score again →',
 
     // Bloques del kit (solo el texto explicativo: el contenido copiable no se traduce)
-    bloqueLlms: '1 · llms.txt',
-    bloqueLlmsExiste: 'You already have llms.txt: append this block to the end of it.',
-    bloqueLlmsFalta:
-      'You do not have llms.txt. Create /llms.txt at the root of your domain with this.',
-
-    bloqueLink: '2 · Discovery link in your HTML',
-    bloqueLinkDetalle: 'In the <head> of your home page.',
-
-    bloqueJsonLd: '3 · JSON-LD with your offer',
+    bloqueJsonLd: '1 · JSON-LD with your offer',
     bloqueJsonLdExiste: 'You already have JSON-LD: add this WebAPI block alongside it.',
     bloqueJsonLdFalta: 'You have no structured data. Paste this into the <head> of your home page.',
 
-    bloquePricing: '4 · pricing.md',
-    bloquePricingDetalle:
-      'Prices in a file agents read directly. Serve /pricing.md on your domain.',
+    bloqueLink: '2 · Discovery links in your HTML',
+    bloqueLinkDetalle:
+      'In the <head> of your home page. They point at paths on your own domain: step 1 is what serves them.',
 
-    bloqueMcp: '5 · .well-known/mcp.json',
-    bloqueMcpDetalle: 'Announce your paid MCP where MCP clients look for it.',
-
-    bloqueRobots: '6 · A robots.txt that does not scare agents away',
+    bloqueRobots: '3 · A robots.txt that does not scare agents away',
     bloqueRobotsDetalle:
       'If your robots.txt blocks bots, agents never even get to see the 402.',
-
-    bloqueGatewayDetalle: (path: string) =>
-      `Upload this file to your domain at /${path}. It is generated from your routes: when you change prices, come back to the kit and copy the new version.`,
 
     // Prompt "todo de una"
     promptTitulo: 'All at once · prompt for your coding agent',
@@ -209,12 +211,41 @@ Aplica estos cambios en el repo del sitio:`,
       `Make my site (${originHost}) agent-ready. My API already charges agents per request via MPP with Peaje; the gateway is ${base}.
 
 Apply these changes in the site repo:`,
-    promptVerifica: (base: string) => `When you are done, verify:
-1. npx mppx@latest validate ${base}  (the payment flow, everything should pass)`,
+    promptNoCrearTitulo: 'Do not create these files by hand',
+    promptNoCrearDetalle:
+      'Step 1 already serves them from your domain. A static copy alongside it wins over the proxy, freezes on the day you copied it, and the auditor ends up reading a stale version. If any of these already exist in your repo (public/, static/, or as a route), delete them:',
+    promptNoCrearCierre:
+      'Leave your llms.txt alone too: the gateway reads yours and appends the payments section by itself.',
+
+    promptVerifica: (originHost: string, rutaPaga: string | null) =>
+      `When you are done, verify against YOUR domain (not the gateway: the auditor measures your origin). Each line must return the code next to it:
+
+\`\`\`bash
+curl -sL -o /dev/null -w "%{http_code} ard\\n" https://${originHost}/.well-known/ard.json          # 200
+curl -sL -o /dev/null -w "%{http_code} openapi\\n" https://${originHost}/openapi.json              # 200
+curl -sL -o /dev/null -w "%{http_code} bazaar\\n" https://${originHost}/discovery/resources        # 200
+curl -sL -o /dev/null -w "%{http_code} mcp-get\\n" https://${originHost}/mcp                       # 405
+curl -sL -o /dev/null -w "%{http_code} mcp-post\\n" -X POST https://${originHost}/mcp \\
+  -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'                                        # 200${
+        rutaPaga
+          ? `
+curl -sL -o /dev/null -w "%{http_code} paid\\n" https://${originHost}${rutaPaga}                   # 402`
+          : ''
+      }
+\`\`\`
+
+The \`-L\` matters: if your apex redirects to www (or the other way around), without it curl shows you the 308 from the redirect and everything looks broken.
+
+A 404 means that rule is missing from the step 1 config. A 200 with stale content means a static copy is shadowing the proxy: delete it.`,
     promptAuditConDominio: (domain: string) =>
-      `2. npx @ora-ai/ax@0.4 audit ${domain}  (the agent-readiness score, compare against the previous one)`,
+      `Then run the score and compare it against the previous one:
+
+\`\`\`bash
+npx @ora-ai/ax@latest audit ${domain}
+\`\`\``,
     promptAuditSinDominio:
-      '2. once the site has a public domain: npx @ora-ai/ax@0.4 audit <domain>',
+      'Once the site has a public domain, run the score: `npx @ora-ai/ax@latest audit <domain>`.',
     promptReferencia: 'Full reference for the audit standard: https://ora.ai/skill.md',
 
     // partes.tsx
@@ -313,6 +344,6 @@ Apply these changes in the site repo:`,
     promptProxyDetalle:
       'Add these forwarding rules to the host config. It is the only thing that makes the site serve MCP, OpenAPI and 402 from its own domain, which is where auditors measure. The example is for Next.js; if the project uses another host, translate the same routes to its syntax (vercel.json, Cloudflare Worker, nginx or Caddy). If a config already exists, merge the block instead of replacing the file.',
     promptProxyNota:
-      'The blocks that follow are the fallback for when the host config cannot be touched: they cover less, because the MCP and payment checks require living on the origin.',
+      'If the host config truly cannot be touched, the site cannot pass the MCP or payment checks at all: those require answering from the origin. The blocks below are not a substitute for step 1, they are the parts no proxy can inject for you.',
   },
 }

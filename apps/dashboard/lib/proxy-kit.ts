@@ -50,8 +50,15 @@ export const HOSTS: { id: Host; archivo: string }[] = [
 /** Comentarios del archivo generado: siguen el idioma de la UI. */
 export type Comentarios = { titulo: string; sub: string; rutaPaga: string }
 
-/** El comodín de links con precio: es lo que pone un 402 real en tu dominio. */
-const RUTA_PAGA = '/r/:slug'
+/**
+ * Rutas con un segmento variable. Van aparte porque cada host las escribe
+ * distinto: comodín en Next y Vercel, prefijo en Cloudflare, nginx y Caddy.
+ * `/r/:slug` es la importante: es lo que pone un 402 real en tu dominio.
+ */
+export const RUTAS_DINAMICAS = [
+  { path: '/r/:slug', prefijo: '/r/', nota: 'links con precio: el 402 en tu dominio' },
+  { path: '/checkout_sessions/:id', prefijo: '/checkout_sessions/', nota: 'leer una sesión de checkout ACP' },
+] as const
 
 export function generarProxy(host: Host, base: string, c: Comentarios): string {
   switch (host) {
@@ -69,27 +76,34 @@ export function generarProxy(host: Host, base: string, c: Comentarios): string {
 }
 
 function next(base: string, c: Comentarios): string {
-  const reglas = RUTAS_PROXY.map((r) => {
-    const guarda =
+  const regla = (path: string, guarda = '') =>
+    `        {\n          source: '${path}',\n          destination: '${base}${path}'${guarda},\n        },`
+
+  const reglas = RUTAS_PROXY.map((r) =>
+    regla(
+      r.path,
       r.path === '/llms.txt'
-        ? `,\n        missing: [{ type: 'header', key: '${HEADER_GUARDA}' }]`
-        : ''
-    return `      {\n        source: '${r.path}',\n        destination: '${base}${r.path}'${guarda},\n      },`
-  }).join('\n')
+        ? `,\n          missing: [{ type: 'header', key: '${HEADER_GUARDA}' }]`
+        : '',
+    ),
+  ).join('\n')
+
+  const dinamicas = RUTAS_DINAMICAS.map((r) => regla(r.path)).join('\n')
 
   return `// ${c.titulo}
 // ${c.sub}
 
 const nextConfig = {
   async rewrites() {
-    return [
+    // beforeFiles, not the default: these paths may also exist as static files
+    // in public/, and a static file would otherwise win and shadow the rewrite.
+    return {
+      beforeFiles: [
 ${reglas}
-      // ${c.rutaPaga}
-      {
-        source: '${RUTA_PAGA}',
-        destination: '${base}${RUTA_PAGA}',
-      },
-    ]
+        // ${c.rutaPaga}
+${dinamicas}
+      ],
+    }
   },
 }
 
@@ -97,7 +111,7 @@ export default nextConfig`
 }
 
 function vercel(base: string): string {
-  const reglas = [...RUTAS_PROXY.map((r) => r.path), RUTA_PAGA]
+  const reglas = [...RUTAS_PROXY.map((r) => r.path), ...RUTAS_DINAMICAS.map((r) => r.path)]
     .map((p) => `    { "source": "${p}", "destination": "${base}${p}" }`)
     .join(',\n')
   return `{
@@ -116,6 +130,7 @@ const PEAJE = '${base}'
 const RUTAS = [
 ${lista}
 ]
+const PREFIJOS = [${RUTAS_DINAMICAS.map((r) => `'${r.prefijo}'`).join(', ')}]
 
 export default {
   async fetch(request, env, ctx) {
@@ -123,7 +138,8 @@ export default {
     // Guard: avoids the loop when the gateway reads your original llms.txt.
     const esFetchDePeaje = request.headers.get('${HEADER_GUARDA}') !== null
     const proxear =
-      (!esFetchDePeaje && RUTAS.includes(url.pathname)) || url.pathname.startsWith('/r/')
+      (!esFetchDePeaje && RUTAS.includes(url.pathname)) ||
+      PREFIJOS.some((p) => url.pathname.startsWith(p))
 
     if (!proxear) return fetch(request)
 
@@ -137,6 +153,10 @@ function nginx(base: string, c: Comentarios): string {
   const bloques = RUTAS_PROXY.map(
     (r) => `    location = ${r.path} {\n        proxy_pass ${base}${r.path};\n    }`,
   ).join('\n\n')
+  const prefijos = RUTAS_DINAMICAS.map(
+    (r) => `    location ${r.prefijo} {\n        proxy_pass ${base}${r.prefijo};\n    }`,
+  ).join('\n\n')
+
   return `# nginx — ${c.titulo}
 
 server {
@@ -145,20 +165,21 @@ server {
 ${bloques}
 
     # ${c.rutaPaga}
-    location /r/ {
-        proxy_pass ${base}/r/;
-    }
+${prefijos}
 }`
 }
 
 function caddy(base: string, c: Comentarios): string {
-  const rutas = RUTAS_PROXY.map((r) => r.path).join(' ')
+  const rutas = [
+    ...RUTAS_PROXY.map((r) => r.path),
+    ...RUTAS_DINAMICAS.map((r) => `${r.prefijo}*`),
+  ].join(' ')
   return `# Caddyfile — ${c.titulo}
 
 tusitio.com {
     # ... your current config ...
 
-    reverse_proxy ${rutas} /r/* ${base} {
+    reverse_proxy ${rutas} ${base} {
         header_up Host {upstream_hostport}
     }
 }`
