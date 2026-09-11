@@ -19,7 +19,7 @@ export async function correrScore(slug: string): Promise<{ ok: boolean; error?: 
   return { ok: true }
 }
 
-export type ChequeoId = 'dominio' | 'proxy' | 'json-ld' | 'links' | 'robots'
+export type ChequeoId = 'dominio' | 'proxy' | 'frescura' | 'json-ld' | 'links' | 'robots'
 
 export type ChequeoIntegracion = {
   id: ChequeoId
@@ -34,7 +34,7 @@ export type ChequeoIntegracion = {
 async function sonda(
   url: string,
   init?: RequestInit,
-): Promise<{ status: number; text: string }> {
+): Promise<{ status: number; text: string; delGateway: boolean }> {
   try {
     const res = await fetch(url, {
       cache: 'no-store',
@@ -44,9 +44,11 @@ async function sonda(
     })
     // Solo leemos el cuerpo cuando lo vamos a mirar: el resto es peso al pedo.
     const text = res.status < 400 ? await res.text() : ''
-    return { status: res.status, text }
+    // El gateway firma cada respuesta con RateLimit-Policy. Un archivo estático
+    // o un route handler del sitio no la traen: es la huella de quién sirvió.
+    return { status: res.status, text, delGateway: res.headers.has('ratelimit-policy') }
   } catch {
-    return { status: 0, text: '' }
+    return { status: 0, text: '', delGateway: false }
   }
 }
 
@@ -62,6 +64,14 @@ const SONDAS_PROXY: { path: string; esperado: number; post?: boolean }[] = [
   { path: '/.well-known/ucp', esperado: 200 },
   { path: '/mcp', esperado: 200, post: true },
 ]
+
+/**
+ * Rutas donde una copia congelada hace más daño. Un 200 no alcanza: la copia
+ * también responde 200. Lo que la delata es que no viene del gateway, y eso
+ * se ve en las cabeceras. Es el bug que dejó un ai-catalog.json con esquema
+ * 0.91 sirviéndose durante días mientras el gateway ya emitía 1.0.
+ */
+const TAPABLES = ['/.well-known/ard.json', '/openapi.json', '/.well-known/api-catalog', '/llms.txt']
 
 /**
  * Qué del kit está realmente publicado en el dominio del negocio.
@@ -80,7 +90,7 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
 
   const site = `https://${domain}`
 
-  const [proxy, home, robots] = await Promise.all([
+  const [proxy, frescura, home, robots] = await Promise.all([
     Promise.all(
       SONDAS_PROXY.map(async (s) => ({
         path: s.path,
@@ -100,11 +110,19 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
           )).status === s.esperado,
       })),
     ),
+    Promise.all(
+      TAPABLES.map(async (path) => {
+        const r = await sonda(`${site}${path}`)
+        // Un 404 no es una copia: eso lo reporta el chequeo del proxy.
+        return { path, vieja: r.status === 200 && !r.delGateway }
+      }),
+    ),
     sonda(site),
     sonda(`${site}/robots.txt`),
   ])
 
   const faltantes = proxy.filter((p) => !p.ok).map((p) => p.path)
+  const viejas = frescura.filter((f) => f.vieja).map((f) => f.path)
   const html = home.text
 
   return [
@@ -119,6 +137,13 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
             ? d.chequeoProxyFalta
             : d.chequeoProxyParcial(faltantes.length, SONDAS_PROXY.length),
       faltantes,
+    },
+    {
+      id: 'frescura',
+      label: d.chequeoFrescura,
+      ok: viejas.length === 0,
+      detalle: viejas.length === 0 ? d.chequeoFrescuraOk : d.chequeoFrescuraVieja(viejas.join(', ')),
+      faltantes: viejas,
     },
     {
       id: 'json-ld',

@@ -135,17 +135,27 @@ export function ImplementarPeaje({
 
   const pendientes = piezas.filter((p) => faltan.some((f) => f.id === p.id))
   const faltaProxy = faltan.some((f) => f.id === 'proxy')
+  // Copias que le ganan al proxy: se nombran una por una, con la ruta exacta,
+  // para que el agente borre esas y no se ponga a adivinar.
+  const tapadas = faltan.find((f) => f.id === 'frescura')?.faltantes ?? []
+
+  const limpieza =
+    faltaProxy || tapadas.length > 0
+      ? [
+          `## ${marco.noCrearTitulo}`,
+          ...(tapadas.length > 0 ? [d.promptTapadas(tapadas), ''] : []),
+          marco.noCrearDetalle,
+          '',
+          ...marco.rutas.map((r) => `- ${r}`),
+          '',
+          marco.noCrearCierre,
+        ].join('\n')
+      : null
 
   const prompt = [
     marco.intro,
     ...pendientes.map((p) => `## ${p.titulo}\n${p.detalle}\n\n\`\`\`\n${p.contenido}\n\`\`\``),
-    ...(faltaProxy
-      ? [
-          `## ${marco.noCrearTitulo}\n${marco.noCrearDetalle}\n\n${marco.rutas
-            .map((r) => `- ${r}`)
-            .join('\n')}\n\n${marco.noCrearCierre}`,
-        ]
-      : []),
+    ...(limpieza ? [limpieza] : []),
     marco.verifica,
     marco.audit,
     marco.referencia,

@@ -41,6 +41,8 @@ Aplica estos cambios en el repo del sitio:`,
       'El paso 1 ya los sirve desde tu dominio. Si además dejas una copia estática, la copia gana sobre el proxy, se congela el día que la copiaste y el auditor termina leyendo una versión vieja. Si alguno ya existe en tu repo (public/, static/, o como ruta), bórralo:',
     promptNoCrearCierre:
       'Tampoco toques tu llms.txt: el gateway lee el tuyo y le agrega la sección de pagos solo.',
+    promptTapadas: (paths: string[]) =>
+      `Medido ahora mismo: ${paths.join(', ')} ${paths.length === 1 ? 'lo sirve' : 'los sirve'} el sitio, no el gateway. Hay una copia estática o un route handler propio tapando el proxy. Búscalo (public/, static/, app/<ruta>/route.ts, pages/api/) y bórralo.`,
 
     promptVerifica: (originHost: string, rutaPaga: string | null) =>
       `Al terminar, verifica contra TU dominio (no contra el gateway: el auditor mide tu origen). Cada línea tiene que dar el código que dice al lado:
@@ -112,6 +114,11 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoProxyFalta: 'Todavía no: tu dominio no reenvía ninguna ruta al gateway.',
     chequeoProxyParcial: (faltan: number, total: number) =>
       `${total - faltan} de ${total} rutas responden. Faltan reglas en la config.`,
+
+    chequeoFrescura: 'Sin copias tapando el proxy',
+    chequeoFrescuraOk: 'Todo lo que sirve tu dominio lo genera el gateway en vivo.',
+    chequeoFrescuraVieja: (paths: string) =>
+      `Hay copias estáticas o rutas propias sirviendo ${paths}. Le ganan al proxy y se quedan viejas: hay que borrarlas.`,
 
     chequeoLink: 'Links de discovery en el HTML',
     chequeoLinkOk: 'La home los tiene.',
@@ -203,6 +210,8 @@ Apply these changes in the site repo:`,
       'Step 1 already serves them from your domain. A static copy alongside it wins over the proxy, freezes on the day you copied it, and the auditor ends up reading a stale version. If any of these already exist in your repo (public/, static/, or as a route), delete them:',
     promptNoCrearCierre:
       'Leave your llms.txt alone too: the gateway reads yours and appends the payments section by itself.',
+    promptTapadas: (paths: string[]) =>
+      `Measured right now: ${paths.join(', ')} ${paths.length === 1 ? 'is' : 'are'} served by the site, not the gateway. A static copy or a route handler of your own is shadowing the proxy. Find it (public/, static/, app/<path>/route.ts, pages/api/) and delete it.`,
 
     promptVerifica: (originHost: string, rutaPaga: string | null) =>
       `When you are done, verify against YOUR domain (not the gateway: the auditor measures your origin). Each line must return the code next to it:
@@ -272,6 +281,11 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoProxyFalta: 'Not yet: your domain forwards no routes to the gateway.',
     chequeoProxyParcial: (faltan: number, total: number) =>
       `${total - faltan} of ${total} routes answer. Some rules are missing from the config.`,
+
+    chequeoFrescura: 'No copies shadowing the proxy',
+    chequeoFrescuraOk: 'Everything your domain serves is generated live by the gateway.',
+    chequeoFrescuraVieja: (paths: string) =>
+      `Static copies or your own routes are serving ${paths}. They win over the proxy and go stale: delete them.`,
 
     chequeoLink: 'Discovery links in the HTML',
     chequeoLinkOk: 'Your home page has them.',
