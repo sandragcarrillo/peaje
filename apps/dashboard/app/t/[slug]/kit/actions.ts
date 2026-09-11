@@ -19,157 +19,137 @@ export async function correrScore(slug: string): Promise<{ ok: boolean; error?: 
   return { ok: true }
 }
 
+export type ChequeoId = 'dominio' | 'proxy' | 'json-ld' | 'links' | 'robots'
+
 export type ChequeoIntegracion = {
-  id: string
+  id: ChequeoId
   label: string
   ok: boolean
   detalle: string
+  /** Para el proxy: las rutas que todavía no responden desde el dominio. */
+  faltantes?: string[]
 }
 
-async function fetchCorto(url: string): Promise<{ ok: boolean; text: string }> {
+/** Fetch que reporta el status, no solo si fue 2xx: un 402 es un éxito acá. */
+async function sonda(
+  url: string,
+  init?: RequestInit,
+): Promise<{ status: number; text: string }> {
   try {
     const res = await fetch(url, {
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
-      headers: { 'user-agent': 'peaje-verificador/1.0' },
+      headers: { 'user-agent': 'peaje-verificador/1.0', ...(init?.headers ?? {}) },
+      ...init,
     })
-    if (!res.ok) return { ok: false, text: '' }
-    return { ok: true, text: await res.text() }
+    // Solo leemos el cuerpo cuando lo vamos a mirar: el resto es peso al pedo.
+    const text = res.status < 400 ? await res.text() : ''
+    return { status: res.status, text }
   } catch {
-    return { ok: false, text: '' }
+    return { status: 0, text: '' }
   }
 }
 
 /**
- * "Ya lo integré": verifica desde nuestro lado qué bloques del kit están
- * realmente publicados en el dominio del tenant. Cada chequeo hace un fetch
- * real; verde solo si el archivo existe Y referencia al gateway de Peaje.
+ * Rutas que prueban que el proxy está puesto. No están todas a propósito:
+ * estas cinco son las que mueven el score, y una lista de dieciocho vueltas
+ * convierte un semáforo en una auditoría.
+ */
+const SONDAS_PROXY: { path: string; esperado: number; post?: boolean }[] = [
+  { path: '/.well-known/ard.json', esperado: 200 },
+  { path: '/openapi.json', esperado: 200 },
+  { path: '/discovery/resources', esperado: 200 },
+  { path: '/.well-known/ucp', esperado: 200 },
+  { path: '/mcp', esperado: 200, post: true },
+]
+
+/**
+ * Qué del kit está realmente publicado en el dominio del negocio.
+ *
+ * El chequeo del proxy es uno solo con varias sondas adentro: para el usuario
+ * "conectaste el dominio" es una sola decisión, y partirla en cinco líneas
+ * rojas hace parecer que hay cinco cosas por hacer cuando hay una.
  */
 export async function verificarIntegracion(slug: string): Promise<ChequeoIntegracion[]> {
   const { kit: d } = await getDict()
   const tenant = await requireTenant(slug)
-  const { scannableDomain } = await import('@/lib/ora')
   const domain = scannableDomain(tenant.originUrl)
   if (!domain) {
-    return [
-      {
-        id: 'dominio',
-        label: d.chequeoDominio,
-        ok: false,
-        detalle: d.chequeoDominioDetalle,
-      },
-    ]
+    return [{ id: 'dominio', label: d.chequeoDominio, ok: false, detalle: d.chequeoDominioDetalle }]
   }
 
   const site = `https://${domain}`
-  const gatewayMark = `/${tenant.slug}`
 
-  const [home, llms, pricing, aiCatalog, agentCard, apiCatalog, authMd, agentsMd, mcpJson, robots] =
-    await Promise.all([
-      fetchCorto(site),
-      fetchCorto(`${site}/llms.txt`),
-      fetchCorto(`${site}/pricing.md`),
-      fetchCorto(`${site}/.well-known/ai-catalog.json`),
-      fetchCorto(`${site}/.well-known/agent-card.json`),
-      fetchCorto(`${site}/.well-known/api-catalog`),
-      fetchCorto(`${site}/auth.md`),
-      fetchCorto(`${site}/agents.md`),
-      fetchCorto(`${site}/.well-known/mcp.json`),
-      fetchCorto(`${site}/robots.txt`),
-    ])
+  const [proxy, home, robots] = await Promise.all([
+    Promise.all(
+      SONDAS_PROXY.map(async (s) => ({
+        path: s.path,
+        ok:
+          (await sonda(
+            `${site}${s.path}`,
+            s.post
+              ? {
+                  method: 'POST',
+                  headers: {
+                    'content-type': 'application/json',
+                    accept: 'application/json, text/event-stream',
+                  },
+                  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+                }
+              : undefined,
+          )).status === s.esperado,
+      })),
+    ),
+    sonda(site),
+    sonda(`${site}/robots.txt`),
+  ])
 
-  /**
-   * Un bloque cuenta como publicado si el archivo existe y apunta a Peaje.
-   *
-   * "Apunta a Peaje" son DOS cosas válidas: la URL del gateway, o el propio
-   * dominio del negocio cuando instaló el proxy. Antes solo aceptábamos la
-   * primera y marcábamos como faltantes archivos correctos servidos desde el
-   * origen, que es justamente la forma que recomendamos.
-   */
-  const refiere = (r: { ok: boolean; text: string }) =>
-    r.ok && (r.text.includes(gatewayMark) || r.text.includes(domain))
+  const faltantes = proxy.filter((p) => !p.ok).map((p) => p.path)
+  const html = home.text
 
   return [
     {
-      id: 'llms',
-      label: d.chequeoLlms,
-      ok: refiere(llms),
-      detalle: llms.ok
-        ? refiere(llms)
-          ? d.chequeoLlmsOk
-          : d.chequeoLlmsSinGateway
-        : d.chequeoLlmsFalta,
-    },
-    {
-      id: 'link-discovery',
-      label: d.chequeoLink,
-      ok: home.ok && home.text.includes('payment-discovery'),
-      detalle: home.ok
-        ? home.text.includes('payment-discovery')
-          ? d.chequeoLinkOk
-          : d.chequeoLinkFalta
-        : d.chequeoLinkSinHome,
+      id: 'proxy',
+      label: d.chequeoProxy,
+      ok: faltantes.length === 0,
+      detalle:
+        faltantes.length === 0
+          ? d.chequeoProxyOk
+          : faltantes.length === SONDAS_PROXY.length
+            ? d.chequeoProxyFalta
+            : d.chequeoProxyParcial(faltantes.length, SONDAS_PROXY.length),
+      faltantes,
     },
     {
       id: 'json-ld',
       label: d.chequeoJsonLd,
-      ok: home.ok && home.text.includes('application/ld+json'),
+      ok: html.includes('application/ld+json'),
+      detalle: html.includes('application/ld+json') ? d.chequeoJsonLdOk : d.chequeoJsonLdFalta,
+    },
+    {
+      id: 'links',
+      label: d.chequeoLink,
+      // `service-desc` es la relación registrada que emite el kit; la vieja
+      // `payment-discovery` sigue contando para no marcar en rojo a quien ya
+      // aplicó la versión anterior.
+      ok: html.includes('rel="service-desc"') || html.includes('payment-discovery'),
       detalle:
-        home.ok && home.text.includes('application/ld+json')
-          ? d.chequeoJsonLdOk
-          : d.chequeoJsonLdFalta,
-    },
-    {
-      id: 'pricing',
-      label: d.chequeoPricing,
-      ok: refiere(pricing),
-      detalle: pricing.ok
-        ? refiere(pricing)
-          ? d.chequeoPricingOk
-          : d.chequeoPricingOtro
-        : d.chequeoPricingFalta,
-    },
-    {
-      id: 'mcp-json',
-      label: d.chequeoMcp,
-      ok: refiere(mcpJson),
-      detalle: refiere(mcpJson) ? d.chequeoMcpOk : d.chequeoMcpFalta,
-    },
-    {
-      id: 'ai-catalog',
-      label: d.chequeoAiCatalog,
-      ok: refiere(aiCatalog),
-      detalle: refiere(aiCatalog) ? d.chequeoAiCatalogOk : d.chequeoAiCatalogFalta,
-    },
-    {
-      id: 'agent-card',
-      label: d.chequeoAgentCard,
-      ok: refiere(agentCard),
-      detalle: refiere(agentCard) ? d.chequeoAgentCardOk : d.chequeoAgentCardFalta,
-    },
-    {
-      id: 'api-catalog',
-      label: d.chequeoApiCatalog,
-      ok: refiere(apiCatalog),
-      detalle: refiere(apiCatalog) ? d.chequeoApiCatalogOk : d.chequeoApiCatalogFalta,
-    },
-    {
-      id: 'auth-md',
-      label: d.chequeoAuthMd,
-      ok: refiere(authMd),
-      detalle: refiere(authMd) ? d.chequeoAuthMdOk : d.chequeoAuthMdFalta,
-    },
-    {
-      id: 'agents-md',
-      label: d.chequeoAgentsMd,
-      ok: refiere(agentsMd),
-      detalle: refiere(agentsMd) ? d.chequeoAgentsMdOk : d.chequeoAgentsMdFalta,
+        html.includes('rel="service-desc"') || html.includes('payment-discovery')
+          ? d.chequeoLinkOk
+          : home.status === 200
+            ? d.chequeoLinkFalta
+            : d.chequeoLinkSinHome,
     },
     {
       id: 'robots',
       label: d.chequeoRobots,
-      ok: robots.ok,
-      detalle: robots.ok ? d.chequeoRobotsOk : d.chequeoRobotsFalta,
+      ok: robots.status === 200 && !/Disallow:\s*\/\s*$/m.test(robots.text),
+      detalle:
+        robots.status !== 200
+          ? d.chequeoRobotsFalta
+          : /Disallow:\s*\/\s*$/m.test(robots.text)
+            ? d.chequeoRobotsBloquea
+            : d.chequeoRobotsOk,
     },
   ]
 }

@@ -73,7 +73,10 @@ export function seccionPagos({ tenant, routes, base }: Ctx): string {
     `- [OpenAPI discovery with prices](${base}/openapi.json)`,
     `- [Pricing](${base}/pricing.md)`,
     `- [How to pay](${base}/auth.md)`,
-    `- [MCP with paid tools](${base}/mcp)`,
+    `- [What answers 402, and on what terms](${base}/discovery/resources)`,
+    // Al MCP se linkea su descriptor, no el transporte: `/mcp` solo habla POST,
+    // y un enlace que responde 405 cuenta como enlace roto para un auditor.
+    `- [MCP with paid tools](${base}/.well-known/mcp)`,
     '',
     'Reference client: `npx mppx@latest <url>` (creates a wallet, pays and retries on its own).',
   ].join('\n')
@@ -92,7 +95,10 @@ export function llmsTxt({ tenant, routes, base }: Ctx): string {
     `- [Pricing](${base}/pricing.md): plain table per endpoint`,
     `- [How to authenticate and pay](${base}/auth.md): walkthrough for agents`,
     `- [Agent guide](${base}/agents.md): what this is and when to use it`,
-    `- [MCP with paid tools](${base}/mcp): same catalog over JSON-RPC`,
+    `- [What answers 402, and on what terms](${base}/discovery/resources): the x402 catalog`,
+    // El descriptor, no el transporte: `/mcp` solo habla POST y un enlace que
+    // devuelve 405 cuenta como roto.
+    `- [MCP with paid tools](${base}/.well-known/mcp): same catalog over JSON-RPC`,
     '',
     '## Priced routes',
     '',

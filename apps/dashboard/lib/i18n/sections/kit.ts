@@ -93,51 +93,38 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoDominio: 'Dominio público',
     chequeoDominioDetalle: 'Tu origin es local: no hay dominio público que verificar.',
 
-    chequeoLlms: 'llms.txt',
-    chequeoLlmsOk: 'Existe y apunta a tu gateway.',
-    chequeoLlmsSinGateway: 'Existe pero no menciona tu gateway: falta el bloque de Peaje.',
-    chequeoLlmsFalta: 'No hay /llms.txt en tu dominio.',
+    implementaTitulo: 'Implementa Peaje',
+    implementaIntro:
+      'Medimos tu dominio en vivo y armamos el prompt solo con lo que te falta. Pégalo en Claude Code, Cursor o el agente que uses sobre el repo de tu sitio.',
+    implementaMidiendo: 'Midiendo tu dominio…',
+    implementaListoTitulo: 'Ya lo tienes listo',
+    implementaListoDetalle:
+      'Todo lo que Peaje puede poner en tu dominio está publicado. No hay nada que pegarle a un agente: vuelve a correr el score para ver el cambio.',
+    implementaFaltan: (n: number) =>
+      n === 1 ? 'Falta 1 cosa. El prompt de abajo es solo esa.' : `Faltan ${n} cosas. El prompt de abajo es solo esas.`,
+    implementaCopiar: 'Copiar prompt de lo que falta',
+    implementaCopiado: 'Prompt copiado',
+    implementaVer: 'Ver el prompt',
+    verificarDeNuevo: 'Verificar de nuevo',
 
-    chequeoLink: 'Link de discovery en el HTML',
-    chequeoLinkOk: 'La home tiene el <link rel="payment-discovery">.',
-    chequeoLinkFalta: 'La home carga pero no tiene el link de discovery.',
+    chequeoProxy: 'Tu dominio conectado',
+    chequeoProxyOk: 'MCP, catálogos y 402 responden desde tu dominio.',
+    chequeoProxyFalta: 'Todavía no: tu dominio no reenvía ninguna ruta al gateway.',
+    chequeoProxyParcial: (faltan: number, total: number) =>
+      `${total - faltan} de ${total} rutas responden. Faltan reglas en la config.`,
+
+    chequeoLink: 'Links de discovery en el HTML',
+    chequeoLinkOk: 'La home los tiene.',
+    chequeoLinkFalta: 'La home carga pero no tiene los links.',
     chequeoLinkSinHome: 'No pude leer tu home.',
 
     chequeoJsonLd: 'JSON-LD',
     chequeoJsonLdOk: 'La home tiene datos estructurados.',
     chequeoJsonLdFalta: 'La home no tiene el bloque JSON-LD.',
 
-    chequeoPricing: 'pricing.md',
-    chequeoPricingOk: 'Existe con tus precios.',
-    chequeoPricingOtro: 'Existe pero no es el de Peaje.',
-    chequeoPricingFalta: 'No hay /pricing.md.',
-
-    chequeoMcp: '.well-known/mcp.json',
-    chequeoMcpOk: 'Anuncia tu MCP pago.',
-    chequeoMcpFalta: 'Falta o no apunta a tu MCP.',
-
-    chequeoAiCatalog: '.well-known/ai-catalog.json',
-    chequeoAiCatalogOk: 'Catálogo ARD publicado.',
-    chequeoAiCatalogFalta: 'Falta el catálogo ARD.',
-
-    chequeoAgentCard: '.well-known/agent-card.json',
-    chequeoAgentCardOk: 'Agent card A2A publicada.',
-    chequeoAgentCardFalta: 'Falta la agent card.',
-
-    chequeoApiCatalog: '.well-known/api-catalog',
-    chequeoApiCatalogOk: 'Catálogo RFC 9727 publicado.',
-    chequeoApiCatalogFalta: 'Falta el api-catalog.',
-
-    chequeoAuthMd: 'auth.md',
-    chequeoAuthMdOk: 'Walkthrough de pago publicado.',
-    chequeoAuthMdFalta: 'Falta /auth.md.',
-
-    chequeoAgentsMd: 'agents.md',
-    chequeoAgentsMdOk: 'Guía para agentes publicada.',
-    chequeoAgentsMdFalta: 'Falta /agents.md.',
-
     chequeoRobots: 'robots.txt',
-    chequeoRobotsOk: 'Existe (revisa que no bloquee bots).',
+    chequeoRobotsOk: 'Existe y no bloquea agentes.',
+    chequeoRobotsBloquea: 'Existe pero bloquea todo: los agentes no llegan al 402.',
     chequeoRobotsFalta: 'No hay /robots.txt.',
     proxyTitulo: 'Conecta Peaje a tu dominio (una sola vez)',
     proxyIntro:
@@ -266,51 +253,38 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoDominio: 'Public domain',
     chequeoDominioDetalle: 'Your origin is local: there is no public domain to check.',
 
-    chequeoLlms: 'llms.txt',
-    chequeoLlmsOk: 'Present and pointing at your gateway.',
-    chequeoLlmsSinGateway: 'Present but it does not mention your gateway: the Peaje block is missing.',
-    chequeoLlmsFalta: 'There is no /llms.txt on your domain.',
+    implementaTitulo: 'Implement Peaje',
+    implementaIntro:
+      'We measure your live domain and build the prompt from what is still missing. Paste it into Claude Code, Cursor or whichever agent you run on your site repo.',
+    implementaMidiendo: 'Measuring your domain…',
+    implementaListoTitulo: 'You already have this ready',
+    implementaListoDetalle:
+      'Everything Peaje can put on your domain is published. There is nothing to hand an agent: run the score again to see the change.',
+    implementaFaltan: (n: number) =>
+      n === 1 ? '1 thing missing. The prompt below is just that one.' : `${n} things missing. The prompt below is just those.`,
+    implementaCopiar: 'Copy prompt for what is missing',
+    implementaCopiado: 'Prompt copied',
+    implementaVer: 'View the prompt',
+    verificarDeNuevo: 'Verify again',
 
-    chequeoLink: 'Discovery link in the HTML',
-    chequeoLinkOk: 'Your home page has the <link rel="payment-discovery">.',
-    chequeoLinkFalta: 'Your home page loads but has no discovery link.',
+    chequeoProxy: 'Your domain connected',
+    chequeoProxyOk: 'MCP, catalogs and 402 all answer from your domain.',
+    chequeoProxyFalta: 'Not yet: your domain forwards no routes to the gateway.',
+    chequeoProxyParcial: (faltan: number, total: number) =>
+      `${total - faltan} of ${total} routes answer. Some rules are missing from the config.`,
+
+    chequeoLink: 'Discovery links in the HTML',
+    chequeoLinkOk: 'Your home page has them.',
+    chequeoLinkFalta: 'Your home page loads but has no discovery links.',
     chequeoLinkSinHome: 'Could not read your home page.',
 
     chequeoJsonLd: 'JSON-LD',
     chequeoJsonLdOk: 'Your home page has structured data.',
     chequeoJsonLdFalta: 'Your home page has no JSON-LD block.',
 
-    chequeoPricing: 'pricing.md',
-    chequeoPricingOk: 'Present, with your prices.',
-    chequeoPricingOtro: 'Present, but not the Peaje one.',
-    chequeoPricingFalta: 'There is no /pricing.md.',
-
-    chequeoMcp: '.well-known/mcp.json',
-    chequeoMcpOk: 'Announces your paid MCP.',
-    chequeoMcpFalta: 'Missing, or not pointing at your MCP.',
-
-    chequeoAiCatalog: '.well-known/ai-catalog.json',
-    chequeoAiCatalogOk: 'ARD catalog published.',
-    chequeoAiCatalogFalta: 'ARD catalog missing.',
-
-    chequeoAgentCard: '.well-known/agent-card.json',
-    chequeoAgentCardOk: 'A2A agent card published.',
-    chequeoAgentCardFalta: 'Agent card missing.',
-
-    chequeoApiCatalog: '.well-known/api-catalog',
-    chequeoApiCatalogOk: 'RFC 9727 catalog published.',
-    chequeoApiCatalogFalta: 'api-catalog missing.',
-
-    chequeoAuthMd: 'auth.md',
-    chequeoAuthMdOk: 'Payment walkthrough published.',
-    chequeoAuthMdFalta: '/auth.md missing.',
-
-    chequeoAgentsMd: 'agents.md',
-    chequeoAgentsMdOk: 'Agent guide published.',
-    chequeoAgentsMdFalta: '/agents.md missing.',
-
     chequeoRobots: 'robots.txt',
-    chequeoRobotsOk: 'Present (check that it does not block bots).',
+    chequeoRobotsOk: 'Present and not blocking agents.',
+    chequeoRobotsBloquea: 'Present but blocking everything: agents never reach the 402.',
     chequeoRobotsFalta: 'There is no /robots.txt.',
     proxyTitulo: 'Connect Peaje to your domain (once)',
     proxyIntro:
@@ -342,7 +316,7 @@ npx @ora-ai/ax@latest audit ${domain}
     proxyComentarioRutaPaga: 'Priced links: this is where your domain returns the 402.',
     promptProxyTitulo: 'Step 1 (the one that matters most): connect the domain',
     promptProxyDetalle:
-      'Add these forwarding rules to the host config. It is the only thing that makes the site serve MCP, OpenAPI and 402 from its own domain, which is where auditors measure. The example is for Next.js; if the project uses another host, translate the same routes to its syntax (vercel.json, Cloudflare Worker, nginx or Caddy). If a config already exists, merge the block instead of replacing the file.',
+      'Add these forwarding rules to the host config. It is the only thing that makes the site serve MCP, OpenAPI and 402 from its own domain, which is where auditors measure. The example is for Next.js; if the project uses another host, translate the same routes to its syntax (vercel.json, Cloudflare Worker, nginx or Caddy). If a config already exists, merge the block instead of replacing the file.\n\nIf the project has middleware (i18n, auth, A/B testing), check its `matcher`: it runs BEFORE rewrites and can swallow these routes. Exclude `mcp`, `r/`, `discovery/`, `checkout_sessions` and `agentic_commerce/` from the matcher. Paths with a dot (`llms.txt`, `openapi.json`, `/.well-known/*`) are usually excluded already.',
     promptProxyNota:
       'If the host config truly cannot be touched, the site cannot pass the MCP or payment checks at all: those require answering from the origin. The blocks below are not a substitute for step 1, they are the parts no proxy can inject for you.',
   },

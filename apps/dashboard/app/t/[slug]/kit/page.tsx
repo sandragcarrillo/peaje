@@ -11,7 +11,7 @@ import {
   type Bloque,
   type Oferta,
 } from './bloques'
-import { ToggleBlock, VerificadorIntegracion } from './partes'
+import { ImplementarPeaje, ToggleBlock, type Pieza } from './partes'
 import { BloqueProxy } from './proxy'
 import { generarProxy } from '@/lib/proxy-kit'
 
@@ -53,6 +53,12 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
     )
     .catch(() => [])
 
+  const configProxy = generarProxy('next', base, {
+    titulo: d.proxyComentarioTitulo,
+    sub: d.proxyComentarioSub,
+    rutaPaga: d.proxyComentarioRutaPaga,
+  })
+
   const bloques = construirBloques({
     d,
     tenant: { name: tenant.name, slug: tenant.slug },
@@ -73,7 +79,55 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         </p>
       </header>
 
-      <VerificadorIntegracion slug={tenant.slug} />
+      <ImplementarPeaje
+        slug={tenant.slug}
+        piezas={[
+          {
+            id: 'proxy',
+            titulo: d.promptProxyTitulo,
+            detalle: d.promptProxyDetalle,
+            contenido: configProxy,
+          },
+          ...bloques.map((b): Pieza => ({
+            id: b.id,
+            titulo: b.titulo,
+            detalle: b.detalle,
+            contenido: b.contenido,
+          })),
+        ]}
+        marco={{
+          intro: d.promptIntro(originHost, base),
+          noCrearTitulo: d.promptNoCrearTitulo,
+          noCrearDetalle: d.promptNoCrearDetalle,
+          noCrearCierre: d.promptNoCrearCierre,
+          rutas: rutasDelProxy(),
+          verifica: d.promptVerifica(originHost, primeraRutaPaga(ofertas)),
+          audit: domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio,
+          referencia: d.promptReferencia,
+        }}
+      />
+
+      <BloqueProxy base={base} />
+
+      <div className="space-y-1">
+        <h2 className="font-medium">{d.proxyManual}</h2>
+        <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
+      </div>
+
+      <PromptTodoDeUna
+        d={d}
+        bloques={bloques}
+        base={base}
+        originHost={originHost}
+        domain={domain}
+        rutaPaga={primeraRutaPaga(ofertas)}
+      />
+
+      <div className="space-y-3">
+        {bloques.map((b) => (
+          <ToggleBlock key={b.titulo} titulo={b.titulo} detalle={b.detalle} contenido={b.contenido} />
+        ))}
+      </div>
 
       <section className="rounded-lg border border-border bg-panel p-4">
         <h2 className="font-medium">{d.yaActivoTitulo}</h2>
@@ -107,28 +161,6 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           </li>
         </ul>
       </section>
-
-      <BloqueProxy base={base} />
-
-      <div className="space-y-1">
-        <h2 className="font-medium">{d.proxyManual}</h2>
-        <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
-      </div>
-
-      <PromptTodoDeUna
-        d={d}
-        bloques={bloques}
-        base={base}
-        originHost={originHost}
-        domain={domain}
-        rutaPaga={primeraRutaPaga(ofertas)}
-      />
-
-      <div className="space-y-3">
-        {bloques.map((b) => (
-          <ToggleBlock key={b.titulo} titulo={b.titulo} detalle={b.detalle} contenido={b.contenido} />
-        ))}
-      </div>
 
       <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm">
         <p>

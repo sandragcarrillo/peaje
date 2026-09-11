@@ -22,6 +22,7 @@ import {
 } from './commerce.js'
 import { handleMcpRequest } from './mcp.js'
 import { enriquecer } from './openapi.js'
+import { docsBase, gatewayBase } from './base.js'
 import { problema } from './problem.js'
 import { rateLimit } from './ratelimit.js'
 import * as wk from './wellknown.js'
@@ -69,8 +70,18 @@ app.get('/:slug/openapi.json', async (c) => {
       })),
     })
   // Los paths van sin el slug; la base la declara `servers`, como manda OpenAPI.
-  const base = `${env.publicUrl}/${tenant.slug}`
-  doc.servers = [{ url: base }]
+  const base = docsBase(tenant)
+  const directo = gatewayBase(tenant)
+  // Primero el dominio del negocio: es el que un agente acaba de leer y el que
+  // mide el auditor. El gateway queda como alternativa para quien todavía no
+  // puso el proxy; si son el mismo, no lo repetimos.
+  doc.servers =
+    base === directo
+      ? [{ url: base }]
+      : [
+          { url: base, description: `${tenant.name} own domain` },
+          { url: directo, description: 'Peaje gateway (direct, no proxy needed)' },
+        ]
   return c.body(JSON.stringify(enriquecer(doc as never, tenant, base), null, 2), 200, {
     'content-type': 'application/json',
   })
@@ -88,11 +99,15 @@ app.route('/_internal', agentsRouter)
 app.use('/:slug/*', async (c, next) => {
   await next()
   const slug = c.req.param('slug')
-  const origin = env.publicUrl
+  const tenant = slug ? await store.getTenantBySlug(slug) : null
+  if (!tenant) return
+  const b = docsBase(tenant)
   c.res.headers.append(
     'Link',
-    `<${origin}/${slug}/llms.txt>; rel="describedby", <${origin}/${slug}/.well-known/ai-catalog.json>; rel="ai-catalog", <${origin}/${slug}/openapi.json>; rel="service-desc"`,
+    `<${b}/llms.txt>; rel="describedby", <${b}/.well-known/ard.json>; rel="ard", <${b}/openapi.json>; rel="service-desc", <${b}/pricing.md>; rel="service-meta"`,
   )
+  // Versionado visible en la respuesta, no solo documentado.
+  c.res.headers.set('API-Version', '2026-09-01')
 })
 
 /** Archivos de agent-readiness por tenant. Ver wellknown.ts: cada uno mapea a un check de Ora. */
@@ -141,7 +156,7 @@ for (const [path, def] of Object.entries(WELL_KNOWN)) {
     const tenant = await store.getTenantBySlug(c.req.param('slug'))
     if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
     const routes = await sellableRoutes(tenant.id)
-    const base = `${env.publicUrl}/${tenant.slug}`
+    const base = docsBase(tenant)
     const body = def.builder({ tenant, routes, base })
     // `c.json` pisaría el content-type con application/json, y estos archivos
     // se identifican por el suyo (ai-catalog+json, linkset+json con profile).
@@ -159,7 +174,7 @@ app.get('/:slug/llms.txt', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.text('Tenant not found', 404)
   const routes = await sellableRoutes(tenant.id)
-  const base = `${env.publicUrl}/${tenant.slug}`
+  const base = docsBase(tenant)
 
   // Si el negocio ya tenía su propio llms.txt, lo respetamos y le pegamos la
   // sección de pagos debajo. Reemplazarlo perdía su contenido, que es
@@ -253,7 +268,7 @@ app.get('/:slug/discovery/resources', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
   const routes = await sellableRoutes(tenant.id)
-  const base = `${env.publicUrl}/${tenant.slug}`
+  const base = docsBase(tenant)
   const limit = Number.parseInt(c.req.query('limit') ?? '', 10)
   const body = wk.bazaarResources(
     { tenant, routes, base },
@@ -269,7 +284,7 @@ app.get('/:slug/discovery/resources', async (c) => {
 app.get('/:slug/.well-known/ucp', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
-  return c.body(JSON.stringify(ucpProfile(tenant, `${env.publicUrl}/${tenant.slug}`), null, 2), 200, {
+  return c.body(JSON.stringify(ucpProfile(tenant, docsBase(tenant)), null, 2), 200, {
     'content-type': 'application/json',
   })
 })
@@ -298,7 +313,7 @@ app.post('/:slug/checkout_sessions', async (c) => {
   }
 
   const resources = await store.listResources(tenant.id)
-  const r = crearCheckout(tenant, `${env.publicUrl}/${tenant.slug}`, resources, body.items ?? [])
+  const r = crearCheckout(tenant, docsBase(tenant), resources, body.items ?? [])
   return r.ok
     ? c.json(r.sesion, 201, cabecerasAcp(c))
     : c.json(r.error, 400, cabecerasAcp(c))
@@ -319,7 +334,7 @@ app.get('/:slug/checkout_sessions/:id', async (c) => {
 app.post('/:slug/agentic_commerce/delegate_payment', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json(acpError('invalid_request', 'not_found', 'Unknown merchant'), 404)
-  const base = `${env.publicUrl}/${tenant.slug}`
+  const base = docsBase(tenant)
   return c.json(
     acpError(
       'invalid_request',
@@ -378,7 +393,35 @@ app.post('/:slug/.well-known/mcp', async (c) => {
   return RESPONSE_ALREADY_SENT
 })
 
-app.get('/:slug/.well-known/mcp', async (c) => sondaMcp(c))
+/**
+ * GET en `/.well-known/mcp` es una pregunta de discovery, no una llamada
+ * JSON-RPC: devolvemos el descriptor del servidor. El transporte sigue
+ * hablando por POST en la misma ruta.
+ */
+app.get('/:slug/.well-known/mcp', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
+  const b = docsBase(tenant)
+  return c.body(
+    JSON.stringify(
+      {
+        servers: [
+          {
+            name: tenant.slug,
+            url: `${b}/mcp`,
+            transport: 'streamable-http',
+            description: `Paid tools from ${tenant.name}: each one charges the price it advertises and returns a receipt. No API keys.`,
+            serverCard: `${b}/.well-known/mcp/server-card.json`,
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+    200,
+    { 'content-type': 'application/json' },
+  )
+})
 
 app.get('/:slug/mcp', async (c) => sondaMcp(c))
 
@@ -391,7 +434,7 @@ async function sondaMcp(c: Context<{ Bindings: HttpBindings }>) {
     {
       error: 'This MCP endpoint speaks Streamable HTTP over POST.',
       transport: 'streamable-http',
-      serverCard: `${env.publicUrl}/${tenant.slug}/.well-known/mcp/server-card.json`,
+      serverCard: `${docsBase(tenant)}/.well-known/mcp/server-card.json`,
     },
     405,
     { allow: 'POST' },

@@ -5,6 +5,7 @@ import type { Resource, Route, Tenant } from '@peaje/db'
 import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
 import { creditPayment, refundOriginFailure } from './charge.js'
+import { docsBase } from './base.js'
 import { env } from './env.js'
 import { chargeMethods } from './methods.js'
 import { proxyToOrigin } from './proxy.js'
@@ -314,7 +315,7 @@ export async function handleMcpRequest(
     store.listRoutes(tenant.id),
     store.listResources(tenant.id),
   ])
-  const base = `${env.publicUrl}/${tenant.slug}`
+  const base = docsBase(tenant)
   const server = buildServer(tenant, routes, resources, base)
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

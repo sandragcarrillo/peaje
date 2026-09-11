@@ -2,7 +2,9 @@ import type { Dict } from '@/lib/i18n/dict'
 import { RUTAS_PROXY } from '@/lib/proxy-kit'
 
 type Kit = Dict['kit']
-export type Bloque = { titulo: string; detalle: string; contenido: string }
+/** El id ata cada bloque a su chequeo, para saber cuál falta. */
+export type BloqueId = 'json-ld' | 'links' | 'robots'
+export type Bloque = { id: BloqueId; titulo: string; detalle: string; contenido: string }
 export type Oferta = { titulo: string; priceUsd: number; url: string }
 
 /**
@@ -84,12 +86,13 @@ Sitemap: https://${originHost}/sitemap.xml`
 
   return [
     {
+      id: 'json-ld',
       titulo: d.bloqueJsonLd,
       detalle: tieneJsonLd ? d.bloqueJsonLdExiste : d.bloqueJsonLdFalta,
       contenido: jsonLd,
     },
-    { titulo: d.bloqueLink, detalle: d.bloqueLinkDetalle, contenido: links },
-    { titulo: d.bloqueRobots, detalle: d.bloqueRobotsDetalle, contenido: robots },
+    { id: 'links', titulo: d.bloqueLink, detalle: d.bloqueLinkDetalle, contenido: links },
+    { id: 'robots', titulo: d.bloqueRobots, detalle: d.bloqueRobotsDetalle, contenido: robots },
   ]
 }
 
