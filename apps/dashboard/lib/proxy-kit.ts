@@ -24,6 +24,10 @@ export const RUTAS_PROXY = [
   { path: '/.well-known/api-catalog', nota: 'linkset RFC 9727' },
   { path: '/.well-known/agent-card.json', nota: 'agent card A2A' },
   { path: '/.well-known/mcp/server-card.json', nota: 'server card MCP' },
+  { path: '/discovery/resources', nota: 'lista x402 Bazaar: lo que cobra 402 de verdad' },
+  { path: '/.well-known/ucp', nota: 'perfil UCP: qué sabe hacer tu negocio' },
+  { path: '/checkout_sessions', nota: 'checkout ACP (el de OpenAI)' },
+  { path: '/agentic_commerce/delegate_payment', nota: 'delegate payment ACP' },
 ] as const
 
 /**

@@ -13,11 +13,24 @@ import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
 import { store } from './store.js'
+import {
+  ACP_VERSION_HEADER,
+  acpError,
+  crearCheckout,
+  getCheckoutSession,
+  ucpProfile,
+} from './commerce.js'
 import { handleMcpRequest } from './mcp.js'
+import { enriquecer } from './openapi.js'
+import { problema } from './problem.js'
+import { rateLimit } from './ratelimit.js'
 import * as wk from './wellknown.js'
 import { withdrawals } from './withdrawals.js'
 
 const app = new Hono<{ Bindings: HttpBindings }>()
+
+// Antes de cualquier ruta: las cabeceras de rate limit van en todas.
+app.use('*', rateLimit)
 
 app.get('/health', async (c) => {
   const usdc = await usdcStatus()
@@ -56,8 +69,11 @@ app.get('/:slug/openapi.json', async (c) => {
       })),
     })
   // Los paths van sin el slug; la base la declara `servers`, como manda OpenAPI.
-  doc.servers = [{ url: `${env.publicUrl}/${tenant.slug}` }]
-  return c.json(doc)
+  const base = `${env.publicUrl}/${tenant.slug}`
+  doc.servers = [{ url: base }]
+  return c.body(JSON.stringify(enriquecer(doc as never, tenant, base), null, 2), 200, {
+    'content-type': 'application/json',
+  })
 })
 
 // El ledger interno vive dentro del router de withdrawals: comparte su
@@ -89,7 +105,14 @@ const WELL_KNOWN: Record<string, { builder: (ctx: { tenant: Parameters<typeof wk
   '.well-known/ard.json': { builder: wk.aiCatalog, contentType: 'application/ai-catalog+json' },
   '.well-known/ai-catalog.json': { builder: wk.aiCatalog, contentType: 'application/ai-catalog+json' },
   '.well-known/agent-card.json': { builder: wk.agentCard, contentType: 'application/json' },
-  '.well-known/api-catalog': { builder: wk.apiCatalog, contentType: 'application/linkset+json' },
+  // El profile del Content-Type es parte de RFC 9727, no decoración: sin él
+  // el cliente no sabe que este linkset es un catálogo de APIs.
+  '.well-known/api-catalog': {
+    builder: wk.apiCatalog,
+    contentType: 'application/linkset+json;profile="https://www.rfc-editor.org/info/rfc9727"',
+  },
+  // Lista x402 Bazaar: las URLs que devuelven 402 de verdad.
+
   '.well-known/mcp/server-card.json': { builder: wk.mcpServerCard, contentType: 'application/json' },
 }
 
@@ -120,9 +143,10 @@ for (const [path, def] of Object.entries(WELL_KNOWN)) {
     const routes = await sellableRoutes(tenant.id)
     const base = `${env.publicUrl}/${tenant.slug}`
     const body = def.builder({ tenant, routes, base })
-    return typeof body === 'string'
-      ? c.text(body, 200, { 'content-type': def.contentType })
-      : c.json(body)
+    // `c.json` pisaría el content-type con application/json, y estos archivos
+    // se identifican por el suyo (ai-catalog+json, linkset+json con profile).
+    const texto = typeof body === 'string' ? body : JSON.stringify(body, null, 2)
+    return c.body(texto, 200, { 'content-type': def.contentType })
   })
 }
 
@@ -220,6 +244,104 @@ app.get('/:slug/r/:rslug', async (c) => {
 
   return sealed
 })
+
+/**
+ * Lista x402 Bazaar con paginación por cursor. Va aparte del mapa de archivos
+ * porque lee query params.
+ */
+app.get('/:slug/discovery/resources', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
+  const routes = await sellableRoutes(tenant.id)
+  const base = `${env.publicUrl}/${tenant.slug}`
+  const limit = Number.parseInt(c.req.query('limit') ?? '', 10)
+  const body = wk.bazaarResources(
+    { tenant, routes, base },
+    { cursor: c.req.query('cursor'), limit: Number.isFinite(limit) ? limit : undefined },
+  )
+  return c.json(body)
+})
+
+/**
+ * UCP · ACP · AP2. Los tres protocolos de comercio agéntico sobre el mismo
+ * riel de pago que ya usa el 402. Ver commerce.ts para el porqué de cada uno.
+ */
+app.get('/:slug/.well-known/ucp', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
+  return c.body(JSON.stringify(ucpProfile(tenant, `${env.publicUrl}/${tenant.slug}`), null, 2), 200, {
+    'content-type': 'application/json',
+  })
+})
+
+/** Preflight: un agente de navegador pregunta antes de postear. */
+const acpPreflight = (c: Context) =>
+  c.body(null, 204, {
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, authorization, idempotency-key, request-id, api-version, signature, timestamp',
+    'access-control-max-age': '86400',
+  })
+
+app.options('/:slug/checkout_sessions', acpPreflight)
+app.options('/:slug/agentic_commerce/delegate_payment', acpPreflight)
+
+app.post('/:slug/checkout_sessions', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json(acpError('invalid_request', 'not_found', 'Unknown merchant'), 404)
+
+  let body: { items?: { id: string; quantity: number }[] }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json(acpError('invalid_request', 'invalid', 'Body must be JSON'), 400, cabecerasAcp(c))
+  }
+
+  const resources = await store.listResources(tenant.id)
+  const r = crearCheckout(tenant, `${env.publicUrl}/${tenant.slug}`, resources, body.items ?? [])
+  return r.ok
+    ? c.json(r.sesion, 201, cabecerasAcp(c))
+    : c.json(r.error, 400, cabecerasAcp(c))
+})
+
+app.get('/:slug/checkout_sessions/:id', async (c) => {
+  const sesion = getCheckoutSession(c.req.param('id'))
+  return sesion
+    ? c.json(sesion, 200, cabecerasAcp(c))
+    : c.json(acpError('invalid_request', 'not_found', 'Unknown or expired checkout session', '$.id'), 404, cabecerasAcp(c))
+})
+
+/**
+ * ACP Delegate Payment. Existe y responde con la forma de la spec, pero
+ * rechaza tarjetas: Peaje no es procesador y no toca PANs. Le decimos al
+ * agente cuál es el riel real en vez de dejarlo adivinando con un 404.
+ */
+app.post('/:slug/agentic_commerce/delegate_payment', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json(acpError('invalid_request', 'not_found', 'Unknown merchant'), 404)
+  const base = `${env.publicUrl}/${tenant.slug}`
+  return c.json(
+    acpError(
+      'invalid_request',
+      'unsupported_payment_method',
+      `${tenant.name} settles in stablecoin over HTTP 402, not cards. No card data is accepted or stored here. Call the resource, read the 402 terms, pay on Tempo or Arc: ${base}/auth.md`,
+      '$.payment_method.type',
+    ),
+    400,
+    cabecerasAcp(c),
+  )
+})
+
+/** ACP pide que el servidor devuelva la versión y eco de idempotencia. */
+function cabecerasAcp(c: Context): Record<string, string> {
+  const eco = (k: string) => c.req.header(k)
+  return {
+    'api-version': ACP_VERSION_HEADER,
+    ...(eco('idempotency-key') ? { 'idempotency-key': eco('idempotency-key')! } : {}),
+    ...(eco('request-id') ? { 'request-id': eco('request-id')! } : {}),
+    'access-control-allow-origin': '*',
+  }
+}
 
 /**
  * Agent card de un agente comprador (ERC-8004). Es el `agentURI` del registro:

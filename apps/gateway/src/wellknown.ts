@@ -1,5 +1,6 @@
 import type { Route, Tenant } from '@peaje/db'
 import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { env } from './env.js'
 
 /**
  * Archivos de agent-readiness servidos por tenant. Cada uno mapea a un check
@@ -129,15 +130,72 @@ export function authMd({ tenant, base }: Ctx): string {
     'This API uses no API keys and no OAuth. Access is bought per request with MPP',
     '(Machine Payments Protocol, HTTP 402). The credential IS the payment.',
     '',
-    '## How to get access (walkthrough)',
+    'Structured as the auth.md spec prescribes (https://github.com/workos/auth.md),',
+    'with one deviation stated up front: the only `identity_types_supported` value',
+    'here is `anonymous`. There is nothing to register and no account to hold, so',
+    'the Register and Revocation steps collapse into "not applicable". That is not',
+    'an omission, it is the design: an agent that can pay is already authorized.',
     '',
-    '1. Make the request with no credentials:',
+    '## Step 1 — Discover',
+    '',
+    `Start at \`${base}/.well-known/oauth-protected-resource\` (RFC 9728). It names this`,
+    'resource, its `agent_auth` block, and links back to this document. You can also',
+    'reach it the short way: call any priced endpoint with no credentials and read the',
+    '`WWW-Authenticate` header it returns.',
+    '',
     '```bash',
     `curl -i ${base}/<route>`,
     '```',
-    '2. You get `402 Payment Required` with a `WWW-Authenticate: Payment` header carrying the Challenge (amount, token, recipient, chain). It includes one offer per supported network: pick the one your wallet can pay.',
-    '3. Pay the Challenge and retry with the `Authorization: Payment <credential>` header.',
-    '4. You get the resource plus a `Payment-Receipt` header as proof.',
+    '',
+    '## Step 2 — Pick a method',
+    '',
+    'The 402 carries one `WWW-Authenticate: Payment` challenge per supported network.',
+    'Pick the one your wallet can settle. See "Payment networks" below.',
+    '',
+    '## Step 3 — Register',
+    '',
+    'Not applicable. `identity_types_supported` is `["anonymous"]`: there is no',
+    'registration endpoint, no client_id and no account. Skip to step 4.',
+    '',
+    '## Step 4 — Claim ceremony',
+    '',
+    'Not applicable for the same reason. There is no `identity_assertion` flow and no',
+    '`service_auth` flow here, so no ID-JAG (`urn:ietf:params:oauth:token-type:id-jag`)',
+    'is minted or exchanged. Where those flows would prove *who* you are, this API only',
+    'needs proof that you *paid*.',
+    '',
+    '## Step 5 — Exchange the assertion',
+    '',
+    'The payment replaces the assertion exchange. Settle the challenge on the network',
+    'you picked and build the credential from the signed authorization:',
+    '',
+    '```bash',
+    `npx mppx@latest ${base}/<route>`,
+    '```',
+    '',
+    '## Step 6 — Use the access_token',
+    '',
+    'Retry the request with the credential in the `Authorization` header. The response',
+    'carries a `Payment-Receipt` header as proof of what you bought.',
+    '',
+    '```bash',
+    `curl -i -H "Authorization: Payment <credential>" ${base}/<route>`,
+    '```',
+    '',
+    'Credentials are single-use and scoped to one request. There is no bearer token to',
+    'store, so there is nothing to leak.',
+    '',
+    '## Errors',
+    '',
+    '- `402` with no credential: not an error, it is the price. Always includes a fresh challenge.',
+    '- `402` after paying: the credential was invalid or expired. Retry by paying the new challenge.',
+    '- `404`: unknown route. JSON body with `error` and `hint`.',
+    '- `502`: you paid and the origin failed. The payment is refunded on-chain automatically and the response carries `Payment-Refund`.',
+    '',
+    '## Revocation',
+    '',
+    'Not applicable. Nothing is issued that could be revoked: each credential dies with',
+    'the request that used it. To stop spending, stop paying challenges.',
     '',
     '## Payment networks',
     '',
@@ -146,20 +204,7 @@ export function authMd({ tenant, base }: Ctx): string {
       return `- **${n.label}** (testnet): ${n.tokenSymbol} · chainId ${n.testnet.chainId} · token \`${n.token}\``
     }),
     '',
-    '## The easy way',
-    '',
-    '```bash',
-    '# the mppx client does all four steps for you (testnet wallet included)',
-    `npx mppx@latest ${base}/<route>`,
-    '```',
-    '',
-    '## Errors',
-    '',
-    '- `402` with no credential: not an error, it is the price. Always includes a fresh Challenge.',
-    '- Invalid or expired credential: `402` again, with a new Challenge. Retry by paying.',
-    '- Unknown route: `404` with JSON `{ error, hint }`.',
-    '',
-    `Protocol spec: https://mpp.dev · Discovery: ${base}/openapi.json`,
+    `Protocol spec: https://mpp.dev · Discovery: ${base}/openapi.json · x402 Bazaar: ${base}/discovery/resources`,
   ].join('\n')
 }
 
@@ -241,6 +286,20 @@ export function aiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown
           `buy data from ${tenant.name} without an API key`,
           `pay per request for ${tenant.name}`,
           `what does ${tenant.name} charge per call`,
+        ],
+        trustManifest: identidad,
+      },
+      {
+        identifier: urn('x402', tenant.slug),
+        displayName: `${tenant.name} x402 Bazaar`,
+        type: 'application/json',
+        url: `${base}/discovery/resources`,
+        description: `The exact URLs from ${tenant.name} that answer HTTP 402, with the payment terms each one accepts. Read this before paying anything.`,
+        tags: ['x402', 'mpp', 'payments', 'discovery', 'bazaar'],
+        representativeQueries: [
+          `what can I buy from ${tenant.name} with a stablecoin`,
+          `which ${tenant.name} endpoints charge per call`,
+          `x402 resources published by ${tenant.name}`,
         ],
         trustManifest: identidad,
       },
@@ -329,7 +388,7 @@ export function agentCard({ tenant, routes, base }: Ctx): Record<string, unknown
 }
 
 /** .well-known/api-catalog (api-catalog-rfc9727, formato linkset RFC 9264) */
-export function apiCatalog({ tenant, base }: Ctx): Record<string, unknown> {
+export function apiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown> {
   // El ancla es el ORIGEN del negocio, no el gateway: quien audita este archivo
   // lo pide en el dominio del negocio y espera que el linkset hable de ese
   // dominio. Los href siguen apuntando al gateway, que responde con o sin proxy.
@@ -338,12 +397,116 @@ export function apiCatalog({ tenant, base }: Ctx): Record<string, unknown> {
     linkset: [
       {
         anchor: origen,
+        // RFC 9727 pide `item`: la lista de APIs del catálogo. Sin esto el
+        // linkset describe una sola API en vez de ser un catálogo.
+        item: [
+          { href: `${base}/openapi.json`, type: 'application/openapi+json', title: `${tenant.name} API` },
+          { href: `${base}/mcp`, type: 'application/json', title: `${tenant.name} MCP server` },
+          { href: `${base}/discovery/resources`, type: 'application/json', title: `${tenant.name} x402 Bazaar` },
+        ],
         'service-desc': [{ href: `${base}/openapi.json`, type: 'application/openapi+json' }],
         'service-doc': [{ href: `${base}/llms.txt`, type: 'text/plain' }],
         'service-meta': [{ href: `${base}/pricing.md`, type: 'text/markdown' }],
       },
+      {
+        anchor: `${base}/openapi.json`,
+        'service-desc': [{ href: `${base}/openapi.json`, type: 'application/openapi+json' }],
+        'service-doc': [{ href: `${base}/auth.md`, type: 'text/markdown' }],
+        status: [{ href: `${base}/../health`, type: 'application/json' }],
+      },
     ],
   }
+}
+
+/**
+ * `/discovery/resources` — lista x402 Bazaar. Es la pieza que le falta a un
+ * auditor para pasar de "documenta que cobra" a "cobra de verdad": le da las
+ * URLs concretas que devuelven 402 en vez de obligarlo a adivinarlas.
+ *
+ * Cada item lleva el mismo `accepts` que viaja en la cabecera `Payment-Required`
+ * del 402 real, para que lo que promete el catálogo y lo que cobra el endpoint
+ * sean la misma cosa.
+ */
+export function bazaarResources(
+  { tenant, routes, base }: Ctx,
+  page?: { cursor?: string; limit?: number },
+): Record<string, unknown> {
+  const ahora = new Date().toISOString()
+
+  const accepts = (priceUsd: string, resource: string) =>
+    NETWORK_IDS.map((id) => {
+      const n = NETWORKS[id]
+      return {
+        scheme: 'exact',
+        network: `eip155:${n.testnet.chainId}`,
+        maxAmountRequired: String(Math.round(Number(priceUsd) * 10 ** n.decimals)),
+        resource,
+        description: `Pay-per-call access to ${tenant.name}`,
+        mimeType: 'application/json',
+        payTo: env.treasuryAddress,
+        maxTimeoutSeconds: 300,
+        asset: n.token,
+        ...(n.eip3009
+          ? { extra: { assetTransferMethod: 'eip3009', name: n.eip3009.name, version: n.eip3009.version } }
+          : {}),
+      }
+    })
+
+  const items = routes
+    .filter((r) => Number(r.priceUsd) > 0)
+    .map((r) => {
+      const resource = `${base}${r.pathPattern}`
+      return {
+        resource,
+        type: 'http',
+        x402Version: 2,
+        lastUpdated: ahora,
+        accepts: accepts(r.priceUsd, resource),
+        extensions: {
+          bazaar: {
+            info: {
+              method: r.method,
+              title: r.description ?? `${r.method} ${r.pathPattern}`,
+              priceUsd: Number(r.priceUsd),
+            },
+          },
+        },
+      }
+    })
+
+  // El MCP también se vende: sus tools cobran por llamada.
+  const masBarato = routes
+    .filter((r) => Number(r.priceUsd) > 0)
+    .reduce<string | null>((min, r) => (min === null || Number(r.priceUsd) < Number(min) ? r.priceUsd : min), null)
+
+  if (masBarato !== null) {
+    items.push({
+      resource: `${base}/mcp`,
+      type: 'mcp',
+      x402Version: 2,
+      lastUpdated: ahora,
+      accepts: accepts(masBarato, `${base}/mcp`),
+      extensions: {
+        bazaar: {
+          info: {
+            method: 'POST',
+            title: `${tenant.name} MCP server (paid tools)`,
+            priceUsd: Number(masBarato),
+          },
+        },
+      },
+    })
+  }
+
+  // Paginación por cursor: el cursor es el índice del próximo item. Con dos
+  // recursos sobra, pero la forma tiene que existir para que un agente que
+  // pagina no tenga que adivinarla cuando el catálogo crezca.
+  const limit = Math.min(Math.max(page?.limit ?? 100, 1), 100)
+  const desde = Number.parseInt(page?.cursor ?? '0', 10) || 0
+  const pagina = items.slice(desde, desde + limit)
+  const siguiente = desde + limit < items.length ? String(desde + limit) : null
+
+  return { x402Version: 2, items: pagina, total: items.length, next_cursor: siguiente }
 }
 
 /** .well-known/mcp/server-card.json (mcp-server-card) */
