@@ -101,7 +101,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           noCrearDetalle: d.promptNoCrearDetalle,
           noCrearCierre: d.promptNoCrearCierre,
           rutas: rutasDelProxy(),
-          verifica: d.promptVerifica(originHost, primeraRutaPaga(ofertas)),
+          verifica: d.promptVerifica(originHost, primeraRutaPaga(ofertas, tenant.slug)),
           audit: domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio,
           referencia: d.promptReferencia,
         }}
@@ -120,7 +120,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         base={base}
         originHost={originHost}
         domain={domain}
-        rutaPaga={primeraRutaPaga(ofertas)}
+        rutaPaga={primeraRutaPaga(ofertas, tenant.slug)}
       />
 
       <div className="space-y-3">

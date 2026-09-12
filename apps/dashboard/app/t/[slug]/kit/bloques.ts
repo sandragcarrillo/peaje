@@ -60,7 +60,7 @@ ${JSON.stringify(
       name: o.titulo,
       price: o.priceUsd,
       priceCurrency: 'USD',
-      url: `https://${originHost}${rutaDe(o.url)}`,
+      url: `https://${originHost}${rutaDe(o.url, tenant.slug)}`,
       availability: 'https://schema.org/InStock',
     })),
   },
@@ -70,11 +70,16 @@ ${JSON.stringify(
 </script>`
 
   // Relaciones registradas en IANA (RFC 8631) más `ard`, la del catálogo.
+  // El <a> del final es distinto: los auditores piden documentación ENLAZADA
+  // desde la home, visible, no solo metadata. Va en el footer o el nav.
   const links = [
     `<link rel="service-desc" type="application/openapi+json" href="/openapi.json">`,
     `<link rel="service-doc" type="text/plain" href="/llms.txt">`,
     `<link rel="service-meta" type="text/markdown" href="/pricing.md">`,
     `<link rel="ard" type="application/ai-catalog+json" href="/.well-known/ard.json">`,
+    '',
+    `<!-- Visible link, in your footer or nav (documentation must be linked from the homepage): -->`,
+    `<a href="/developers">API for agents</a>`,
   ].join('\n')
 
   const robots = `# Agents welcome. This site charges per request over MPP (HTTP 402).
@@ -96,10 +101,19 @@ Sitemap: https://${originHost}/sitemap.xml`
   ]
 }
 
-/** `https://gw/tenant/r/x` → `/r/x`: la misma ruta, en el dominio del negocio. */
-function rutaDe(url: string): string {
-  const i = url.indexOf('/r/')
-  return i === -1 ? url : url.slice(i)
+/**
+ * `https://gw/tenant/r/x` → `/r/x`, `https://gw/tenant/mcp` → `/mcp`: la
+ * misma ruta, en el dominio del negocio. Antes solo entendía `/r/` y para el
+ * MCP devolvía la URL entera, que pegada al dominio daba dos URLs juntas.
+ */
+function rutaDe(url: string, slug: string): string {
+  try {
+    const path = new URL(url).pathname
+    const prefijo = `/${slug}`
+    return path.startsWith(`${prefijo}/`) ? path.slice(prefijo.length) : path
+  } catch {
+    return url
+  }
 }
 
 /**
@@ -112,7 +126,7 @@ export function rutasDelProxy(): string[] {
 }
 
 /** Un link con precio real, para que la verificación pruebe un 402 de verdad. */
-export function primeraRutaPaga(ofertas: Oferta[]): string | null {
+export function primeraRutaPaga(ofertas: Oferta[], slug: string): string | null {
   const conPrecio = ofertas.find((o) => o.priceUsd > 0)
-  return conPrecio ? rutaDe(conPrecio.url) : null
+  return conPrecio ? rutaDe(conPrecio.url, slug) : null
 }

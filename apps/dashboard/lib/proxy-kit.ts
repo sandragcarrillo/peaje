@@ -28,6 +28,7 @@ export const RUTAS_PROXY = [
   { path: '/.well-known/ucp', nota: 'perfil UCP: qué sabe hacer tu negocio' },
   { path: '/checkout_sessions', nota: 'checkout ACP (el de OpenAI)' },
   { path: '/agentic_commerce/delegate_payment', nota: 'delegate payment ACP' },
+  { path: '/developers', nota: 'portal de desarrolladores, renderizado con tus precios' },
 ] as const
 
 /**

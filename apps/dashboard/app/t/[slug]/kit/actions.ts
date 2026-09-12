@@ -62,6 +62,7 @@ const SONDAS_PROXY: { path: string; esperado: number; post?: boolean }[] = [
   { path: '/openapi.json', esperado: 200 },
   { path: '/discovery/resources', esperado: 200 },
   { path: '/.well-known/ucp', esperado: 200 },
+  { path: '/developers', esperado: 200 },
   { path: '/mcp', esperado: 200, post: true },
 ]
 

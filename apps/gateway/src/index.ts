@@ -20,9 +20,10 @@ import {
   getCheckoutSession,
   ucpProfile,
 } from './commerce.js'
-import { handleMcpRequest } from './mcp.js'
+import { handleMcpRequest, resourceTitle } from './mcp.js'
 import { enriquecer } from './openapi.js'
 import { docsBase, gatewayBase } from './base.js'
+import { developersHtml } from './developers.js'
 import { problema } from './problem.js'
 import { rateLimit } from './ratelimit.js'
 import * as wk from './wellknown.js'
@@ -145,7 +146,7 @@ async function sellableRoutes(tenantId: string) {
       method: 'GET',
       pathPattern: `/r/${r.slug}`,
       priceUsd: r.priceUsd,
-      description: r.title ?? r.slug,
+      description: resourceTitle(r),
       active: true,
     })),
   ]
@@ -276,6 +277,18 @@ app.get('/:slug/discovery/resources', async (c) => {
   )
   return c.json(body)
 })
+
+/**
+ * Portal de desarrolladores (developer-portal, public-api-docs): la página
+ * que abre un humano. `/docs` redirige ahí porque los auditores prueban ambas.
+ */
+app.get('/:slug/developers', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
+  const routes = await sellableRoutes(tenant.id)
+  return c.html(developersHtml({ tenant, routes, base: docsBase(tenant) }))
+})
+app.get('/:slug/docs', (c) => c.redirect(`/${c.req.param('slug')}/developers`, 308))
 
 /**
  * UCP · ACP · AP2. Los tres protocolos de comercio agéntico sobre el mismo

@@ -38,12 +38,26 @@ export async function llmsDelOrigen(originUrl: string): Promise<string | null> {
     if (!res.ok) return null
     const texto = (await res.text()).trim()
     if (!texto || texto.length > 100_000) return null
-    // Si ya es el nuestro, no lo fusionamos con sí mismo.
-    if (texto.includes('## Payments for agents')) return null
-    return texto
+    // Si el origen ya trae una sección de pagos (una copia vieja, o el propio
+    // gateway leído en bucle), la sacamos y dejamos que el llamador pegue la
+    // fresca. Antes devolvíamos null acá y el llamador caía al documento de
+    // pagos a secas: el negocio perdía su bio y su mapa del sitio en /llms.txt.
+    const sinSeccion = quitarSeccionPagos(texto)
+    return sinSeccion || null
   } catch {
     return null
   }
+}
+
+/** Corta desde `## Payments for agents` hasta el próximo `## ` o el final. */
+export function quitarSeccionPagos(texto: string): string {
+  const marca = '## Payments for agents'
+  const ini = texto.indexOf(marca)
+  if (ini === -1) return texto
+  const resto = texto.slice(ini + marca.length)
+  const siguiente = resto.search(/\n## /)
+  const fin = siguiente === -1 ? texto.length : ini + marca.length + siguiente + 1
+  return `${texto.slice(0, ini)}${texto.slice(fin)}`.replace(/\n{3,}/g, '\n\n').trim()
 }
 
 /**
@@ -73,6 +87,7 @@ export function seccionPagos({ tenant, routes, base }: Ctx): string {
     `- [OpenAPI discovery with prices](${base}/openapi.json)`,
     `- [Pricing](${base}/pricing.md)`,
     `- [How to pay](${base}/auth.md)`,
+    `- [Developer portal](${base}/developers)`,
     `- [What answers 402, and on what terms](${base}/discovery/resources)`,
     // Al MCP se linkea su descriptor, no el transporte: `/mcp` solo habla POST,
     // y un enlace que responde 405 cuenta como enlace roto para un auditor.

@@ -22,7 +22,7 @@ export const kit = {
 
     bloqueLink: '2 · Links de discovery en tu HTML',
     bloqueLinkDetalle:
-      'En el <head> de tu página principal. Apuntan a rutas de tu propio dominio: las sirve el proxy del paso 1.',
+      'Los <link> van en el <head> de tu página principal y el <a> visible en tu footer o nav: los auditores piden la documentación enlazada desde la home. Todo apunta a rutas de tu propio dominio, las sirve el proxy del paso 1.',
 
     bloqueRobots: '3 · robots.txt que no espanta agentes',
     bloqueRobotsDetalle:
@@ -191,7 +191,7 @@ npx @ora-ai/ax@latest audit ${domain}
 
     bloqueLink: '2 · Discovery links in your HTML',
     bloqueLinkDetalle:
-      'In the <head> of your home page. They point at paths on your own domain: step 1 is what serves them.',
+      'The <link> tags go in the <head> of your home page and the visible <a> in your footer or nav: auditors require documentation linked from the homepage. Everything points at paths on your own domain, served by step 1.',
 
     bloqueRobots: '3 · A robots.txt that does not scare agents away',
     bloqueRobotsDetalle:
