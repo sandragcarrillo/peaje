@@ -23,4 +23,11 @@ export const env = {
   arcRpcUrl: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
+  /**
+   * Take rate de Peaje por transacción (0.02 = 2%). El agente paga el precio
+   * listado completo; al ledger del negocio se acredita el neto. Como todo
+   * el pago cae on-chain en la treasury, la diferencia queda ahí: ese es el
+   * revenue de la plataforma.
+   */
+  feePct: Math.min(0.1, Math.max(0, Number(process.env.PEAJE_FEE_PCT ?? '0.02'))),
 }

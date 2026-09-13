@@ -2,6 +2,7 @@ import type { Payment } from '@peaje/db'
 import { networkFromReceiptMethod, isNetworkId } from '@peaje/shared'
 import { Receipt } from 'mppx'
 import { resolvePayer } from './chain.js'
+import { env } from './env.js'
 import { store } from './store.js'
 import { sendPayout } from './treasury.js'
 
@@ -24,12 +25,20 @@ export type ReceiptInfo = {
  */
 export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): Promise<Payment> {
   const network = networkFromReceiptMethod(receipt.method)
+
+  // El agente pagó el precio listado (bruto). El negocio recibe el neto; la
+  // diferencia es el take rate de Peaje y se queda en la treasury, donde el
+  // pago ya cayó on-chain. Un solo punto de cobro: acá.
+  const bruto = Number(ctx.priceUsd)
+  const fee = bruto * env.feePct
+  const neto = Math.max(0, bruto - fee)
+
   const payment = await store.recordPayment({
     tenantId: ctx.tenantId,
     routeId: ctx.routeId,
     path: ctx.path,
     agentWallet: null,
-    amount: ctx.priceUsd,
+    amount: neto.toFixed(6),
     receiptRef: receipt.reference,
     method: receipt.method,
     network,
@@ -38,7 +47,9 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
   console.log('[charge] pago acreditado', {
     tenant: ctx.tenantId,
     path: ctx.path,
-    amount: ctx.priceUsd,
+    bruto: ctx.priceUsd,
+    neto: neto.toFixed(6),
+    feePct: env.feePct,
     ref: receipt.reference,
     network,
   })
