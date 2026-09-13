@@ -2,7 +2,7 @@ export const nav = {
   es: {
     mercado: 'Mercado',
     negocios: 'Mis negocios',
-    agentes: 'Mis agentes',
+    agentes: 'Tu agente',
     wallet: 'Wallet',
     salir: 'Salir',
     registrar: 'Registrar negocio',
@@ -17,7 +17,7 @@ export const nav = {
   en: {
     mercado: 'Market',
     negocios: 'My businesses',
-    agentes: 'My agents',
+    agentes: 'Your agent',
     wallet: 'Wallet',
     salir: 'Sign out',
     registrar: 'Register business',

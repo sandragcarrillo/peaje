@@ -66,8 +66,17 @@ export async function sweepAgent(
   amount?: string,
 ): Promise<`0x${string}`> {
   const account = agentAccount(walletId, address)
-  const monto = amount ?? (await agentBalance(address, network))
+  let monto = amount ?? (await agentBalance(address, network))
   const decimals = NETWORKS[network].decimals
+
+  // En Tempo el fee se paga en el MISMO pathUSD: barrer el 100% deja la tx
+  // sin gas y revienta. Se deja un margen chico para la comisión.
+  if (network === 'tempo') {
+    const saldo = Number(await agentBalance(address, network))
+    const maximo = Math.max(0, saldo - 0.005)
+    if (Number(monto) > maximo) monto = maximo.toFixed(6)
+    if (Number(monto) <= 0) throw new Error('Saldo insuficiente para cubrir la comisión del barrido')
+  }
 
   if (network === 'arc') {
     const wallet = createWalletClient({ account, chain: arcTestnet, transport: http() })

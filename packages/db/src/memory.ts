@@ -291,6 +291,10 @@ export class MemoryStore implements Store {
     return row
   }
 
+  async listPendingWithdrawals(limit = 20) {
+    return this.#withdrawals.filter((w) => w.status === 'pending' && w.txRef).slice(0, limit)
+  }
+
   async listWithdrawals(tenantId: string, limit = 20) {
     return this.#withdrawals
       .filter((w) => w.tenantId === tenantId)

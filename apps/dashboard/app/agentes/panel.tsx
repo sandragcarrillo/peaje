@@ -16,6 +16,7 @@ import {
   fondearAgente,
   pausarAgente,
 } from './actions'
+import { CuerpoMarkdown, separarFuente } from './tu-agente'
 
 type Red = { id: string; label: string; symbol: string }
 type Negocio = {
@@ -211,7 +212,7 @@ function TarjetaAgente({
   const router = useRouter()
   const locale = useLocale()
   const [ocupado, setOcupado] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<{ texto: string; ok: boolean } | null>(null)
   const [monto, setMonto] = useState('0.10')
   const [corridas, setCorridas] = useState<AgentRun[] | null>(null)
 
@@ -220,13 +221,22 @@ function TarjetaAgente({
   const saldo = Number(agente.balance ?? 0)
   const disponible = Number(negocio.disponible[agente.network] ?? 0)
 
-  async function accion(nombre: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
+  async function accion(
+    nombre: string,
+    fn: () => Promise<{ ok: boolean; error?: string }>,
+    exito?: string,
+  ) {
     setOcupado(nombre)
     setAviso(null)
     try {
       const r = await fn()
-      setAviso(r.ok ? null : (r.error ?? d.agentes.fallo))
-      if (r.ok) router.refresh()
+      if (r.ok) {
+        // Confirmar también cuando sale bien: un botón mudo parece roto.
+        if (exito) setAviso({ texto: exito, ok: true })
+        router.refresh()
+      } else {
+        setAviso({ texto: r.error ?? d.agentes.fallo, ok: false })
+      }
     } finally {
       setOcupado(null)
     }
@@ -290,7 +300,9 @@ function TarjetaAgente({
           className="w-20 rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-xs outline-none focus:border-accent"
         />
         <Boton
-          onClick={() => accion('fondear', () => fondearAgente(slug, agente.id, monto))}
+          onClick={() =>
+            accion('fondear', () => fondearAgente(slug, agente.id, monto), d.agentes.fondeoOk(`$${monto}`))
+          }
           disabled={ocupado !== null || disponible <= 0}
           cargando={ocupado === 'fondear'}
           titulo={
@@ -335,14 +347,19 @@ function TarjetaAgente({
         </Boton>
       </div>
 
-      {aviso ? <p className="mt-3 text-sm text-red-600">{aviso}</p> : null}
+      {aviso ? (
+        <p className={`mt-3 flex items-center gap-2 text-sm ${aviso.ok ? 'text-accent' : 'text-amber-500'}`}>
+          {aviso.ok ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
+          {aviso.texto}
+        </p>
+      ) : null}
       {corridas ? <Resultados runs={corridas} /> : null}
     </article>
   )
 }
 
 /** El historial del agente: acá es donde la persona lee lo que compró. */
-function Resultados({ runs }: { runs: AgentRun[] }) {
+export function Resultados({ runs }: { runs: AgentRun[] }) {
   const d = useDict()
   if (runs.length === 0) {
     return <p className="mt-4 text-sm text-muted">{d.agentes.sinCompras}</p>
@@ -363,8 +380,13 @@ function Resultado({ run }: { run: AgentRun }) {
     mercado?: { consultados?: number; conReputacionOnchain?: number }
     justificacion?: string | null
     elegido?: { nombre?: string } | null
+    codigo?: string | null
   }
-  const cuerpo = run.result ?? run.resultExcerpt
+  const crudo = run.result ?? run.resultExcerpt
+  // Una corrida vieja puede traer HTML comprado tal cual: no se vomita en la
+  // tarjeta. Se muestra una nota y el HTML queda plegado como texto.
+  const esHtml = crudo !== null && /^\s*<!doctype|^\s*<html/i.test(crudo)
+  const cuerpo = crudo
 
   return (
     <li className="text-sm">
@@ -409,12 +431,9 @@ function Resultado({ run }: { run: AgentRun }) {
         ) : null}
       </div>
 
-      {decision.justificacion ? (
-        <p className="mt-1.5 border-l-2 border-border pl-3 text-xs text-muted">
-          {decision.justificacion}
-        </p>
+      {run.error ? (
+        <p className="mt-1 text-xs text-amber-500">{traducirErrorDeCorrida(run.error, decision.codigo, d)}</p>
       ) : null}
-      {run.error ? <p className="mt-1 text-xs text-red-600">{run.error}</p> : null}
 
       {cuerpo ? (
         <div className="mt-2">
@@ -423,17 +442,53 @@ function Resultado({ run }: { run: AgentRun }) {
             onClick={() => setAbierto(!abierto)}
             className="text-xs text-accent hover:underline"
           >
-            {abierto ? d.agentes.ocultarResultado : d.agentes.leerResultado}
+            {abierto
+              ? d.agentes.ocultarResultado
+              : esHtml
+                ? d.agentes.verHtml(Math.max(1, Math.round((cuerpo?.length ?? 0) / 1024)))
+                : d.agentes.leerResultado}
           </button>
           {abierto ? (
-            <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-border bg-bg p-3 text-[11px] whitespace-pre-wrap text-muted">
-              {cuerpo}
-            </pre>
+            esHtml ? (
+              <pre className="mt-2 max-h-80 overflow-auto border border-border bg-bg p-3 text-[11px] whitespace-pre-wrap text-muted">
+                {cuerpo}
+              </pre>
+            ) : (
+              <div className="mt-2 max-h-96 overflow-auto border border-border bg-bg p-4">
+                <CuerpoMarkdown texto={separarFuente(cuerpo ?? '').cuerpo} />
+                {separarFuente(cuerpo ?? '').fuente ? (
+                  <p className="mt-3 border-t border-border pt-3 font-mono text-[11px] break-all text-muted">
+                    {d.agentes.fuenteComprada}: {separarFuente(cuerpo ?? '').fuente}
+                  </p>
+                ) : null}
+              </div>
+            )
           ) : null}
         </div>
       ) : null}
     </li>
   )
+}
+
+/**
+ * Los errores de corridas se guardan en español (los escribe el gateway).
+ * Acá se mapean a la copy del idioma del UI: por código cuando existe, y por
+ * prefijo para las corridas viejas que no lo traen.
+ */
+export function traducirErrorDeCorrida(
+  error: string,
+  codigo: string | null | undefined,
+  d: ReturnType<typeof useDict>,
+): string {
+  if (codigo === 'fondos') return d.agentes.faltaSaldoCompra
+  if (codigo === 'sin-match') return d.agentes.sinPlan
+  if (error.startsWith('Sin presupuesto') || error.startsWith('Falta saldo')) {
+    return d.agentes.faltaSaldoCompra
+  }
+  if (error.startsWith('Ningún servicio') || error.startsWith('No compré nada')) {
+    return d.agentes.sinPlan
+  }
+  return error
 }
 
 function EstadoBadge({ status }: { status: string }) {

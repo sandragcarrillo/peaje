@@ -44,8 +44,11 @@ const QUERY = `{
 }`
 
 export type Candidato = {
-  /** 'peaje' = 402 pagable hoy; 'erc8004' = servicio del registro. */
-  fuente: 'peaje' | 'erc8004'
+  /**
+   * 'peaje' = directorio propio; 'x402' = Bazaar público de x402 (servicios
+   * reales de terceros que cobran 402); 'erc8004' = registro de identidad.
+   */
+  fuente: 'peaje' | 'x402' | 'erc8004'
   nombre: string
   descripcion: string | null
   url: string | null
@@ -54,6 +57,11 @@ export type Candidato = {
   reputacion: number | null
   feedbacks: number
   aceptaPagos: boolean
+  /**
+   * true = el agente puede pagarlo HOY con sus rieles (Tempo/Arc testnet).
+   * Un servicio real en Base mainnet es señal de mercado, no una compra.
+   */
+  pagable: boolean
   etiquetas: string[]
   chain?: string
 }
@@ -111,6 +119,7 @@ async function desdeElRegistro(): Promise<Candidato[]> {
         reputacion: reputationAverage(a.feedback.map((f) => f.value)),
         feedbacks: Number(a.totalFeedback) || 0,
         aceptaPagos: reg.x402Support ?? false,
+        pagable: false,
         etiquetas: [...(reg.oasfDomains ?? []), ...(reg.oasfSkills ?? [])],
         chain: r.value.chain,
       })
@@ -124,6 +133,26 @@ async function desdeElDirectorio(): Promise<Candidato[]> {
   const tenants = await store.listTenants()
   const out: Candidato[] = []
   for (const t of tenants) {
+    // Las rutas de API con precio también son comprables (GET sin parámetros
+    // de path; la query la completa la capa de lenguaje sobre la misión).
+    const routes = await store.listRoutes(t.id).catch(() => [])
+    for (const r of routes) {
+      if (Number(r.priceUsd) <= 0) continue
+      if (r.method.toUpperCase() !== 'GET') continue
+      if (r.pathPattern.includes(':') || r.pathPattern.includes('*')) continue
+      out.push({
+        fuente: 'peaje',
+        nombre: r.description ?? `${t.name} ${r.pathPattern}`,
+        descripcion: `${t.name} · API ${r.method} ${r.pathPattern}`,
+        url: `${env.publicUrl}/${t.slug}${r.pathPattern}`,
+        precio: Number(r.priceUsd),
+        reputacion: null,
+        feedbacks: 0,
+        aceptaPagos: true,
+        pagable: true,
+        etiquetas: [t.name, r.pathPattern, r.description ?? '', 'api'].filter(Boolean),
+      })
+    }
     const resources = await store.listResources(t.id).catch(() => [])
     for (const r of resources) {
       if (Number(r.priceUsd) <= 0) continue
@@ -136,6 +165,7 @@ async function desdeElDirectorio(): Promise<Candidato[]> {
         reputacion: null,
         feedbacks: 0,
         aceptaPagos: true,
+        pagable: true,
         etiquetas: [t.name, r.slug, r.title ?? ''].filter(Boolean),
       })
     }
@@ -143,9 +173,92 @@ async function desdeElDirectorio(): Promise<Candidato[]> {
   return out
 }
 
+/**
+ * Redes que las wallets de agentes pueden liquidar hoy: Tempo y Arc testnet
+ * (demo Peaje-a-Peaje) más Base mainnet, donde vive el mercado real de x402.
+ * La misma wallet Privy firma en todas: son cuentas EVM.
+ */
+const REDES_PAGABLES = new Set(['eip155:42431', 'eip155:5042002', 'eip155:8453'])
+
+type BazaarItem = {
+  resource?: string
+  type?: string
+  accepts?: { network?: string; maxAmountRequired?: string; amount?: string }[]
+  metadata?: { name?: string; description?: string; category?: string }
+  extensions?: { bazaar?: { info?: { title?: string; description?: string } } }
+}
+
+/**
+ * El Bazaar público de x402 (índice de CDP): servicios REALES de terceros
+ * que cobran 402, con precio y red. Saca al agente de la burbuja de Peaje:
+ * ve el mercado completo y compra donde sus rieles alcanzan.
+ */
+let bazaarCache: { candidatos: Candidato[]; expira: number } | null = null
+
+async function desdeElBazaar(): Promise<Candidato[]> {
+  if (bazaarCache && bazaarCache.expira > Date.now()) return bazaarCache.candidatos
+  try {
+    // El índice completo son ~15 páginas de 1000. Con 100 el agente veía el
+    // 0,7% del mercado y "lo mejor disponible" era casi siempre basura.
+    const primera = await paginaBazaar(0)
+    const total = Math.min(primera.total, 20_000)
+    const offsets: number[] = []
+    for (let o = 1000; o < total; o += 1000) offsets.push(o)
+    const resto = await Promise.all(offsets.map((o) => paginaBazaar(o).catch(() => ({ items: [], total: 0 }))))
+    const items = [...primera.items, ...resto.flatMap((p) => p.items)]
+
+    const out: Candidato[] = []
+    for (const item of items) {
+      if (!item.resource) continue
+      const acepta = item.accepts?.[0]
+      const red = acepta?.network ?? null
+      const crudo = Number(acepta?.maxAmountRequired ?? acepta?.amount ?? Number.NaN)
+      // USDC de 6 decimales en todas las redes que lista el Bazaar hoy.
+      const precio = Number.isFinite(crudo) ? crudo / 1e6 : null
+      let host = item.resource
+      try {
+        host = new URL(item.resource).hostname
+      } catch {}
+      const info = item.extensions?.bazaar?.info
+      out.push({
+        fuente: 'x402',
+        nombre: item.metadata?.name ?? info?.title ?? host,
+        descripcion: item.metadata?.description ?? info?.description ?? item.resource,
+        url: item.resource,
+        precio,
+        reputacion: null,
+        feedbacks: 0,
+        aceptaPagos: true,
+        pagable: red !== null && REDES_PAGABLES.has(red),
+        etiquetas: [host, item.metadata?.category ?? '', item.type ?? ''].filter(Boolean),
+        chain: red ?? undefined,
+      })
+    }
+    bazaarCache = { candidatos: out, expira: Date.now() + 60 * 60 * 1000 }
+    return out
+  } catch {
+    // Si el índice falla, mejor el caché viejo que un mercado vacío.
+    return bazaarCache?.candidatos ?? []
+  }
+}
+
+async function paginaBazaar(offset: number): Promise<{ items: BazaarItem[]; total: number }> {
+  const res = await fetch(
+    `https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources?limit=1000&offset=${offset}`,
+    { signal: AbortSignal.timeout(15_000) },
+  )
+  if (!res.ok) throw new Error(`Bazaar ${res.status}`)
+  const json = (await res.json()) as { items?: BazaarItem[]; pagination?: { total?: number } }
+  return { items: json.items ?? [], total: json.pagination?.total ?? 0 }
+}
+
 export async function descubrirCandidatos(): Promise<Candidato[]> {
-  const [registro, directorio] = await Promise.all([desdeElRegistro(), desdeElDirectorio()])
-  return [...directorio, ...registro]
+  const [registro, directorio, bazaar] = await Promise.all([
+    desdeElRegistro(),
+    desdeElDirectorio(),
+    desdeElBazaar(),
+  ])
+  return [...directorio, ...bazaar, ...registro]
 }
 
 // ---- decisión ----
@@ -203,7 +316,13 @@ export function evaluar(
 
       if (c.aceptaPagos) {
         score += 20
-        motivos.push(c.fuente === 'peaje' ? 'tiene 402 pagable' : 'declara soporte x402')
+        motivos.push(
+          c.pagable
+            ? 'tiene 402 pagable con tus rieles'
+            : c.fuente === 'x402'
+              ? 'cobra 402 real, pero en una red que tu agente aún no liquida'
+              : 'declara soporte x402',
+        )
       } else {
         motivos.push('no declara soporte de pagos')
       }
@@ -231,5 +350,72 @@ export function evaluar(
 
 /** El elegido: mejor score, pagable y dentro del tope. */
 export function elegir(evaluados: Evaluado[]): Evaluado | null {
-  return evaluados.find((e) => e.score > 0 && e.url !== null && e.precio !== null && e.aceptaPagos) ?? null
+  return elegirVarios(evaluados, 1)[0] ?? null
+}
+
+/**
+ * Lista corta de comprables, en orden de score. El runner valida cada uno
+ * con la capa de lenguaje antes de pagar: si el primero es basura pertinente
+ * (docs que mencionan el tema), cae al siguiente en vez de comprarla.
+ */
+export function elegirVarios(evaluados: Evaluado[], n: number): Evaluado[] {
+  // Un host por cupo: tres endpoints del mismo proveedor no son tres
+  // opciones, y taparían alternativas reales en la lista corta.
+  const hosts = new Set<string>()
+  const out: Evaluado[] = []
+  for (const e of evaluados) {
+    if (!(e.score > 0 && e.url !== null && e.precio !== null && e.pagable)) continue
+    let host = e.url
+    try {
+      host = new URL(e.url).hostname
+    } catch {}
+    if (hosts.has(host)) continue
+    hosts.add(host)
+    out.push(e)
+    if (out.length >= n) break
+  }
+  return out
+}
+
+// ---- capacidades ----
+
+const CATEGORIAS: { id: string; patron: RegExp }[] = [
+  { id: 'web', patron: /search|serp|websearch|extract|scrape/i },
+  { id: 'clima', patron: /weather|forecast|clima/i },
+  { id: 'social', patron: /twitter|tweet|reddit|instagram|social/i },
+  { id: 'noticias', patron: /news|hackernews|headline/i },
+  { id: 'viajes', patron: /hotel|flight|tripadvisor|travel|nearby|airbnb/i },
+  { id: 'imagenes', patron: /image|imagen|photo|album/i },
+  { id: 'cripto', patron: /token|onchain|defi|nansen|gas|coingecko|wallet|balance/i },
+  { id: 'compras', patron: /ebay|amazon|giftcard|bitrefill|shop|product/i },
+]
+
+export type Capacidad = {
+  id: string
+  cuantos: number
+  precioDesde: number | null
+  ejemplo: { nombre: string; precio: number | null } | null
+}
+
+/**
+ * Lo que el agente puede comprar HOY, agrupado en lenguaje de persona:
+ * alimenta la sección "qué puede hacer tu agente" del dashboard. Sale del
+ * mismo inventario que usa la compra, así que nunca promete de más.
+ */
+export async function capacidadesDelMercado(): Promise<Capacidad[]> {
+  const candidatos = await descubrirCandidatos()
+  const pagables = candidatos.filter((c) => c.pagable && c.url && c.precio !== null)
+  return CATEGORIAS.map(({ id, patron }) => {
+    const grupo = pagables.filter((c) =>
+      patron.test([c.nombre, c.descripcion ?? '', c.url ?? ''].join(' ')),
+    )
+    const precios = grupo.map((c) => c.precio ?? Infinity).filter((p) => Number.isFinite(p))
+    const ejemplo = grupo.toSorted((a, b) => (a.precio ?? 1) - (b.precio ?? 1))[0] ?? null
+    return {
+      id,
+      cuantos: grupo.length,
+      precioDesde: precios.length > 0 ? Math.min(...precios) : null,
+      ejemplo: ejemplo ? { nombre: ejemplo.nombre, precio: ejemplo.precio } : null,
+    }
+  }).filter((c) => c.cuantos > 0)
 }

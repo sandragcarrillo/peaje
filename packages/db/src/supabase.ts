@@ -464,6 +464,18 @@ export class SupabaseStore implements Store {
     return withdrawalFrom(data as Row)
   }
 
+  async listPendingWithdrawals(limit = 20): Promise<Withdrawal[]> {
+    const { data, error } = await this.#db
+      .from('withdrawals')
+      .select()
+      .eq('status', 'pending')
+      .not('tx_ref', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(limit)
+    this.#fail('listPendingWithdrawals', error)
+    return (data ?? []).map(withdrawalFrom)
+  }
+
   async listWithdrawals(tenantId: string, limit = 20): Promise<Withdrawal[]> {
     const { data, error } = await this.#db
       .from('withdrawals')
@@ -525,6 +537,8 @@ export class SupabaseStore implements Store {
   async updateAgent(id: string, patch: Parameters<Store['updateAgent']>[1]): Promise<Agent> {
     const update: Row = {}
     if (patch.status !== undefined) update.status = patch.status
+    if (patch.mission !== undefined) update.mission = patch.mission
+    if (patch.network !== undefined) update.network = patch.network
     if (patch.frequency !== undefined) update.frequency = patch.frequency
     if (patch.maxPerRun !== undefined) update.max_per_run = patch.maxPerRun
     if (patch.nextRunAt !== undefined) update.next_run_at = patch.nextRunAt

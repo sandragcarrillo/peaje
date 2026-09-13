@@ -21,8 +21,12 @@ async function internal<T>(path: string, init?: RequestInit): Promise<T> {
     },
     cache: 'no-store',
   })
-  const data = (await res.json()) as T & { error?: string }
-  if (!res.ok) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
+  const data = (await res.json()) as T & { error?: string; code?: string }
+  if (!res.ok) {
+    const err = new Error(data.error ?? `Gateway respondió ${res.status}`) as Error & { code?: string }
+    err.code = data.code
+    throw err
+  }
   return data
 }
 
@@ -42,8 +46,14 @@ export function getWithdrawal(slug: string, id: string) {
 
 // ---- agentes compradores ----
 
-/** Agente + saldo live de su wallet, tal como lo devuelve el gateway. */
-export type AgenteConSaldo = Agent & { balance: string | null }
+/** Agente + saldos live de su wallet, tal como lo devuelve el gateway. */
+export type AgenteConSaldo = Agent & {
+  balance: string | null
+  balanceTempo: string | null
+  balanceArc: string | null
+  /** USDC en Base mainnet: el riel del mercado real de x402. */
+  balanceBase: string | null
+}
 
 export type AgentRunConExplorer = AgentRun & { explorerUrl: string | null }
 
@@ -70,17 +80,65 @@ export function createAgent(
   })
 }
 
-export function fundAgent(slug: string, id: string, amount: string) {
+export function fundAgent(
+  slug: string,
+  id: string,
+  amount: string,
+  network?: string,
+  fromSlug?: string,
+) {
   return internal<{ agent: AgenteConSaldo; tx: string; explorerUrl: string }>(
     `/${slug}/agents/${id}/fund`,
-    { method: 'POST', body: JSON.stringify({ amount }) },
+    { method: 'POST', body: JSON.stringify({ amount, network, fromSlug }) },
   )
 }
 
-export function runAgent(slug: string, id: string) {
+export function runAgent(slug: string, id: string, body?: { mission?: string; url?: string }) {
   return internal<{ run: AgentRun; agent: AgenteConSaldo | null }>(`/${slug}/agents/${id}/run`, {
     method: 'POST',
+    body: JSON.stringify(body ?? {}),
   })
+}
+
+/** Un candidato del plan, ya en lenguaje de persona. */
+export type ServicioDelPlan = {
+  nombre: string
+  descripcion: string | null
+  url: string | null
+  precio: number | null
+  red: string
+  fuente: string
+  reputacion: number | null
+}
+
+export type PlanDeCompra = {
+  consultados: number
+  saldos: Record<string, number>
+  elegido: ServicioDelPlan | null
+  veredicto: string | null
+  vetados: { nombre: string; motivo: string }[]
+  alternativas: ServicioDelPlan[]
+  faltaFondeo: boolean
+}
+
+/** Plan sin compra: qué compraría el agente para este pedido. */
+export function askAgent(slug: string, id: string, texto: string) {
+  return internal<{ plan: PlanDeCompra }>(`/${slug}/agents/${id}/ask`, {
+    method: 'POST',
+    body: JSON.stringify({ texto }),
+  })
+}
+
+export type Capacidad = {
+  id: string
+  cuantos: number
+  precioDesde: number | null
+  ejemplo: { nombre: string; precio: number | null } | null
+}
+
+/** Qué puede comprar un agente hoy, agrupado por categoría. */
+export function marketCapacidades() {
+  return internal<{ capacidades: Capacidad[] }>(`/mercado/capacidades`)
 }
 
 export function sweepAgent(slug: string, id: string) {

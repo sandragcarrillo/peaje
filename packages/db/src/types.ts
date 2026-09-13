@@ -221,6 +221,8 @@ export interface Store {
   createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }): Promise<Withdrawal>
   updateWithdrawal(id: string, patch: { txRef?: string; status?: WithdrawalStatus }): Promise<Withdrawal>
   listWithdrawals(tenantId: string, limit?: number): Promise<Withdrawal[]>
+  /** Retiros pending con tx enviada, de todos los tenants: los reconcilia el gateway contra la chain. */
+  listPendingWithdrawals(limit?: number): Promise<Withdrawal[]>
   getWithdrawal(id: string): Promise<Withdrawal | null>
 
   // agentes compradores
@@ -233,6 +235,8 @@ export interface Store {
       Pick<
         Agent,
         | 'status'
+        | 'mission'
+        | 'network'
         | 'frequency'
         | 'maxPerRun'
         | 'nextRunAt'

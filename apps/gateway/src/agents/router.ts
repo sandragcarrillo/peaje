@@ -10,9 +10,11 @@ import { Hono } from 'hono'
 import { env } from '../env.js'
 import { store } from '../store.js'
 import { sendPayout } from '../treasury.js'
+import { capacidadesDelMercado } from './discovery.js'
 import { estadoRegistro, registrarAgente } from './erc8004.js'
-import { correrYReprogramar } from './runner.js'
+import { correrYReprogramar, planearCompra } from './runner.js'
 import { agentBalance, createAgentWallet, sweepAgent } from './wallet.js'
+import { baseUsdcBalance } from './base-mainnet.js'
 
 /**
  * API interna de agentes compradores. La consume el dashboard con el mismo
@@ -38,8 +40,16 @@ agentsRouter.use('*', async (c, next) => {
 
 async function conSaldo(agent: Agent) {
   const network = isNetworkId(agent.network) ? agent.network : 'arc'
-  const balance = await agentBalance(agent.walletAddress as `0x${string}`, network).catch(() => null)
-  return { ...agent, balance }
+  // La misma address firma en los tres rieles: Tempo y Arc (testnet, demo) y
+  // Base mainnet (mercado real de x402). Se muestran los tres saldos.
+  const address = agent.walletAddress as `0x${string}`
+  const [balanceTempo, balanceArc, balanceBase] = await Promise.all([
+    agentBalance(address, 'tempo').catch(() => null),
+    agentBalance(address, 'arc').catch(() => null),
+    baseUsdcBalance(address).catch(() => null),
+  ])
+  const balance = network === 'arc' ? balanceArc : balanceTempo
+  return { ...agent, balance, balanceTempo, balanceArc, balanceBase }
 }
 
 agentsRouter.get('/:slug/agents', async (c) => {
@@ -164,22 +174,27 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   const agent = await store.getAgent(c.req.param('id'))
   if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
 
-  const network = isNetworkId(agent.network) ? agent.network : 'arc'
-  const { amount } = await c.req.json<{ amount?: string }>()
-  const monto = Number(amount)
+  const body = await c.req.json<{ amount?: string; network?: string; fromSlug?: string }>()
+  // La persona elige la red del fondeo (Tempo o Arc) y de qué negocio suyo
+  // sale la plata. El dashboard ya verificó que ambos negocios son del mismo
+  // usuario; esta API es interna y solo la llama el dashboard.
+  const network = isNetworkId(body.network ?? '') ? (body.network as 'tempo' | 'arc') : isNetworkId(agent.network) ? agent.network : 'arc'
+  const pagador = body.fromSlug ? await store.getTenantBySlug(body.fromSlug) : tenant
+  if (!pagador) return c.json({ error: 'Negocio de origen no encontrado' }, 404)
+  const monto = Number(body.amount)
   if (!Number.isFinite(monto) || monto <= 0) return c.json({ error: 'Monto inválido.' }, 400)
 
-  const balances = await store.balanceByNetwork(tenant.id)
+  const balances = await store.balanceByNetwork(pagador.id)
   const disponible = Number(balances.find((b) => b.network === network)?.available ?? 0)
   if (monto > disponible + 1e-9) {
     return c.json(
-      { error: `Saldo insuficiente en ${network}: disponible $${disponible.toFixed(6)}` },
+      { error: `Saldo insuficiente en ${network}: disponible $${disponible.toFixed(6)}`, code: 'fondos-negocio' },
       400,
     )
   }
 
   const withdrawal = await store.createWithdrawal({
-    tenantId: tenant.id,
+    tenantId: pagador.id,
     amount: monto.toFixed(6),
     toWallet: agent.walletAddress,
     network,
@@ -188,10 +203,12 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   try {
     const hash = await sendPayout(network, agent.walletAddress as `0x${string}`, monto.toFixed(6))
     await store.updateWithdrawal(withdrawal.id, { txRef: hash })
-    // Con saldo, el agente ya puede correr: se programa para ahora.
+    // Con saldo, el agente ya puede correr: se programa para ahora. Si el
+    // fondeo llegó por otra red de prueba, el agente pasa a operar en esa.
     const actualizado = await store.updateAgent(agent.id, {
       status: 'idle',
       nextRunAt: new Date().toISOString(),
+      ...(network !== agent.network ? { network } : {}),
     })
     return c.json({
       agent: await conSaldo(actualizado),
@@ -209,13 +226,53 @@ agentsRouter.post('/:slug/agents/:id/run', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
 
+  let agent = await store.getAgent(c.req.param('id'))
+  if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
+
+  // El flujo "ask" confirma un plan: el pedido pasa a ser la misión del
+  // agente y la compra queda fijada al servicio que la persona aprobó.
+  const body = await c.req.json<{ mission?: string; url?: string }>().catch(() => ({}) as { mission?: string; url?: string })
+  if (body.mission && body.mission.trim().length > 0) {
+    agent = await store.updateAgent(agent.id, { mission: body.mission.trim().slice(0, 500) })
+  }
+
+  // Un agente "done" (agotó sus corridas de una vez) o "paused" revive cuando
+  // la persona aprieta el botón: el claim atómico solo toma desde idle, y sin
+  // esto todo Run devolvía 409 para siempre con un mensaje engañoso.
+  if (agent.status === 'done' || agent.status === 'paused') {
+    agent = await store.updateAgent(agent.id, { status: 'idle' })
+  }
+
+  const run = await correrYReprogramar(agent, body.url ? { urlFijada: body.url } : {})
+  if (!run) return c.json({ error: 'El agente ya está corriendo. Espera a que termine.', code: 'busy' }, 409)
+  const actualizado = await store.getAgent(agent.id)
+  return c.json({ run, agent: actualizado ? await conSaldo(actualizado) : null })
+})
+
+/**
+ * Plan sin compra: qué compraría el agente para este pedido. La persona ve
+ * servicio, precio y veredicto ANTES de que se mueva un centavo, y confirma
+ * con /run pasando la URL elegida.
+ */
+agentsRouter.post('/:slug/agents/:id/ask', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+
   const agent = await store.getAgent(c.req.param('id'))
   if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
 
-  const run = await correrYReprogramar(agent)
-  if (!run) return c.json({ error: 'El agente ya está corriendo. Espera a que termine.' }, 409)
-  const actualizado = await store.getAgent(agent.id)
-  return c.json({ run, agent: actualizado ? await conSaldo(actualizado) : null })
+  const { texto } = await c.req.json<{ texto?: string }>().catch(() => ({}) as { texto?: string })
+  if (!texto || texto.trim().length < 5) {
+    return c.json({ error: 'Cuéntale a tu agente qué necesita conseguir.' }, 400)
+  }
+
+  const plan = await planearCompra(agent, texto.trim().slice(0, 500))
+  return c.json({ plan })
+})
+
+/** Qué puede comprar un agente hoy, agrupado por categoría legible. */
+agentsRouter.get('/mercado/capacidades', async (c) => {
+  return c.json({ capacidades: await capacidadesDelMercado() })
 })
 
 /** Barrido: el agente devuelve su saldo a la wallet del negocio. */
