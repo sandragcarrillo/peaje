@@ -20,6 +20,15 @@ import { agentBalance, createAgentWallet, sweepAgent } from './wallet.js'
  */
 export const agentsRouter = new Hono()
 
+/**
+ * Los errores salen como JSON siempre: un 500 en texto plano rompe al
+ * dashboard, que espera parsear la respuesta ("Unexpected token I...").
+ */
+agentsRouter.onError((err, c) => {
+  console.error('[agents] error no manejado', err)
+  return c.json({ error: err instanceof Error ? err.message : 'Error interno del gateway.' }, 500)
+})
+
 agentsRouter.use('*', async (c, next) => {
   if (c.req.header('authorization') !== `Bearer ${env.internalSecret}`) {
     return c.json({ error: 'No autorizado' }, 401)
