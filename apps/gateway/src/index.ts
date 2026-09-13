@@ -29,6 +29,29 @@ import { rateLimit } from './ratelimit.js'
 import * as wk from './wellknown.js'
 import { withdrawals } from './withdrawals.js'
 
+
+/**
+ * Detrás del proxy de Railway el TLS termina antes de llegar acá: Node ve la
+ * petición como http:// aunque el cliente pidió https://. mppx mete esa URL
+ * en el challenge 402 como `resource.url`, y los clientes x402 comparan esa
+ * URL contra la que pidieron: si difiere el esquema, abortan el pago
+ * ("payment-required resource does not match response URL"). Se reconstruye
+ * la Request con el esquema/host externos (X-Forwarded-*) antes de cobrar.
+ */
+function conUrlExterna(req: Request): Request {
+  const proto = req.headers.get('x-forwarded-proto')
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+  if (!proto && !host) return req
+  const url = new URL(req.url)
+  const externa = `${proto ?? url.protocol.replace(':', '')}://${host ?? url.host}${url.pathname}${url.search}`
+  if (externa === req.url) return req
+  if (req.method === 'GET' || req.method === 'HEAD' || req.body === null) {
+    return new Request(externa, req)
+  }
+  // Con body en stream, Node exige declarar duplex al clonar.
+  return new Request(externa, { ...req, duplex: 'half' } as RequestInit & { duplex: 'half' })
+}
+
 const app = new Hono<{ Bindings: HttpBindings }>()
 
 // Antes de cualquier ruta: las cabeceras de rate limit van en todas.
@@ -213,7 +236,7 @@ app.get('/:slug/r/:rslug', async (c) => {
     : await mppx.charge({
         amount: resource.priceUsd,
         description: resource.title ?? resource.slug,
-      })(c.req.raw)
+      })(conUrlExterna(c.req.raw))
 
   if (result && result.status === 402) return result.challenge
 
@@ -492,7 +515,7 @@ app.all('/:slug/*', async (c) => {
   const result = await mppx.charge({
     amount: match.route.priceUsd,
     description: match.route.description ?? `${tenant.name} · ${path}`,
-  })(c.req.raw)
+  })(conUrlExterna(c.req.raw))
 
   if (result.status === 402) return result.challenge
 
