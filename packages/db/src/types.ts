@@ -8,6 +8,9 @@ export type Tenant = {
   payoutWallet: string | null
   email: string | null
   privyUserId: string | null
+  /** Score de agent-readiness con el que llegó, antes de aplicar Peaje. */
+  baselineScore: number | null
+  baselineScoreAt: string | null
   createdAt: string
 }
 
@@ -189,6 +192,9 @@ export interface Store {
   listAllowedOrigins(tenantId: string): Promise<string[]>
   addAllowedOrigin(tenantId: string, origin: string): Promise<void>
   removeAllowedOrigin(tenantId: string, origin: string): Promise<void>
+
+  /** Primer score visto: solo escribe si todavía no hay baseline. */
+  setBaselineScore(tenantId: string, score: number): Promise<void>
 
   // rutas y precios
   listRoutes(tenantId: string): Promise<Route[]>

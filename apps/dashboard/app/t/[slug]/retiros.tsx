@@ -61,61 +61,77 @@ export function RetirosPanel({
   }
 
   return (
-    <section>
-      <div className="rounded-lg border border-accent/40 bg-accent/5 p-5">
-        <p className="text-xs tracking-wide text-accent uppercase">{d.dinero.saldoDisponible}</p>
-        <p className="mt-3 text-3xl font-medium tabular-nums">{money(disponible)}</p>
-
-        {wallet ? (
-          <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-            <span className="text-xs text-muted">
-              {d.dinero.cuenta}: <span className="font-mono">{shortWallet(wallet)}</span>
-            </span>
-            <button
-              type="button"
-              onClick={copiarWallet}
-              className="text-xs text-accent hover:underline"
-            >
-              {copiado ? d.dinero.copiado : d.dinero.copiar}
-            </button>
+    <section className="space-y-4">
+      {/* Hero: saldo disponible (mock Withdraw de Stitch) */}
+      <div className="border border-border bg-panel p-6 sm:p-8">
+        <div className="mb-6 flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+            {d.dinero.saldoDisponible}
+          </span>
+          <div className="flex items-center gap-2 self-start border border-border bg-bg px-2.5 py-1 font-mono text-[10px] text-muted">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span>MPP · 402</span>
           </div>
-        ) : (
-          <p className="mt-5 border-t border-border pt-4 text-xs text-muted">
-            {d.dinero.configuraWallet}
-          </p>
-        )}
+        </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline">
+          <span className="text-5xl font-bold tracking-tight tabular-nums">{money(disponible)}</span>
+          <span className="font-mono text-xs text-muted">TEMPO + ARC</span>
+        </div>
+        <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+          {wallet ? (
+            <>
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+                {d.dinero.cuenta}: <span className="text-text">{shortWallet(wallet)}</span>
+              </span>
+              <button
+                type="button"
+                onClick={copiarWallet}
+                className="border border-border px-2.5 py-1 font-mono text-[10px] uppercase text-text hover:bg-panel-2"
+              >
+                {copiado ? d.dinero.copiado : `[${d.dinero.copiar}]`}
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-muted">{d.dinero.configuraWallet}</span>
+          )}
+        </div>
+      </div>
 
-        {redesConSaldo.length === 0 ? (
-          <button
-            type="button"
-            disabled
-            className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black opacity-40"
-          >
-            {d.dinero.retirar}
-          </button>
-        ) : (
-          <div className="mt-4 space-y-2">
-            {redesConSaldo.map((b) => {
-              const label = isNetworkId(b.network) ? NETWORKS[b.network].label : b.network
-              const symbol = isNetworkId(b.network) ? NETWORKS[b.network].tokenSymbol : ''
-              return (
+      {/* Una fila de retiro por red con saldo */}
+      {redesConSaldo.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3">
+          {redesConSaldo.map((b) => {
+            const label = isNetworkId(b.network) ? NETWORKS[b.network].label : b.network
+            const symbol = isNetworkId(b.network) ? NETWORKS[b.network].tokenSymbol : ''
+            return (
+              <div
+                key={b.network}
+                className="flex flex-col justify-between gap-4 border border-border bg-bg p-4 transition-colors hover:bg-panel sm:p-5 md:flex-row md:items-center"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <span className="font-mono text-sm font-bold">
+                    {money(b.available)} {symbol}
+                  </span>
+                  <span className="inline-flex w-fit items-center gap-1.5 border border-border bg-panel-2 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+                    {label}
+                  </span>
+                </div>
                 <button
-                  key={b.network}
                   type="button"
                   disabled={!wallet || enCurso !== null}
                   onClick={() => retirarDe(b.network)}
-                  className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40"
+                  className="border border-text bg-negro px-4 py-2 font-mono text-xs font-bold uppercase text-white transition-colors hover:bg-tinta disabled:opacity-40"
                 >
-                  {enCurso === b.network
-                    ? d.dinero.enviando
-                    : d.dinero.retirarMonto(money(b.available), symbol, label)}
+                  {enCurso === b.network ? d.dinero.enviando : d.dinero.retirar}
                 </button>
-              )
-            })}
-          </div>
-        )}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
 
-        {estado ? (
+      {estado ? (
           <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-panel p-3 text-sm">
             <Badge status={estado.status} />
             <span className="text-muted">
@@ -138,12 +154,9 @@ export function RetirosPanel({
           </div>
         ) : null}
 
-        {error ? (
-          <p className="mt-3 rounded-lg border border-red-400/40 bg-panel p-3 text-sm text-red-400">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      {error ? (
+        <p className="border border-red-400/40 bg-panel p-3 text-sm text-red-600">{error}</p>
+      ) : null}
 
       {historial.length > 0 ? (
         <ul className="mt-5 space-y-1.5">
@@ -184,9 +197,9 @@ export function RetirosPanel({
 function Badge({ status }: { status: Withdrawal['status'] }) {
   const d = useDict()
   const styles = {
-    pending: 'text-yellow-400 border-yellow-400/40',
+    pending: 'text-amber-700 border-amber-600/50',
     confirmed: 'text-accent border-accent/40',
-    failed: 'text-red-400 border-red-400/40',
+    failed: 'text-red-600 border-red-400/40',
   } as const
   const labels = {
     pending: d.dinero.estadoPendiente,

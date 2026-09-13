@@ -1,5 +1,6 @@
 export const mercado = {
   es: {
+    eyebrow: 'MERCADO / EN VIVO',
     /** Etiqueta BCP-47 para Intl (fechas y números de la página). */
     intl: 'es-CO',
 
@@ -57,8 +58,11 @@ export const mercado = {
       ' en los últimos meses. Si tu tráfico de agentes acompaña ese ritmo, esta proyección sería ',
     calcRitmoFin: ' en 3 meses.',
     calcBoton: 'Empezar a cobrar →',
+    calcPctLabel: 'Agentes que pagan',
+    calcPctNota: (pct: number) => `El ${pct}% del mercado ya declara soporte de pago on-chain; ajusta el supuesto si quieres.`,
   },
   en: {
+    eyebrow: 'MARKET / LIVE',
     /** Etiqueta BCP-47 para Intl (fechas y números de la página). */
     intl: 'en-US',
 
@@ -93,7 +97,7 @@ export const mercado = {
     ctaTitulo: 'These agents are already buying',
     ctaCuerpo:
       'More and more agents have a wallet, an identity and a budget. Peaje lets your site or your API charge them per request, with no API keys and no changes to your code.',
-    ctaBoton: 'Put a toll on your site →',
+    ctaBoton: 'Use Peaje on your site →',
 
     fuenteInicio: 'Source: Subgraphs from ',
     fuenteLink: 'Agent0 (ERC-8004)',
@@ -117,5 +121,7 @@ export const mercado = {
       ' over the last few months. If your agent traffic keeps that pace, this projection would be ',
     calcRitmoFin: ' in 3 months.',
     calcBoton: 'Start charging →',
+    calcPctLabel: 'Agents that pay',
+    calcPctNota: (pct: number) => `${pct}% of the market already declares on-chain payment support; adjust the assumption if you want.`,
   },
 }

@@ -4,6 +4,7 @@ import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
+import { Eyebrow } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
 import { entrarConPrivy } from './actions'
 
@@ -123,8 +124,9 @@ export default function Acceder() {
   if (step === 'code') {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
-        <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-medium">{d.acceso.revisaTuEmail}</h1>
+        <div className="w-full max-w-sm border border-border bg-panel p-8">
+          <Eyebrow>PEAJE</Eyebrow>
+        <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
             {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
           </p>
@@ -141,7 +143,7 @@ export default function Acceder() {
                 className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
               />
             </label>
-            {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
             {noRegistrado ? (
               <Link href="/nuevo" className="block text-sm text-accent hover:underline">
                 {d.acceso.registrarEsteNegocio} →
@@ -150,7 +152,7 @@ export default function Acceder() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+              className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
             >
               {pending ? d.acceso.verificando : d.acceso.botonEntrar}
             </button>
@@ -162,8 +164,9 @@ export default function Acceder() {
 
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-medium">{d.acceso.tituloEntrar}</h1>
+      <div className="w-full max-w-sm border border-border bg-panel p-8">
+        <Eyebrow>PEAJE</Eyebrow>
+        <h1 className="mt-2 text-2xl font-semibold">{d.acceso.tituloEntrar}</h1>
         <p className="mt-2 text-sm text-muted">{d.acceso.subtituloEntrar}</p>
         <form onSubmit={enviarCodigo} className="mt-6 space-y-4">
           <label className="block">
@@ -177,10 +180,10 @@ export default function Acceder() {
               className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-sm outline-none focus:border-accent"
             />
           </label>
-          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <button
             disabled={pending}
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+            className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
           >
             {pending ? d.acceso.enviando : d.acceso.enviarCodigo}
           </button>

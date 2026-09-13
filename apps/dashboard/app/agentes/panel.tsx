@@ -38,7 +38,7 @@ export function AgentesPanel({ negocios, redes }: { negocios: Negocio[]; redes: 
         <button
           type="button"
           onClick={() => setCreando(true)}
-          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black"
+          className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
         >
           {d.agentes.crear}
         </button>
@@ -91,7 +91,7 @@ function FormNuevo({
   }
 
   return (
-    <form onSubmit={enviar} className="space-y-4 rounded-lg border border-border bg-panel p-5">
+    <form onSubmit={enviar} className="space-y-4 border border-border bg-panel p-5">
       <p className="text-sm font-medium">{d.agentes.nuevoAgente}</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -179,13 +179,13 @@ function FormNuevo({
 
       <p className="text-xs text-muted">{d.agentes.notaEntrega}</p>
 
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+          className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
         >
           {pending ? d.agentes.creandoWallet : d.agentes.crearAgente}
         </button>
@@ -243,7 +243,7 @@ function TarjetaAgente({
   }
 
   return (
-    <article className="rounded-lg border border-border bg-panel p-5">
+    <article className="border border-border bg-panel p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="font-medium">
@@ -335,7 +335,7 @@ function TarjetaAgente({
         </Boton>
       </div>
 
-      {aviso ? <p className="mt-3 text-sm text-red-400">{aviso}</p> : null}
+      {aviso ? <p className="mt-3 text-sm text-red-600">{aviso}</p> : null}
       {corridas ? <Resultados runs={corridas} /> : null}
     </article>
   )
@@ -374,8 +374,8 @@ function Resultado({ run }: { run: AgentRun }) {
             run.status === 'success'
               ? 'text-accent'
               : run.status === 'failed'
-                ? 'text-red-400'
-                : 'text-yellow-400'
+                ? 'text-red-600'
+                : 'text-amber-700'
           }
         >
           ●
@@ -394,7 +394,7 @@ function Resultado({ run }: { run: AgentRun }) {
         {run.amount ? <span>{money(run.amount)}</span> : null}
         {run.deliveredAt ? <span className="text-muted">· {d.agentes.avisado}</span> : null}
         {run.deliveryError ? (
-          <span className="text-yellow-400" title={run.deliveryError}>
+          <span className="text-amber-700" title={run.deliveryError}>
             · {d.agentes.noSePudoAvisar}
           </span>
         ) : null}
@@ -414,7 +414,7 @@ function Resultado({ run }: { run: AgentRun }) {
           {decision.justificacion}
         </p>
       ) : null}
-      {run.error ? <p className="mt-1 text-xs text-red-400">{run.error}</p> : null}
+      {run.error ? <p className="mt-1 text-xs text-red-600">{run.error}</p> : null}
 
       {cuerpo ? (
         <div className="mt-2">
@@ -440,7 +440,7 @@ function EstadoBadge({ status }: { status: string }) {
   const d = useDict()
   const estilos: Record<string, string> = {
     idle: 'text-accent border-accent/40',
-    running: 'text-yellow-400 border-yellow-400/40',
+    running: 'text-amber-700 border-amber-600/50',
     paused: 'text-muted border-border',
     done: 'text-muted border-border',
   }
@@ -482,7 +482,7 @@ function Boton({
       title={titulo}
       className={`rounded-lg px-3 py-1.5 text-xs disabled:opacity-40 ${
         principal
-          ? 'bg-accent font-medium text-black'
+          ? 'bg-text font-medium text-bg'
           : 'border border-border text-muted hover:border-accent hover:text-text'
       }`}
     >
@@ -492,12 +492,12 @@ function Boton({
 }
 
 const input =
-  'w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-sm outline-none focus:border-accent'
+  'w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text'
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-xs uppercase tracking-wide text-muted">{label}</span>
+      <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{label}</span>
       <div className="mt-1.5">{children}</div>
     </label>
   )

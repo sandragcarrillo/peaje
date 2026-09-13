@@ -7,58 +7,86 @@ export type PasoSetup = {
   descripcion: string
   href: string
   hecho: boolean
+  estado: string
 }
 
 /**
- * Checklist de configuración. Aparece en el Dashboard mientras falte algo;
- * cuando los tres pasos están, desaparece solo.
+ * Checklist de configuración, calcada del mock: tres pasos en grilla con
+ * índice PASO 0n, estado [✓]/[ ], y el par de botones unidos abajo.
+ * Desaparece sola cuando los tres pasos están.
  */
-export async function SetupChecklist({ pasos }: { pasos: PasoSetup[] }) {
+export async function SetupChecklist({ pasos, slug }: { pasos: PasoSetup[]; slug: string }) {
   const pendientes = pasos.filter((p) => !p.hecho)
   if (pendientes.length === 0) return null
 
-  const actual = pendientes[0]!.n
   const d = await getDict()
+  const siguiente = pendientes[0]!
 
   return (
-    <section className="rounded-lg border border-accent/40 bg-accent/5 p-4">
-      <h2 className="font-medium">{d.panel.setupTitulo}</h2>
-      <p className="mt-1 text-xs text-muted">
-        {d.panel.setupProgreso(pasos.length - pendientes.length, pasos.length)}
-      </p>
-      <ol className="mt-4 space-y-3">
+    <div className="space-y-5 border border-border bg-bg p-6">
+      <div className="flex flex-col justify-between gap-2 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          <span aria-hidden className="h-2 w-2 bg-accent" />
+          <h3 className="text-lg font-semibold">{d.panel.setupTitulo}</h3>
+        </div>
+        <span className="font-mono text-xs uppercase tracking-[0.1em] text-muted">
+          ({d.panel.setupProgreso(pasos.length - pendientes.length, pasos.length)})
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 pt-1 md:grid-cols-3">
         {pasos.map((p) => (
-          <li key={p.n} className="flex items-center gap-3">
+          <Link
+            key={p.n}
+            href={p.href}
+            className={`flex items-start gap-3 border border-border p-3.5 transition-colors hover:border-text ${
+              p.hecho ? 'bg-panel' : 'bg-bg'
+            }`}
+          >
             <span
-              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border font-mono text-xs ${
-                p.hecho
-                  ? 'border-accent/40 text-accent'
-                  : p.n === actual
-                    ? 'border-accent bg-accent text-black'
-                    : 'border-border text-muted'
+              aria-hidden
+              className={`mt-0.5 flex h-4 w-4 items-center justify-center border ${
+                p.hecho ? 'border-text bg-negro' : 'border-faint bg-panel-2'
               }`}
             >
-              {p.hecho ? '✓' : p.n}
+              <span className={`h-1.5 w-1.5 ${p.hecho ? 'bg-accent' : 'bg-border'}`} />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm ${p.hecho ? 'text-muted line-through' : ''}`}>{p.titulo}</p>
-              {!p.hecho ? <p className="text-xs text-muted">{p.descripcion}</p> : null}
-            </div>
-            {!p.hecho ? (
-              <Link
-                href={p.href}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium ${
-                  p.n === actual
-                    ? 'bg-accent text-black'
-                    : 'border border-border text-muted hover:text-text'
+            <span className="min-w-0">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+                {d.panel.pasoLabel(p.n)}
+              </span>
+              <span className={`mt-0.5 block font-mono text-xs ${p.hecho ? 'font-bold' : ''}`}>
+                {p.titulo}
+              </span>
+              <span
+                className={`mt-1 block font-mono text-[10px] tracking-[0.04em] ${
+                  p.hecho ? 'text-accent' : 'text-muted'
                 }`}
               >
-                {p.n === actual ? d.panel.setupContinuar : d.panel.setupIr}
-              </Link>
-            ) : null}
-          </li>
+                {p.estado}
+              </span>
+            </span>
+          </Link>
         ))}
-      </ol>
-    </section>
+      </div>
+
+      <div className="flex items-center justify-end pt-2">
+        <div className="inline-flex border border-text bg-bg p-0.5">
+          <Link
+            href={siguiente.href}
+            className="flex items-center gap-2 bg-negro px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
+          >
+            <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+            {d.panel.setupContinuar}
+          </Link>
+          <Link
+            href={`/t/${slug}/kit`}
+            className="px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors hover:bg-panel-2"
+          >
+            KIT
+          </Link>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,0 +1,2 @@
+- Mayúsculas solo en micro-labels de chrome (eyebrows, nav, índices); títulos, frases y estados van en sentence case: puras mayúsculas en frases se ve feo (regla de San, 2026-09-12).
+- En inglés, "peaje" nunca se traduce como "toll": la marca es Peaje ("Use Peaje on your site", no "Put a toll on your site"). Regla de San, 2026-09-13.

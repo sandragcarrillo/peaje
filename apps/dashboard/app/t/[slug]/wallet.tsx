@@ -52,7 +52,7 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
           {d.panel.guardar}
         </button>
       </form>
-      {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
     </section>
   )
 }

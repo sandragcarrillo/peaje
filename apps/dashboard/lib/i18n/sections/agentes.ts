@@ -1,5 +1,6 @@
 export const agentes = {
   es: {
+    eyebrow: 'MIS AGENTES',
     titulo: 'Mis agentes',
     intro:
       'Agentes que compran por ti. Cada uno tiene su propia wallet: el presupuesto que le das es su saldo real, así que no puede gastar de más. Buscan en el registro ERC-8004 vía The Graph, eligen, pagan y te dejan el resultado acá.',
@@ -86,6 +87,7 @@ export const agentes = {
     fechaLocale: 'es-CO',
   },
   en: {
+    eyebrow: 'MY AGENTS',
     titulo: 'My agents',
     intro:
       'Agents that buy for you. Each one has its own wallet: the budget you give it is its real balance, so it cannot overspend. They search the ERC-8004 registry via The Graph, pick a service, pay, and leave the result here.',

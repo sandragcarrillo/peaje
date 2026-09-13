@@ -2,18 +2,26 @@ import Link from 'next/link'
 import { getDict } from '@/lib/i18n'
 import { currentTenant } from '@/lib/session'
 
+/**
+ * Landing según design/direccion-visual.md §10: hero split crema/tinta con
+ * status bar de datos reales, ticker, comparativa antes/después, pasos
+ * numerados y CTA final a dos tonos. Un solo momento animado (el ticker).
+ */
+
+/** Sección a sangre completa: se escapa del max-w-5xl del layout. */
+function Sangre({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`mx-[calc(50%-50vw)] w-screen ${className}`}>{children}</div>
+}
+
 async function TickerRow() {
   const d = await getDict()
   const items = [d.landing.tickerMpp, d.landing.tickerPagos, d.landing.tickerSinApiKey]
-
   return (
     <div className="flex shrink-0 items-center">
       {items.map((item) => (
         <span key={item} className="mx-4 flex items-center gap-4">
           {item}
-          <span aria-hidden className="text-border">
-            ·
-          </span>
+          <span aria-hidden className="text-border">·</span>
         </span>
       ))}
     </div>
@@ -22,47 +30,80 @@ async function TickerRow() {
 
 export default async function Landing() {
   const [tenant, d] = await Promise.all([currentTenant(), getDict()])
+  const L = d.landing
 
   return (
-    <div className="space-y-20 py-8">
-      <section className="grid gap-14 lg:grid-cols-[1.05fr_1fr] lg:items-center">
-        <div className="max-w-xl">
-          <h1 className="text-4xl leading-tight font-medium lg:text-5xl">
-            {d.landing.heroTitulo}{' '}
-            <span className="text-muted">{d.landing.heroTituloTenue}</span>
-          </h1>
-          <p className="mt-5 text-lg text-muted">{d.landing.heroTexto}</p>
-          <div className="mt-8 flex items-center gap-6">
-            {tenant ? (
-              <Link
-                href={`/t/${tenant.slug}`}
-                className="rounded-full bg-text px-5 py-3 text-sm font-medium text-bg"
-              >
-                {d.landing.ctaDashboard} →
-              </Link>
-            ) : (
-              <>
+    <div className="pb-4">
+      {/* ── Hero split crema/tinta ─────────────────────────────── */}
+      <Sangre>
+        <div className="grid lg:grid-cols-[1.1fr_1fr]">
+          <div className="bg-crema px-6 py-16 text-tinta sm:px-10 lg:py-24 lg:pl-[max(2.5rem,calc(50vw-40rem))]">
+            <p className="font-mono text-[11px] tracking-[0.14em] text-tinta/60">{L.eyebrow}</p>
+            <h1 className="mt-6 max-w-xl text-4xl leading-[1.05] font-semibold sm:text-5xl">
+              {L.hero1}
+              <br />
+              {L.hero2}
+              <br />
+              <span className="text-tinta/45">{L.hero3}</span>
+            </h1>
+            <p className="mt-6 max-w-lg text-base text-tinta/70">{L.heroTexto}</p>
+
+            {/* Botones pastilla conectados (§5.4) */}
+            <div className="mt-9 inline-flex font-mono text-xs tracking-[0.08em]">
+              {tenant ? (
+                <Link
+                  href={`/t/${tenant.slug}`}
+                  className="rounded-l-full border border-tinta bg-tinta px-6 py-3 text-crema"
+                >
+                  {L.ctaDashboard}
+                </Link>
+              ) : (
                 <Link
                   href="/nuevo"
-                  className="rounded-full bg-text px-5 py-3 text-sm font-medium text-bg"
+                  className="rounded-l-full border border-tinta bg-tinta px-6 py-3 text-crema"
                 >
-                  {d.landing.ctaRegistrar}
+                  {L.ctaRegistrar}
                 </Link>
-                <Link
-                  href="/mercado"
-                  className="inline-flex items-center gap-1.5 border-b border-current pb-0.5 text-sm font-medium text-muted hover:text-text"
-                >
-                  {d.landing.ctaMercado} <span aria-hidden>→</span>
-                </Link>
-              </>
-            )}
+              )}
+              <Link
+                href="/mercado"
+                className="flex items-center gap-2 rounded-r-full border border-l-0 border-tinta px-6 py-3 text-tinta hover:bg-tinta/5"
+              >
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+                {L.ctaMercado}
+              </Link>
+            </div>
+          </div>
+
+          {/* Tinta: arte concéntrico sobre retícula con coordenadas (§6) */}
+          <div className="isla-tinta relative hidden overflow-hidden bg-bg lg:block">
+            <div className="dot-grid absolute inset-0 text-border opacity-50" />
+            <span className="absolute top-3 left-4 font-mono text-[10px] text-muted/60">0.0</span>
+            <span className="absolute right-4 bottom-3 font-mono text-[10px] text-muted/60">
+              402.2026
+            </span>
+            <ArteConcentrico frase={L.arte} />
           </div>
         </div>
+      </Sangre>
 
-        <RequestFlow />
-      </section>
+      {/* Status bar (§5.1): el sitio reportando su propio estado */}
+      <Sangre className="isla-tinta border-y border-border bg-bg">
+        <div className="mx-auto flex max-w-5xl flex-wrap gap-x-10 gap-y-2 px-6 py-3 font-mono text-[11px] tracking-[0.1em]">
+          {L.status.map(([k, v]) => (
+            <span key={k} className="flex items-center gap-2">
+              <span className="text-muted">{k}:</span>
+              <span className="text-text">{v}</span>
+              {k === 'MPP' || k === 'MPP ' ? (
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+              ) : null}
+            </span>
+          ))}
+        </div>
+      </Sangre>
 
-      <div className="overflow-hidden border-y border-border py-2.5">
+      {/* Ticker: el único elemento en movimiento de la página */}
+      <div className="overflow-hidden border-b border-border py-2.5">
         <div className="flex animate-marquee font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
           <TickerRow />
           <div aria-hidden>
@@ -71,98 +112,211 @@ export default async function Landing() {
         </div>
       </div>
 
-      <section className="relative grid grid-cols-1 gap-8 sm:grid-cols-3">
-        <div
-          aria-hidden
-          className="absolute top-[7px] right-0 left-0 hidden h-px bg-border sm:block"
-        />
-        <SequenceStep titulo={d.landing.paso1Titulo} texto={d.landing.paso1Texto} />
-        <SequenceStep titulo={d.landing.paso2Titulo} texto={d.landing.paso2Texto} />
-        <SequenceStep titulo={d.landing.paso3Titulo} texto={d.landing.paso3Texto} last />
-      </section>
+      {/* ── Comparativa antes/después (§5.5) ───────────────────── */}
+      <Sangre className="bg-crema">
+        <div className="mx-auto max-w-5xl px-6 py-20">
+          <h2 className="text-2xl font-semibold text-tinta sm:text-3xl">{L.compTitulo}</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <PanelComparativa
+              badge={L.compSinBadge}
+              nota={L.compSinNota}
+              activo={false}
+              estadoSin={L.compSinEstado}
+            />
+            <PanelComparativa
+              badge={L.compConBadge}
+              nota={L.compConNota}
+              activo
+              hace={L.compConHace}
+            />
+          </div>
+        </div>
+      </Sangre>
+
+      {/* ── Pasos numerados sobre tinta con ruido (§5.3, §6) ───── */}
+      <Sangre className="isla-tinta bg-bg">
+        <section className="relative mx-auto max-w-5xl px-6 py-20">
+          <RuidoTipografico />
+        <h2 className="relative text-2xl font-semibold sm:text-3xl">{L.featuresTitulo}</h2>
+        <div className="relative mt-10 grid gap-10 sm:grid-cols-3">
+          <Paso n="001" titulo={L.paso1Titulo} texto={L.paso1Texto} />
+          <Paso n="002" titulo={L.paso2Titulo} texto={L.paso2Texto} />
+          <Paso n="003" titulo={L.paso3Titulo} texto={L.paso3Texto} ultimo />
+          </div>
+        </section>
+      </Sangre>
+
+      {/* ── CTA final a dos tonos (§3) ─────────────────────────── */}
+      <Sangre className="isla-tinta border-t border-border bg-bg">
+        <div className="mx-auto max-w-5xl px-6 py-24">
+          <h2 className="max-w-3xl text-3xl leading-[1.1] font-semibold sm:text-5xl">
+            {L.ctaFinal1} <span className="text-muted">{L.ctaFinal2}</span>
+          </h2>
+          <div className="mt-9 inline-flex font-mono text-xs tracking-[0.08em]">
+            <Link
+              href={tenant ? `/t/${tenant.slug}/kit` : '/nuevo'}
+              className="rounded-l-full border border-text bg-text px-6 py-3 text-bg"
+            >
+              {tenant ? L.ctaDashboard : L.ctaRegistrar}
+            </Link>
+            <Link
+              href="/mercado"
+              className="flex items-center gap-2 rounded-r-full border border-l-0 border-text px-6 py-3 text-text hover:bg-panel"
+            >
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+              {L.ctaMercado}
+            </Link>
+          </div>
+        </div>
+      </Sangre>
     </div>
   )
 }
 
-function SequenceStep({
+/**
+ * La gota: un pulso desde el centro y los anillos de texto apareciendo hacia
+ * afuera. La frase se repite las veces que caben en cada circunferencia y se
+ * estira con `textLength`, así nunca se corta a mitad de palabra.
+ */
+function ArteConcentrico({ frase }: { frase: string }) {
+  const texto = `${frase} · `
+  // Ancho aproximado por carácter: mono 11px + letter-spacing 3.
+  const charW = 11 * 0.6 + 3
+  const anillos = [
+    { r: 70, op: 0.55 },
+    { r: 110, op: 0.38 },
+    { r: 150, op: 0.24 },
+    { r: 190, op: 0.14 },
+  ]
+  return (
+    <svg
+      viewBox="0 0 440 440"
+      className="absolute top-1/2 left-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2"
+      aria-hidden
+    >
+      <title>Peaje</title>
+      {/* la onda: dos círculos que se expanden una vez al cargar */}
+      <circle className="gota-onda" cx="220" cy="220" fill="none" stroke="var(--accent)" strokeWidth="1" />
+      <circle className="gota-onda gota-onda-2" cx="220" cy="220" fill="none" stroke="var(--accent)" strokeWidth="1" />
+
+      {anillos.map((a, i) => {
+        const c = 2 * Math.PI * a.r
+        const reps = Math.max(1, Math.floor(c / (texto.length * charW)))
+        return (
+          <g key={a.r} className="gota-anillo" style={{ animationDelay: `${0.25 + i * 0.3}s` }}>
+            <path
+              id={`anillo-${a.r}`}
+              fill="none"
+              d={`M 220,220 m -${a.r},0 a ${a.r},${a.r} 0 1,1 ${a.r * 2},0 a ${a.r},${a.r} 0 1,1 -${a.r * 2},0`}
+            />
+            <text
+              fontSize="11"
+              letterSpacing="3"
+              fill="var(--crema)"
+              opacity={a.op}
+              style={{ fontFamily: 'var(--font-chrome), monospace' }}
+            >
+              <textPath href={`#anillo-${a.r}`} textLength={c} lengthAdjust="spacing">
+                {Array.from({ length: reps }, () => texto).join('')}
+              </textPath>
+            </text>
+          </g>
+        )
+      })}
+      <circle className="gota-centro" cx="220" cy="220" r="5" fill="var(--accent)" />
+    </svg>
+  )
+}
+
+function PanelComparativa({
+  badge,
+  nota,
+  activo,
+  estadoSin,
+  hace,
+}: {
+  badge: string
+  nota: string
+  activo: boolean
+  estadoSin?: string
+  hace?: (s: number) => string
+}) {
+  const rutas = [
+    { path: '/llms.txt', monto: null },
+    { path: '/openapi.json', monto: null },
+    { path: '/mcp', monto: '$0.01', s: 2 },
+    { path: '/r/informe-2026', monto: '$0.05', s: 9 },
+  ]
+  return (
+    <div
+      className={
+        activo
+          ? 'isla-tinta rounded-lg border border-tinta bg-bg p-6'
+          : 'rounded-lg border border-linea-clara p-6'
+      }
+    >
+      <p
+        className={`flex items-center gap-2 font-mono text-[11px] tracking-[0.12em] ${
+          activo ? 'text-crema' : 'text-tinta/50'
+        }`}
+      >
+        {activo ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
+        {badge}
+      </p>
+      <ul className="mt-5 space-y-2.5">
+        {rutas.map((r) => (
+          <li
+            key={r.path}
+            className={`flex items-center justify-between rounded-md border px-3.5 py-2.5 font-mono text-xs ${
+              activo ? 'border-border bg-tinta-suave text-crema' : 'border-linea-clara text-tinta/45'
+            }`}
+          >
+            <span>{r.path}</span>
+            {activo ? (
+              <span className="flex items-center gap-3">
+                {r.monto ? <span className="text-accent">+{r.monto}</span> : null}
+                <span className="text-muted">{r.s !== undefined && hace ? hace(r.s) : 'OK'}</span>
+              </span>
+            ) : (
+              <span>{estadoSin}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className={`mt-5 text-sm ${activo ? 'text-muted' : 'text-tinta/60'}`}>{nota}</p>
+    </div>
+  )
+}
+
+function Paso({
+  n,
   titulo,
   texto,
-  last,
+  ultimo,
 }: {
+  n: string
   titulo: string
   texto: string
-  last?: boolean
+  ultimo?: boolean
 }) {
   return (
-    <div className="relative pt-7">
-      <span
-        aria-hidden
-        className="absolute top-0 left-0 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-accent bg-bg"
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${last ? 'bg-accent' : 'bg-border'}`} />
-      </span>
-      <h3 className="font-medium">{titulo}</h3>
-      <p className="mt-1.5 text-sm text-muted">{texto}</p>
+    <div className="border-t border-border pt-5">
+      <p className="font-mono text-[11px] tracking-[0.14em] text-muted">
+        {n} <span className="mx-1 text-border">/</span>{' '}
+        <span className={ultimo ? 'text-accent' : ''}>{titulo.toUpperCase()}</span>
+      </p>
+      <p className="mt-3 text-sm text-muted">{texto}</p>
     </div>
   )
 }
 
-const WALLET_DEMO = '0x71…4f2'
-const MONTO_DEMO = '$0.002'
-
-async function RequestFlow() {
-  const d = await getDict()
-
-  const flowSteps = [
-    { label: 'GET /precio', tone: 'text' as const },
-    { label: '402 Payment Required', tone: 'muted' as const },
-    { label: d.landing.flujoPagaConWallet, tone: 'muted' as const },
-    { label: '200 OK', tone: 'accent' as const },
-  ]
-
+/** Ruido tipográfico (§6): texto real del dominio, apenas legible. */
+function RuidoTipografico() {
+  const linea =
+    'GET /r/informe-2026 → 402 → PAGO CONFIRMADO 0x3715…e253 → 200 OK · AGENT: VERIFIED · '
   return (
-    <div className="relative isolate overflow-hidden rounded-2xl border border-border bg-panel p-8">
-      <div className="dot-grid pointer-events-none absolute inset-0 text-border opacity-60" />
-
-      <div className="relative flex flex-col font-mono text-xs">
-        {flowSteps.map((step, i) => (
-          <div key={step.label}>
-            {i > 0 && <div aria-hidden className="ml-[5px] h-5 w-px bg-border" />}
-            <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                  step.tone === 'accent' ? 'bg-accent' : 'border border-border bg-bg'
-                }`}
-              />
-              <span
-                className={
-                  step.tone === 'accent'
-                    ? 'text-accent'
-                    : step.tone === 'text'
-                      ? 'text-text'
-                      : 'text-muted'
-                }
-              >
-                {step.label}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="chip relative mt-8 flex max-w-[260px] items-center gap-3 rounded-2xl bg-bg p-4">
-        <span
-          aria-hidden
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-xs font-semibold text-accent-text"
-        >
-          $
-        </span>
-        <div className="font-mono text-xs leading-tight">
-          <p className="text-text">{d.landing.flujoPago(WALLET_DEMO, MONTO_DEMO)}</p>
-          <p className="mt-0.5 text-muted">{d.landing.flujoTxConfirmada}</p>
-        </div>
-      </div>
+    <div aria-hidden className="ruido">
+      {linea.repeat(40)}
     </div>
   )
 }

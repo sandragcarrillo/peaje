@@ -1,5 +1,6 @@
 export const dinero = {
   es: {
+    eyebrow: 'MI WALLET',
     // Retirar
     retirarTitulo: 'Retirar',
     retirarIntro: 'Tu saldo disponible, listo para retirar.',
@@ -51,6 +52,7 @@ export const dinero = {
     fechaLocale: 'es-CO',
   },
   en: {
+    eyebrow: 'MY WALLET',
     // Retirar
     retirarTitulo: 'Withdraw',
     retirarIntro: 'Your available balance, ready to withdraw.',

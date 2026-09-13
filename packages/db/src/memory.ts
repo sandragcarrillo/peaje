@@ -48,6 +48,8 @@ export class MemoryStore implements Store {
       payoutWallet: input.payoutWallet ?? null,
       email: input.email ?? null,
       privyUserId: input.privyUserId ?? null,
+      baselineScore: null,
+      baselineScoreAt: null,
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -104,6 +106,14 @@ export class MemoryStore implements Store {
 
   async removeAllowedOrigin(tenantId: string, origin: string) {
     this.#origins.get(tenantId)?.delete(origin)
+  }
+
+  async setBaselineScore(tenantId: string, score: number) {
+    const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
+    if (t && t.baselineScore === null) {
+      t.baselineScore = score
+      t.baselineScoreAt = new Date().toISOString()
+    }
   }
 
   async listRoutes(tenantId: string) {

@@ -2,6 +2,7 @@ import { NETWORK_IDS, NETWORKS } from '@peaje/shared'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { listAgents, type AgenteConSaldo } from '@/lib/gateway'
+import { Eyebrow } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -38,7 +39,8 @@ export default async function Agentes() {
   return (
     <div className="space-y-8 py-2">
       <header className="max-w-2xl">
-        <h1 className="text-2xl font-medium">{d.agentes.titulo}</h1>
+        <Eyebrow>{`${d.agentes.eyebrow} / ${total}`}</Eyebrow>
+        <h1 className="mt-2 text-2xl font-semibold">{d.agentes.titulo}</h1>
         <p className="mt-2 text-sm text-muted">{d.agentes.intro}</p>
         {tenants.length > 1 ? (
           <p className="mt-2 text-xs text-muted">{d.agentes.variosNegocios}</p>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { gatewayUrl } from '@/lib/config'
+import { PageHeader } from '@/components/chrome'
 import { getDict, type Dict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
@@ -70,14 +71,17 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
 
   return (
     <div className="max-w-3xl space-y-8">
-      <header>
-        <h1 className="text-2xl font-medium">{d.titulo}</h1>
-        <p className="mt-2 text-sm text-muted">
-          {d.subtituloInicio}
-          <strong>{originHost}</strong>
-          {d.subtituloFin}
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={`KIT / ${originHost}`}
+        titulo={d.titulo}
+        sub={
+          <>
+            {d.subtituloInicio}
+            <strong className="text-text">{originHost}</strong>
+            {d.subtituloFin}
+          </>
+        }
+      />
 
       <ImplementarPeaje
         slug={tenant.slug}
@@ -134,7 +138,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
         <ul className="mt-3 grid grid-cols-3 gap-3 text-sm">
           <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">{d.yaActivoDiscovery}</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.yaActivoDiscovery}</p>
             <a
               href={`${base}/openapi.json`}
               target="_blank"
@@ -145,7 +149,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             </a>
           </li>
           <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">llms.txt</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">llms.txt</p>
             <a
               href={`${base}/llms.txt`}
               target="_blank"
@@ -156,13 +160,13 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             </a>
           </li>
           <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="text-xs uppercase tracking-wide text-muted">MCP</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">MCP</p>
             <span className="mt-1 block truncate font-mono text-xs text-accent">/mcp</span>
           </li>
         </ul>
       </section>
 
-      <div className="rounded-lg border border-accent/40 bg-accent/5 p-4 text-sm">
+      <div className="rounded-lg border border-accent/40 bg-panel p-4 text-sm">
         <p>
           {d.verificaInicio}
           {d.verificar}

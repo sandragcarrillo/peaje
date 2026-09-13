@@ -1,8 +1,9 @@
 import { getDict } from '@/lib/i18n'
 
 /**
- * Gráfica de revenue diario, server-rendered como SVG puro.
- * Sin librería de charts: son barras, no hace falta.
+ * Gráfica de revenue calcada del mock: card con header y leyenda, retícula
+ * de hairlines punteadas con valores en $, barras div con hover, y la de
+ * hoy resaltada en el acento. Datos reales por día.
  */
 export async function GraficaRevenue({
   datos,
@@ -22,66 +23,84 @@ export async function GraficaRevenue({
     const row = porDia.get(clave)
     serie.push({
       fecha: clave,
-      label: d.toLocaleDateString(dict.panel.formatoFecha, { day: '2-digit', month: 'short' }),
+      label: d.toLocaleDateString(dict.panel.formatoFecha, { weekday: 'short' }),
       amount: row ? Number(row.amount) : 0,
       count: row?.count ?? 0,
     })
   }
 
   const max = Math.max(...serie.map((s) => s.amount), 0.0001)
-  const W = 720
-  const H = 120
-  const gap = 6
-  const barW = (W - gap * (serie.length - 1)) / serie.length
+  const ALTO = 150
+  const totalPagos = serie.reduce((a, s) => a + s.count, 0)
+  const totalMonto = serie.reduce((a, s) => a + s.amount, 0).toFixed(2)
 
   return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-medium">{dict.panel.ultimosDias(dias)}</h2>
-        <p className="text-xs text-muted">
-          {dict.panel.resumenPagos(
-            serie.reduce((a, s) => a + s.count, 0),
-            serie.reduce((a, s) => a + s.amount, 0).toFixed(2),
-          )}
-        </p>
+    <div className="space-y-6 border border-border bg-bg p-6">
+      <div className="flex flex-col justify-between gap-2 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <div className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+            {dict.panel.ultimosDias(dias)}
+          </div>
+          <h3 className="mt-0.5 text-lg font-semibold">
+            {dict.panel.resumenPagos(totalPagos, totalMonto)}
+          </h3>
+        </div>
+        <div className="flex items-center gap-4 font-mono text-[10px] tracking-[0.04em]">
+          <span className="flex items-center gap-1.5 text-muted">
+            <span aria-hidden className="inline-block h-3 w-3 bg-border" />
+            {dict.panel.histLabel}
+          </span>
+          <span className="flex items-center gap-1.5 font-bold">
+            <span aria-hidden className="inline-block h-3 w-3 bg-accent" />
+            {dict.panel.hoyLabel}
+          </span>
+        </div>
       </div>
-      <svg
-        viewBox={`0 0 ${W} ${H + 18}`}
-        className="mt-3 w-full rounded-lg border border-border bg-panel p-2"
-        role="img"
-        aria-label={dict.panel.graficaAria(dias)}
-      >
-        {serie.map((s, i) => {
-          const h = s.amount === 0 ? 2 : Math.max((s.amount / max) * H, 3)
-          const x = i * (barW + gap)
-          return (
-            <g key={s.fecha}>
-              <rect
-                x={x}
-                y={H - h}
-                width={barW}
-                height={h}
-                rx={2}
-                fill={s.amount === 0 ? 'var(--border)' : 'var(--accent)'}
-              >
-                <title>{dict.panel.graficaBarra(s.label, s.amount.toFixed(2), s.count)}</title>
-              </rect>
-              {serie.length <= 14 || i % 5 === 0 ? (
-                <text
-                  x={x + barW / 2}
-                  y={H + 13}
-                  textAnchor="middle"
-                  fill="var(--muted)"
-                  fontSize={9}
-                  fontFamily="var(--font-mono)"
-                >
-                  {s.label}
-                </text>
-              ) : null}
-            </g>
-          )
-        })}
-      </svg>
-    </section>
+
+      <div className="pt-2 pb-1">
+        <div className="relative flex h-48 w-full flex-col justify-between border-b border-border">
+          {[1, 0.75, 0.5, 0.25].map((f) => (
+            <div
+              key={f}
+              className="flex w-full justify-between border-b border-dashed border-border pb-1 font-mono text-[10px] text-muted"
+            >
+              <span>${(max * f).toFixed(2)}</span>
+            </div>
+          ))}
+          <div className="absolute inset-x-0 top-6 bottom-0 flex items-end justify-between px-3 md:px-8">
+            {serie.map((s, i) => {
+              const esHoy = i === serie.length - 1
+              const alto = Math.max(Math.round((s.amount / max) * ALTO), s.amount > 0 ? 6 : 2)
+              return (
+                <div key={s.fecha} className="group flex cursor-default flex-col items-center gap-2">
+                  <span
+                    className={`font-mono text-[10px] ${
+                      esHoy
+                        ? 'font-bold text-text'
+                        : 'text-muted opacity-0 transition-opacity group-hover:opacity-100'
+                    }`}
+                  >
+                    ${s.amount.toFixed(2)}
+                  </span>
+                  <div
+                    className={`w-8 transition-colors md:w-12 ${
+                      esHoy ? 'bg-accent' : 'bg-border group-hover:bg-faint'
+                    }`}
+                    style={{ height: `${alto}px` }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="flex justify-between px-3 pt-2 font-mono text-[10px] uppercase text-muted md:px-8">
+          {serie.map((s, i) => (
+            <span key={s.fecha} className={i === serie.length - 1 ? 'font-bold text-text' : ''}>
+              {s.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }

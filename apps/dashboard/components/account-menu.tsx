@@ -8,11 +8,13 @@ import { money, shortWallet } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 
 /**
- * Popover de wallet en el navbar: balance total, Enviar/Recibir y actividad
- * reciente, sin salir de la página. La vista completa vive en /t/{slug}/wallet.
+ * Menú de cuenta: se abre desde el email en el navbar. Arriba la wallet
+ * (balance, enviar/recibir, actividad) y abajo el submenu de navegación
+ * personal (Mis negocios, Mis agentes). La vista completa vive en /wallet.
  */
-export function WalletPopover({ slug }: { slug: string }) {
+export function AccountMenu({ slug, email }: { slug: string; email: string }) {
   const d = useDict()
+  const nav = useDict().nav
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<ResumenWallet | null>(null)
   const [cargando, setCargando] = useState(false)
@@ -47,10 +49,12 @@ export function WalletPopover({ slug }: { slug: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-text"
+        className="flex max-w-56 items-center gap-1.5 truncate text-sm text-muted hover:text-text"
       >
-        <IconoWallet />
-        {d.dinero.wallet}
+        <span className="truncate">{email}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
 
       {open ? (
@@ -61,7 +65,7 @@ export function WalletPopover({ slug }: { slug: string }) {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-border bg-panel p-5 shadow-xl shadow-black/40">
+          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-border bg-panel p-5 text-text shadow-xl shadow-black/40">
             {cargando || !data ? (
               <p className="py-8 text-center text-sm text-muted">
                 {cargando ? d.dinero.cargando : d.dinero.sinWallet}
@@ -77,7 +81,7 @@ export function WalletPopover({ slug }: { slug: string }) {
                   <button
                     type="button"
                     onClick={copiar}
-                    className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-black"
+                    className="flex-1 rounded-lg bg-text px-3 py-2 text-sm font-medium text-bg"
                   >
                     {copiado ? d.dinero.copiada : d.dinero.copiarAddress}
                   </button>
@@ -92,6 +96,23 @@ export function WalletPopover({ slug }: { slug: string }) {
               </div>
             ) : (
               <div className="space-y-4">
+                <nav className="border-b border-border pb-2">
+                  <Link
+                    href="/negocios"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-text"
+                  >
+                    {nav.negocios}
+                  </Link>
+                  <Link
+                    href="/agentes"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-text"
+                  >
+                    {nav.agentes}
+                  </Link>
+                </nav>
+
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted">{shortWallet(data.address)}</span>
                   <button type="button" onClick={copiar} className="text-xs text-accent hover:underline">
@@ -110,9 +131,9 @@ export function WalletPopover({ slug }: { slug: string }) {
 
                 <div className="grid grid-cols-2 gap-2">
                   <Link
-                    href={`/t/${slug}/wallet`}
+                    href="/wallet"
                     onClick={() => setOpen(false)}
-                    className="rounded-lg bg-accent px-3 py-2.5 text-center text-sm font-medium text-black"
+                    className="rounded-lg bg-text px-3 py-2.5 text-center text-sm font-medium text-bg"
                   >
                     {d.dinero.enviar}
                   </Link>
@@ -127,7 +148,7 @@ export function WalletPopover({ slug }: { slug: string }) {
 
                 {data.retiros.length > 0 ? (
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-muted">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
                       {d.dinero.actividadReciente}
                     </p>
                     <ul className="mt-2 space-y-1.5">
@@ -138,8 +159,8 @@ export function WalletPopover({ slug }: { slug: string }) {
                               w.status === 'confirmed'
                                 ? 'text-accent'
                                 : w.status === 'failed'
-                                  ? 'text-red-400'
-                                  : 'text-yellow-400'
+                                  ? 'text-red-600'
+                                  : 'text-amber-700'
                             }
                           >
                             ●
@@ -168,12 +189,13 @@ export function WalletPopover({ slug }: { slug: string }) {
                 ) : null}
 
                 <Link
-                  href={`/t/${slug}/wallet`}
+                  href="/wallet"
                   onClick={() => setOpen(false)}
                   className="block rounded-lg border border-border px-3 py-2 text-center text-sm text-muted hover:border-accent hover:text-text"
                 >
                   {d.dinero.verWalletCompleta}
                 </Link>
+
               </div>
             )}
           </div>

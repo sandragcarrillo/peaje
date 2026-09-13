@@ -3,6 +3,7 @@
 import type { Resource } from '@peaje/db'
 import { useState, useTransition } from 'react'
 import { money } from '@/lib/config'
+import { SectionBar } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
 import { borrarLink, crearLink, importarLinks, leerSitemap, type UrlImportable } from './actions'
 
@@ -21,34 +22,51 @@ export function LinksPanel({
 
   return (
     <div>
-      <h3 className="font-medium">{d.linksTitulo}</h3>
-      <p className="mt-1 text-sm text-muted">{d.linksIntro}</p>
+      <SectionBar n={1} label={d.linksTitulo} meta={String(resources.length)} />
+      <p className="mt-2 text-sm text-muted">{d.linksIntro}</p>
 
       {resources.length > 0 ? (
-        <ul className="mt-4 divide-y divide-border rounded-lg border border-border bg-panel">
-          {resources.map((r) => (
-            <li key={r.id} className="flex items-center gap-4 px-4 py-3">
-              <span className="flex-1 truncate font-mono text-sm" title={r.url}>
-                /r/{r.slug}
-                <span className="ml-2 text-xs text-muted">{r.title ?? r.url}</span>
-              </span>
-              {Number(r.priceUsd) > 0 ? (
-                <span className="text-sm">{money(r.priceUsd)}</span>
-              ) : (
-                <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted">
-                  {d.linksGratis}
-                </span>
-              )}
-              <button
-                disabled={pending}
-                onClick={() => startTransition(async () => borrarLink(slug, r.id))}
-                className="text-xs text-muted hover:text-red-400 disabled:opacity-50"
-              >
-                {d.linksQuitar}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table className="mt-4 w-full text-sm">
+          <thead className="text-left font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+            <tr>
+              <th className="pb-2 font-normal" />
+              <th className="pb-2 font-normal">{d.colRuta}</th>
+              <th className="pb-2 font-normal" />
+              <th className="pb-2 text-right font-normal">{d.colMonto}</th>
+              <th className="pb-2 font-normal" />
+            </tr>
+          </thead>
+          <tbody>
+            {resources.map((r) => (
+              <tr key={r.id} className="border-t border-border">
+                <td className="w-14 py-2.5 pr-2">
+                  <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">
+                    GET
+                  </span>
+                </td>
+                <td className="py-2.5 pr-4">
+                  <span className="font-mono text-sm" title={r.url}>/r/{r.slug}</span>
+                </td>
+                <td className="max-w-48 truncate py-2.5 pr-4 text-xs text-muted">
+                  {r.title ?? r.url}
+                </td>
+                <td className="py-2.5 text-right font-mono text-sm text-accent">
+                  {Number(r.priceUsd) > 0 ? `+${money(r.priceUsd)}` : d.linksGratis}
+                </td>
+                <td className="w-24 py-2.5 text-right">
+                  <span aria-hidden className="mr-3 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                  <button
+                    disabled={pending}
+                    onClick={() => startTransition(async () => borrarLink(slug, r.id))}
+                    className="font-mono text-[11px] uppercase text-muted hover:text-red-600 disabled:opacity-50"
+                  >
+                    {d.linksQuitar}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : (
         <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted">
           {d.linksVacio}
@@ -74,7 +92,7 @@ export function LinksPanel({
             name="url"
             required
             placeholder={d.linksUrlPlaceholder}
-            className="mt-1 w-full rounded-lg border border-border bg-panel px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <label className="w-40">
@@ -82,7 +100,7 @@ export function LinksPanel({
           <input
             name="title"
             placeholder={d.linksTituloPlaceholder}
-            className="mt-1 w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm outline-none focus:border-accent"
+            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <label className="w-28">
@@ -93,18 +111,18 @@ export function LinksPanel({
             step="0.001"
             min="0"
             placeholder={d.linksPrecioPlaceholder}
-            className="mt-1 w-full rounded-lg border border-border bg-panel px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <button
           disabled={pending}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+          className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
         >
           {d.linksAgregar}
         </button>
       </form>
 
-      {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
 
       <ImportarSitemap slug={slug} />
 
@@ -143,7 +161,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
           value={urlSitemap}
           onChange={(e) => setUrlSitemap(e.target.value)}
           placeholder={d.sitemapPlaceholder}
-          className="min-w-72 flex-1 rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+          className="min-w-72 flex-1 rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
         />
         <button
           disabled={pending || !urlSitemap.trim()}
@@ -171,7 +189,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
             placeholder={d.sitemapBuscar}
-            className="mb-2 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-accent"
+            className="mb-2 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
           <div className="flex items-center justify-between text-xs text-muted">
             <span className="flex items-center gap-2">
@@ -252,7 +270,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
                 }
               })
             }}
-            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+            className="mt-3 rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
           >
             {d.sitemapImportar(seleccion.size)}
           </button>

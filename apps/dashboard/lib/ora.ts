@@ -36,7 +36,7 @@ export function scannableDomain(originUrl: string): string | null {
     let host = new URL(originUrl).hostname
     if (host === 'localhost' || host.endsWith('.local') || /^[0-9.]+$/.test(host)) return null
     // Subdominios típicos de API: el sitio del negocio vive en el raíz.
-    host = host.replace(/^(api|gw|gateway|developers?|docs|data)\./, '')
+    host = host.replace(/^(www|api|gw|gateway|developers?|docs|data)\./, '')
     return host
   } catch {
     return null
@@ -44,11 +44,24 @@ export function scannableDomain(originUrl: string): string | null {
 }
 
 export async function cachedScore(domain: string): Promise<OraScore | null> {
-  const res = await fetch(`${BASE}/score/${domain}`, { cache: 'no-store' })
-  if (!res.ok) return null
-  const data = (await res.json()) as OraScore & { code?: string }
-  if (data.code === 'DOMAIN_NOT_SCANNED') return null
-  return data
+  // Ora a veces devuelve un 429/5xx transitorio; un fallo puntual no puede
+  // verse como "tu sitio no tiene score". Un reintento corto y timeout.
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await fetch(`${BASE}/score/${domain}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.status === 404) return null
+      if (!res.ok) continue
+      const data = (await res.json()) as OraScore & { code?: string }
+      if (data.code === 'DOMAIN_NOT_SCANNED') return null
+      return data
+    } catch {
+      // red o timeout: probamos una vez más y si no, null sin romper la página
+    }
+  }
+  return null
 }
 
 /** Scan fresco. Tarda ~30 s; llamar desde una server action, no en render. */
@@ -62,6 +75,7 @@ export async function freshScan(domain: string): Promise<OraScore | null> {
   if (!res.ok) return null
   return (await res.json()) as OraScore
 }
+
 
 /**
  * Checks de Ora que el kit de Peaje ataca, con el bloque que los arregla.

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Eyebrow, SectionBar, StatTile } from '@/components/chrome'
 import { domainLabel, fetchMarketAgents, type MarketAgent } from '@/lib/agent0-market'
 import { getDict, type Dict } from '@/lib/i18n'
 import { Calculadora } from './calculadora'
@@ -47,7 +48,8 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
   return (
     <div className="space-y-10 py-8">
       <header className="max-w-2xl">
-        <h1 className="text-3xl font-medium">{d.titulo}</h1>
+        <Eyebrow dot>{d.eyebrow}</Eyebrow>
+        <h1 className="mt-2 text-3xl font-semibold">{d.titulo}</h1>
         <p className="mt-3 text-muted">{d.intro(chains.length)}</p>
       </header>
 
@@ -67,15 +69,33 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
         <p className="text-sm text-muted">{d.sinDatos}</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label={d.statAgentes} value={String(agentes.length)} />
-            <Stat
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MarketStat
+              tag="ERC-8004"
+              label={d.statAgentes}
+              value={String(agentes.length)}
+              pie={`+${crecimientoMensual(todos)}% ${d.porMesNota}`}
+              vivo
+            />
+            <MarketStat
+              tag="x402"
               label={d.statPago}
               value={`${Math.round((conPago / agentes.length) * 100)}%`}
-              destacado
+              pie={`${conPago} / ${agentes.length}`}
+              acento
             />
-            <Stat label={d.statMcp} value={`${Math.round((conMcp / agentes.length) * 100)}%`} />
-            <Stat label={d.statFeedback} value={String(feedbackTotal)} />
+            <MarketStat
+              tag="MCP"
+              label={d.statMcp}
+              value={`${Math.round((conMcp / agentes.length) * 100)}%`}
+              pie={`${conMcp} / ${agentes.length}`}
+            />
+            <MarketStat
+              tag="ERC-8004"
+              label={d.statFeedback}
+              value={String(feedbackTotal)}
+              pie="on-chain"
+            />
           </div>
 
           <RegistrosPorMes agentes={agentes} d={d} />
@@ -98,11 +118,6 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <Stat label={d.statInterfazMcp} value={String(conMcp)} />
-            <Stat label={d.statInterfazA2a} value={String(conA2a)} />
-            <Stat label={d.statPaganX402} value={String(conPago)} />
-          </div>
         </>
       )}
 
@@ -113,13 +128,14 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
         />
       ) : null}
 
-      <section className="rounded-2xl border border-accent/40 bg-accent/5 p-6">
-        <h2 className="text-lg font-medium">{d.ctaTitulo}</h2>
+      <section className="border border-border bg-panel p-6">
+        <h2 className="text-lg font-semibold">{d.ctaTitulo}</h2>
         <p className="mt-2 max-w-xl text-sm text-muted">{d.ctaCuerpo}</p>
         <Link
           href="/nuevo"
-          className="mt-4 inline-block rounded-full bg-text px-5 py-2.5 text-sm font-medium text-bg"
+          className="mt-4 inline-flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
         >
+          <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
           {d.ctaBoton}
         </Link>
       </section>
@@ -173,21 +189,55 @@ function Chip({ href, activo, label }: { href: string; activo: boolean; label: s
   return (
     <Link
       href={href}
-      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+      className={`flex items-center gap-1.5 border px-3 py-1.5 font-mono text-xs transition-colors ${
         activo
-          ? 'border-accent bg-accent text-black'
-          : 'border-border text-muted hover:border-muted hover:text-text'
+          ? 'border-text bg-negro font-bold text-white'
+          : 'border-border bg-bg text-muted hover:border-text hover:text-text'
       }`}
     >
-      {label}
+      {activo ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
+      [{label}]
     </Link>
+  )
+}
+
+/** Card de métrica del mercado, calcada del mock: label arriba, pie con delta. */
+function MarketStat({
+  tag,
+  label,
+  value,
+  pie,
+  vivo,
+  acento,
+}: {
+  tag: string
+  label: string
+  value: string
+  pie: string
+  vivo?: boolean
+  acento?: boolean
+}) {
+  return (
+    <div className="flex flex-col justify-between space-y-4 border border-border bg-panel p-5">
+      <div className="flex items-center justify-between font-mono text-[10px] text-muted">
+        <span className="uppercase tracking-[0.12em]">{label}</span>
+        {vivo ? <span aria-hidden className="h-2 w-2 bg-accent" /> : <span>{tag}</span>}
+      </div>
+      <div className={`text-4xl font-bold tracking-tight ${acento ? 'text-accent' : ''}`}>
+        {value}
+      </div>
+      <div className="flex items-center gap-1.5 border-t border-border pt-2 font-mono text-[11px] font-bold text-muted">
+        {vivo ? <span aria-hidden className="h-1.5 w-1.5 bg-accent" /> : null}
+        <span>{pie}</span>
+      </div>
+    </div>
   )
 }
 
 function Stat({ label, value, destacado }: { label: string; value: string; destacado?: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-panel p-4">
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{label}</p>
       <p className={`mt-2 text-2xl tabular-nums ${destacado ? 'text-accent' : ''}`}>{value}</p>
     </div>
   )
@@ -212,72 +262,63 @@ function RegistrosPorMes({ agentes, d }: { agentes: MarketAgent[]; d: Mercado })
     const i = idx.get(clave)
     if (i !== undefined) meses[i]!.n += 1
   }
-
   const max = Math.max(...meses.map((m) => m.n), 1)
-  const W = 720
-  const H = 140
-  const gap = 6
-  const barW = (W - gap * (meses.length - 1)) / meses.length
 
   return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-medium">{d.porMesTitulo}</h2>
-        <p className="text-xs text-muted">{d.porMesNota}</p>
+    <section className="space-y-6 border border-border bg-panel p-6">
+      <div className="flex flex-col justify-between gap-2 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <h2 className="text-lg font-semibold">{d.porMesTitulo}</h2>
+        <span className="border border-border bg-bg px-3 py-1 font-mono text-[10px] font-bold text-muted">
+          {d.porMesNota}
+        </span>
       </div>
-      <svg
-        viewBox={`0 0 ${W} ${H + 18}`}
-        className="mt-3 w-full rounded-lg border border-border bg-panel p-2"
-        role="img"
-        aria-label={d.porMesAria}
-      >
-        {meses.map((m, i) => {
-          const h = m.n === 0 ? 2 : Math.max((m.n / max) * H, 3)
-          const x = i * (barW + gap)
-          // El área de hover es la columna completa (no solo la barra): meses
-          // chicos también son apuntables. El valor aparece sobre la barra.
-          return (
-            <g key={m.clave} className="group">
-              <rect x={x} y={0} width={barW} height={H} fill="transparent" />
-              <rect
-                x={x}
-                y={H - h}
-                width={barW}
-                height={h}
-                rx={4}
-                fill={m.n === 0 ? 'var(--border)' : 'var(--accent)'}
-                className="transition-opacity group-hover:opacity-80"
-              />
-              <text
-                x={x + barW / 2}
-                y={Math.min(H - h - 6, H - 10)}
-                textAnchor="middle"
-                fill="var(--text)"
-                fontSize={11}
-                fontFamily="var(--font-mono)"
-                className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100"
-              >
-                {m.n}
-              </text>
-              <text
-                x={x + barW / 2}
-                y={H + 13}
-                textAnchor="middle"
-                fill="var(--muted)"
-                fontSize={9}
-                fontFamily="var(--font-mono)"
-              >
-                {m.label}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
+      <div className="pt-2 pb-1" role="img" aria-label={d.porMesAria}>
+        <div className="relative flex h-44 w-full items-end justify-between gap-1 border-b border-border sm:gap-3">
+          <div aria-hidden className="pointer-events-none absolute inset-0 flex flex-col justify-between opacity-40">
+            <div className="w-full border-b border-dashed border-faint" />
+            <div className="w-full border-b border-dashed border-faint" />
+            <div className="w-full border-b border-dashed border-faint" />
+            <div />
+          </div>
+          {meses.map((m, i) => {
+            const esUltimo = i === meses.length - 1
+            const alto = m.n === 0 ? 2 : Math.max((m.n / max) * 100, 4)
+            return (
+              <div key={m.clave} className="group flex h-full flex-1 flex-col items-center justify-end">
+                <span
+                  className={`mb-1 font-mono text-[9px] transition-opacity ${
+                    esUltimo ? 'font-bold text-accent' : 'text-muted opacity-0 group-hover:opacity-100'
+                  }`}
+                >
+                  {m.n}
+                </span>
+                <div
+                  className={`w-full border ${
+                    esUltimo ? 'border-accent bg-accent' : 'border-border bg-panel-2 group-hover:bg-border'
+                  }`}
+                  style={{ height: `${alto}%` }}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between gap-1 pt-2 sm:gap-3">
+          {meses.map((m, i) => (
+            <span
+              key={m.clave}
+              className={`flex-1 text-center font-mono text-[10px] uppercase ${
+                i === meses.length - 1 ? 'font-bold text-text' : 'text-muted'
+              }`}
+            >
+              {m.label}
+            </span>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
 
-/** Barras horizontales de una serie, con label y valor directos. */
 function BarrasH({
   titulo,
   nota,
@@ -289,25 +330,28 @@ function BarrasH({
 }) {
   const max = Math.max(...datos.map((d) => d.valor), 1)
   return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-medium">{titulo}</h2>
-        <p className="text-xs text-muted">{nota}</p>
+    <section className="border border-border bg-panel p-6">
+      <div className="flex items-baseline justify-between border-b border-border pb-3">
+        <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">{titulo}</h2>
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{nota}</p>
       </div>
-      <div className="mt-3 space-y-2 rounded-lg border border-border bg-panel p-4">
+      <div className="mt-4 space-y-4">
         {datos.map((d) => (
-          <div key={d.label} className="flex items-center gap-3" title={`${d.label}: ${d.valor}`}>
-            <span className="w-40 shrink-0 truncate text-xs text-muted">{d.label}</span>
-            <div className="h-3 flex-1 overflow-hidden rounded-sm">
+          <div key={d.label} title={`${d.label}: ${d.valor}`}>
+            <div className="flex items-baseline justify-between font-mono text-xs">
+              <span className="truncate uppercase">{d.label}</span>
+              <span className="shrink-0 pl-3 font-bold tabular-nums">{d.valor}</span>
+            </div>
+            <div className="mt-1.5 h-1.5 w-full bg-panel-2">
               <div
-                className="h-full rounded-sm bg-accent"
+                className="h-full bg-text"
                 style={{ width: `${Math.max((d.valor / max) * 100, 1)}%` }}
               />
             </div>
-            <span className="w-10 shrink-0 text-right font-mono text-xs">{d.valor}</span>
           </div>
         ))}
       </div>
     </section>
   )
 }
+

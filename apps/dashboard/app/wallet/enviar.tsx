@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
-import { enviarFondos, type EnvioResultado } from '../actions'
+import { enviarFondos, type EnvioResultado } from '@/app/t/[slug]/actions'
 import type { WalletBalance } from '@/lib/walletops'
 
 export function EnviarPanel({
@@ -67,7 +67,7 @@ export function EnviarPanel({
         <div className="mt-4 grid grid-cols-2 gap-4">
           {balances.map((b) => (
             <div key={b.network} className="rounded-lg border border-border p-3">
-              <p className="text-xs uppercase tracking-wide text-muted">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
                 {isNetworkId(b.network) ? NETWORKS[b.network].label : b.network}
               </p>
               <p className="mt-1 text-xl tabular-nums">
@@ -82,7 +82,7 @@ export function EnviarPanel({
         <form onSubmit={enviar} className="space-y-4 rounded-lg border border-border bg-panel p-5">
           <p className="text-sm font-medium">{d.dinero.enviarAOtraWallet}</p>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">{d.dinero.red}</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.dinero.red}</span>
             <select
               value={network}
               onChange={(e) => {
@@ -98,7 +98,7 @@ export function EnviarPanel({
             </select>
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
               {d.dinero.addressDestino}
             </span>
             <input
@@ -110,7 +110,7 @@ export function EnviarPanel({
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wide text-muted">{d.dinero.monto}</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.dinero.monto}</span>
             <input
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -124,7 +124,7 @@ export function EnviarPanel({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+            className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
           >
             {pending ? d.dinero.enviando : d.dinero.enviar}
           </button>
@@ -138,7 +138,7 @@ export function EnviarPanel({
                 </a>
               </p>
             ) : (
-              <p className="text-sm text-red-400">{resultado.error}</p>
+              <p className="text-sm text-red-600">{resultado.error}</p>
             )
           ) : null}
         </form>

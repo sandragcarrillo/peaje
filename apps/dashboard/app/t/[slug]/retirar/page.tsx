@@ -1,6 +1,7 @@
 import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
+import { PageHeader } from '@/components/chrome'
 import { RetirosPanel } from '../retiros'
 import { WalletForm } from '../wallet'
 
@@ -16,10 +17,11 @@ export default async function Retirar({ params }: PageProps<'/t/[slug]/retirar'>
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-medium">{d.dinero.retirarTitulo}</h1>
-        <p className="mt-2 text-sm text-muted">{d.dinero.retirarIntro}</p>
-      </header>
+      <PageHeader
+        eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`}
+        titulo={d.dinero.retirarTitulo}
+        sub={d.dinero.retirarIntro}
+      />
       <div className="space-y-3">
         <RetirosPanel
           slug={tenant.slug}

@@ -1,5 +1,21 @@
 export const acceso = {
   es: {
+    negociosRegistrados: 'Negocios activos',
+    registrarKicker: 'Configuración simple · sin código',
+    crearDirecto: 'Crear negocio',
+    creando: 'Creando…',
+    notaSesion: 'Ya tienes sesión: el negocio se crea con tu cuenta actual, sin código nuevo.',
+    registrarNota: 'Varios negocios, una cuenta: cada uno tiene su balance, sus rutas y sus precios por separado.',
+    negociosCobrado: 'Cobrado total',
+    negociosLinks: 'Links con precio',
+    negociosPayouts: 'Retiros automáticos',
+    negociosDisponible: 'Disponible',
+    negociosRequests: 'Requests pagados',
+    negociosAbrir: 'Abrir dashboard',
+    negociosOnline: 'Online · cobrando',
+    negociosPista: '¿Qué puedes monetizar? Portafolios, archivos, PDFs, APIs privadas y newsletters de pago.',
+    negociosOperativos: 'operativos',
+    negociosEntrar: 'Entrar',
     // --- /acceder ---
     entrando: 'Entrando…',
     tituloEntrar: 'Entrar',
@@ -67,9 +83,25 @@ export const acceso = {
     // --- /negocios ---
     tusNegocios: 'Tus negocios',
     eligeNegocio: 'Elige a cuál entrar.',
-    registrarOtro: '+ Registrar otro negocio',
+    registrarOtro: 'Registrar otro negocio',
   },
   en: {
+    negociosRegistrados: 'Active businesses',
+    registrarKicker: 'Easy setup · no code required',
+    crearDirecto: 'Create business',
+    creando: 'Creating…',
+    notaSesion: 'You are signed in: the business is created on your current account, no new code.',
+    registrarNota: 'Multiple businesses, one account: each one keeps its own balance, routes and prices.',
+    negociosCobrado: 'Total collected',
+    negociosLinks: 'Priced links',
+    negociosPayouts: 'Automatic payouts',
+    negociosDisponible: 'Available',
+    negociosRequests: 'Paid requests',
+    negociosAbrir: 'Open dashboard',
+    negociosOnline: 'Online · charging',
+    negociosPista: 'What can you monetize? Portfolios, files, PDFs, private APIs and paid newsletters.',
+    negociosOperativos: 'operational',
+    negociosEntrar: 'Open',
     // --- /acceder ---
     entrando: 'Signing in…',
     tituloEntrar: 'Sign in',
@@ -137,6 +169,6 @@ export const acceso = {
     // --- /negocios ---
     tusNegocios: 'Your businesses',
     eligeNegocio: 'Pick which one to open.',
-    registrarOtro: '+ Register another business',
+    registrarOtro: 'Register another business',
   },
 }

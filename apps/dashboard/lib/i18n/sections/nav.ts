@@ -24,7 +24,7 @@ export const nav = {
     entrar: 'Sign in',
     metaTitulo: 'Peaje · charge the AI agents using your site',
     metaDescripcion:
-      'Put a toll on your website and charge AI agents per request. Priced links, agent-readiness score and withdrawals.',
+      'Use Peaje on your website and charge AI agents per request. Priced links, agent-readiness score and withdrawals.',
     hechoPor: 'Made with love by',
     equipo: 'Team 33',
     evento: 'at Platanus Hack Bogotá 26',

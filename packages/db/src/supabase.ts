@@ -29,6 +29,8 @@ function tenantFrom(row: Row): Tenant {
     embedSecret: row.embed_secret,
     originUrl: row.origin_url,
     payoutWallet: row.payout_wallet,
+    baselineScore: row.baseline_score ?? null,
+    baselineScoreAt: row.baseline_score_at ?? null,
     email: row.email,
     privyUserId: row.privy_user_id,
     createdAt: row.created_at,
@@ -202,6 +204,16 @@ export class SupabaseStore implements Store {
       .update({ payout_wallet: wallet })
       .eq('id', tenantId)
     this.#fail('setPayoutWallet', error)
+  }
+
+  async setBaselineScore(tenantId: string, score: number): Promise<void> {
+    // Solo la primera vez: el baseline es el "antes" y no se pisa.
+    const { error } = await this.#db
+      .from('tenants')
+      .update({ baseline_score: score, baseline_score_at: new Date().toISOString() })
+      .eq('id', tenantId)
+      .is('baseline_score', null)
+    this.#fail('setBaselineScore', error)
   }
 
   async listAllowedOrigins(tenantId: string) {

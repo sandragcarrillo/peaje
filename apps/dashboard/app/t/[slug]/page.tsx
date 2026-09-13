@@ -1,13 +1,14 @@
-import Link from 'next/link'
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { gatewayUrl, money, shortWallet } from '@/lib/config'
+import { TerminalBuffer } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
+import { cachedScore, prevision, scannableDomain } from '@/lib/ora'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
-import { cachedScore, prevision, scannableDomain } from '@/lib/ora'
 import { GraficaRevenue } from './grafica'
 import { SetupChecklist } from './setup'
 
+/** Panel del negocio, calcado del mock "Business Dashboard" de Stitch. */
 export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   const { slug } = await params
   const tenant = await requireTenant(slug)
@@ -31,6 +32,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
       descripcion: d.panel.paso1Descripcion,
       href: `/t/${tenant.slug}/score`,
       hecho: domain === null || score !== null,
+      estado: score ? `${d.panel.setupListo} (${score.score}/100)` : d.panel.setupPendiente,
     },
     {
       n: 2,
@@ -38,6 +40,10 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
       descripcion: d.panel.paso2Descripcion,
       href: `/t/${tenant.slug}/rutas`,
       hecho: resources.length > 0,
+      estado:
+        resources.length > 0
+          ? `${d.panel.setupListo} (${resources.length})`
+          : d.panel.setupPendiente,
     },
     {
       n: 3,
@@ -45,102 +51,164 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
       descripcion: d.panel.paso3Descripcion,
       href: `/t/${tenant.slug}/kit`,
       hecho: kitAplicado,
+      estado: kitAplicado ? d.panel.setupListo : d.panel.setupPendiente,
+    },
+  ]
+
+  const metricas = [
+    {
+      n: 1,
+      label: d.panel.metricaDisponible,
+      valor: money(balance.available),
+      pie: [d.panel.subDisponible, 'TEMPO + ARC'] as const,
+      vivo: true,
+    },
+    {
+      n: 2,
+      label: d.panel.metricaRequests,
+      valor: String(balance.requestCount),
+      pie: [d.panel.subRequests, 'MPP'] as const,
+      vivo: false,
+    },
+    {
+      n: 3,
+      label: d.panel.metricaRevenue,
+      valor: money(balance.revenue),
+      pie: [d.panel.subRevenue, '402'] as const,
+      vivo: false,
     },
   ]
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-medium">{d.panel.dashboardTitulo}</h1>
-        <p className="mt-2 text-sm text-muted">
-          {d.panel.consumenPor} <code className="font-mono text-text">{base}</code>
-        </p>
-      </header>
+    <>
+      {/* Header del workspace */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-6 md:flex-row md:items-end">
+        <div>
+          <div className="mb-1 font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+            {d.panel.consola} // {tenant.slug}
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">{d.panel.dashboardTitulo}</h1>
+          <p className="mt-1.5 font-mono text-xs text-muted">
+            MPP: {d.panel.estadoActivo} · GATEWAY: {base}
+          </p>
+        </div>
+      </div>
 
-      <SetupChecklist pasos={pasos} />
+      <SetupChecklist pasos={pasos} slug={tenant.slug} />
 
-      <div className="grid grid-cols-3 gap-4">
-        <Metric label={d.panel.metricaDisponible} value={money(balance.available)} destacado />
-        <Metric label={d.panel.metricaRequests} value={String(balance.requestCount)} />
-        <Metric label={d.panel.metricaRevenue} value={money(balance.revenue)} />
+      {/* Tres cards de métrica con pie técnico */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {metricas.map((m) => (
+          <div key={m.n} className="border border-border bg-bg p-6">
+            <div className="mb-4 flex items-start justify-between">
+              <span className="font-mono text-[11px] tracking-[0.14em] text-muted uppercase">
+                {m.label}
+              </span>
+              <span aria-hidden className={`h-2 w-2 ${m.vivo ? 'bg-accent' : 'bg-border'}`} />
+            </div>
+            <div className="my-2 text-4xl font-bold tracking-tight">{m.valor}</div>
+            <div className="flex items-center justify-between border-t border-border pt-3 font-mono text-[11px]">
+              <span className="text-muted">{m.pie[0]}</span>
+              <span className="font-bold">{m.pie[1]}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <GraficaRevenue datos={porDia} dias={7} />
 
-      <section>
-        <h2 className="font-medium">{d.panel.ultimosPagos}</h2>
+      {/* Ledger de pagos */}
+      <div className="border border-border bg-bg">
+        <div className="flex flex-col justify-between gap-2 border-b border-border p-6 sm:flex-row sm:items-center">
+          <div>
+            <h3 className="text-lg font-semibold">{d.panel.ultimosPagos}</h3>
+          </div>
+          <span className="border border-border bg-panel-2 px-2 py-1 font-mono text-[10px] tracking-[0.04em] text-muted">
+            {d.panel.filtro402}
+          </span>
+        </div>
+
         {payments.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">
-            {d.panel.nadiePaga}{' '}
-            {resources.length === 0 ? (
-              <>
-                <Link href={`/t/${tenant.slug}/rutas`} className="text-accent underline">
-                  {d.panel.agregaPrimerLink}
-                </Link>{' '}
-                {d.panel.yPruebaCon}{' '}
-                <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
-              </>
-            ) : (
-              <>
-                {d.panel.pruebaCon}{' '}
-                <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
-              </>
-            )}
+          <p className="p-6 text-sm text-muted">
+            {d.panel.nadiePaga} <code className="font-mono">npx mppx {base}/r/&lt;slug&gt;</code>
           </p>
         ) : (
-          <table className="mt-4 w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="pb-2 font-normal">{d.panel.colHora}</th>
-                <th className="pb-2 font-normal">{d.panel.colRuta}</th>
-                <th className="pb-2 font-normal">{d.panel.colAgente}</th>
-                <th className="pb-2 font-normal">{d.panel.colRed}</th>
-                <th className="pb-2 text-right font-normal">{d.panel.colMonto}</th>
-                <th className="pb-2 text-right font-normal">{d.panel.colTx}</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono text-xs">
-              {payments.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="py-2 text-muted">
-                    {new Date(p.createdAt).toLocaleTimeString(d.panel.formatoFecha, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="py-2">{p.path}</td>
-                  <td className="py-2 text-muted">{shortWallet(p.agentWallet)}</td>
-                  <td className="py-2 text-muted">
-                    {isNetworkId(p.network) ? NETWORKS[p.network].label : p.network}
-                  </td>
-                  <td className="py-2 text-right">{money(p.amount)}</td>
-                  <td className="py-2 text-right">
-                    {isNetworkId(p.network) ? (
-                      <a
-                        href={explorerTxUrl(p.network, p.receiptRef)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-accent hover:underline"
-                      >
-                        {d.panel.verTx}
-                      </a>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-border bg-panel font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    <th className="px-6 py-3 font-bold">{d.panel.colHora}</th>
+                    <th className="px-6 py-3 font-bold">{d.panel.colRuta}</th>
+                    <th className="px-6 py-3 font-bold">{d.panel.colAgente}</th>
+                    <th className="px-6 py-3 font-bold">{d.panel.colRed}</th>
+                    <th className="px-6 py-3 text-right font-bold">{d.panel.colMonto}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border font-mono text-xs">
+                  {payments.slice(0, 6).map((p) => (
+                    <tr key={p.id} className="transition-colors hover:bg-panel-2">
+                      <td className="whitespace-nowrap px-6 py-3.5 text-muted">
+                        {new Date(p.createdAt).toLocaleTimeString(d.panel.formatoFecha, {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className="font-bold">[GET]</span>{' '}
+                        <span className="break-all">{p.path}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-3.5">
+                        <span className="border border-border bg-panel-2 px-1.5 py-0.5">
+                          {shortWallet(p.agentWallet)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-3.5">
+                        <span className="flex items-center gap-1.5 uppercase">
+                          <span
+                            aria-hidden
+                            className={`h-1.5 w-1.5 ${p.network === 'tempo' ? 'bg-accent' : 'bg-faint'}`}
+                          />
+                          {isNetworkId(p.network) ? NETWORKS[p.network].label : p.network}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-3.5 text-right font-bold">
+                        {isNetworkId(p.network) ? (
+                          <a
+                            href={explorerTxUrl(p.network, p.receiptRef)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:text-accent"
+                          >
+                            {money(p.amount)}
+                          </a>
+                        ) : (
+                          money(p.amount)
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-border bg-panel p-4 font-mono text-[10px] tracking-[0.04em] text-muted">
+              {d.panel.mostrando(Math.min(6, payments.length), balance.requestCount)}
+            </div>
+          </>
         )}
-      </section>
-    </div>
-  )
-}
+      </div>
 
-function Metric({ label, value, destacado }: { label: string; value: string; destacado?: boolean }) {
-  return (
-    <div className="rounded-lg border border-border bg-panel p-4">
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-2 text-2xl ${destacado ? 'text-accent' : ''}`}>{value}</p>
-    </div>
+      <TerminalBuffer
+        label={`TERMINAL // ${d.panel.ultimosPagos}`}
+        lineas={payments.slice(0, 5).map((p) => {
+          const hora = new Date(p.createdAt).toLocaleTimeString(d.panel.formatoFecha, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+          const red = isNetworkId(p.network) ? NETWORKS[p.network].label : p.network
+          return `[${hora}] +${money(p.amount)} · ${p.path} · ${red} · ${shortWallet(p.agentWallet)}`
+        })}
+      />
+    </>
   )
 }

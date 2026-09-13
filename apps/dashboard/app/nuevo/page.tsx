@@ -4,6 +4,7 @@ import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import Link from 'next/link'
 import { type FormEvent, useState } from 'react'
 import { gatewayUrl } from '@/lib/config'
+import { Eyebrow } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
 import { registrarNegocio, type AltaResultado } from './actions'
 
@@ -45,12 +46,29 @@ export default function NuevoNegocio() {
     const url = normalizarUrl(originUrl)
     if (!url) return setError(d.acceso.errorUrlInvalida)
     setOriginUrl(url)
-    if (!email.trim()) return setError(d.acceso.errorFaltaEmail)
     setPending(true)
     try {
-      // Sesión Privy vieja → loginWithCode intentaría vincular en vez de
-      // loguear. Se limpia antes (mismo fix que en /acceder).
-      if (authenticated) await logout().catch(() => {})
+      // Con sesión Privy válida no se manda código nuevo: el segundo negocio
+      // se crea directo sobre la misma cuenta.
+      if (authenticated) {
+        const accessToken = await getAccessToken().catch(() => null)
+        if (accessToken) {
+          const formData = new FormData()
+          formData.set('name', name)
+          formData.set('originUrl', url)
+          formData.set('privyAccessToken', accessToken)
+          const r = await registrarNegocio(null, formData)
+          if (r.ok) {
+            setResultado(r)
+            return
+          }
+          setError(r.error)
+          return
+        }
+        // Token irrecuperable = sesión zombie: limpiar y caer al OTP.
+        await logout().catch(() => {})
+      }
+      if (!email.trim()) return setError(d.acceso.errorFaltaEmail)
       await sendCode({ email })
       setStep('code')
     } catch {
@@ -97,8 +115,9 @@ export default function NuevoNegocio() {
   if (step === 'code') {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
-        <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-medium">{d.acceso.revisaTuEmail}</h1>
+        <div className="w-full max-w-sm border border-border bg-panel p-8">
+          <Eyebrow>PEAJE</Eyebrow>
+          <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
             {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
           </p>
@@ -112,15 +131,16 @@ export default function NuevoNegocio() {
                 onChange={(e) => setCode(e.target.value)}
                 required
                 placeholder={d.acceso.placeholderCodigo}
-                className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
+                className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
               />
             </label>
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
             <button
               type="submit"
               disabled={pending}
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
+              className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
             >
+              <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
               {pending ? d.acceso.verificando : d.acceso.verificarYCrear}
             </button>
           </form>
@@ -131,60 +151,77 @@ export default function NuevoNegocio() {
 
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-medium">{d.acceso.tituloRegistrar}</h1>
-        <p className="mt-2 text-sm text-muted">{d.acceso.subtituloRegistrar}</p>
+      <div className="w-full max-w-4xl border border-border bg-panel p-8">
+        <Eyebrow dot>{d.acceso.registrarKicker}</Eyebrow>
+        <h1 className="mt-2 text-2xl font-semibold">{d.acceso.tituloRegistrar}</h1>
+        <p className="mt-2 max-w-xl text-sm text-muted">{d.acceso.subtituloRegistrar}</p>
 
-        <form onSubmit={enviarCodigo} className="mt-8 space-y-5">
+        <form onSubmit={enviarCodigo} className="mt-8 space-y-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <label className="block">
-            <span className="text-xs tracking-wide text-muted uppercase">
-              {d.acceso.campoNombre}
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              {d.acceso.campoNombre} <span className="text-accent">*</span>
             </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               placeholder={d.acceso.placeholderNombre}
-              className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-sm outline-none focus:border-accent"
+              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
           </label>
 
           <label className="block">
-            <span className="text-xs tracking-wide text-muted uppercase">{d.acceso.campoUrl}</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              {d.acceso.campoUrl} <span className="text-accent">*</span>
+            </span>
             <input
               value={originUrl}
               onChange={(e) => setOriginUrl(e.target.value)}
               required
               placeholder={d.acceso.placeholderUrl}
-              className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
+              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaUrl}</span>
           </label>
 
-          <label className="block">
-            <span className="text-xs tracking-wide text-muted uppercase">
-              {d.acceso.campoTuEmail}
+          <label className="block" hidden={authenticated}>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              {d.acceso.campoTuEmail} <span className="text-accent">*</span>
             </span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              required={!authenticated}
               placeholder={d.acceso.placeholderEmail}
-              className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-sm outline-none focus:border-accent"
+              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaEmail}</span>
           </label>
+          </div>
 
-          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black disabled:opacity-50"
-          >
-            {pending ? d.acceso.enviandoCodigo : d.acceso.enviarCodigo}
-          </button>
+          <div className="flex flex-col justify-between gap-4 border-t border-border pt-5 sm:flex-row sm:items-center">
+            <p className="max-w-lg text-xs text-muted">
+              {authenticated ? d.acceso.notaSesion : d.acceso.registrarNota}
+            </p>
+            <button
+              type="submit"
+              disabled={pending}
+              className="flex shrink-0 items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+            >
+              <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+              {pending
+                ? authenticated
+                  ? d.acceso.creando
+                  : d.acceso.enviandoCodigo
+                : authenticated
+                  ? d.acceso.crearDirecto
+                  : d.acceso.enviarCodigo}
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -212,7 +249,7 @@ function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
         <h1 className="text-2xl font-medium">{d.acceso.listoTitulo}</h1>
 
         <div className="mt-6 space-y-4">
-          <div className="rounded-lg border border-accent/40 bg-accent/5 p-5">
+          <div className="border border-accent/50 bg-panel p-5">
             <p className="text-xs tracking-wide text-accent uppercase">{d.acceso.tuSaldo}</p>
             <p className="mt-3 text-3xl font-medium tabular-nums">$0.00</p>
 
@@ -233,7 +270,7 @@ function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
             <p className="mt-3 text-xs text-muted">{d.acceso.recibirasPagos}</p>
           </div>
 
-          <div className="rounded-lg border border-border bg-panel p-5">
+          <div className="border border-border bg-panel p-5">
             <p className="text-xs tracking-wide text-muted uppercase">{d.acceso.etiquetaEndpoint}</p>
             <code className="mt-3 block break-all font-mono text-sm text-text">
               {base}/&lt;{d.acceso.placeholderRuta}&gt;
@@ -246,8 +283,9 @@ function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
 
         <Link
           href={`/t/${slug}/score`}
-          className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black"
+          className="mt-6 inline-flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
         >
+          <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
           {d.acceso.empezarConScore} →
         </Link>
       </div>

@@ -69,11 +69,11 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
             setEstado('idle')
           }
         }}
-        className="shrink-0 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-black disabled:opacity-50"
+        className="shrink-0 rounded-lg bg-text px-3 py-2 text-xs font-medium text-bg disabled:opacity-50"
       >
         {estado === 'corriendo' ? d.escaneando : label}
       </button>
-      {error ? <p className="text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>
   )
 }
@@ -162,7 +162,7 @@ export function ImplementarPeaje({
   ].join('\n\n')
 
   return (
-    <section className="rounded-lg border border-accent/40 bg-accent/5 p-5">
+    <section className="rounded-lg border border-accent/40 bg-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-medium">{d.implementaTitulo}</h2>
@@ -181,26 +181,31 @@ export function ImplementarPeaje({
       {corriendo && resultados === null ? (
         <p className="mt-5 text-sm text-muted">{d.implementaMidiendo}</p>
       ) : sinDominio ? (
-        <p className="mt-5 rounded-lg border border-yellow-400/40 bg-panel p-3 text-sm text-yellow-400">
+        <p className="mt-5 rounded-lg border border-amber-600/50 bg-panel p-3 text-sm text-amber-700">
           {resultados?.[0]?.detalle}
         </p>
       ) : (
         <>
-          <ul className="mt-5 space-y-1.5">
+          <div className="mt-5 grid grid-cols-1 gap-2.5 font-mono text-xs md:grid-cols-2">
             {(resultados ?? []).map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.ok ? 'bg-green-400' : 'bg-red-400'}`}
-                />
-                <span className={r.ok ? '' : 'text-muted'}>{r.label}</span>
-                <span className="text-xs text-muted">· {r.detalle}</span>
-              </li>
+              <div key={r.id} className="flex items-start gap-2.5 border border-border bg-bg p-2">
+                <span className={`font-bold ${r.ok ? 'text-accent' : 'text-red-600'}`}>
+                  {r.ok ? '[x]' : '[ ]'}
+                </span>
+                <span className="min-w-0">
+                  <span className="block">{r.label}</span>
+                  <span className="block truncate text-[10px] text-muted">{r.detalle}</span>
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
 
           {listo ? (
-            <div className="mt-5 rounded-lg border border-green-400/40 bg-panel p-4">
-              <p className="text-sm font-medium text-green-400">{d.implementaListoTitulo}</p>
+            <div className="mt-5 border border-accent bg-bg p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+                {d.implementaListoTitulo}
+              </p>
               <p className="mt-1 text-sm text-muted">{d.implementaListoDetalle}</p>
             </div>
           ) : (
@@ -214,7 +219,7 @@ export function ImplementarPeaje({
                     setCopiado(true)
                     setTimeout(() => setCopiado(false), 1500)
                   }}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black"
+                  className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg"
                 >
                   {copiado ? d.implementaCopiado : d.implementaCopiar}
                 </button>
