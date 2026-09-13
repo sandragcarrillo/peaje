@@ -141,34 +141,11 @@ export default async function Landing() {
         <div className="relative mt-10 grid gap-10 sm:grid-cols-3">
           <Paso n="001" titulo={L.paso1Titulo} texto={L.paso1Texto} />
           <Paso n="002" titulo={L.paso2Titulo} texto={L.paso2Texto} />
-          <Paso n="003" titulo={L.paso3Titulo} texto={L.paso3Texto} ultimo />
+          <Paso n="003" titulo={L.paso3Titulo} texto={L.paso3Texto} />
           </div>
         </section>
       </Sangre>
 
-      {/* ── CTA final a dos tonos (§3) ─────────────────────────── */}
-      <Sangre className="isla-tinta border-t border-border bg-bg">
-        <div className="mx-auto max-w-5xl px-6 py-24">
-          <h2 className="max-w-3xl text-3xl leading-[1.1] font-semibold sm:text-5xl">
-            {L.ctaFinal1} <span className="text-muted">{L.ctaFinal2}</span>
-          </h2>
-          <div className="mt-9 inline-flex font-mono text-xs tracking-[0.08em]">
-            <Link
-              href={tenant ? `/t/${tenant.slug}/kit` : '/nuevo'}
-              className="rounded-l-full border border-text bg-text px-6 py-3 text-bg"
-            >
-              {tenant ? L.ctaDashboard : L.ctaRegistrar}
-            </Link>
-            <Link
-              href="/mercado"
-              className="flex items-center gap-2 rounded-r-full border border-l-0 border-text px-6 py-3 text-text hover:bg-panel"
-            >
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-              {L.ctaMercado}
-            </Link>
-          </div>
-        </div>
-      </Sangre>
     </div>
   )
 }
@@ -288,22 +265,12 @@ function PanelComparativa({
   )
 }
 
-function Paso({
-  n,
-  titulo,
-  texto,
-  ultimo,
-}: {
-  n: string
-  titulo: string
-  texto: string
-  ultimo?: boolean
-}) {
+function Paso({ n, titulo, texto }: { n: string; titulo: string; texto: string }) {
   return (
     <div className="border-t border-border pt-5">
       <p className="font-mono text-[11px] tracking-[0.14em] text-muted">
         {n} <span className="mx-1 text-border">/</span>{' '}
-        <span className={ultimo ? 'text-accent' : ''}>{titulo.toUpperCase()}</span>
+        <span className="text-accent">{titulo.toUpperCase()}</span>
       </p>
       <p className="mt-3 text-sm text-muted">{texto}</p>
     </div>

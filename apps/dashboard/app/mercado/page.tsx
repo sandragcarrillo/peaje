@@ -196,7 +196,7 @@ function Chip({ href, activo, label }: { href: string; activo: boolean; label: s
       }`}
     >
       {activo ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
-      [{label}]
+      {label}
     </Link>
   )
 }
