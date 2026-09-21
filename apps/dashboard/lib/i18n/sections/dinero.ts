@@ -4,6 +4,16 @@ export const dinero = {
     // Retirar
     retirarTitulo: 'Retirar',
     retirarIntro: 'Tu saldo disponible, listo para retirar.',
+    onchainTitulo: 'Verificado on-chain · Arbitrum',
+    onchainIntro:
+      'En Arbitrum tu plata vive en el contrato PeajeSettlement, a nombre de tu wallet. Estas cifras salen de sus eventos, no de nuestra base de datos.',
+    onchainRecibido: 'Recibido',
+    onchainFees: 'Fee de Peaje',
+    onchainRetirado: 'Retirado',
+    onchainPago: 'Pago',
+    onchainRetiro: 'Retiro',
+    onchainVacio: 'Todavía no hay movimientos en Arbitrum.',
+    onchainContrato: 'Ver el contrato',
     saldoDisponible: 'Saldo disponible',
     cuenta: 'Cuenta',
     copiar: 'Copiar',
@@ -56,6 +66,16 @@ export const dinero = {
     // Retirar
     retirarTitulo: 'Withdraw',
     retirarIntro: 'Your available balance, ready to withdraw.',
+    onchainTitulo: 'Verified on-chain · Arbitrum',
+    onchainIntro:
+      'On Arbitrum your money lives in the PeajeSettlement contract, in your wallet\'s name. These figures come from its events, not from our database.',
+    onchainRecibido: 'Received',
+    onchainFees: 'Peaje fee',
+    onchainRetirado: 'Withdrawn',
+    onchainPago: 'Payment',
+    onchainRetiro: 'Withdrawal',
+    onchainVacio: 'No Arbitrum activity yet.',
+    onchainContrato: 'View the contract',
     saldoDisponible: 'Available balance',
     cuenta: 'Account',
     copiar: 'Copy',

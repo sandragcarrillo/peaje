@@ -1,0 +1,34 @@
+type Account @entity(immutable: false) {
+  id: Bytes!
+  totalReceived: BigInt!
+  totalFees: BigInt!
+  totalWithdrawn: BigInt!
+  paymentCount: Int!
+  payments: [Payment!]! @derivedFrom(field: "merchant")
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "account")
+}
+
+type Payment @entity(immutable: true) {
+  id: Bytes!
+  nonce: Bytes!
+  token: Bytes!
+  merchant: Account!
+  payer: Bytes!
+  amount: BigInt!
+  fee: BigInt!
+  net: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}
+
+type Withdrawal @entity(immutable: true) {
+  id: Bytes!
+  token: Bytes!
+  account: Account!
+  to: Bytes!
+  amount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  txHash: Bytes!
+}

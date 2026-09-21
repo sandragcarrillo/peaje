@@ -5,6 +5,7 @@ import { cachedScore, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Sidebar } from './sidebar'
+import { saldoTotal } from '@/lib/saldos'
 
 /**
  * Frame de consola del negocio, calcado del diseño de Stitch (Business
@@ -37,7 +38,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
 
   const domain = scannableDomain(tenant.originUrl)
   const [balance, resources, score] = await Promise.all([
-    store.balance(tenant.id),
+    saldoTotal(tenant),
     store.listResources(tenant.id).catch(() => []),
     domain ? cachedScore(domain) : Promise.resolve(null),
   ])

@@ -4,7 +4,7 @@ import type { Withdrawal } from '@peaje/db'
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { money, shortWallet } from '@/lib/config'
+import { money, shortWallet, RAILS_LABEL } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 import { estadoRetiro, retirar, type RetiroEstado } from './actions'
 
@@ -75,7 +75,7 @@ export function RetirosPanel({
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-baseline">
           <span className="text-5xl font-bold tracking-tight tabular-nums">{money(disponible)}</span>
-          <span className="font-mono text-xs text-muted">TEMPO + ARC</span>
+          <span className="font-mono text-xs text-muted">{RAILS_LABEL}</span>
         </div>
         <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
           {wallet ? (

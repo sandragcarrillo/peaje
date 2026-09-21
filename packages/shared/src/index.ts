@@ -91,6 +91,33 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
 
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
 
+/**
+ * PeajeSettlement desplegado (y verificado) por red. En estas redes el saldo
+ * de cada negocio vive en el contrato: la fuente de verdad es `claimable`, no
+ * el ledger. Deploy: contracts/broadcast/DeployPeajeSettlement.s.sol/421614.
+ */
+export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
+  arbitrum: '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
+}
+
+/** Bloque del deploy: desde ahí indexa el subgraph. */
+export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
+  arbitrum: 311342003,
+}
+
+export const CLAIMABLE_ABI = [
+  {
+    type: 'function',
+    name: 'claimable',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'account', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const
+
 export function isNetworkId(value: string): value is NetworkId {
   return value in NETWORKS
 }

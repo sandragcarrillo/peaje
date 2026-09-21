@@ -1,5 +1,5 @@
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
-import { gatewayUrl, money, shortWallet } from '@/lib/config'
+import { gatewayUrl, money, shortWallet, RAILS_LABEL } from '@/lib/config'
 import { TerminalBuffer } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { cachedScore, prevision, scannableDomain } from '@/lib/ora'
@@ -7,6 +7,7 @@ import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { GraficaRevenue } from './grafica'
 import { SetupChecklist } from './setup'
+import { saldoTotal } from '@/lib/saldos'
 
 /** Panel del negocio, calcado del mock "Business Dashboard" de Stitch. */
 export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
@@ -15,7 +16,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
 
   const domain = scannableDomain(tenant.originUrl)
   const [balance, payments, porDia, resources, score, d] = await Promise.all([
-    store.balance(tenant.id),
+    saldoTotal(tenant),
     store.listPayments(tenant.id, 10),
     store.dailyRevenue(tenant.id, 7),
     store.listResources(tenant.id).catch(() => []),
@@ -60,7 +61,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
       n: 1,
       label: d.panel.metricaDisponible,
       valor: money(balance.available),
-      pie: [d.panel.subDisponible, 'TEMPO + ARC'] as const,
+      pie: [d.panel.subDisponible, RAILS_LABEL] as const,
       vivo: true,
     },
     {

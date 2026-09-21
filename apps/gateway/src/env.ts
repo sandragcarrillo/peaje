@@ -1,4 +1,4 @@
-import { DEFAULT_CURRENCY, NETWORKS, tempoConfig } from '@peaje/shared'
+import { DEFAULT_CURRENCY, NETWORKS, SETTLEMENT_CONTRACTS, tempoConfig } from '@peaje/shared'
 
 function required(name: string): string {
   const value = process.env[name]
@@ -22,8 +22,10 @@ export const env = {
   /** RPC de Arc. Solo testnet: Arc no publica mainnet todavía. */
   arcRpcUrl: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
   arbitrumRpcUrl: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl,
-  /** Dirección de PeajeSettlement en Arbitrum Sepolia. Sin ella el riel no se ofrece. */
-  arbitrumSettlement: (process.env.ARBITRUM_SETTLEMENT_ADDRESS || null) as `0x${string}` | null,
+  /** PeajeSettlement en Arbitrum Sepolia. `ARBITRUM_SETTLEMENT_ADDRESS=off` apaga el riel. */
+  arbitrumSettlement: (process.env.ARBITRUM_SETTLEMENT_ADDRESS === 'off'
+    ? null
+    : (process.env.ARBITRUM_SETTLEMENT_ADDRESS ?? SETTLEMENT_CONTRACTS.arbitrum ?? null)) as `0x${string}` | null,
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
   /**

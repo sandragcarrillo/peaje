@@ -236,3 +236,14 @@ export async function arbitrumUsdcBalance(address: `0x${string}`): Promise<strin
   })
   return fromBaseUnits(raw, ARB.decimals)
 }
+
+/** Lo que el contrato le debe hoy a una cuenta, en decimal. */
+export async function claimableEnContrato(account: `0x${string}`): Promise<string> {
+  const raw = await arbitrumPublicClient.readContract({
+    address: settlementAddress(),
+    abi: settlementAbi,
+    functionName: 'claimable',
+    args: [ARB.token, account],
+  })
+  return fromBaseUnits(raw, ARB.decimals)
+}

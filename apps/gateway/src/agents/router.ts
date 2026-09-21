@@ -9,6 +9,7 @@ import {
 } from '@peaje/shared'
 import { Hono } from 'hono'
 import { env } from '../env.js'
+import { saldosPorRed } from '../saldos.js'
 import { store } from '../store.js'
 import { payoutFromTenant } from '../treasury.js'
 import { capacidadesDelMercado } from './discovery.js'
@@ -186,7 +187,7 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   const monto = Number(body.amount)
   if (!Number.isFinite(monto) || monto <= 0) return c.json({ error: 'Monto inválido.' }, 400)
 
-  const balances = await store.balanceByNetwork(pagador.id)
+  const balances = await saldosPorRed(pagador)
   const disponible = Number(balances.find((b) => b.network === network)?.available ?? 0)
   if (monto > disponible + 1e-9) {
     return c.json(

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { explorerTxUrl, isNetworkId, NETWORK_IDS, type NetworkId } from '@peaje/shared'
 import { env } from './env.js'
+import { saldosPorRed } from './saldos.js'
 import { store } from './store.js'
 import { payoutConfirmed, payoutFromTenant, treasuryBalance } from './treasury.js'
 
@@ -25,7 +26,7 @@ withdrawals.get('/:slug/ledger', async (c) => {
   const payments = await store.listPayments(tenant.id)
   return c.json({
     balance: await store.balance(tenant.id),
-    balanceByNetwork: await store.balanceByNetwork(tenant.id),
+    balanceByNetwork: await saldosPorRed(tenant),
     payments: payments.map((p) => ({
       ...p,
       explorer: isNetworkId(p.network) ? explorerTxUrl(p.network, p.receiptRef, env.testnet) : null,
@@ -49,7 +50,7 @@ withdrawals.post('/:slug/withdraw', async (c) => {
   }
 
   // El saldo disponible es POR RED: el payout sale de la treasury de esa red.
-  const balances = await store.balanceByNetwork(tenant.id)
+  const balances = await saldosPorRed(tenant)
   const balance = balances.find((b) => b.network === network)
   const available = Number(balance?.available ?? 0)
   const amount = Number(body.amount ?? available)

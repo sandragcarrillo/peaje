@@ -12,9 +12,9 @@ import {
 import { Eyebrow } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
-import { store } from '@/lib/store'
 import { walletBalances } from '@/lib/walletops'
 import { ActivarAgente, TuAgente } from './tu-agente'
+import { saldosPorRed } from '@/lib/saldos'
 
 /**
  * Tu agente: un agente comprador por cuenta. La persona le pide cosas en
@@ -29,7 +29,7 @@ export default async function Agentes() {
     tenants.map(async (t) => {
       const [{ agents }, balances] = await Promise.all([
         listAgents(t.slug).catch(() => ({ agents: [] as AgenteConSaldo[] })),
-        store.balanceByNetwork(t.id),
+        saldosPorRed(t),
       ])
       return {
         slug: t.slug,

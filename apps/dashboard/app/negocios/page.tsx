@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { money } from '@/lib/config'
+import { money, RAILS_LABEL } from '@/lib/config'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 import { store } from '@/lib/store'
+import { saldoTotal } from '@/lib/saldos'
 
 /**
  * Mis negocios, calcado del mock de Stitch: header de workspace, barra de
@@ -17,7 +18,7 @@ export default async function Negocios() {
   const datos = await Promise.all(
     tenants.map(async (t) => {
       const [balance, resources] = await Promise.all([
-        store.balance(t.id),
+        saldoTotal(t),
         store.listResources(t.id).catch(() => []),
       ])
       return { t, balance, links: resources.length }
@@ -79,7 +80,7 @@ export default async function Negocios() {
             {d.acceso.negociosPayouts}
           </span>
           <span className="mt-2 text-3xl font-bold tabular-nums">100%</span>
-          <span className="mt-1 font-mono text-[10px] text-muted">TEMPO + ARC</span>
+          <span className="mt-1 font-mono text-[10px] text-muted">{RAILS_LABEL}</span>
         </div>
       </section>
 
