@@ -38,7 +38,11 @@ export function TuAgente({
   const d = useDict()
   const [abierto, setAbierto] = useState(false)
   const sinSaldo =
-    Number(agente.balanceTempo ?? 0) + Number(agente.balanceArc ?? 0) + Number(agente.balanceBase ?? 0) <= 0
+    Number(agente.balanceTempo ?? 0) +
+      Number(agente.balanceArc ?? 0) +
+      Number(agente.balanceArbitrum ?? 0) +
+      Number(agente.balanceBase ?? 0) <=
+    0
 
   return (
     <div className="space-y-6">
@@ -156,6 +160,10 @@ function CabeceraAgente({
             <p className="text-xs text-muted">{d.agentes.saldoArc}</p>
           </div>
           <div>
+            <p className="text-xl tabular-nums">{money(Number(agente.balanceArbitrum ?? 0))}</p>
+            <p className="text-xs text-muted">{d.agentes.saldoArbitrum}</p>
+          </div>
+          <div>
             <p className="text-xl tabular-nums">{money(Number(agente.balanceBase ?? 0))}</p>
             <p className="text-xs text-muted">{d.agentes.saldoReal}</p>
           </div>
@@ -177,6 +185,7 @@ function CabeceraAgente({
         >
           <option value="tempo">Tempo</option>
           <option value="arc">Arc</option>
+          <option value="arbitrum">Arbitrum</option>
         </select>
         {opciones.length > 1 ? (
           <select

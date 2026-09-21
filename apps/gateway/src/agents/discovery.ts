@@ -174,11 +174,11 @@ async function desdeElDirectorio(): Promise<Candidato[]> {
 }
 
 /**
- * Redes que las wallets de agentes pueden liquidar hoy: Tempo y Arc testnet
- * (demo Peaje-a-Peaje) más Base mainnet, donde vive el mercado real de x402.
- * La misma wallet Privy firma en todas: son cuentas EVM.
+ * Redes que las wallets de agentes pueden liquidar hoy: Tempo, Arc y Arbitrum
+ * Sepolia (rieles de Peaje) más Base mainnet, donde vive el mercado real de
+ * x402. La misma wallet Privy firma en todas: son cuentas EVM.
  */
-const REDES_PAGABLES = new Set(['eip155:42431', 'eip155:5042002', 'eip155:8453'])
+const REDES_PAGABLES = new Set(['eip155:42431', 'eip155:5042002', 'eip155:421614', 'eip155:8453'])
 
 type BazaarItem = {
   resource?: string

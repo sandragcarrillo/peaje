@@ -51,6 +51,7 @@ export type AgenteConSaldo = Agent & {
   balance: string | null
   balanceTempo: string | null
   balanceArc: string | null
+  balanceArbitrum: string | null
   /** USDC en Base mainnet: el riel del mercado real de x402. */
   balanceBase: string | null
 }

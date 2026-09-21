@@ -9,6 +9,7 @@ import { iniciarScheduler } from './agents/scheduler.js'
 import { usdcStatus } from './chainlink.js'
 import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
+import { contextoCobro, nuevoContexto } from './contexto.js'
 import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
@@ -231,12 +232,15 @@ app.get('/:slug/r/:rslug', async (c) => {
   // Precio 0 = link gratis: se sirve directo, sin 402.
   const gratis = Number(resource.priceUsd) <= 0
 
+  const cobro = nuevoContexto(tenant.payoutWallet)
   const result = gratis
     ? null
-    : await mppx.charge({
-        amount: resource.priceUsd,
-        description: resource.title ?? resource.slug,
-      })(conUrlExterna(c.req.raw))
+    : await contextoCobro.run(cobro, () =>
+        mppx.charge({
+          amount: resource.priceUsd,
+          description: resource.title ?? resource.slug,
+        })(conUrlExterna(c.req.raw)),
+      )
 
   if (result && result.status === 402) return result.challenge
 
@@ -267,6 +271,7 @@ app.get('/:slug/r/:rslug', async (c) => {
     routeId: null,
     path: `/r/${resource.slug}`,
     priceUsd: resource.priceUsd,
+    network: cobro.network,
   })
 
   // Pago condicionado: origin caído = plata de vuelta al agente.
@@ -512,10 +517,13 @@ app.all('/:slug/*', async (c) => {
 
   if (!match) return proxyToOrigin(c.req.raw, tenant, path)
 
-  const result = await mppx.charge({
-    amount: match.route.priceUsd,
-    description: match.route.description ?? `${tenant.name} · ${path}`,
-  })(conUrlExterna(c.req.raw))
+  const cobro = nuevoContexto(tenant.payoutWallet)
+  const result = await contextoCobro.run(cobro, () =>
+    mppx.charge({
+      amount: match.route.priceUsd,
+      description: match.route.description ?? `${tenant.name} · ${path}`,
+    })(conUrlExterna(c.req.raw)),
+  )
 
   if (result.status === 402) return result.challenge
 
@@ -544,6 +552,7 @@ app.all('/:slug/*', async (c) => {
     routeId: match.route.id,
     path,
     priceUsd: match.route.priceUsd,
+    network: cobro.network,
   })
 
   if (originFallo && payment) {

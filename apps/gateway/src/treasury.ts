@@ -4,6 +4,12 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPayoutConfirmed, arcTreasuryBalance, sendArcPayout } from './arc.js'
+import {
+  arbitrumPayoutConfirmed,
+  arbitrumTreasuryBalance,
+  sendArbitrumPayout,
+  withdrawFromSettlement,
+} from './arbitrum.js'
 import { publicClient } from './chain.js'
 import { env } from './env.js'
 
@@ -55,12 +61,26 @@ export async function sendPayout(
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
-  return network === 'arc' ? sendArcPayout(to, amount) : sendTempoPayout(to, amount)
+  switch (network) {
+    case 'tempo':
+      return sendTempoPayout(to, amount)
+    case 'arc':
+      return sendArcPayout(to, amount)
+    case 'arbitrum':
+      return sendArbitrumPayout(to, amount)
+  }
 }
 
 /** Saldo de la treasury en decimal, en la red indicada. */
 export async function treasuryBalance(network: NetworkId): Promise<string> {
-  return network === 'arc' ? arcTreasuryBalance() : tempoTreasuryBalance()
+  switch (network) {
+    case 'tempo':
+      return tempoTreasuryBalance()
+    case 'arc':
+      return arcTreasuryBalance()
+    case 'arbitrum':
+      return arbitrumTreasuryBalance()
+  }
 }
 
 /** true si la tx ya está minada y salió bien. null si todavía no aparece. */
@@ -68,5 +88,28 @@ export async function payoutConfirmed(
   network: NetworkId,
   hash: `0x${string}`,
 ): Promise<boolean | null> {
-  return network === 'arc' ? arcPayoutConfirmed(hash) : tempoPayoutConfirmed(hash)
+  switch (network) {
+    case 'tempo':
+      return tempoPayoutConfirmed(hash)
+    case 'arc':
+      return arcPayoutConfirmed(hash)
+    case 'arbitrum':
+      return arbitrumPayoutConfirmed(hash)
+  }
+}
+
+/**
+ * Saca plata del saldo de un negocio hacia `to` (retiro o fondeo de agente).
+ * En Tempo y Arc ese saldo vive en la treasury; en Arbitrum vive en
+ * PeajeSettlement a nombre de la wallet de cobro del negocio.
+ */
+export async function payoutFromTenant(
+  tenant: { payoutWallet: string | null },
+  network: NetworkId,
+  to: `0x${string}`,
+  amount: string,
+): Promise<`0x${string}`> {
+  if (network !== 'arbitrum') return sendPayout(network, to, amount)
+  if (!tenant.payoutWallet) throw new Error('El negocio no tiene wallet de cobro en Arbitrum')
+  return withdrawFromSettlement(tenant.payoutWallet as `0x${string}`, to, amount)
 }

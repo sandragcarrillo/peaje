@@ -26,7 +26,7 @@ export const TOKEN_DECIMALS = 6
 // ---- redes de settlement ----
 
 /** Redes donde el gateway acepta pagos. La clave es la que se persiste en la DB. */
-export type NetworkId = 'tempo' | 'arc'
+export type NetworkId = 'tempo' | 'arc' | 'arbitrum'
 
 type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string }
 
@@ -70,6 +70,23 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
       explorerUrl: 'https://testnet.arcscan.app',
     },
   },
+  arbitrum: {
+    id: 'arbitrum',
+    label: 'Arbitrum',
+    // USDC de Circle en Arbitrum Sepolia. En Arbitrum One vive en otra dirección,
+    // por eso mainnet queda en null hasta que el gateway opere allá.
+    token: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    tokenSymbol: 'USDC',
+    decimals: 6,
+    // Leído on-chain: name() = "USD Coin", version() = "2" (distinto al USDC de Arc).
+    eip3009: { name: 'USD Coin', version: '2' },
+    mainnet: null,
+    testnet: {
+      chainId: 421614,
+      rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+      explorerUrl: 'https://sepolia.arbiscan.io',
+    },
+  },
 }
 
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
@@ -90,8 +107,9 @@ export function explorerTxUrl(network: NetworkId, hash: string, testnet = true):
 }
 
 /**
- * El Receipt de MPP trae el método de pago (`tempo`, `evm`), no la red.
- * Mientras la única red EVM genérica sea Arc, el mapeo es directo.
+ * El Receipt de MPP trae el método de pago (`tempo`, `evm`), no la red. Con
+ * más de una red EVM, la red la anota el settlement en el contexto del cobro;
+ * este mapeo es solo el fallback cuando no hay contexto (pagos previos a Arbitrum).
  */
 export function networkFromReceiptMethod(method: string | undefined): NetworkId {
   return method === 'evm' ? 'arc' : 'tempo'

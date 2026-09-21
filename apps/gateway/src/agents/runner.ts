@@ -244,18 +244,20 @@ export async function ejecutarMision(agent: Agent, opts: OpcionesCorrida = {}): 
         } catch {}
       }
     } else {
+      // Un método por agente: cada red EVM firma con su propio dominio EIP-712
+      // (el USDC de Arc y el de Arbitrum no comparten nombre).
       const cliente = Mppx.create({
         polyfill: false,
         methods:
-          network === 'arc'
-            ? [
+          network === 'tempo'
+            ? [tempo({ account })]
+            : [
                 evm({
                   account,
-                  authorization: NETWORKS.arc.eip3009!,
-                  networks: [NETWORKS.arc.testnet.chainId],
+                  authorization: NETWORKS[network].eip3009!,
+                  networks: [NETWORKS[network].testnet.chainId],
                 }),
-              ]
-            : [tempo({ account })],
+              ],
       })
       res = await cliente.fetch(urlCompra)
       const header = res.headers.get('Payment-Receipt')

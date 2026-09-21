@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Resource, Route, Tenant } from '@peaje/db'
 import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
+import { contextoCobro, nuevoContexto } from './contexto.js'
 import { creditPayment, refundOriginFailure } from './charge.js'
 import { docsBase } from './base.js'
 import { env } from './env.js'
@@ -181,7 +182,8 @@ function buildServer(
           return { content: [{ type: 'text' as const, text: await libre.text() }] }
         }
 
-        const result = await mcpMppx.charge({ amount: resource.priceUsd, description: titulo })(extra)
+        const cobro = nuevoContexto(tenant.payoutWallet)
+        const result = await contextoCobro.run(cobro, () => mcpMppx.charge({ amount: resource.priceUsd, description: titulo })(extra))
         if (result.status === 402) throw result.challenge
 
         // Ya pagó: si la fuente falla de acá en más, sellamos igual y
@@ -208,7 +210,7 @@ function buildServer(
         }
         if (receipt.reference) {
           const payment = await creditPayment(
-            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd },
+            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
           if (originFallo) await refundOriginFailure(payment)
@@ -241,10 +243,13 @@ function buildServer(
         },
       },
       async (args: Record<string, unknown>, extra) => {
-        const result = await mcpMppx.charge({
-          amount: route.priceUsd,
-          description: route.description ?? `${tenant.name} · ${route.pathPattern}`,
-        })(extra)
+        const cobro = nuevoContexto(tenant.payoutWallet)
+        const result = await contextoCobro.run(cobro, () =>
+          mcpMppx.charge({
+            amount: route.priceUsd,
+            description: route.description ?? `${tenant.name} · ${route.pathPattern}`,
+          })(extra),
+        )
 
         if (result.status === 402) throw result.challenge
 
@@ -287,6 +292,7 @@ function buildServer(
               routeId: route.id,
               path: `mcp:${toolName(route)}`,
               priceUsd: route.priceUsd,
+              network: cobro.network,
             },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )

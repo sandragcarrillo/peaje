@@ -1,6 +1,7 @@
 import type { Payment } from '@peaje/db'
-import { networkFromReceiptMethod, isNetworkId } from '@peaje/shared'
+import { networkFromReceiptMethod, isNetworkId, type NetworkId } from '@peaje/shared'
 import { Receipt } from 'mppx'
+import { withdrawFromSettlement } from './arbitrum.js'
 import { resolvePayer } from './chain.js'
 import { env } from './env.js'
 import { store } from './store.js'
@@ -11,6 +12,8 @@ export type ChargeContext = {
   routeId: string | null
   path: string
   priceUsd: string
+  /** Red donde se liquidó, si el settlement la anotó (ver contexto.ts). */
+  network?: NetworkId | null
 }
 
 export type ReceiptInfo = {
@@ -24,7 +27,7 @@ export type ReceiptInfo = {
  * La red sale del método del Receipt: `tempo` → tempo, `evm` → arc.
  */
 export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): Promise<Payment> {
-  const network = networkFromReceiptMethod(receipt.method)
+  const network = ctx.network ?? networkFromReceiptMethod(receipt.method)
 
   // El agente pagó el precio listado (bruto). El negocio recibe el neto; la
   // diferencia es el take rate de Peaje y se queda en la treasury, donde el
@@ -79,7 +82,10 @@ export async function refundOriginFailure(payment: Payment): Promise<string | nu
   }
 
   try {
-    const hash = await sendPayout(payment.network, payer as `0x${string}`, payment.amount)
+    const hash =
+      payment.network === 'arbitrum'
+        ? await refundFromSettlement(payment, payer as `0x${string}`)
+        : await sendPayout(payment.network, payer as `0x${string}`, payment.amount)
     await store.markPaymentRefunded(payment.id, hash)
     console.log('[refund] pago devuelto', {
       payment: payment.id,
@@ -93,6 +99,16 @@ export async function refundOriginFailure(payment: Payment): Promise<string | nu
     console.error('[refund] fallo el refund de', payment.id, error)
     return null
   }
+}
+
+/**
+ * En Arbitrum el pago quedó acreditado al comerciante dentro de PeajeSettlement,
+ * no en la treasury: el reembolso sale de ese saldo, firmado por su wallet.
+ */
+async function refundFromSettlement(payment: Payment, payer: `0x${string}`): Promise<`0x${string}`> {
+  const tenant = await store.getTenantById(payment.tenantId)
+  if (!tenant?.payoutWallet) throw new Error('El negocio no tiene wallet de cobro para reembolsar desde el contrato')
+  return withdrawFromSettlement(tenant.payoutWallet as `0x${string}`, payer, payment.amount)
 }
 
 /**

@@ -80,6 +80,12 @@ export async function sendFromMerchantWallet(
   // Privy revienta el checker); en runtime firma ambos tipos de tx igual.
   const account = merchantViemAccount(walletId, walletAddress) as unknown as LocalAccount
 
+  // En Arbitrum el saldo del negocio vive en PeajeSettlement y el gas es ETH:
+  // esos retiros los hace el gateway con un retiro firmado, no esta wallet.
+  if (network === 'arbitrum') {
+    throw new Error('Arbitrum withdrawals go through Peaje: use Withdraw in your business dashboard.')
+  }
+
   if (network === 'arc') {
     const wallet = createWalletClient({ account, chain: arcTestnet, transport: http() })
     return wallet.writeContract({

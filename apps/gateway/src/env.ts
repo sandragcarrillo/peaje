@@ -21,6 +21,9 @@ export const env = {
   rpcUrl: tempoConfig((process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet').rpcUrl,
   /** RPC de Arc. Solo testnet: Arc no publica mainnet todavía. */
   arcRpcUrl: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
+  arbitrumRpcUrl: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl,
+  /** Dirección de PeajeSettlement en Arbitrum Sepolia. Sin ella el riel no se ofrece. */
+  arbitrumSettlement: (process.env.ARBITRUM_SETTLEMENT_ADDRESS || null) as `0x${string}` | null,
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
   /**

@@ -3,13 +3,14 @@ import {
   AGENT_FREQUENCIES,
   explorerTxUrl,
   isNetworkId,
+  type NetworkId,
   nextRunAt,
   type AgentFrequencyId,
 } from '@peaje/shared'
 import { Hono } from 'hono'
 import { env } from '../env.js'
 import { store } from '../store.js'
-import { sendPayout } from '../treasury.js'
+import { payoutFromTenant } from '../treasury.js'
 import { capacidadesDelMercado } from './discovery.js'
 import { estadoRegistro, registrarAgente } from './erc8004.js'
 import { correrYReprogramar, planearCompra } from './runner.js'
@@ -43,13 +44,14 @@ async function conSaldo(agent: Agent) {
   // La misma address firma en los tres rieles: Tempo y Arc (testnet, demo) y
   // Base mainnet (mercado real de x402). Se muestran los tres saldos.
   const address = agent.walletAddress as `0x${string}`
-  const [balanceTempo, balanceArc, balanceBase] = await Promise.all([
+  const [balanceTempo, balanceArc, balanceArbitrum, balanceBase] = await Promise.all([
     agentBalance(address, 'tempo').catch(() => null),
     agentBalance(address, 'arc').catch(() => null),
+    agentBalance(address, 'arbitrum').catch(() => null),
     baseUsdcBalance(address).catch(() => null),
   ])
-  const balance = network === 'arc' ? balanceArc : balanceTempo
-  return { ...agent, balance, balanceTempo, balanceArc, balanceBase }
+  const porRed = { tempo: balanceTempo, arc: balanceArc, arbitrum: balanceArbitrum }
+  return { ...agent, balance: porRed[network], balanceTempo, balanceArc, balanceArbitrum, balanceBase }
 }
 
 agentsRouter.get('/:slug/agents', async (c) => {
@@ -178,7 +180,7 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   // La persona elige la red del fondeo (Tempo o Arc) y de qué negocio suyo
   // sale la plata. El dashboard ya verificó que ambos negocios son del mismo
   // usuario; esta API es interna y solo la llama el dashboard.
-  const network = isNetworkId(body.network ?? '') ? (body.network as 'tempo' | 'arc') : isNetworkId(agent.network) ? agent.network : 'arc'
+  const network = isNetworkId(body.network ?? '') ? (body.network as NetworkId) : isNetworkId(agent.network) ? agent.network : 'arc'
   const pagador = body.fromSlug ? await store.getTenantBySlug(body.fromSlug) : tenant
   if (!pagador) return c.json({ error: 'Negocio de origen no encontrado' }, 404)
   const monto = Number(body.amount)
@@ -201,7 +203,7 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   })
 
   try {
-    const hash = await sendPayout(network, agent.walletAddress as `0x${string}`, monto.toFixed(6))
+    const hash = await payoutFromTenant(pagador, network, agent.walletAddress as `0x${string}`, monto.toFixed(6))
     await store.updateWithdrawal(withdrawal.id, { txRef: hash })
     // Con saldo, el agente ya puede correr: se programa para ahora. Si el
     // fondeo llegó por otra red de prueba, el agente pasa a operar en esa.

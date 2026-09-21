@@ -34,6 +34,19 @@ export async function createAgentWallet(name: string): Promise<{ id: string; add
   return { id: wallet.id, address: wallet.address as `0x${string}` }
 }
 
+/**
+ * Cuenta firmante de cualquier wallet que esta app de Privy custodia, a partir
+ * de su address (así se guarda la wallet de cobro del negocio). null si no es nuestra.
+ */
+export async function privyAccountByAddress(address: `0x${string}`): Promise<LocalAccount | null> {
+  try {
+    const wallet = await privy().wallets().getWalletByAddress({ address })
+    return wallet ? agentAccount(wallet.id, address) : null
+  } catch {
+    return null
+  }
+}
+
 /** El cast aplaca la inferencia de viem con la firma doble tempo+EVM de Privy. */
 export function agentAccount(walletId: string, address: `0x${string}`): LocalAccount {
   return createViemAccount(privy(), { walletId, address }) as unknown as LocalAccount
@@ -41,6 +54,10 @@ export function agentAccount(walletId: string, address: `0x${string}`): LocalAcc
 
 /** Saldo del agente en la red donde opera, en decimal. */
 export async function agentBalance(address: `0x${string}`, network: NetworkId): Promise<string> {
+  if (network === 'arbitrum') {
+    const { arbitrumUsdcBalance } = await import('../arbitrum.js')
+    return arbitrumUsdcBalance(address)
+  }
   if (network === 'arc') {
     const raw = await arcPublicClient.readContract({
       address: NETWORKS.arc.token,
@@ -76,6 +93,12 @@ export async function sweepAgent(
     const maximo = Math.max(0, saldo - 0.005)
     if (Number(monto) > maximo) monto = maximo.toFixed(6)
     if (Number(monto) <= 0) throw new Error('Saldo insuficiente para cubrir la comisión del barrido')
+  }
+
+  if (network === 'arbitrum') {
+    // El agente no tiene ETH para gas: firma y el relayer somete.
+    const { relayUsdcTransfer } = await import('../arbitrum.js')
+    return relayUsdcTransfer(account as never, to, monto)
   }
 
   if (network === 'arc') {

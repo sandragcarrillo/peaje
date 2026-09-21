@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { explorerTxUrl, isNetworkId, NETWORK_IDS, type NetworkId } from '@peaje/shared'
 import { env } from './env.js'
 import { store } from './store.js'
-import { payoutConfirmed, sendPayout, treasuryBalance } from './treasury.js'
+import { payoutConfirmed, payoutFromTenant, treasuryBalance } from './treasury.js'
 
 /**
  * API interna de retiros. La consume solo el dashboard, autenticada con un
@@ -70,7 +70,7 @@ withdrawals.post('/:slug/withdraw', async (c) => {
   })
 
   try {
-    const hash = await sendPayout(network, toWallet as `0x${string}`, amount.toFixed(6))
+    const hash = await payoutFromTenant(tenant, network, toWallet as `0x${string}`, amount.toFixed(6))
     const updated = await store.updateWithdrawal(withdrawal.id, { txRef: hash })
     return c.json({
       withdrawal: updated,
