@@ -12,8 +12,16 @@ export function microMoney(value: string | number): string {
   return money(n)
 }
 
+/**
+ * Cadenas donde se cobra, una vez cada una. Arbitrum tiene dos rieles (USDC y
+ * USDG) pero es una sola cadena: la etiqueta cuenta cadenas, no tokens.
+ */
+export const CHAINS = [
+  ...new Map(NETWORK_IDS.map((id) => [NETWORKS[id].testnet.chainId, NETWORKS[id].label.split(' · ')[0].toUpperCase()])).values(),
+]
+
 /** Rieles de cobro activos, para las etiquetas del panel. */
-export const RAILS_LABEL = NETWORK_IDS.map((id) => NETWORKS[id].label.toUpperCase()).join(' + ')
+export const RAILS_LABEL = CHAINS.join(' + ')
 
 export function shortWallet(wallet: string | null): string {
   if (!wallet) return '—'

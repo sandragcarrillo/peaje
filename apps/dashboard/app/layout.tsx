@@ -48,9 +48,6 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
               </Link>
               {tenant ? (
                 <nav className="flex items-center gap-3 text-sm">
-                  <Link href="/mercado" className="text-muted hover:text-text">
-                    {d.nav.mercado}
-                  </Link>
                   <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} />
                   <ThemeToggle />
                   <LanguageToggle locale={locale} />

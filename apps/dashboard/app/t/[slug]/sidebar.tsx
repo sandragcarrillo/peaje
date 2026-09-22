@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useDict } from '@/lib/i18n/client'
-import { RAILS_LABEL } from '@/lib/config'
+import { CHAINS } from '@/lib/config'
 
 /**
  * Sidebar calcado del diseño de Stitch: tarjeta de identidad con bloque de
@@ -120,9 +120,9 @@ export function Sidebar({
           </a>
         </div>
 
-        <div className="flex justify-between border-t border-border px-3 pt-2 font-mono text-[10px] uppercase text-muted">
-          <span>MPP/1.1 · 402</span>
-          <span>{RAILS_LABEL.replaceAll(' ', '')}</span>
+        <div className="space-y-1 border-t border-border px-3 pt-2 font-mono text-[10px] uppercase leading-relaxed text-muted">
+          <p>MPP/1.1 · 402</p>
+          <p>{CHAINS.join(' · ')}</p>
         </div>
       </div>
     </aside>

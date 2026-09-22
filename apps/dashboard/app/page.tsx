@@ -53,25 +53,18 @@ export default async function Landing() {
               {tenant ? (
                 <Link
                   href={`/t/${tenant.slug}`}
-                  className="rounded-l-full border border-tinta bg-tinta px-6 py-3 text-crema"
+                  className="rounded-full border border-tinta bg-tinta px-6 py-3 text-crema"
                 >
                   {L.ctaDashboard}
                 </Link>
               ) : (
                 <Link
                   href="/nuevo"
-                  className="rounded-l-full border border-tinta bg-tinta px-6 py-3 text-crema"
+                  className="rounded-full border border-tinta bg-tinta px-6 py-3 text-crema"
                 >
                   {L.ctaRegistrar}
                 </Link>
               )}
-              <Link
-                href="/mercado"
-                className="flex items-center gap-2 rounded-r-full border border-l-0 border-tinta px-6 py-3 text-tinta hover:bg-tinta/5"
-              >
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-                {L.ctaMercado}
-              </Link>
             </div>
           </div>
 
