@@ -2,7 +2,18 @@
 
 On-chain settlement for Peaje payments. An AI agent signs an EIP-3009 `transferWithAuthorization` for the price in an HTTP 402 challenge; the Peaje gateway submits it through `settle`, which pulls the stablecoin into the contract, credits the merchant the net amount and the platform its fee, all in one transaction. Merchants withdraw whenever they want, directly or through a gasless signed withdrawal.
 
-Deployed on Arbitrum Sepolia. Works with any EIP-3009 stablecoin the owner allowlists (USDC today).
+Works with any EIP-3009 stablecoin the owner allowlists, so a new stablecoin is a transaction, not a redeploy.
+
+## Deployments
+
+Same address on both chains: same deployer, same nonce.
+
+| Network | Address | Accepted tokens | Deploy |
+|---|---|---|---|
+| Arbitrum Sepolia (421614) | [`0x583Cd05d…62225`](https://sepolia.arbiscan.io/address/0x583Cd05d8C13E6a160B09B8BF5704e9E32962225) | USDC `0x75faf114…6AA4d`, USDG `0xFFC95faa…41892` | [tx](https://sepolia.arbiscan.io/tx/0x2db7d650578ec89ec3d784defe2f5a77f549a3fe20e3a8227e81b8a8c6152097), verified on Sourcify (exact match) |
+| Robinhood Chain Testnet (46630) | [`0x583Cd05d…62225`](https://explorer.testnet.chain.robinhood.com/address/0x583Cd05d8C13E6a160B09B8BF5704e9E32962225) | USDG `0x7E955252…1802F` | [tx](https://explorer.testnet.chain.robinhood.com/tx/0x5ed87048d54b2c7501b79b23c7ef1869facdda808b3762125fe0a4b6e12dbb13), verified on Blockscout |
+
+Robinhood Chain's own testnet "USDC" is a mock without EIP-3009, so that rail settles in Paxos USDG, whose EIP-712 domain (`Global Dollar`, version `1`) was read from the token contract.
 
 ## Flow
 

@@ -245,7 +245,8 @@ export async function ejecutarMision(agent: Agent, opts: OpcionesCorrida = {}): 
       }
     } else {
       // Un método por agente: cada red EVM firma con su propio dominio EIP-712
-      // (el USDC de Arc y el de Arbitrum no comparten nombre).
+      // (el USDC de Arc y el de Arbitrum no comparten nombre). `currencies`
+      // desempata cuando una cadena ofrece más de un stablecoin.
       const cliente = Mppx.create({
         polyfill: false,
         methods:
@@ -256,6 +257,7 @@ export async function ejecutarMision(agent: Agent, opts: OpcionesCorrida = {}): 
                   account,
                   authorization: NETWORKS[network].eip3009!,
                   networks: [NETWORKS[network].testnet.chainId],
+                  currencies: [NETWORKS[network].token],
                 }),
               ],
       })

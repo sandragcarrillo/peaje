@@ -1,30 +1,49 @@
 import 'server-only'
 import type { Balance, NetworkBalance, Tenant } from '@peaje/db'
-import { CLAIMABLE_ABI, fromBaseUnits, NETWORKS, SETTLEMENT_CONTRACTS, type NetworkId } from '@peaje/shared'
-import { createPublicClient, http } from 'viem'
-import { arbitrumSepolia } from 'viem/chains'
+import {
+  CLAIMABLE_ABI,
+  fromBaseUnits,
+  isSettlementNetwork,
+  NETWORKS,
+  SETTLEMENT_CONTRACTS,
+  type SettlementNetwork,
+} from '@peaje/shared'
+import { createPublicClient, defineChain, http, type PublicClient } from 'viem'
 import { store } from './store'
 
-const arbitrum = createPublicClient({
-  chain: arbitrumSepolia,
-  transport: http(process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl),
-})
+const clientes = new Map<SettlementNetwork, PublicClient>()
+
+function cliente(network: SettlementNetwork): PublicClient {
+  const cached = clientes.get(network)
+  if (cached) return cached
+  const def = NETWORKS[network]
+  const chain = defineChain({
+    id: def.testnet.chainId,
+    name: def.label,
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: { default: { http: [def.testnet.rpcUrl] } },
+  })
+  const nuevo = createPublicClient({ chain, transport: http() }) as PublicClient
+  clientes.set(network, nuevo)
+  return nuevo
+}
 
 /**
  * Lo que el contrato le debe al negocio en una red con settlement on-chain.
  * null si la red no tiene contrato o la lectura falla (se usa el ledger).
  */
-async function claimableOnchain(network: NetworkId, wallet: string | null): Promise<string | null> {
+async function claimableOnchain(network: string, wallet: string | null): Promise<string | null> {
+  if (!isSettlementNetwork(network) || !wallet) return null
   const contrato = SETTLEMENT_CONTRACTS[network]
-  if (!contrato || !wallet || network !== 'arbitrum') return null
+  if (!contrato) return null
   try {
-    const raw = await arbitrum.readContract({
+    const raw = await cliente(network).readContract({
       address: contrato,
       abi: CLAIMABLE_ABI,
       functionName: 'claimable',
-      args: [NETWORKS.arbitrum.token, wallet as `0x${string}`],
+      args: [NETWORKS[network].token, wallet as `0x${string}`],
     })
-    return fromBaseUnits(raw, NETWORKS.arbitrum.decimals)
+    return fromBaseUnits(raw, NETWORKS[network].decimals)
   } catch {
     return null
   }
@@ -38,7 +57,7 @@ export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'payoutWallet'>):
   const ledger = await store.balanceByNetwork(tenant.id)
   return Promise.all(
     ledger.map(async (b) => {
-      const onchain = await claimableOnchain(b.network as NetworkId, tenant.payoutWallet)
+      const onchain = await claimableOnchain(b.network, tenant.payoutWallet)
       return onchain === null ? b : { ...b, available: onchain }
     }),
   )

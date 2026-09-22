@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useDict } from '@/lib/i18n/client'
-import { generarProxy, HOSTS, RUTAS_PROXY, type Host } from '@/lib/proxy-kit'
+import { generarProxy, HOSTS, RUTAS_PROXY, type Host } from '@peaje/shared'
 
 /**
  * El bloque recomendado del kit: una sola pieza de configuración que hace que

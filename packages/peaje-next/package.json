@@ -1,0 +1,71 @@
+{
+  "name": "@peaje/next",
+  "version": "0.1.0",
+  "description": "Peaje for Next.js: proxy rewrites and the head block that make your site speak MPP, MCP and OpenAPI on your own domain.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./head": {
+      "import": {
+        "types": "./dist/head.d.ts",
+        "default": "./dist/head.js"
+      },
+      "require": {
+        "types": "./dist/head.d.cts",
+        "default": "./dist/head.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "keywords": [
+    "peaje",
+    "next",
+    "mpp",
+    "x402",
+    "mcp",
+    "agents"
+  ],
+  "peerDependencies": {
+    "next": ">=14",
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@peaje/shared": "workspace:*",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.0"
+  }
+}

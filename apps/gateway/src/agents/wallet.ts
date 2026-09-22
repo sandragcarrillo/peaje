@@ -1,6 +1,6 @@
 import { PrivyClient } from '@privy-io/node'
 import { createViemAccount } from '@privy-io/node/viem'
-import { fromBaseUnits, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
+import { fromBaseUnits, isSettlementNetwork, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
 import { createClient, createWalletClient, erc20Abi, http, parseUnits, type LocalAccount } from 'viem'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
@@ -54,9 +54,9 @@ export function agentAccount(walletId: string, address: `0x${string}`): LocalAcc
 
 /** Saldo del agente en la red donde opera, en decimal. */
 export async function agentBalance(address: `0x${string}`, network: NetworkId): Promise<string> {
-  if (network === 'arbitrum') {
-    const { arbitrumUsdcBalance } = await import('../arbitrum.js')
-    return arbitrumUsdcBalance(address)
+  if (isSettlementNetwork(network)) {
+    const { tokenBalance } = await import('../settlement.js')
+    return tokenBalance(network, address)
   }
   if (network === 'arc') {
     const raw = await arcPublicClient.readContract({
@@ -95,10 +95,10 @@ export async function sweepAgent(
     if (Number(monto) <= 0) throw new Error('Saldo insuficiente para cubrir la comisión del barrido')
   }
 
-  if (network === 'arbitrum') {
+  if (isSettlementNetwork(network)) {
     // El agente no tiene ETH para gas: firma y el relayer somete.
-    const { relayUsdcTransfer } = await import('../arbitrum.js')
-    return relayUsdcTransfer(account as never, to, monto)
+    const { relayTokenTransfer } = await import('../settlement.js')
+    return relayTokenTransfer(network, account, to, monto)
   }
 
   if (network === 'arc') {

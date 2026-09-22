@@ -12,9 +12,10 @@ import {
   type Bloque,
   type Oferta,
 } from './bloques'
-import { ImplementarPeaje, ToggleBlock, type Pieza } from './partes'
+import { MotoresDeRespuesta } from './motores'
+import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
 import { BloqueProxy } from './proxy'
-import { generarProxy } from '@/lib/proxy-kit'
+import { generarProxy, type Entidad } from '@peaje/shared'
 
 type Kit = Dict['kit']
 
@@ -60,125 +61,143 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
     rutaPaga: d.proxyComentarioRutaPaga,
   })
 
+  // Lo que el negocio cargó en "Motores de respuesta": alimenta el
+  // Organization del head y el toggle del robots, en el kit y en el prompt.
+  const entidad: Entidad = {
+    logoUrl: tenant.entityLogoUrl,
+    telefono: tenant.entityPhone,
+    direccion: tenant.entityAddress,
+    sameAs: tenant.entitySameAs,
+    descripcion: tenant.entityDescription,
+  }
+
   const bloques = construirBloques({
     d,
     tenant: { name: tenant.name, slug: tenant.slug },
-    base,
     originHost,
     ofertas,
     tieneJsonLd,
+    entidad,
+    sinEntrenamiento: tenant.robotsBlockTraining,
   })
 
   return (
-    <div className="max-w-3xl space-y-8">
-      <PageHeader
-        eyebrow={`KIT / ${originHost}`}
-        titulo={d.titulo}
-        sub={
-          <>
-            {d.subtituloInicio}
-            <strong className="text-text">{originHost}</strong>
-            {d.subtituloFin}
-          </>
-        }
-      />
+    <VerificacionProvider slug={tenant.slug}>
+      <div className="max-w-3xl space-y-8">
+        <PageHeader
+          eyebrow={`KIT / ${originHost}`}
+          titulo={d.titulo}
+          sub={
+            <>
+              {d.subtituloInicio}
+              <strong className="text-text">{originHost}</strong>
+              {d.subtituloFin}
+            </>
+          }
+        />
 
-      <ImplementarPeaje
-        slug={tenant.slug}
-        piezas={[
-          {
-            id: 'proxy',
-            titulo: d.promptProxyTitulo,
-            detalle: d.promptProxyDetalle,
-            contenido: configProxy,
-          },
-          ...bloques.map((b): Pieza => ({
-            id: b.id,
-            titulo: b.titulo,
-            detalle: b.detalle,
-            contenido: b.contenido,
-          })),
-        ]}
-        marco={{
-          intro: d.promptIntro(originHost, base),
-          noCrearTitulo: d.promptNoCrearTitulo,
-          noCrearDetalle: d.promptNoCrearDetalle,
-          noCrearCierre: d.promptNoCrearCierre,
-          rutas: rutasDelProxy(),
-          verifica: d.promptVerifica(originHost, primeraRutaPaga(ofertas, tenant.slug)),
-          audit: domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio,
-          referencia: d.promptReferencia,
-        }}
-      />
+        <ImplementarPeaje
+          piezas={[
+            {
+              id: 'proxy',
+              titulo: d.promptProxyTitulo,
+              detalle: d.promptProxyDetalle,
+              contenido: configProxy,
+            },
+            ...bloques.map((b): Pieza => ({
+              id: b.id,
+              titulo: b.titulo,
+              detalle: b.detalle,
+              contenido: b.contenido,
+            })),
+          ]}
+          marco={{
+            corto: (faltan) => d.promptCorto(originHost, base, tenant.slug, faltan),
+            intro: d.promptIntro(originHost, base),
+            noCrearTitulo: d.promptNoCrearTitulo,
+            noCrearDetalle: d.promptNoCrearDetalle,
+            noCrearCierre: d.promptNoCrearCierre,
+            rutas: rutasDelProxy(),
+            verifica: d.promptVerifica(originHost, primeraRutaPaga(ofertas, tenant.slug)),
+            audit: domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio,
+            referencia: d.promptReferencia,
+          }}
+        />
 
-      <BloqueProxy base={base} />
+        <MotoresDeRespuesta
+          slug={tenant.slug}
+          nombre={tenant.name}
+          entidad={entidad}
+          bloquearEntrenamiento={tenant.robotsBlockTraining}
+        />
 
-      <div className="space-y-1">
-        <h2 className="font-medium">{d.proxyManual}</h2>
-        <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
+        <BloqueProxy base={base} />
+
+        <div className="space-y-1">
+          <h2 className="font-medium">{d.proxyManual}</h2>
+          <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
+        </div>
+
+        <PromptTodoDeUna
+          d={d}
+          bloques={bloques}
+          base={base}
+          originHost={originHost}
+          domain={domain}
+          rutaPaga={primeraRutaPaga(ofertas, tenant.slug)}
+        />
+
+        <div className="space-y-3">
+          {bloques.map((b) => (
+            <ToggleBlock key={b.titulo} titulo={b.titulo} detalle={b.detalle} contenido={b.contenido} />
+          ))}
+        </div>
+
+        <section className="rounded-lg border border-border bg-panel p-4">
+          <h2 className="font-medium">{d.yaActivoTitulo}</h2>
+          <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
+          <ul className="mt-3 grid grid-cols-3 gap-3 text-sm">
+            <li className="rounded-lg border border-border bg-bg p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.yaActivoDiscovery}</p>
+              <a
+                href={`${base}/openapi.json`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 block truncate font-mono text-xs text-accent hover:underline"
+              >
+                /openapi.json
+              </a>
+            </li>
+            <li className="rounded-lg border border-border bg-bg p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">llms.txt</p>
+              <a
+                href={`${base}/llms.txt`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 block truncate font-mono text-xs text-accent hover:underline"
+              >
+                /llms.txt
+              </a>
+            </li>
+            <li className="rounded-lg border border-border bg-bg p-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">MCP</p>
+              <span className="mt-1 block truncate font-mono text-xs text-accent">/mcp</span>
+            </li>
+          </ul>
+        </section>
+
+        <div className="rounded-lg border border-accent/40 bg-panel p-4 text-sm">
+          <p>
+            {d.verificaInicio}
+            {d.verificar}
+            {d.verificaFin}
+            <Link href={`/t/${tenant.slug}/score`} className="text-accent underline">
+              {d.verificaLink}
+            </Link>
+          </p>
+        </div>
       </div>
-
-      <PromptTodoDeUna
-        d={d}
-        bloques={bloques}
-        base={base}
-        originHost={originHost}
-        domain={domain}
-        rutaPaga={primeraRutaPaga(ofertas, tenant.slug)}
-      />
-
-      <div className="space-y-3">
-        {bloques.map((b) => (
-          <ToggleBlock key={b.titulo} titulo={b.titulo} detalle={b.detalle} contenido={b.contenido} />
-        ))}
-      </div>
-
-      <section className="rounded-lg border border-border bg-panel p-4">
-        <h2 className="font-medium">{d.yaActivoTitulo}</h2>
-        <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
-        <ul className="mt-3 grid grid-cols-3 gap-3 text-sm">
-          <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.yaActivoDiscovery}</p>
-            <a
-              href={`${base}/openapi.json`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 block truncate font-mono text-xs text-accent hover:underline"
-            >
-              /openapi.json
-            </a>
-          </li>
-          <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">llms.txt</p>
-            <a
-              href={`${base}/llms.txt`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 block truncate font-mono text-xs text-accent hover:underline"
-            >
-              /llms.txt
-            </a>
-          </li>
-          <li className="rounded-lg border border-border bg-bg p-3">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">MCP</p>
-            <span className="mt-1 block truncate font-mono text-xs text-accent">/mcp</span>
-          </li>
-        </ul>
-      </section>
-
-      <div className="rounded-lg border border-accent/40 bg-panel p-4 text-sm">
-        <p>
-          {d.verificaInicio}
-          {d.verificar}
-          {d.verificaFin}
-          <Link href={`/t/${tenant.slug}/score`} className="text-accent underline">
-            {d.verificaLink}
-          </Link>
-        </p>
-      </div>
-
-
-    </div>
+    </VerificacionProvider>
   )
 }
 

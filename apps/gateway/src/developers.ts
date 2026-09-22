@@ -1,5 +1,5 @@
 import type { Route, Tenant } from '@peaje/db'
-import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { dominioVerificable, jsonParaScript, NETWORKS, NETWORK_IDS } from '@peaje/shared'
 
 /**
  * Portal de desarrolladores: la página HTML que un humano (o un juez, o el
@@ -10,15 +10,42 @@ import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
  * La sección de "API keys" que pide el chequeo existe, pero dice la verdad:
  * acá no hay keys, la credencial es el pago. Y el sandbox también es real:
  * hoy todo liquida en testnets con tokens de faucet.
+ *
+ * Para los motores de respuesta (ChatGPT, Perplexity, AI Overviews) esta es
+ * la página citable del negocio: HTML completo sin JS, `index,follow`
+ * explícito, un WebPage con `dateModified` y la fecha visible. La frescura
+ * es una de las pocas señales que estos motores documentan.
  */
 
-type Ctx = { tenant: Tenant; routes: Route[]; base: string }
+type Ctx = { tenant: Tenant; routes: Route[]; base: string; actualizado?: Date }
 
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-export function developersHtml({ tenant, routes, base }: Ctx): string {
+export function developersHtml({ tenant, routes, base, actualizado = new Date() }: Ctx): string {
   const nombre = esc(tenant.name)
+  // Las rutas no guardan fecha de cambio, así que la fecha es la de la
+  // respuesta: la página se genera en vivo y eso es literalmente cierto.
+  const fechaIso = actualizado.toISOString()
+  const fechaDia = fechaIso.slice(0, 10)
+  const fechaLegible = actualizado.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+  // El Organization del kit se ancla en el dominio raíz del negocio (sin
+  // `api.`/`www.`), no en el origin de la API: el `@id` tiene que ser el
+  // mismo que el que emite peaje/head.html o el grafo no cierra.
+  const raiz = dominioVerificable(tenant.originUrl)
+  const origen = raiz ? `https://${raiz}` : new URL(base).origin
+  const webPage = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${base}/developers`,
+    url: `${base}/developers`,
+    name: `${tenant.name} · Developer portal`,
+    description: `Pay-per-request API from ${tenant.name}: HTTP 402, stablecoin settlement, no API keys.`,
+    inLanguage: 'en',
+    dateModified: fechaIso,
+    isPartOf: { '@id': `${origen}/#organization` },
+    about: { '@id': `${origen}/#api` },
+  }
   const vendibles = routes.filter((r) => Number(r.priceUsd) > 0)
   const ejemplo = vendibles[0]?.pathPattern ?? '/r/example'
   const precioEjemplo = vendibles[0] ? `$${Number(vendibles[0].priceUsd)}` : '$0.01'
@@ -50,7 +77,11 @@ export function developersHtml({ tenant, routes, base }: Ctx): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${nombre} · Developer portal</title>
 <meta name="description" content="Pay-per-request API from ${nombre}: HTTP 402, stablecoin settlement, no API keys. Quickstart, pricing, MCP and sandbox.">
+<meta name="robots" content="index,follow">
 <link rel="service-desc" type="application/openapi+json" href="${base}/openapi.json">
+<script type="application/ld+json">
+${jsonParaScript(webPage)}
+</script>
 <style>
   /* Paleta de design/direccion-visual.md: tinta/crema/naranja. */
   :root { --bg:#1a1917; --panel:#2a2825; --border:#3a3833; --text:#efebe2; --muted:#8c8880; --accent:#a2dae2; }
@@ -163,7 +194,7 @@ ${redes}
     </ul>
   </section>
 
-  <footer>Charged per request via <a href="https://mpp.dev">MPP</a>. Gateway by Peaje.</footer>
+  <footer>Charged per request via <a href="https://mpp.dev">MPP</a>. Gateway by Peaje. Last updated: <time datetime="${fechaDia}">${fechaLegible}</time>.</footer>
 </main>
 </body>
 </html>`

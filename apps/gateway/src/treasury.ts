@@ -1,15 +1,10 @@
-import { TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
+import { isSettlementNetwork, NETWORKS, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
 import { createClient, http, parseUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPayoutConfirmed, arcTreasuryBalance, sendArcPayout } from './arc.js'
-import {
-  arbitrumPayoutConfirmed,
-  arbitrumTreasuryBalance,
-  sendArbitrumPayout,
-  withdrawFromSettlement,
-} from './arbitrum.js'
+import { sendTreasuryPayout, treasuryTokenBalance, txConfirmed, withdrawFromSettlement } from './settlement.js'
 import { publicClient } from './chain.js'
 import { env } from './env.js'
 
@@ -67,7 +62,9 @@ export async function sendPayout(
     case 'arc':
       return sendArcPayout(to, amount)
     case 'arbitrum':
-      return sendArbitrumPayout(to, amount)
+    case 'arbitrum-usdg':
+    case 'robinhood':
+      return sendTreasuryPayout(network, to, amount)
   }
 }
 
@@ -79,7 +76,9 @@ export async function treasuryBalance(network: NetworkId): Promise<string> {
     case 'arc':
       return arcTreasuryBalance()
     case 'arbitrum':
-      return arbitrumTreasuryBalance()
+    case 'arbitrum-usdg':
+    case 'robinhood':
+      return treasuryTokenBalance(network)
   }
 }
 
@@ -94,14 +93,16 @@ export async function payoutConfirmed(
     case 'arc':
       return arcPayoutConfirmed(hash)
     case 'arbitrum':
-      return arbitrumPayoutConfirmed(hash)
+    case 'arbitrum-usdg':
+    case 'robinhood':
+      return txConfirmed(network, hash)
   }
 }
 
 /**
  * Saca plata del saldo de un negocio hacia `to` (retiro o fondeo de agente).
- * En Tempo y Arc ese saldo vive en la treasury; en Arbitrum vive en
- * PeajeSettlement a nombre de la wallet de cobro del negocio.
+ * En Tempo y Arc ese saldo vive en la treasury; en las redes con settlement
+ * vive en PeajeSettlement a nombre de la wallet de cobro del negocio.
  */
 export async function payoutFromTenant(
   tenant: { payoutWallet: string | null },
@@ -109,7 +110,7 @@ export async function payoutFromTenant(
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
-  if (network !== 'arbitrum') return sendPayout(network, to, amount)
-  if (!tenant.payoutWallet) throw new Error('El negocio no tiene wallet de cobro en Arbitrum')
-  return withdrawFromSettlement(tenant.payoutWallet as `0x${string}`, to, amount)
+  if (!isSettlementNetwork(network)) return sendPayout(network, to, amount)
+  if (!tenant.payoutWallet) throw new Error(`El negocio no tiene wallet de cobro en ${NETWORKS[network].label}`)
+  return withdrawFromSettlement(network, tenant.payoutWallet as `0x${string}`, to, amount)
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import type { AgentRun } from '@peaje/db'
-import { isNetworkId, NETWORKS } from '@peaje/shared'
+import { isNetworkId, NETWORK_IDS, NETWORKS } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
@@ -38,9 +38,7 @@ export function TuAgente({
   const d = useDict()
   const [abierto, setAbierto] = useState(false)
   const sinSaldo =
-    Number(agente.balanceTempo ?? 0) +
-      Number(agente.balanceArc ?? 0) +
-      Number(agente.balanceArbitrum ?? 0) +
+    NETWORK_IDS.reduce((n, id) => n + Number(agente.balances?.[id] ?? 0), 0) +
       Number(agente.balanceBase ?? 0) <=
     0
 
@@ -150,23 +148,20 @@ function CabeceraAgente({
             {shortWallet(agente.walletAddress)} ⧉
           </button>
         </div>
-        <div className="flex gap-6 text-right">
-          <div>
-            <p className="text-xl tabular-nums">{money(Number(agente.balanceTempo ?? 0))}</p>
-            <p className="text-xs text-muted">{d.agentes.saldoTempo}</p>
-          </div>
-          <div>
-            <p className="text-xl tabular-nums">{money(Number(agente.balanceArc ?? 0))}</p>
-            <p className="text-xs text-muted">{d.agentes.saldoArc}</p>
-          </div>
-          <div>
-            <p className="text-xl tabular-nums">{money(Number(agente.balanceArbitrum ?? 0))}</p>
-            <p className="text-xs text-muted">{d.agentes.saldoArbitrum}</p>
-          </div>
-          <div>
-            <p className="text-xl tabular-nums">{money(Number(agente.balanceBase ?? 0))}</p>
-            <p className="text-xs text-muted">{d.agentes.saldoReal}</p>
-          </div>
+        <div className="flex flex-wrap justify-end gap-x-6 gap-y-3 text-right">
+          {[
+            ...NETWORK_IDS.map((id) => ({
+              clave: id,
+              monto: agente.balances?.[id] ?? 0,
+              etiqueta: `${NETWORKS[id].tokenSymbol} · ${NETWORKS[id].label}`,
+            })),
+            { clave: 'base', monto: agente.balanceBase ?? 0, etiqueta: d.agentes.saldoReal },
+          ].map((saldo) => (
+            <div key={saldo.clave}>
+              <p className="text-xl tabular-nums">{money(Number(saldo.monto))}</p>
+              <p className="text-xs text-muted">{saldo.etiqueta}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -183,9 +178,11 @@ function CabeceraAgente({
           className="rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-xs outline-none focus:border-accent"
           title={d.agentes.fondearRed}
         >
-          <option value="tempo">Tempo</option>
-          <option value="arc">Arc</option>
-          <option value="arbitrum">Arbitrum</option>
+          {NETWORK_IDS.map((id) => (
+            <option key={id} value={id}>
+              {NETWORKS[id].label}
+            </option>
+          ))}
         </select>
         {opciones.length > 1 ? (
           <select

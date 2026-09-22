@@ -1,7 +1,13 @@
 import type { Payment } from '@peaje/db'
-import { networkFromReceiptMethod, isNetworkId, type NetworkId } from '@peaje/shared'
+import {
+  isNetworkId,
+  isSettlementNetwork,
+  networkFromReceiptMethod,
+  type NetworkId,
+  type SettlementNetwork,
+} from '@peaje/shared'
 import { Receipt } from 'mppx'
-import { withdrawFromSettlement } from './arbitrum.js'
+import { withdrawFromSettlement } from './settlement.js'
 import { resolvePayer } from './chain.js'
 import { env } from './env.js'
 import { store } from './store.js'
@@ -83,8 +89,8 @@ export async function refundOriginFailure(payment: Payment): Promise<string | nu
 
   try {
     const hash =
-      payment.network === 'arbitrum'
-        ? await refundFromSettlement(payment, payer as `0x${string}`)
+      isSettlementNetwork(payment.network)
+        ? await refundFromSettlement(payment.network, payment, payer as `0x${string}`)
         : await sendPayout(payment.network, payer as `0x${string}`, payment.amount)
     await store.markPaymentRefunded(payment.id, hash)
     console.log('[refund] pago devuelto', {
@@ -102,13 +108,18 @@ export async function refundOriginFailure(payment: Payment): Promise<string | nu
 }
 
 /**
- * En Arbitrum el pago quedó acreditado al comerciante dentro de PeajeSettlement,
- * no en la treasury: el reembolso sale de ese saldo, firmado por su wallet.
+ * En redes con settlement el pago quedó acreditado al comerciante dentro de
+ * PeajeSettlement, no en la treasury: el reembolso sale de ese saldo, firmado
+ * por su wallet.
  */
-async function refundFromSettlement(payment: Payment, payer: `0x${string}`): Promise<`0x${string}`> {
+async function refundFromSettlement(
+  network: SettlementNetwork,
+  payment: Payment,
+  payer: `0x${string}`,
+): Promise<`0x${string}`> {
   const tenant = await store.getTenantById(payment.tenantId)
   if (!tenant?.payoutWallet) throw new Error('El negocio no tiene wallet de cobro para reembolsar desde el contrato')
-  return withdrawFromSettlement(tenant.payoutWallet as `0x${string}`, payer, payment.amount)
+  return withdrawFromSettlement(network, tenant.payoutWallet as `0x${string}`, payer, payment.amount)
 }
 
 /**

@@ -1,8 +1,50 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useDict } from '@/lib/i18n/client'
 import type { ChequeoIntegracion } from './actions'
+
+/**
+ * Una sola medición del dominio para toda la página. "Implementa Peaje" y
+ * "Motores de respuesta" leen el mismo resultado: cada verificación son unos
+ * veinte fetches al dominio del negocio, y dos secciones midiendo por su
+ * cuenta lo duplicaban.
+ */
+type Verificacion = {
+  resultados: ChequeoIntegracion[] | null
+  corriendo: boolean
+  verificar: () => Promise<void>
+}
+
+const VerificacionCtx = createContext<Verificacion | null>(null)
+
+export function VerificacionProvider({ slug, children }: { slug: string; children: React.ReactNode }) {
+  const [resultados, setResultados] = useState<ChequeoIntegracion[] | null>(null)
+  const [corriendo, setCorriendo] = useState(true)
+
+  const verificar = useCallback(async () => {
+    setCorriendo(true)
+    try {
+      const { verificarIntegracion } = await import('./actions')
+      setResultados(await verificarIntegracion(slug))
+    } finally {
+      setCorriendo(false)
+    }
+  }, [slug])
+
+  useEffect(() => {
+    void verificar()
+  }, [verificar])
+
+  const valor = useMemo(() => ({ resultados, corriendo, verificar }), [resultados, corriendo, verificar])
+  return <VerificacionCtx.Provider value={valor}>{children}</VerificacionCtx.Provider>
+}
+
+export function useVerificacion(): Verificacion {
+  const v = useContext(VerificacionCtx)
+  if (!v) throw new Error('useVerificacion necesita VerificacionProvider')
+  return v
+}
 
 /** Bloque colapsable del kit: título + detalle visibles, contenido bajo toggle. */
 export function ToggleBlock({
@@ -83,6 +125,8 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
 export type Pieza = { id: string; titulo: string; detalle: string; contenido: string }
 
 export type MarcoPrompt = {
+  /** El prompt corto: una línea que apunta al kit del gateway. Es el principal. */
+  corto: (faltan: string[]) => string
   intro: string
   noCrearTitulo: string
   noCrearDetalle: string
@@ -101,35 +145,16 @@ export type MarcoPrompt = {
  * si ya conectaste el dominio, volver a mandarle a un agente las reglas del
  * proxy es pedirle que toque algo que ya está bien. Acá se ve el delta.
  */
-export function ImplementarPeaje({
-  slug,
-  piezas,
-  marco,
-}: {
-  slug: string
-  piezas: Pieza[]
-  marco: MarcoPrompt
-}) {
+export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: MarcoPrompt }) {
   const { kit: d } = useDict()
-  const [resultados, setResultados] = useState<ChequeoIntegracion[] | null>(null)
-  const [corriendo, setCorriendo] = useState(true)
+  const { resultados, corriendo, verificar } = useVerificacion()
   const [copiado, setCopiado] = useState(false)
 
-  const verificar = useCallback(async () => {
-    setCorriendo(true)
-    try {
-      const { verificarIntegracion } = await import('./actions')
-      setResultados(await verificarIntegracion(slug))
-    } finally {
-      setCorriendo(false)
-    }
-  }, [slug])
-
-  useEffect(() => {
-    void verificar()
-  }, [verificar])
-
-  const faltan = resultados?.filter((r) => !r.ok) ?? []
+  // `bots` se muestra y se explica en "Motores de respuesta": no es algo que
+  // el coding agent arregle en el repo (es el WAF o el bot fight mode), así
+  // que meterlo en el prompt solo lo confundiría.
+  const propios = (resultados ?? []).filter((r) => r.id !== 'bots')
+  const faltan = resultados ? propios.filter((r) => !r.ok) : []
   const listo = resultados !== null && faltan.length === 0
   const sinDominio = resultados?.[0]?.id === 'dominio'
 
@@ -152,7 +177,9 @@ export function ImplementarPeaje({
         ].join('\n')
       : null
 
-  const prompt = [
+  // El prompt largo queda como respaldo para agentes que no pueden descargar
+  // el kit. Se arma igual que antes, pero ya no es lo que se copia primero.
+  const promptLargo = [
     marco.intro,
     ...pendientes.map((p) => `## ${p.titulo}\n${p.detalle}\n\n\`\`\`\n${p.contenido}\n\`\`\``),
     ...(limpieza ? [limpieza] : []),
@@ -160,6 +187,7 @@ export function ImplementarPeaje({
     marco.audit,
     marco.referencia,
   ].join('\n\n')
+  const prompt = marco.corto(faltan.map((f) => f.label))
 
   return (
     <section className="rounded-lg border border-accent/40 bg-panel p-5">
@@ -187,7 +215,7 @@ export function ImplementarPeaje({
       ) : (
         <>
           <div className="mt-5 grid grid-cols-1 gap-2.5 font-mono text-xs md:grid-cols-2">
-            {(resultados ?? []).map((r) => (
+            {propios.map((r) => (
               <div key={r.id} className="flex items-start gap-2.5 border border-border bg-bg p-2">
                 <span className={`font-bold ${r.ok ? 'text-accent' : 'text-red-600'}`}>
                   {r.ok ? '[x]' : '[ ]'}
@@ -229,6 +257,24 @@ export function ImplementarPeaje({
                   </summary>
                   <pre className="mt-2 max-h-96 overflow-auto rounded-lg border border-border bg-bg p-3 text-[11px] whitespace-pre-wrap text-muted">
                     {prompt}
+                  </pre>
+                </details>
+                <details className="min-w-full sm:min-w-0">
+                  <summary className="cursor-pointer text-xs text-muted hover:text-text">
+                    {d.implementaVerLargo}
+                  </summary>
+                  <p className="mt-2 text-xs text-muted">{d.implementaLargoDetalle}</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void navigator.clipboard.writeText(promptLargo)}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      {d.copiar}
+                    </button>
+                  </div>
+                  <pre className="mt-2 max-h-96 overflow-auto rounded-lg border border-border bg-bg p-3 text-[11px] whitespace-pre-wrap text-muted">
+                    {promptLargo}
                   </pre>
                 </details>
               </div>

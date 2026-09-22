@@ -1,0 +1,1 @@
+{ "cleanUrls": true, "rewrites": [{ "source": "/old", "destination": "/new" }] }

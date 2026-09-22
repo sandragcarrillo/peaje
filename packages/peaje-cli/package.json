@@ -1,0 +1,36 @@
+{
+  "name": "peaje",
+  "version": "1.0.0",
+  "description": "Install Peaje on your site in one command: proxy rewrites, head block, robots.txt, and a verifier that measures your own domain.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "peaje": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "keywords": [
+    "peaje",
+    "mpp",
+    "x402",
+    "mcp",
+    "agents",
+    "cli"
+  ],
+  "devDependencies": {
+    "@peaje/shared": "workspace:*",
+    "@types/node": "^20",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.0"
+  }
+}

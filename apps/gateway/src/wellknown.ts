@@ -19,7 +19,7 @@ const RAILS = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${NETWORKS
 
 /**
  * Header con el que leemos el origen sin que el proxy del negocio nos
- * reenvíe de vuelta a nosotros. Ver lib/proxy-kit.ts en el dashboard.
+ * reenvíe de vuelta a nosotros. Ver kit/rutas.ts en @peaje/shared.
  */
 export const PEAJE_FETCH_HEADER = 'x-peaje-fetch'
 

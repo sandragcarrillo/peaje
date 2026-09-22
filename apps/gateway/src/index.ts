@@ -1,6 +1,7 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
-import { NETWORK_IDS } from '@peaje/shared'
+import type { Tenant } from '@peaje/db'
+import { NETWORK_IDS, PEAJE_FETCH_HEADER } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
 import { agentCard } from './agents/erc8004.js'
@@ -21,6 +22,8 @@ import {
   getCheckoutSession,
   ucpProfile,
 } from './commerce.js'
+import { kitRouter } from './kit.js'
+import { indexNowRouter } from './indexnow.js'
 import { handleMcpRequest, resourceTitle } from './mcp.js'
 import { enriquecer } from './openapi.js'
 import { docsBase, gatewayBase } from './base.js'
@@ -39,18 +42,36 @@ import { withdrawals } from './withdrawals.js'
  * ("payment-required resource does not match response URL"). Se reconstruye
  * la Request con el esquema/host externos (X-Forwarded-*) antes de cobrar.
  */
-function conUrlExterna(req: Request): Request {
+function conUrlExterna(req: Request, tenant?: Tenant): Request {
   const proto = req.headers.get('x-forwarded-proto')
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+  const host = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? req.headers.get('host')
   if (!proto && !host) return req
   const url = new URL(req.url)
-  const externa = `${proto ?? url.protocol.replace(':', '')}://${host ?? url.host}${url.pathname}${url.search}`
+  // Cuando la petición entra por el proxy del negocio (rewrite en su host), el
+  // cliente pidió `https://negocio.com/r/x`, no `https://gateway/slug/r/x`.
+  // Si el host reenviado es el del negocio, el challenge tiene que nombrar esa
+  // URL sin el prefijo del slug, o los clientes x402 estrictos abortan.
+  let pathname = url.pathname
+  if (tenant && host && esHostDelTenant(host, tenant) && pathname.startsWith(`/${tenant.slug}/`)) {
+    pathname = pathname.slice(tenant.slug.length + 1)
+  }
+  const externa = `${proto ?? url.protocol.replace(':', '')}://${host ?? url.host}${pathname}${url.search}`
   if (externa === req.url) return req
   if (req.method === 'GET' || req.method === 'HEAD' || req.body === null) {
     return new Request(externa, req)
   }
   // Con body en stream, Node exige declarar duplex al clonar.
   return new Request(externa, { ...req, duplex: 'half' } as RequestInit & { duplex: 'half' })
+}
+
+function esHostDelTenant(host: string, tenant: Tenant): boolean {
+  try {
+    const origen = new URL(tenant.originUrl).hostname.replace(/^www\./, '')
+    const h = host.split(':')[0]?.replace(/^www\./, '') ?? ''
+    return h !== '' && (h === origen || h.endsWith(`.${origen}`))
+  } catch {
+    return false
+  }
 }
 
 const app = new Hono<{ Bindings: HttpBindings }>()
@@ -204,7 +225,11 @@ app.get('/:slug/llms.txt', async (c) => {
   // Si el negocio ya tenía su propio llms.txt, lo respetamos y le pegamos la
   // sección de pagos debajo. Reemplazarlo perdía su contenido, que es
   // justamente lo que un agente necesita para saber cuándo usarlo.
-  const propio = await wk.llmsDelOrigen(tenant.originUrl)
+  // Si la request ya trae la guarda es que somos nosotros leyendo el origen a
+  // través de su proxy (vercel.json, nginx y Caddy no la respetan): devolver
+  // el documento propio corta la recursión sin depender del host del cliente.
+  const somosNosotros = c.req.header(PEAJE_FETCH_HEADER) !== undefined
+  const propio = somosNosotros ? null : await wk.llmsDelOrigen(tenant.originUrl)
   const cuerpo = propio
     ? `${propio}\n\n${wk.seccionPagos({ tenant, routes, base })}`
     : wk.llmsTxt({ tenant, routes, base })
@@ -239,7 +264,7 @@ app.get('/:slug/r/:rslug', async (c) => {
         mppx.charge({
           amount: resource.priceUsd,
           description: resource.title ?? resource.slug,
-        })(conUrlExterna(c.req.raw)),
+        })(conUrlExterna(c.req.raw, tenant)),
       )
 
   if (result && result.status === 402) return result.challenge
@@ -316,7 +341,13 @@ app.get('/:slug/developers', async (c) => {
   const routes = await sellableRoutes(tenant.id)
   return c.html(developersHtml({ tenant, routes, base: docsBase(tenant) }))
 })
-app.get('/:slug/docs', (c) => c.redirect(`/${c.req.param('slug')}/developers`, 308))
+app.get('/:slug/docs', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
+  // Al dominio del negocio cuando lo hay: si /docs llega por su proxy, un
+  // redirect relativo al gateway sacaría al visitante de su sitio.
+  return c.redirect(`${docsBase(tenant)}/developers`, 308)
+})
 
 /**
  * UCP · ACP · AP2. Los tres protocolos de comercio agéntico sobre el mismo
@@ -497,6 +528,11 @@ app.post('/:slug/mcp', async (c) => {
  * Con precio: cobra por MPP y recién ahí llama al origin. Sin precio:
  * pasa derecho, gratis. El tenant decide qué cobra desde el dashboard.
  */
+// Kit de instalación por tenant: kit.json, kit/verify, kit/INSTALL.md.
+app.route('/', kitRouter)
+// Clave IndexNow por tenant, servida en su dominio vía el proxy del kit.
+app.route('/', indexNowRouter)
+
 app.all('/:slug/*', async (c) => {
   const slug = c.req.param('slug')
   const tenant = await store.getTenantBySlug(slug)
@@ -522,7 +558,7 @@ app.all('/:slug/*', async (c) => {
     mppx.charge({
       amount: match.route.priceUsd,
       description: match.route.description ?? `${tenant.name} · ${path}`,
-    })(conUrlExterna(c.req.raw)),
+    })(conUrlExterna(c.req.raw, tenant)),
   )
 
   if (result.status === 402) return result.challenge

@@ -1,7 +1,7 @@
-import { NETWORKS } from '@peaje/shared'
+import { NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
 import { settleArcAuthorization } from './arc.js'
-import { settleArbitrumAuthorization } from './arbitrum.js'
+import { settleAuthorization } from './settlement.js'
 import { usdcStatus } from './chainlink.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
@@ -13,8 +13,6 @@ import { env } from './env.js'
  */
 export function chargeMethods() {
   const arc = NETWORKS.arc
-  const arbitrum = NETWORKS.arbitrum
-  const settlement = env.arbitrumSettlement
 
   const depegGuard = async (rail: string) => {
     const { depegged, price } = await usdcStatus()
@@ -46,23 +44,28 @@ export function chargeMethods() {
     },
   })
 
-  // Sin contrato desplegado el riel no se ofrece. El tipo de la tupla es el
-  // mismo con o sin Arbitrum: ambos rieles EVM comparten método.
-  if (!settlement) return [tempoRail, arcRail] as const
-
-  const arbitrumRail = evm.charge({
-    currency: arbitrum.token,
-    chainId: arbitrum.testnet.chainId,
-    decimals: arbitrum.decimals,
-    authorization: arbitrum.eip3009!,
-    // El recipient es el contrato, no la treasury: el split negocio/Peaje
-    // ocurre on-chain dentro de PeajeSettlement.settle.
-    recipient: settlement,
-    settle: async ({ payload }) => {
-      await depegGuard('Arbitrum')
-      return settleArbitrumAuthorization(payload)
-    },
+  // Una oferta por red con PeajeSettlement configurado. El recipient es el
+  // contrato, no la treasury: el split negocio/Peaje ocurre on-chain en `settle`.
+  const settlementRails = SETTLEMENT_NETWORKS.flatMap((network) => {
+    const contrato = env.settlementContracts[network]
+    if (!contrato) return []
+    const def = NETWORKS[network]
+    return [
+      evm.charge({
+        currency: def.token,
+        chainId: def.testnet.chainId,
+        decimals: def.decimals,
+        authorization: def.eip3009!,
+        recipient: contrato,
+        settle: async ({ payload }) => {
+          if (def.tokenSymbol === 'USDC') await depegGuard(def.label)
+          return settleAuthorization(network, payload)
+        },
+      }),
+    ]
   })
 
-  return [tempoRail, arcRail, arbitrumRail] as unknown as readonly [typeof tempoRail, typeof arcRail]
+  // El tipo de la tupla no cambia con los rieles de settlement: todos comparten
+  // el método `evm` con Arc, que es lo que mppx usa para tipar `mppx.charge`.
+  return [tempoRail, arcRail, ...settlementRails] as unknown as readonly [typeof tempoRail, typeof arcRail]
 }

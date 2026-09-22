@@ -140,9 +140,6 @@ export const agentes = {
 
     // Wallet del agente
     saldoDemo: (symbol: string) => `${symbol} · red de prueba`,
-    saldoTempo: 'pathUSD · Tempo',
-    saldoArc: 'USDC · Arc',
-    saldoArbitrum: 'USDC · Arbitrum',
     saldoReal: 'USDC · Base',
     walletCopiada: 'Dirección copiada.',
     copiarWallet: 'Copiar dirección',
@@ -330,9 +327,6 @@ export const agentes = {
 
     // Wallet del agente
     saldoDemo: (symbol: string) => `${symbol} · test network`,
-    saldoTempo: 'pathUSD · Tempo',
-    saldoArc: 'USDC · Arc',
-    saldoArbitrum: 'USDC · Arbitrum',
     saldoReal: 'USDC · Base',
     walletCopiada: 'Address copied.',
     copiarWallet: 'Copy address',

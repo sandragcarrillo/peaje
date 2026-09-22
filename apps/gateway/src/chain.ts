@@ -1,7 +1,7 @@
-import { tempoConfig, type NetworkId } from '@peaje/shared'
+import { isSettlementNetwork, tempoConfig, type NetworkId } from '@peaje/shared'
 import { createPublicClient, http } from 'viem'
 import { resolveArcPayer } from './arc.js'
-import { resolveArbitrumPayer } from './arbitrum.js'
+import { resolveSettlementPayer } from './settlement.js'
 import { env } from './env.js'
 
 const config = tempoConfig(env.testnet)
@@ -19,7 +19,7 @@ export const publicClient = createPublicClient({
  */
 export async function resolvePayer(network: NetworkId, txHash: string): Promise<string | null> {
   if (network === 'arc') return resolveArcPayer(txHash)
-  if (network === 'arbitrum') return resolveArbitrumPayer(txHash)
+  if (isSettlementNetwork(network)) return resolveSettlementPayer(network, txHash)
   try {
     const tx = await publicClient.getTransaction({ hash: txHash as `0x${string}` })
     return tx.from ?? null

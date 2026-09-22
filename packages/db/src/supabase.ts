@@ -14,6 +14,7 @@ import type {
   Route,
   Store,
   Tenant,
+  TenantEntityUpdate,
   Withdrawal,
   WithdrawalStatus,
 } from './types'
@@ -31,6 +32,14 @@ function tenantFrom(row: Row): Tenant {
     payoutWallet: row.payout_wallet,
     baselineScore: row.baseline_score ?? null,
     baselineScoreAt: row.baseline_score_at ?? null,
+    // `??` a propósito: hasta que corra la migración 20260922 estas columnas
+    // no existen y la fila llega sin ellas. El gateway tiene que seguir andando.
+    entityLogoUrl: row.entity_logo_url ?? null,
+    entityPhone: row.entity_phone ?? null,
+    entityAddress: row.entity_address ?? null,
+    entitySameAs: Array.isArray(row.entity_same_as) ? row.entity_same_as : [],
+    entityDescription: row.entity_description ?? null,
+    robotsBlockTraining: row.robots_block_training ?? false,
     email: row.email,
     privyUserId: row.privy_user_id,
     createdAt: row.created_at,
@@ -204,6 +213,19 @@ export class SupabaseStore implements Store {
       .update({ payout_wallet: wallet })
       .eq('id', tenantId)
     this.#fail('setPayoutWallet', error)
+  }
+
+  async updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void> {
+    const fila: Row = {}
+    if (patch.entityLogoUrl !== undefined) fila.entity_logo_url = patch.entityLogoUrl
+    if (patch.entityPhone !== undefined) fila.entity_phone = patch.entityPhone
+    if (patch.entityAddress !== undefined) fila.entity_address = patch.entityAddress
+    if (patch.entitySameAs !== undefined) fila.entity_same_as = patch.entitySameAs
+    if (patch.entityDescription !== undefined) fila.entity_description = patch.entityDescription
+    if (patch.robotsBlockTraining !== undefined) fila.robots_block_training = patch.robotsBlockTraining
+    if (Object.keys(fila).length === 0) return
+    const { error } = await this.#db.from('tenants').update(fila).eq('id', tenantId)
+    this.#fail('updateTenantEntity', error)
   }
 
   async setBaselineScore(tenantId: string, score: number): Promise<void> {

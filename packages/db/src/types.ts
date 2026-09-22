@@ -11,8 +11,31 @@ export type Tenant = {
   /** Score de agent-readiness con el que llegó, antes de aplicar Peaje. */
   baselineScore: number | null
   baselineScoreAt: string | null
+  /**
+   * Datos de entidad para los motores de respuesta: alimentan el JSON-LD
+   * Organization del kit y el NAP (nombre, dirección, teléfono) que el negocio
+   * repite en Google Business Profile, Yelp, etc. Todos opcionales: el kit no
+   * inventa campos vacíos.
+   */
+  entityLogoUrl: string | null
+  entityPhone: string | null
+  /** Texto libre en una línea; va a PostalAddress.streetAddress tal cual. */
+  entityAddress: string | null
+  /** URLs de perfiles (LinkedIn, Instagram, Google Business Profile, Wikidata). */
+  entitySameAs: string[]
+  entityDescription: string | null
+  /** Bloquear bots de entrenamiento en robots.txt. No afecta la citación. */
+  robotsBlockTraining: boolean
   createdAt: string
 }
+
+/** Lo que el formulario del kit puede cambiar del tenant. */
+export type TenantEntityUpdate = Partial<
+  Pick<
+    Tenant,
+    'entityLogoUrl' | 'entityPhone' | 'entityAddress' | 'entitySameAs' | 'entityDescription' | 'robotsBlockTraining'
+  >
+>
 
 export type Route = {
   id: string
@@ -187,6 +210,8 @@ export interface Store {
   listTenantsByPrivyUserId(privyUserId: string): Promise<Tenant[]>
   listTenants(): Promise<Tenant[]>
   setPayoutWallet(tenantId: string, wallet: string): Promise<void>
+  /** Datos de entidad del kit (JSON-LD Organization, toggle de robots). Solo pisa lo que viene definido. */
+  updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void>
 
   // origins permitidos para el iframe
   listAllowedOrigins(tenantId: string): Promise<string[]>

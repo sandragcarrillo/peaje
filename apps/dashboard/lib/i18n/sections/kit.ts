@@ -97,7 +97,14 @@ npx @ora-ai/ax@latest audit ${domain}
 
     implementaTitulo: 'Implementa Peaje',
     implementaIntro:
-      'Medimos tu dominio en vivo y armamos el prompt solo con lo que te falta. Pégalo en Claude Code, Cursor o el agente que uses sobre el repo de tu sitio.',
+      'Medimos tu dominio en vivo. El prompt es una línea: tu agente baja del gateway los archivos ya generados y las instrucciones, y solo fusiona lo que falta.',
+    implementaVerLargo: 'Ver el prompt largo (respaldo)',
+    implementaLargoDetalle:
+      'Solo si tu agente no puede descargar URLs. Trae los mismos bloques pegados en el texto.',
+    promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
+      `Instala Peaje en el repo de este sitio (${originHost}). Sigue al pie de la letra ${base}/kit/INSTALL.md; los archivos ya generados están en ${base}/kit.json (agrega ?host=next|vercel|cloudflare|nginx|caddy según el host). Si es Next.js, el camino corto es \`npx peaje@1 init ${slug} --yes --json\`.${
+        faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
+      } No reescribas los archivos descargados ni crees copias estáticas de lo que sirve el proxy. Cuando el deploy esté en producción, consulta ${base}/kit/verify y arregla solo lo que salga en falso.`,
     implementaMidiendo: 'Midiendo tu dominio…',
     implementaListoTitulo: 'Ya lo tienes listo',
     implementaListoDetalle:
@@ -133,6 +140,51 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoRobotsOk: 'Existe y no bloquea agentes.',
     chequeoRobotsBloquea: 'Existe pero bloquea todo: los agentes no llegan al 402.',
     chequeoRobotsFalta: 'No hay /robots.txt.',
+
+    chequeoBots: 'Los bots que citan te leen',
+    chequeoBotsOk: 'OAI-SearchBot, PerplexityBot y Googlebot leen tu home y /developers.',
+    chequeoBotsBloqueados: (casos: string) => `Tu borde los rechaza (403/429/503): ${casos}. Permítelos por nombre en el WAF.`,
+    chequeoBotsChallenge: (casos: string) =>
+      `Cloudflare les pide un challenge que no pueden pasar: ${casos}. Desactiva el bot fight mode para estos bots.`,
+    chequeoBotsSinHtml:
+      'Tu home responde 200 pero sin <title> ni <h1>: depende de JavaScript y los motores no lo ejecutan.',
+
+    // Motores de respuesta
+    motoresTitulo: 'Motores de respuesta',
+    motoresIntro:
+      'ChatGPT, Perplexity y los AI Overviews de Google citan lo que pueden leer: HTML sin JavaScript, bots de búsqueda permitidos por nombre y una entidad que puedan reconocer. Esto vive en el mismo kit: el robots.txt y el head de tu home ya lo incluyen.',
+    motoresNota:
+      'Esto hace que los motores puedan leer y entender tu sitio. Que te citen depende de contenido y menciones de terceros que Peaje no puede generar.',
+    motoresChequeos: 'Lo que medimos',
+    motoresMidiendo: 'Midiendo…',
+    motoresSinDominio: 'Sin dominio público no hay nada que medir.',
+
+    entidadTitulo: 'Tu entidad',
+    entidadIntro:
+      'Va al bloque Organization del JSON-LD de tu home, junto al WebAPI. Solo lo que llenes: no inventamos campos vacíos.',
+    entidadLogo: 'URL del logo',
+    entidadTelefono: 'Teléfono',
+    entidadDireccion: 'Dirección (una línea)',
+    entidadDescripcion: 'Descripción corta',
+    entidadDescripcionAyuda: 'Máximo 300 caracteres. Qué es tu negocio, en una frase.',
+    entidadSameAs: 'Perfiles (sameAs)',
+    entidadSameAsAyuda: 'Una URL por línea: LinkedIn, Instagram, Google Business Profile, Wikidata.',
+    entidadBloquearEntrenamiento: 'Bloquear bots de entrenamiento (no afecta las citas)',
+    entidadBloquearEntrenamientoAyuda:
+      'GPTBot, ClaudeBot, Google-Extended, Applebot-Extended y CCBot. Los bots de búsqueda siguen permitidos.',
+    entidadGuardar: 'Guardar',
+    entidadGuardando: 'Guardando…',
+    entidadGuardado: 'Guardado. El kit y el head ya usan estos datos.',
+    errorEntidadUrl: (url: string) => `"${url}" no es una URL válida (tiene que empezar con https://).`,
+    errorEntidadDescripcionLarga: 'La descripción supera los 300 caracteres.',
+
+    fueraTitulo: 'Fuera de tu sitio',
+    fueraIntro:
+      'Los motores confían en menciones de terceros. Crea o revisa estos perfiles con el nombre y la dirección escritos exactamente igual que acá.',
+    fueraNombre: 'Nombre',
+    fueraDireccion: 'Dirección',
+    fueraSinDireccion: 'Carga la dirección arriba para copiarla desde acá.',
+    fueraAbrir: 'abrir',
     proxyTitulo: 'Conecta Peaje a tu dominio (una sola vez)',
     proxyIntro:
       'Los auditores de agent-readiness miden TU dominio. Un catálogo que apunta a otro host no cuenta: para ellos tu sitio no habla MCP ni devuelve 402. Con esta configuración esas rutas se sirven desde tu dominio, sin que toques tu código.',
@@ -163,7 +215,7 @@ npx @ora-ai/ax@latest audit ${domain}
     proxyComentarioRutaPaga: 'Links con precio: acá es donde tu dominio devuelve el 402.',
     promptProxyTitulo: 'Paso 1 (el que más importa): conectar el dominio',
     promptProxyDetalle:
-      'Agrega estas reglas de reenvío en la configuración del host. Es lo único que hace que el sitio sirva MCP, OpenAPI y 402 desde su propio dominio, que es donde los auditores miden. El ejemplo es para Next.js; si el proyecto usa otro host, traduce las mismas rutas a su sintaxis (vercel.json, Cloudflare Worker, nginx o Caddy). Si ya existe una configuración, fusiona el bloque en vez de reemplazar el archivo.',
+      'Agrega estas reglas de reenvío en la configuración del host. Es lo único que hace que el sitio sirva MCP, OpenAPI y 402 desde su propio dominio, que es donde los auditores miden. El ejemplo es para Next.js; si el proyecto usa otro host, traduce las mismas rutas a su sintaxis (vercel.json, Cloudflare Worker, nginx o Caddy). Si ya existe una configuración, fusiona el bloque en vez de reemplazar el archivo.\n\nSi el proyecto tiene middleware (i18n, auth, A/B testing), revisa su `matcher`: corre ANTES de los rewrites y puede tragarse estas rutas. Excluye `mcp`, `r/`, `discovery/`, `checkout_sessions`, `agentic_commerce/` y `docs` del matcher. Los paths con punto (`llms.txt`, `openapi.json`, `/.well-known/*`) suelen estar excluidos ya.',
     promptProxyNota:
       'Los bloques que siguen son el respaldo para cuando no se puede tocar la configuración del host: cubren menos, porque los checks de MCP y de pagos exigen estar en el origen.',
   },
@@ -264,7 +316,14 @@ npx @ora-ai/ax@latest audit ${domain}
 
     implementaTitulo: 'Implement Peaje',
     implementaIntro:
-      'We measure your live domain and build the prompt from what is still missing. Paste it into Claude Code, Cursor or whichever agent you run on your site repo.',
+      'We measure your domain live. The prompt is one line: your agent downloads the generated files and the instructions from the gateway and only merges what is missing.',
+    implementaVerLargo: 'Show the long prompt (fallback)',
+    implementaLargoDetalle:
+      'Only if your agent cannot download URLs. Same blocks, pasted inline.',
+    promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
+      `Install Peaje in this site's repo (${originHost}). Follow ${base}/kit/INSTALL.md to the letter; the generated files are at ${base}/kit.json (add ?host=next|vercel|cloudflare|nginx|caddy for the host). On Next.js the short path is \`npx peaje@1 init ${slug} --yes --json\`.${
+        faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
+      } Do not rewrite the downloaded files and do not create static copies of what the proxy serves. Once the deploy is live, read ${base}/kit/verify and fix only what comes back false.`,
     implementaMidiendo: 'Measuring your domain…',
     implementaListoTitulo: 'You already have this ready',
     implementaListoDetalle:
@@ -300,6 +359,51 @@ npx @ora-ai/ax@latest audit ${domain}
     chequeoRobotsOk: 'Present and not blocking agents.',
     chequeoRobotsBloquea: 'Present but blocking everything: agents never reach the 402.',
     chequeoRobotsFalta: 'There is no /robots.txt.',
+
+    chequeoBots: 'Citing bots can read you',
+    chequeoBotsOk: 'OAI-SearchBot, PerplexityBot and Googlebot can read your home page and /developers.',
+    chequeoBotsBloqueados: (casos: string) => `Your edge rejects them (403/429/503): ${casos}. Allow them by name in the WAF.`,
+    chequeoBotsChallenge: (casos: string) =>
+      `Cloudflare serves them a challenge they cannot pass: ${casos}. Turn off bot fight mode for these bots.`,
+    chequeoBotsSinHtml:
+      'Your home page returns 200 but has no <title> or <h1>: it depends on JavaScript and answer engines do not run it.',
+
+    // Motores de respuesta
+    motoresTitulo: 'Answer engines',
+    motoresIntro:
+      'ChatGPT, Perplexity and Google AI Overviews cite what they can read: HTML without JavaScript, search bots allowed by name and an entity they can recognize. It lives in the same kit: your robots.txt and the head of your home page already include it.',
+    motoresNota:
+      'This lets answer engines read and understand your site. Getting cited depends on content and third-party mentions that Peaje cannot generate.',
+    motoresChequeos: 'What we measure',
+    motoresMidiendo: 'Measuring…',
+    motoresSinDominio: 'Without a public domain there is nothing to measure.',
+
+    entidadTitulo: 'Your entity',
+    entidadIntro:
+      'Goes into the Organization block of your home page JSON-LD, next to the WebAPI. Only what you fill in: we do not invent empty fields.',
+    entidadLogo: 'Logo URL',
+    entidadTelefono: 'Phone',
+    entidadDireccion: 'Address (one line)',
+    entidadDescripcion: 'Short description',
+    entidadDescripcionAyuda: 'Up to 300 characters. What your business is, in one sentence.',
+    entidadSameAs: 'Profiles (sameAs)',
+    entidadSameAsAyuda: 'One URL per line: LinkedIn, Instagram, Google Business Profile, Wikidata.',
+    entidadBloquearEntrenamiento: 'Block training bots (does not affect citations)',
+    entidadBloquearEntrenamientoAyuda:
+      'GPTBot, ClaudeBot, Google-Extended, Applebot-Extended and CCBot. Search bots stay allowed.',
+    entidadGuardar: 'Save',
+    entidadGuardando: 'Saving…',
+    entidadGuardado: 'Saved. The kit and the head already use this data.',
+    errorEntidadUrl: (url: string) => `"${url}" is not a valid URL (it must start with https://).`,
+    errorEntidadDescripcionLarga: 'The description is longer than 300 characters.',
+
+    fueraTitulo: 'Off your site',
+    fueraIntro:
+      'Answer engines trust third-party mentions. Create or review these profiles with the name and address written exactly as they appear here.',
+    fueraNombre: 'Name',
+    fueraDireccion: 'Address',
+    fueraSinDireccion: 'Fill in the address above to copy it from here.',
+    fueraAbrir: 'open',
     proxyTitulo: 'Connect Peaje to your domain (once)',
     proxyIntro:
       'Agent-readiness auditors measure YOUR domain. A catalog pointing at another host does not count: as far as they can tell, your site speaks no MCP and returns no 402. With this config those routes are served from your domain, without touching your code.',

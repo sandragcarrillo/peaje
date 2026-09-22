@@ -26,7 +26,7 @@ export const TOKEN_DECIMALS = 6
 // ---- redes de settlement ----
 
 /** Redes donde el gateway acepta pagos. La clave es la que se persiste en la DB. */
-export type NetworkId = 'tempo' | 'arc' | 'arbitrum'
+export type NetworkId = 'tempo' | 'arc' | 'arbitrum' | 'arbitrum-usdg' | 'robinhood'
 
 type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string }
 
@@ -87,17 +87,64 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
       explorerUrl: 'https://sepolia.arbiscan.io',
     },
   },
+  'arbitrum-usdg': {
+    id: 'arbitrum-usdg',
+    label: 'Arbitrum · USDG',
+    // Mismo contrato y misma cadena que el riel USDC: cambia el stablecoin.
+    // Un riel es (cadena, token), y el saldo del negocio se lleva por token.
+    token: '0xFFC95faa3d63Cde504a05B567C600B78C0b41892',
+    tokenSymbol: 'USDG',
+    decimals: 6,
+    eip3009: { name: 'Global Dollar', version: '1' },
+    mainnet: null,
+    testnet: {
+      chainId: 421614,
+      rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+      explorerUrl: 'https://sepolia.arbiscan.io',
+    },
+  },
+  robinhood: {
+    id: 'robinhood',
+    label: 'Robinhood',
+    // USDG de Paxos en Robinhood Chain Testnet (el "USDC" de esa testnet es un
+    // mock sin EIP-3009). Leído on-chain: dominio "Global Dollar", versión "1".
+    token: '0x7E955252E15c84f5768B83c41a71F9eba181802F',
+    tokenSymbol: 'USDG',
+    decimals: 6,
+    eip3009: { name: 'Global Dollar', version: '1' },
+    mainnet: null,
+    testnet: {
+      chainId: 46630,
+      rpcUrl: 'https://rpc.testnet.chain.robinhood.com',
+      explorerUrl: 'https://explorer.testnet.chain.robinhood.com',
+    },
+  },
 }
 
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
 
+/** Redes donde los pagos se liquidan en PeajeSettlement y no en la treasury. */
+export const SETTLEMENT_NETWORKS = [
+  'arbitrum',
+  'arbitrum-usdg',
+  'robinhood',
+] as const satisfies readonly NetworkId[]
+export type SettlementNetwork = (typeof SETTLEMENT_NETWORKS)[number]
+
+export function isSettlementNetwork(network: string): network is SettlementNetwork {
+  return (SETTLEMENT_NETWORKS as readonly string[]).includes(network)
+}
+
 /**
  * PeajeSettlement desplegado (y verificado) por red. En estas redes el saldo
  * de cada negocio vive en el contrato: la fuente de verdad es `claimable`, no
- * el ledger. Deploy: contracts/broadcast/DeployPeajeSettlement.s.sol/421614.
+ * el ledger. Deploys: contracts/broadcast/DeployPeajeSettlement.s.sol/<chainId>.
  */
 export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
+  // Misma dirección en las dos redes: mismo deployer, mismo nonce.
   arbitrum: '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
+  'arbitrum-usdg': '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
+  robinhood: '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
 }
 
 /** Bloque del deploy: desde ahí indexa el subgraph. */
@@ -276,3 +323,6 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
 }
+
+// ---- kit de instalación (proxy, bloques HTML, verificador) ----
+export * from './kit/index'

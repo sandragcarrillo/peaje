@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { getDict } from '@/lib/i18n'
 import { freshScan, scannableDomain } from '@/lib/ora'
 import { requireTenant } from '@/lib/session'
+import { store } from '@/lib/store'
+import { verificarIntegracion as verificar, type Chequeo, type ChequeoId } from '@peaje/shared'
+
+export type { ChequeoId }
 
 /** Corre (o re-corre) el scan de Ora sobre el dominio del tenant. ~30 s. */
 export async function correrScore(slug: string): Promise<{ ok: boolean; error?: string }> {
@@ -19,8 +23,6 @@ export async function correrScore(slug: string): Promise<{ ok: boolean; error?: 
   return { ok: true }
 }
 
-export type ChequeoId = 'dominio' | 'proxy' | 'frescura' | 'json-ld' | 'links' | 'robots'
-
 export type ChequeoIntegracion = {
   id: ChequeoId
   label: string
@@ -30,152 +32,122 @@ export type ChequeoIntegracion = {
   faltantes?: string[]
 }
 
-/** Fetch que reporta el status, no solo si fue 2xx: un 402 es un éxito acá. */
-async function sonda(
-  url: string,
-  init?: RequestInit,
-): Promise<{ status: number; text: string; delGateway: boolean }> {
-  try {
-    const res = await fetch(url, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(8_000),
-      headers: { 'user-agent': 'peaje-verificador/1.0', ...(init?.headers ?? {}) },
-      ...init,
-    })
-    // Solo leemos el cuerpo cuando lo vamos a mirar: el resto es peso al pedo.
-    const text = res.status < 400 ? await res.text() : ''
-    // El gateway firma cada respuesta con RateLimit-Policy. Un archivo estático
-    // o un route handler del sitio no la traen: es la huella de quién sirvió.
-    return { status: res.status, text, delGateway: res.headers.has('ratelimit-policy') }
-  } catch {
-    return { status: 0, text: '', delGateway: false }
-  }
-}
-
 /**
- * Rutas que prueban que el proxy está puesto. No están todas a propósito:
- * estas cinco son las que mueven el score, y una lista de dieciocho vueltas
- * convierte un semáforo en una auditoría.
- */
-const SONDAS_PROXY: { path: string; esperado: number; post?: boolean }[] = [
-  { path: '/.well-known/ard.json', esperado: 200 },
-  { path: '/openapi.json', esperado: 200 },
-  { path: '/discovery/resources', esperado: 200 },
-  { path: '/.well-known/ucp', esperado: 200 },
-  { path: '/developers', esperado: 200 },
-  { path: '/mcp', esperado: 200, post: true },
-]
-
-/**
- * Rutas donde una copia congelada hace más daño. Un 200 no alcanza: la copia
- * también responde 200. Lo que la delata es que no viene del gateway, y eso
- * se ve en las cabeceras. Es el bug que dejó un ai-catalog.json con esquema
- * 0.91 sirviéndose durante días mientras el gateway ya emitía 1.0.
- */
-const TAPABLES = ['/.well-known/ard.json', '/openapi.json', '/.well-known/api-catalog', '/llms.txt']
-
-/**
- * Qué del kit está realmente publicado en el dominio del negocio.
- *
- * El chequeo del proxy es uno solo con varias sondas adentro: para el usuario
- * "conectaste el dominio" es una sola decisión, y partirla en cinco líneas
- * rojas hace parecer que hay cinco cosas por hacer cuando hay una.
+ * Qué del kit está realmente publicado en el dominio del negocio. La medición
+ * vive en `@peaje/shared` (la misma que expone el gateway en /kit/verify);
+ * acá solo se le ponen los textos de la UI.
  */
 export async function verificarIntegracion(slug: string): Promise<ChequeoIntegracion[]> {
   const { kit: d } = await getDict()
   const tenant = await requireTenant(slug)
-  const domain = scannableDomain(tenant.originUrl)
-  if (!domain) {
-    return [{ id: 'dominio', label: d.chequeoDominio, ok: false, detalle: d.chequeoDominioDetalle }]
+  const chequeos = await verificar(tenant.originUrl)
+  return chequeos.map((c) => conTexto(c, d))
+}
+
+function conTexto(c: Chequeo, d: Awaited<ReturnType<typeof getDict>>['kit']): ChequeoIntegracion {
+  const faltantes = c.faltantes
+  switch (c.id) {
+    case 'dominio':
+      return { id: c.id, label: d.chequeoDominio, ok: false, detalle: d.chequeoDominioDetalle }
+    case 'proxy':
+      return {
+        id: c.id,
+        label: d.chequeoProxy,
+        ok: c.ok,
+        detalle:
+          c.motivo === 'ok'
+            ? d.chequeoProxyOk
+            : c.motivo === 'proxy-nada'
+              ? d.chequeoProxyFalta
+              : d.chequeoProxyParcial(faltantes?.length ?? 0, c.total ?? 0),
+        faltantes,
+      }
+    case 'frescura':
+      return {
+        id: c.id,
+        label: d.chequeoFrescura,
+        ok: c.ok,
+        detalle: c.ok ? d.chequeoFrescuraOk : d.chequeoFrescuraVieja((faltantes ?? []).join(', ')),
+        faltantes,
+      }
+    case 'json-ld':
+      return { id: c.id, label: d.chequeoJsonLd, ok: c.ok, detalle: c.ok ? d.chequeoJsonLdOk : d.chequeoJsonLdFalta }
+    case 'links':
+      return {
+        id: c.id,
+        label: d.chequeoLink,
+        ok: c.ok,
+        detalle: c.ok ? d.chequeoLinkOk : c.motivo === 'links-sin-home' ? d.chequeoLinkSinHome : d.chequeoLinkFalta,
+      }
+    case 'robots':
+      return {
+        id: c.id,
+        label: d.chequeoRobots,
+        ok: c.ok,
+        detalle:
+          c.motivo === 'ok' ? d.chequeoRobotsOk : c.motivo === 'robots-bloquea' ? d.chequeoRobotsBloquea : d.chequeoRobotsFalta,
+      }
+    case 'bots': {
+      const casos = (faltantes ?? []).join(', ')
+      return {
+        id: c.id,
+        label: d.chequeoBots,
+        ok: c.ok,
+        detalle:
+          c.motivo === 'ok'
+            ? d.chequeoBotsOk
+            : c.motivo === 'bots-bloqueados'
+              ? d.chequeoBotsBloqueados(casos)
+              : c.motivo === 'bots-challenge'
+                ? d.chequeoBotsChallenge(casos)
+                : d.chequeoBotsSinHtml,
+        faltantes,
+      }
+    }
   }
+}
 
-  const site = `https://${domain}`
+const DESCRIPCION_MAX = 300
 
-  const [proxy, frescura, home, robots] = await Promise.all([
-    Promise.all(
-      SONDAS_PROXY.map(async (s) => ({
-        path: s.path,
-        ok:
-          (await sonda(
-            `${site}${s.path}`,
-            s.post
-              ? {
-                  method: 'POST',
-                  headers: {
-                    'content-type': 'application/json',
-                    accept: 'application/json, text/event-stream',
-                  },
-                  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-                }
-              : undefined,
-          )).status === s.esperado,
-      })),
-    ),
-    Promise.all(
-      TAPABLES.map(async (path) => {
-        const r = await sonda(`${site}${path}`)
-        // Un 404 no es una copia: eso lo reporta el chequeo del proxy.
-        return { path, vieja: r.status === 200 && !r.delGateway }
-      }),
-    ),
-    sonda(site),
-    sonda(`${site}/robots.txt`),
-  ])
+/**
+ * Guarda los datos de entidad del negocio (Organization del JSON-LD y toggle
+ * de robots). Campos vacíos se guardan como null: el builder no emite lo que
+ * no hay. Devuelve el error como valor, no como excepción, para mostrarlo al
+ * lado del formulario.
+ */
+export async function guardarEntidad(slug: string, formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const [tenant, { kit: d }] = await Promise.all([requireTenant(slug), getDict()])
+  const texto = (k: string) => String(formData.get(k) ?? '').trim()
+  const oNull = (v: string) => (v ? v : null)
 
-  const faltantes = proxy.filter((p) => !p.ok).map((p) => p.path)
-  const viejas = frescura.filter((f) => f.vieja).map((f) => f.path)
-  const html = home.text
+  const logo = texto('logoUrl')
+  const sameAs = texto('sameAs')
+    .split(/\r?\n/)
+    .map((u) => u.trim())
+    .filter(Boolean)
+  for (const url of [logo, ...sameAs].filter(Boolean)) {
+    if (!esHttps(url)) return { ok: false, error: d.errorEntidadUrl(url) }
+  }
+  const descripcion = texto('descripcion')
+  if (descripcion.length > DESCRIPCION_MAX) return { ok: false, error: d.errorEntidadDescripcionLarga }
 
-  return [
-    {
-      id: 'proxy',
-      label: d.chequeoProxy,
-      ok: faltantes.length === 0,
-      detalle:
-        faltantes.length === 0
-          ? d.chequeoProxyOk
-          : faltantes.length === SONDAS_PROXY.length
-            ? d.chequeoProxyFalta
-            : d.chequeoProxyParcial(faltantes.length, SONDAS_PROXY.length),
-      faltantes,
-    },
-    {
-      id: 'frescura',
-      label: d.chequeoFrescura,
-      ok: viejas.length === 0,
-      detalle: viejas.length === 0 ? d.chequeoFrescuraOk : d.chequeoFrescuraVieja(viejas.join(', ')),
-      faltantes: viejas,
-    },
-    {
-      id: 'json-ld',
-      label: d.chequeoJsonLd,
-      ok: html.includes('application/ld+json'),
-      detalle: html.includes('application/ld+json') ? d.chequeoJsonLdOk : d.chequeoJsonLdFalta,
-    },
-    {
-      id: 'links',
-      label: d.chequeoLink,
-      // `service-desc` es la relación registrada que emite el kit; la vieja
-      // `payment-discovery` sigue contando para no marcar en rojo a quien ya
-      // aplicó la versión anterior.
-      ok: html.includes('rel="service-desc"') || html.includes('payment-discovery'),
-      detalle:
-        html.includes('rel="service-desc"') || html.includes('payment-discovery')
-          ? d.chequeoLinkOk
-          : home.status === 200
-            ? d.chequeoLinkFalta
-            : d.chequeoLinkSinHome,
-    },
-    {
-      id: 'robots',
-      label: d.chequeoRobots,
-      ok: robots.status === 200 && !/Disallow:\s*\/\s*$/m.test(robots.text),
-      detalle:
-        robots.status !== 200
-          ? d.chequeoRobotsFalta
-          : /Disallow:\s*\/\s*$/m.test(robots.text)
-            ? d.chequeoRobotsBloquea
-            : d.chequeoRobotsOk,
-    },
-  ]
+  await store.updateTenantEntity(tenant.id, {
+    entityLogoUrl: oNull(logo),
+    entityPhone: oNull(texto('telefono')),
+    entityAddress: oNull(texto('direccion').replace(/\s+/g, ' ')),
+    entitySameAs: sameAs,
+    entityDescription: oNull(descripcion),
+    robotsBlockTraining: formData.get('bloquearEntrenamiento') === 'on',
+  })
+  revalidatePath(`/t/${slug}/kit`)
+  return { ok: true }
+}
+
+function esHttps(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
 }

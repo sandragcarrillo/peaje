@@ -2,6 +2,7 @@ import type { Agent, AgentDelivery } from '@peaje/db'
 import {
   AGENT_FREQUENCIES,
   explorerTxUrl,
+  NETWORK_IDS,
   isNetworkId,
   type NetworkId,
   nextRunAt,
@@ -42,17 +43,16 @@ agentsRouter.use('*', async (c, next) => {
 
 async function conSaldo(agent: Agent) {
   const network = isNetworkId(agent.network) ? agent.network : 'arc'
-  // La misma address firma en los tres rieles: Tempo y Arc (testnet, demo) y
-  // Base mainnet (mercado real de x402). Se muestran los tres saldos.
+  // Una wallet, todos los rieles: la misma address EVM firma en cada red de
+  // Peaje y en Base mainnet (mercado real de x402). Falla suave por red.
   const address = agent.walletAddress as `0x${string}`
-  const [balanceTempo, balanceArc, balanceArbitrum, balanceBase] = await Promise.all([
-    agentBalance(address, 'tempo').catch(() => null),
-    agentBalance(address, 'arc').catch(() => null),
-    agentBalance(address, 'arbitrum').catch(() => null),
-    baseUsdcBalance(address).catch(() => null),
-  ])
-  const porRed = { tempo: balanceTempo, arc: balanceArc, arbitrum: balanceArbitrum }
-  return { ...agent, balance: porRed[network], balanceTempo, balanceArc, balanceArbitrum, balanceBase }
+  const entradas = await Promise.all(
+    NETWORK_IDS.map(async (id) => [id, await agentBalance(address, id).catch(() => null)] as const),
+  )
+  const balances = Object.fromEntries(entradas) as Record<NetworkId, string | null>
+  const balanceBase = await baseUsdcBalance(address).catch(() => null)
+
+  return { ...agent, balance: balances[network], balances, balanceBase }
 }
 
 agentsRouter.get('/:slug/agents', async (c) => {

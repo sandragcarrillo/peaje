@@ -48,10 +48,10 @@ export function getWithdrawal(slug: string, id: string) {
 
 /** Agente + saldos live de su wallet, tal como lo devuelve el gateway. */
 export type AgenteConSaldo = Agent & {
+  /** Saldo en la red donde opera el agente. */
   balance: string | null
-  balanceTempo: string | null
-  balanceArc: string | null
-  balanceArbitrum: string | null
+  /** Saldo por cada riel de Peaje. */
+  balances: Record<string, string | null>
   /** USDC en Base mainnet: el riel del mercado real de x402. */
   balanceBase: string | null
 }

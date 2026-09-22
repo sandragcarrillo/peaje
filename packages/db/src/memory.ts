@@ -13,6 +13,7 @@ import type {
   Route,
   Store,
   Tenant,
+  TenantEntityUpdate,
   Withdrawal,
   WithdrawalStatus,
 } from './types'
@@ -50,6 +51,12 @@ export class MemoryStore implements Store {
       privyUserId: input.privyUserId ?? null,
       baselineScore: null,
       baselineScoreAt: null,
+      entityLogoUrl: null,
+      entityPhone: null,
+      entityAddress: null,
+      entitySameAs: [],
+      entityDescription: null,
+      robotsBlockTraining: false,
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -93,6 +100,15 @@ export class MemoryStore implements Store {
   async setPayoutWallet(tenantId: string, wallet: string) {
     const tenant = this.#tenants.get(tenantId)
     if (tenant) tenant.payoutWallet = wallet
+  }
+
+  async updateTenantEntity(tenantId: string, patch: TenantEntityUpdate) {
+    const tenant = this.#tenants.get(tenantId)
+    if (!tenant) return
+    // Solo las claves definidas: un patch parcial no debe borrar lo demás.
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) (tenant as unknown as Record<string, unknown>)[k] = v
+    }
   }
 
   async listAllowedOrigins(tenantId: string) {

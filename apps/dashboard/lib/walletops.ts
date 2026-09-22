@@ -1,5 +1,5 @@
 import 'server-only'
-import { fromBaseUnits, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
+import { fromBaseUnits, isSettlementNetwork, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
 import {
   createClient,
   createPublicClient,
@@ -80,10 +80,10 @@ export async function sendFromMerchantWallet(
   // Privy revienta el checker); en runtime firma ambos tipos de tx igual.
   const account = merchantViemAccount(walletId, walletAddress) as unknown as LocalAccount
 
-  // En Arbitrum el saldo del negocio vive en PeajeSettlement y el gas es ETH:
-  // esos retiros los hace el gateway con un retiro firmado, no esta wallet.
-  if (network === 'arbitrum') {
-    throw new Error('Arbitrum withdrawals go through Peaje: use Withdraw in your business dashboard.')
+  // En las redes con settlement el saldo del negocio vive en PeajeSettlement y
+  // el gas es ETH: esos retiros los hace el gateway con un retiro firmado.
+  if (isSettlementNetwork(network)) {
+    throw new Error(`${NETWORKS[network].label} withdrawals go through Peaje: use Withdraw in your business dashboard.`)
   }
 
   if (network === 'arc') {

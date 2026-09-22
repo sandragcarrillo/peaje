@@ -4,6 +4,7 @@ import { isNetworkId, explorerTxUrl } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
 import { getWithdrawal, requestWithdrawal } from '@/lib/gateway'
 import { getDict } from '@/lib/i18n'
+import { avisarIndexNow } from '@/lib/indexnow'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { sendFromMerchantWallet } from '@/lib/walletops'
@@ -27,12 +28,15 @@ export async function crearRuta(slug: string, formData: FormData) {
     priceUsd: price.toFixed(6),
     description: description || null,
   })
+  // Cambió la tabla de precios: que Bing recrawlee /developers y /pricing.md.
+  avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
 }
 
 export async function borrarRuta(slug: string, routeId: string) {
   const tenant = await requireTenant(slug)
   await store.deleteRoute(tenant.id, routeId)
+  avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
 }
 
@@ -197,12 +201,14 @@ export async function crearLink(slug: string, formData: FormData) {
       priceUsd: priceUsd.toFixed(6),
     },
   ])
+  avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
 }
 
 export async function borrarLink(slug: string, resourceId: string) {
   const tenant = await requireTenant(slug)
   await store.deleteResource(tenant.id, resourceId)
+  avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
 }
 
@@ -271,6 +277,7 @@ export async function importarLinks(
       priceUsd: priceUsd.toFixed(6),
     })),
   )
+  if (created.length > 0) avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
   return created.length
 }

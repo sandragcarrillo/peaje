@@ -14,6 +14,14 @@ create table if not exists tenants (
   embed_secret text not null,
   origin_url text not null,
   payout_wallet text,
+  -- Datos de entidad para el JSON-LD Organization del kit y el NAP. Opcionales.
+  entity_logo_url text,
+  entity_phone text,
+  entity_address text,
+  entity_same_as text[] not null default '{}',
+  entity_description text,
+  -- Bloquear bots de entrenamiento en robots.txt (no afecta la citación).
+  robots_block_training boolean not null default false,
   created_at timestamptz not null default now()
 );
 
