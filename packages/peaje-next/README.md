@@ -69,7 +69,7 @@ Auditors look for documentation linked from the homepage, visibly. Add this to y
 After the deploy is live:
 
 ```sh
-npx peaje@1 verify cafe-andino --wait 600
+npx @peaje/cli@1 verify cafe-andino --wait 600
 ```
 
 ## License

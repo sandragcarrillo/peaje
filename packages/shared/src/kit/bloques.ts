@@ -122,7 +122,8 @@ export function jsonLdOrganization({
   direccion,
   sameAs,
   descripcion,
-}: Entidad & { nombre: string; originHost: string }): Record<string, unknown> {
+  conApi = true,
+}: Entidad & { nombre: string; originHost: string; conApi?: boolean }): Record<string, unknown> {
   const org: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -140,8 +141,9 @@ export function jsonLdOrganization({
   if (perfiles.length > 0) org.sameAs = perfiles
   const desc = limpiar(descripcion)
   if (desc) org.description = desc
-  // La API es lo que la organización ofrece: cierra el grafo con WebAPI.
-  org.makesOffer = [{ '@type': 'Offer', itemOffered: { '@id': `https://${originHost}/#api` } }]
+  // La API es lo que la organización ofrece: cierra el grafo con WebAPI. Sin
+  // capa de agentes no hay nodo #api al que apuntar, y un @id colgado es ruido.
+  if (conApi) org.makesOffer = [{ '@type': 'Offer', itemOffered: { '@id': `https://${originHost}/#api` } }]
   return org
 }
 
@@ -204,18 +206,22 @@ export const BOTS_ENTRENAMIENTO = ['GPTBot', 'ClaudeBot', 'Google-Extended', 'Ap
 
 export type OpcionesRobots = {
   originHost: string
+  /** false en el kit "solo motores de respuesta": el sitio no cobra 402. */
+  conPagos?: boolean
   /** Rutas que devuelven 402: no tiene sentido que un bot de búsqueda las indexe. */
   rutasPagas?: string[]
   /** Bloquear los bots de entrenamiento sin tocar los de búsqueda. */
   sinEntrenamiento?: boolean
 }
 
-export function robotsTxt({ originHost, rutasPagas = [], sinEntrenamiento = false }: OpcionesRobots): string {
-  const pagas = rutasPagas.length > 0 ? rutasPagas : []
+export function robotsTxt({ originHost, rutasPagas = [], sinEntrenamiento = false, conPagos = true }: OpcionesRobots): string {
+  const pagas = conPagos ? rutasPagas : []
   const bloqueBusqueda = BOTS_BUSQUEDA.map((b) => `User-agent: ${b}`).join('\n')
   const disallowPagas = pagas.map((p) => `Disallow: ${p}`).join('\n')
   const partes = [
-    `# Agents welcome. This site charges per request over MPP (HTTP 402).`,
+    conPagos
+      ? `# Agents welcome. This site charges per request over MPP (HTTP 402).`
+      : `# Answer engines welcome.`,
     `# Answer engines: allowed by name so a stricter default never locks them out.`,
     `${bloqueBusqueda}\nAllow: /${disallowPagas ? `\n# Paid endpoints answer 402: nothing to index there.\n${disallowPagas}` : ''}`,
   ]

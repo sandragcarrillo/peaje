@@ -122,12 +122,16 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
 
 /** "Ya lo integré" → Peaje verifica bloque por bloque contra el dominio real. */
 /** Una pieza del kit: lo que el prompt dice sobre ella cuando falta. */
-export type Pieza = { id: string; titulo: string; detalle: string; contenido: string }
+export type Pieza = { id: string; titulo: string; detalle: string; contenido: string; contenidoAeo?: string }
+
+/** Qué capas del kit quiere instalar el dueño. */
+export type Capa = 'todo' | 'aeo'
 
 export type MarcoPrompt = {
   /** El prompt corto: una línea que apunta al kit del gateway. Es el principal. */
-  corto: (faltan: string[]) => string
+  corto: (faltan: string[], capa: Capa) => string
   intro: string
+  introAeo: string
   noCrearTitulo: string
   noCrearDetalle: string
   noCrearCierre: string
@@ -149,17 +153,23 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
   const { kit: d } = useDict()
   const { resultados, corriendo, verificar } = useVerificacion()
   const [copiado, setCopiado] = useState(false)
+  const [capa, setCapa] = useState<Capa>('todo')
+  const soloAeo = capa === 'aeo'
 
   // `bots` se muestra y se explica en "Motores de respuesta": no es algo que
   // el coding agent arregle en el repo (es el WAF o el bot fight mode), así
-  // que meterlo en el prompt solo lo confundiría.
-  const propios = (resultados ?? []).filter((r) => r.id !== 'bots')
+  // que meterlo en el prompt solo lo confundiría. Con "solo motores" tampoco
+  // cuentan el proxy, los links ni las copias: no hay proxy que instalar.
+  const DE_AEO = new Set(['dominio', 'json-ld', 'robots'])
+  const propios = (resultados ?? []).filter((r) => r.id !== 'bots' && (!soloAeo || DE_AEO.has(r.id)))
   const faltan = resultados ? propios.filter((r) => !r.ok) : []
   const listo = resultados !== null && faltan.length === 0
   const sinDominio = resultados?.[0]?.id === 'dominio'
 
-  const pendientes = piezas.filter((p) => faltan.some((f) => f.id === p.id))
-  const faltaProxy = faltan.some((f) => f.id === 'proxy')
+  const pendientes = piezas
+    .filter((p) => faltan.some((f) => f.id === p.id))
+    .map((p) => (soloAeo ? { ...p, contenido: p.contenidoAeo ?? p.contenido } : p))
+  const faltaProxy = !soloAeo && faltan.some((f) => f.id === 'proxy')
   // Copias que le ganan al proxy: se nombran una por una, con la ruta exacta,
   // para que el agente borre esas y no se ponga a adivinar.
   const tapadas = faltan.find((f) => f.id === 'frescura')?.faltantes ?? []
@@ -179,15 +189,32 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
 
   // El prompt largo queda como respaldo para agentes que no pueden descargar
   // el kit. Se arma igual que antes, pero ya no es lo que se copia primero.
-  const promptLargo = [
-    marco.intro,
-    ...pendientes.map((p) => `## ${p.titulo}\n${p.detalle}\n\n\`\`\`\n${p.contenido}\n\`\`\``),
-    ...(limpieza ? [limpieza] : []),
-    marco.verifica,
-    marco.audit,
-    marco.referencia,
-  ].join('\n\n')
-  const prompt = marco.corto(faltan.map((f) => f.label))
+  const promptLargo = (
+    soloAeo
+      ? [marco.introAeo, ...pendientes.map((p) => `## ${p.titulo}\n${p.detalle}\n\n\`\`\`\n${p.contenido}\n\`\`\``)]
+      : [
+          marco.intro,
+          ...pendientes.map((p) => `## ${p.titulo}\n${p.detalle}\n\n\`\`\`\n${p.contenido}\n\`\`\``),
+          ...(limpieza ? [limpieza] : []),
+          marco.verifica,
+          marco.audit,
+          marco.referencia,
+        ]
+  ).join('\n\n')
+  const prompt = marco.corto(faltan.map((f) => f.label), capa)
+
+  const chip = (valor: Capa, label: string) => (
+    <button
+      key={valor}
+      type="button"
+      onClick={() => setCapa(valor)}
+      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+        capa === valor ? 'border-accent bg-text text-bg' : 'border-border text-muted hover:border-muted hover:text-text'
+      }`}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <section className="rounded-lg border border-accent/40 bg-panel p-5">
@@ -204,6 +231,15 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
         >
           {corriendo ? d.verificando : d.verificarDeNuevo}
         </button>
+      </div>
+
+      <div className="mt-4">
+        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.capaTitulo}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {chip('todo', d.capaTodo)}
+          {chip('aeo', d.capaAeo)}
+        </div>
+        <p className="mt-2 max-w-2xl text-xs text-muted">{soloAeo ? d.capaAeoDetalle : d.capaTodoDetalle}</p>
       </div>
 
       {corriendo && resultados === null ? (

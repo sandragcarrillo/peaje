@@ -105,7 +105,44 @@ export function insertarPeajeHead(src: string, slug: string): Edicion {
   return { ok: false, motivo: 'complex' }
 }
 
-/** Agrega `@peaje/next` a dependencies conservando la indentación del archivo. */
+const MARCA_JSONLD = 'data-peaje="organization"'
+
+/**
+ * Inserta un <script type="application/ld+json"> estático en el <head> del
+ * layout (o crea el <head>), como JSX válido: el JSON va en una cadena
+ * literal dentro de dangerouslySetInnerHTML. La marca data-peaje permite
+ * reconocerlo y no duplicarlo en una segunda corrida.
+ */
+export function insertarJsonLdEstatico(src: string, json: string): Edicion {
+  if (src.includes(MARCA_JSONLD)) return { ok: false, motivo: 'already' }
+  // Compacto y con `<` escapado como \u003c: el HTML final no puede llevar
+  // `</script>` dentro del JSON, y volver a stringify perdería el escape que
+  // el gateway ya había puesto.
+  const compacto = JSON.stringify(JSON.parse(json)).replace(/</g, '\\u003c')
+  const literal = JSON.stringify(compacto)
+  const etiqueta = `<script type="application/ld+json" ${MARCA_JSONLD} dangerouslySetInnerHTML={{ __html: ${literal} }} />`
+
+  const head = /<head(\s[^>]*)?(?<!\/)>/.exec(src)
+  if (head && head.index !== undefined) {
+    const indent = indentacionDeLinea(src, head.index)
+    const corte = head.index + head[0].length
+    return { ok: true, src: `${src.slice(0, corte)}\n${indent}  ${etiqueta}${src.slice(corte)}` }
+  }
+  const body = /<body[\s>]/.exec(src)
+  if (/<html[\s>]/.test(src) && body && body.index !== undefined) {
+    const indent = indentacionDeLinea(src, body.index)
+    const inicioLinea = src.lastIndexOf('\n', body.index) + 1
+    const bloque = `${indent}<head>\n${indent}  ${etiqueta}\n${indent}</head>\n`
+    return { ok: true, src: `${src.slice(0, inicioLinea)}${bloque}${src.slice(inicioLinea)}` }
+  }
+  return { ok: false, motivo: 'complex' }
+}
+
+/**
+ * Agrega la dependencia con un diff de una línea: se inserta como primera
+ * entrada de `dependencies` respetando la indentación. Reserializar el JSON
+ * entero reordenaba claves y ensuciaba el diff que el dueño tiene que revisar.
+ */
 export function agregarDependencia(pkgSrc: string, nombre: string, version: string): string | null {
   let pkg: Record<string, unknown>
   try {
@@ -113,10 +150,15 @@ export function agregarDependencia(pkgSrc: string, nombre: string, version: stri
   } catch {
     return null
   }
-  const deps = { ...((pkg.dependencies as Record<string, string> | undefined) ?? {}) }
+  const deps = (pkg.dependencies as Record<string, string> | undefined) ?? {}
   if (deps[nombre]) return null
-  deps[nombre] = version
-  pkg.dependencies = Object.fromEntries(Object.entries(deps).sort(([a], [b]) => a.localeCompare(b)))
+  const m = /"dependencies"\s*:\s*\{\s*\n(\s*)/.exec(pkgSrc)
+  if (m && m.index !== undefined && Object.keys(deps).length > 0) {
+    const indent = m[1] ?? '    '
+    const corte = m.index + m[0].length - indent.length
+    return `${pkgSrc.slice(0, corte)}${indent}${JSON.stringify(nombre)}: ${JSON.stringify(version)},\n${pkgSrc.slice(corte)}`
+  }
+  pkg.dependencies = { [nombre]: version, ...deps }
   const indent = /^[ \t]+/m.exec(pkgSrc)?.[0] ?? '  '
   return `${JSON.stringify(pkg, null, indent)}${pkgSrc.endsWith('\n') ? '\n' : ''}`
 }

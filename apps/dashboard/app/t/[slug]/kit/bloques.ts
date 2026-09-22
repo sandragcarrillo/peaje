@@ -6,7 +6,8 @@ export { primeraRutaPaga, type Oferta } from '@peaje/shared'
 type Kit = Dict['kit']
 /** El id ata cada bloque a su chequeo, para saber cuál falta. */
 export type BloqueId = 'json-ld' | 'links' | 'robots'
-export type Bloque = { id: BloqueId; titulo: string; detalle: string; contenido: string }
+/** `contenidoAeo`: la versión del bloque para el kit "solo motores de respuesta" (sin API ni 402). */
+export type Bloque = { id: BloqueId; titulo: string; detalle: string; contenido: string; contenidoAeo?: string }
 
 /**
  * Los bloques manuales del kit, con los textos de la UI. El contenido lo
@@ -35,20 +36,25 @@ export function construirBloques({
   sinEntrenamiento?: boolean
 }): Bloque[] {
   const jsonLd = headJsonLd({ nombre: tenant.name, slug: tenant.slug, originHost, ofertas, entidad })
+  const jsonLdAeo = headJsonLd({ nombre: tenant.name, slug: tenant.slug, originHost, ofertas, entidad, capas: ['aeo'] })
   const rutasPagas = ofertas.filter((o) => o.priceUsd > 0).map((o) => rutaLocal(o.url, tenant.slug))
+  const robots = (conPagos: boolean) =>
+    robotsTxt({ originHost, rutasPagas, sinEntrenamiento: sinEntrenamiento ?? false, conPagos })
   return [
     {
       id: 'json-ld',
       titulo: d.bloqueJsonLd,
       detalle: tieneJsonLd ? d.bloqueJsonLdExiste : d.bloqueJsonLdFalta,
       contenido: jsonLd,
+      contenidoAeo: jsonLdAeo,
     },
     { id: 'links', titulo: d.bloqueLink, detalle: d.bloqueLinkDetalle, contenido: linksHtml() },
     {
       id: 'robots',
       titulo: d.bloqueRobots,
       detalle: d.bloqueRobotsDetalle,
-      contenido: robotsTxt({ originHost, rutasPagas, sinEntrenamiento: sinEntrenamiento ?? false }),
+      contenido: robots(true),
+      contenidoAeo: robots(false),
     },
   ]
 }

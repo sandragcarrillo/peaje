@@ -1,9 +1,9 @@
-# peaje
+# @peaje/cli
 
 Install [Peaje](https://peaje-gateway.up.railway.app) on your site in one command. Peaje charges AI agents per request (MPP, HTTP 402) and publishes your catalog, MCP server and OpenAPI spec; this CLI makes all of that answer on your own domain.
 
 ```sh
-npx peaje@1 init <slug> --yes
+npx @peaje/cli@1 init <slug> --yes
 ```
 
 `<slug>` is the business slug from your Peaje dashboard. `@1` pins the major so a future `peaje@2` never changes behavior under a script.
@@ -49,11 +49,11 @@ Does not touch: anything else. It never runs your package manager, never deletes
 ## For coding agents
 
 ```sh
-npx peaje@1 init <slug> --yes --json      # one JSON object: { ok, stack, host, written, moved, manual, next }
+npx @peaje/cli@1 init <slug> --yes --json      # one JSON object: { ok, stack, host, written, moved, manual, next }
 # apply what is in `manual`, run the install command from `next`
 <build>
 <deploy>
-npx peaje@1 verify <slug> --wait 600 --json
+npx @peaje/cli@1 verify <slug> --wait 600 --json
 ```
 
 Exit codes: `0` ok, `1` error or failed verification, `2` confirmation needed (no TTY, no `--yes`), `3` stack not recognized. On `3` the full kit is written under `peaje/` so you can translate it to the host by hand.
@@ -63,3 +63,7 @@ Exit codes: `0` ok, `1` error or failed verification, `2` confirmation needed (n
 ## License
 
 MIT
+
+## Answer engines only
+
+`npx @peaje/cli@1 init <slug> --only aeo` installs just the answer-engine layer: a robots.txt that allows the citing bots by name and an Organization JSON-LD in the homepage head. No proxy, no 402, no npm dependency. Use it when the business only wants ChatGPT, Perplexity and Google to read the site correctly; run the same command without `--only aeo` later to add the agents layer. `peaje verify <slug> --only aeo` checks only that layer.

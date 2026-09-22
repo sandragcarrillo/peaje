@@ -1,7 +1,7 @@
 /**
  * El kit ensamblado por tenant: los archivos listos y las instrucciones
  * cortas. Lo sirve el gateway en `/:slug/kit.json` y lo consume el CLI
- * `npx peaje` y cualquier coding agent con curl.
+ * `npx @peaje/cli` y cualquier coding agent con curl.
  *
  * Los bytes de las reglas, el JSON-LD y el robots salen de acá y no de la
  * transcripción de un LLM. Lo que sigue en manos del agente (fusionar la
@@ -23,7 +23,33 @@ import {
 import { esHost, generarProxy, HOSTS, rutasABorrar, type Host } from './rutas'
 import type { Chequeo } from './verificar'
 
-export const KIT_VERSION = '2026-09-21'
+export const KIT_VERSION = '2026-09-22'
+
+/**
+ * Las dos capas del kit. `agentes`: proxy al gateway, WebAPI, links y
+ * limpieza de copias (lo que hace que los agentes te encuentren y te paguen).
+ * `aeo`: robots por bot y Organization (lo que hace que los motores de
+ * respuesta te lean). Un negocio puede querer solo la segunda.
+ */
+export type Capa = 'agentes' | 'aeo'
+export const CAPAS: Capa[] = ['agentes', 'aeo']
+
+/** `?layers=all|agents|aeo` (también acepta `agentes` y listas con coma). */
+export function parsearCapas(x: string | null | undefined): Capa[] {
+  if (!x || x === 'all') return CAPAS
+  const pedidas = x
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .map((t) => (t === 'agents' || t === 'agentes' ? 'agentes' : t === 'aeo' ? 'aeo' : null))
+    .filter((t): t is Capa => t !== null)
+  return pedidas.length > 0 ? CAPAS.filter((c) => pedidas.includes(c)) : CAPAS
+}
+
+/** Qué chequeos del verificador aplican a las capas pedidas. */
+export function filtrarChequeos(chequeos: Chequeo[], capas: Capa[]): Chequeo[] {
+  if (capas.includes('agentes')) return chequeos
+  return chequeos.filter((c) => c.id === 'dominio' || c.id === 'json-ld' || c.id === 'robots' || c.id === 'bots')
+}
 
 /**
  * `create`: archivo nuevo, no pisar si existe.
@@ -37,6 +63,8 @@ export type ArchivoKit = { path: string; mode: ModoArchivo; content: string; not
 export type Kit = {
   version: string
   slug: string
+  /** Capas incluidas: las dos, o solo `aeo`. */
+  layers: Capa[]
   host: Host | 'unknown'
   originHost: string
   gateway: string
@@ -65,16 +93,20 @@ export type EntradaKit = {
   entidad?: Entidad | null
   /** Bloquear bots de entrenamiento en robots.txt (no afecta la citación). */
   sinEntrenamiento?: boolean
+  /** Por defecto las dos. Con solo `aeo` no hay proxy, WebAPI, links ni borrados. */
+  capas?: Capa[]
 }
 
 export function construirKit(e: EntradaKit): Kit {
+  const capas = e.capas && e.capas.length > 0 ? e.capas : CAPAS
+  const conAgentes = capas.includes('agentes')
   const host: Host | 'unknown' = esHost(e.host) ? e.host : 'unknown'
   const falta = (id: Chequeo['id']) => !e.chequeos || e.chequeos.some((c) => c.id === id && !c.ok)
   const rutasPagas = e.ofertas.filter((o) => o.priceUsd > 0).map((o) => rutaSinSlug(o.url, e.slug))
   const files: ArchivoKit[] = []
   const manual: string[] = []
 
-  if (falta('proxy')) {
+  if (conAgentes && falta('proxy')) {
     if (host === 'unknown') {
       // Sin host conocido, mandamos todos: el agente elige por lo que ve en el repo.
       for (const h of HOSTS) files.push(archivoProxy(h.id, h.archivo, e.base))
@@ -90,30 +122,32 @@ export function construirKit(e: EntradaKit): Kit {
     }
   }
 
-  if (falta('json-ld') || falta('links')) {
+  if (falta('json-ld') || (conAgentes && falta('links'))) {
     const partes: string[] = []
-    if (falta('json-ld')) partes.push(headJsonLd(e))
-    if (falta('links')) partes.push(linksHtml())
+    if (falta('json-ld')) partes.push(headJsonLd({ ...e, capas }))
+    if (conAgentes && falta('links')) partes.push(linksHtml())
     files.push({
       path: 'peaje/head.html',
       mode: 'snippet',
       content: partes.join('\n\n'),
-      nota: 'Goes in the <head> of the homepage (the root layout in Next.js). The <a> goes in the footer or nav, visible.',
+      nota: conAgentes
+        ? 'Goes in the <head> of the homepage (the root layout in Next.js). The <a> goes in the footer or nav, visible.'
+        : 'Goes in the <head> of the homepage (the root layout in Next.js). Fill logo, phone, address and profiles in the Peaje dashboard so the Organization node has data.',
     })
-    if (falta('links')) manual.push('Add the visible <a href="/developers"> link to the footer or nav component.')
+    if (conAgentes && falta('links')) manual.push('Add the visible <a href="/developers"> link to the footer or nav component.')
   }
 
   if (falta('robots')) {
     files.push({
       path: 'public/robots.txt',
       mode: 'create',
-      content: robotsTxt({ originHost: e.originHost, rutasPagas, sinEntrenamiento: e.sinEntrenamiento ?? false }),
+      content: robotsTxt({ originHost: e.originHost, rutasPagas, sinEntrenamiento: e.sinEntrenamiento ?? false, conPagos: conAgentes }),
       nota: 'Only if there is no robots.txt yet. If app/robots.ts exists, edit that one instead; Next fails the build with both.',
     })
   }
 
   const tapadas = e.chequeos?.find((c) => c.id === 'frescura')?.faltantes ?? []
-  const remove = tapadas.length > 0 ? tapadas : falta('proxy') ? rutasABorrar() : []
+  const remove = !conAgentes ? [] : tapadas.length > 0 ? tapadas : falta('proxy') ? rutasABorrar() : []
   if (remove.length > 0) {
     manual.push(
       tapadas.length > 0
@@ -121,29 +155,42 @@ export function construirKit(e: EntradaKit): Kit {
         : 'If any path in `remove` exists as a static file (public/, static/) or route handler, delete it: the copy wins over the proxy and freezes.',
     )
   }
-  manual.push('Deploy. Only after the deploy is live, run the verification (see INSTALL.md). Before that everything answers 404 and there is nothing to fix.')
+  manual.push(
+    conAgentes
+      ? 'Deploy. Only after the deploy is live, run the verification (see INSTALL.md). Before that everything answers 404 and there is nothing to fix.'
+      : 'Deploy. Only after the deploy is live, run the verification (see INSTALL.md).',
+  )
 
+  const layersQuery = conAgentes ? '' : '?layers=aeo'
   return {
     version: KIT_VERSION,
     slug: e.slug,
+    layers: capas,
     host,
     originHost: e.originHost,
     gateway: e.base,
     files,
     remove,
     manual,
-    paidPath: primeraRutaPaga(e.ofertas, e.slug),
-    verifyUrl: `${e.base}/kit/verify`,
-    installUrl: `${e.base}/kit/INSTALL.md`,
+    paidPath: conAgentes ? primeraRutaPaga(e.ofertas, e.slug) : null,
+    verifyUrl: `${e.base}/kit/verify${layersQuery}`,
+    installUrl: `${e.base}/kit/INSTALL.md${layersQuery}`,
   }
 }
 
 /**
- * El JSON-LD de la home. Con datos de entidad va el grafo Organization +
- * WebAPI (el `provider` del WebAPI ya apuntaba a `#organization`); sin datos,
- * solo WebAPI, como antes: no inventamos una organización vacía.
+ * El JSON-LD de la home. Con capa de agentes y datos de entidad va el grafo
+ * Organization + WebAPI (el `provider` del WebAPI ya apuntaba a
+ * `#organization`); sin datos, solo WebAPI, como antes: no inventamos una
+ * organización vacía. Con solo la capa AEO va Organization siempre, aunque
+ * sea nombre y URL: es el ancla de entidad que los motores resuelven, y el
+ * formulario del dashboard la completa.
  */
-export function headJsonLd(e: Pick<EntradaKit, 'nombre' | 'slug' | 'originHost' | 'ofertas' | 'entidad'>): string {
+export function headJsonLd(e: Pick<EntradaKit, 'nombre' | 'slug' | 'originHost' | 'ofertas' | 'entidad' | 'capas'>): string {
+  const capas = e.capas && e.capas.length > 0 ? e.capas : CAPAS
+  if (!capas.includes('agentes')) {
+    return scriptJsonLd(jsonLdOrganization({ nombre: e.nombre, originHost: e.originHost, ...(e.entidad ?? {}), conApi: false }))
+  }
   const webApi = jsonLdWebApi({ nombre: e.nombre, slug: e.slug, originHost: e.originHost, ofertas: e.ofertas })
   if (!tieneDatosEntidad(e.entidad)) return scriptJsonLd(webApi)
   const org = jsonLdOrganization({ nombre: e.nombre, originHost: e.originHost, ...e.entidad })
@@ -177,6 +224,7 @@ function rutaSinSlug(url: string, slug: string): string {
  * decisiones de integración que hoy el agente improvisaba.
  */
 export function installMd(k: Kit): string {
+  if (!k.layers.includes('agentes')) return installMdAeo(k)
   const verify = k.paidPath
     ? `curl -s ${k.verifyUrl}   # JSON: every check with ok:true. Also: curl -sIL https://${k.originHost}${k.paidPath} must return 402.`
     : `curl -s ${k.verifyUrl}   # JSON: every check with ok:true.`
@@ -185,7 +233,8 @@ export function installMd(k: Kit): string {
 Gateway for this business: ${k.gateway}
 Files and data: ${k.gateway}/kit.json${k.host === 'unknown' ? '?host=next|vercel|cloudflare|nginx|caddy' : `?host=${k.host}`}
 
-Fastest path (Next.js): \`npx peaje@1 init ${k.slug} --yes --json\` does steps 1 to 4 and prints what is left for you.
+## Do this first
+Run \`npx @peaje/cli@1 init ${k.slug} --yes --json\` at the repo root BEFORE reading any file. It detects the stack, applies steps 1, 2 and 4 below and prints one JSON object: \`written\` (what it changed), \`moved\` (static copies it backed up), \`manual\` (the only things left for you) and \`next\`. Do not re-read or re-verify the files it wrote; trust the JSON and work only on \`manual\`. Skip \`peaje plan\` and \`--help\`. Only if the command is unavailable or exits with code 3, fall back to the steps below by hand.
 
 ## Rules
 - Do NOT rewrite the contents of the files in kit.json. Write them as given; only merge where the file already exists.
@@ -202,5 +251,31 @@ Fastest path (Next.js): \`npx peaje@1 init ${k.slug} --yes --json\` does steps 1
 7. After the deploy is live:
    ${verify}
    Every check is measured from the business domain, not the gateway. If proxy shows missing paths, a rule is missing or the matcher swallows it. If frescura lists paths, a static copy is still winning: delete it.
+`
+}
+
+/**
+ * La variante "solo motores de respuesta": sin proxy, sin dependencia npm,
+ * sin borrados. Dos archivos y un deploy.
+ */
+function installMdAeo(k: Kit): string {
+  return `# Make ${k.originHost} readable by answer engines (Peaje, AEO layer only)
+
+Files and data: ${k.gateway}/kit.json?layers=aeo${k.host === 'unknown' ? '' : `&host=${k.host}`}
+Shortcut (Next.js): \`npx @peaje/cli@1 init ${k.slug} --only aeo --yes --json\`
+
+This layer does NOT connect the domain to the gateway: no proxy, no 402, no MCP on the domain. It only makes the business entity readable and keeps the citing bots allowed. Add the agents layer later with the same command without \`--only aeo\`.
+
+## Rules
+- Do NOT rewrite the contents of the files in kit.json. Write them as given; only merge where the file already exists.
+- Do NOT run the verification before the deploy is live.
+
+## Steps
+1. Head. Put peaje/head.html inside the <head> of the homepage: in Next.js app router that is the root layout, as JSX (\`<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ... }} />\`). If JSON-LD already exists, add this block next to it, do not replace it. The Organization data (logo, phone, address, profiles) comes from the Peaje dashboard: change it there, not here.
+2. robots.txt. Create public/robots.txt only if none exists. If one exists, or app/robots.ts exists, merge: allow the named answer-engine bots, remove any bare \`Disallow: /\`, keep the Sitemap line.
+3. Build, commit, deploy. Ask the owner to deploy if you cannot.
+4. After the deploy is live:
+   curl -s ${k.verifyUrl}   # JSON: json-ld, robots and bots with ok:true
+   If bots fails, the WAF or a bot fight mode is blocking search bots: that is fixed in the CDN panel, not in the repo.
 `
 }

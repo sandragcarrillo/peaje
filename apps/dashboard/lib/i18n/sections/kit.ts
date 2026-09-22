@@ -101,8 +101,19 @@ npx @ora-ai/ax@latest audit ${domain}
     implementaVerLargo: 'Ver el prompt largo (respaldo)',
     implementaLargoDetalle:
       'Solo si tu agente no puede descargar URLs. Trae los mismos bloques pegados en el texto.',
+    capaTitulo: 'Qué instalar',
+    capaTodo: 'Todo el kit',
+    capaTodoDetalle: 'Proxy al gateway (MCP, OpenAPI y 402 en tu dominio), datos estructurados, robots y motores de respuesta.',
+    capaAeo: 'Solo motores de respuesta',
+    capaAeoDetalle: 'robots.txt por bot y ficha de tu negocio (Organization) en el head. Sin proxy ni cobro. Para que ChatGPT, Perplexity y Google te lean; no para que los agentes te paguen.',
+    promptIntroAeo: (originHost: string) =>
+      `Haz que los motores de respuesta puedan leer mi sitio (${originHost}). No conectes ningún proxy ni cobro: solo estos bloques en el repo del sitio:`,
+    promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
+      `Prepara este sitio (${originHost}) para motores de respuesta con Peaje, SOLO la capa de motores: sin proxy, sin cobro, sin dependencias. Sigue al pie de la letra ${base}/kit/INSTALL.md?layers=aeo; los archivos ya generados están en ${base}/kit.json?layers=aeo. Si es Next.js, el camino corto es \`npx @peaje/cli@1 init ${slug} --only aeo --yes --json\`.${
+        faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
+      } No reescribas los archivos descargados. Cuando el deploy esté en producción, consulta ${base}/kit/verify?layers=aeo y arregla solo lo que salga en falso.`,
     promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Instala Peaje en el repo de este sitio (${originHost}). Sigue al pie de la letra ${base}/kit/INSTALL.md; los archivos ya generados están en ${base}/kit.json (agrega ?host=next|vercel|cloudflare|nginx|caddy según el host). Si es Next.js, el camino corto es \`npx peaje@1 init ${slug} --yes --json\`.${
+      `Instala Peaje en el repo de este sitio (${originHost}). Sigue al pie de la letra ${base}/kit/INSTALL.md; los archivos ya generados están en ${base}/kit.json (agrega ?host=next|vercel|cloudflare|nginx|caddy según el host). Si es Next.js, el camino corto es \`npx @peaje/cli@1 init ${slug} --yes --json\`.${
         faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
       } No reescribas los archivos descargados ni crees copias estáticas de lo que sirve el proxy. Cuando el deploy esté en producción, consulta ${base}/kit/verify y arregla solo lo que salga en falso.`,
     implementaMidiendo: 'Midiendo tu dominio…',
@@ -320,8 +331,19 @@ npx @ora-ai/ax@latest audit ${domain}
     implementaVerLargo: 'Show the long prompt (fallback)',
     implementaLargoDetalle:
       'Only if your agent cannot download URLs. Same blocks, pasted inline.',
+    capaTitulo: 'What to install',
+    capaTodo: 'The whole kit',
+    capaTodoDetalle: 'Proxy to the gateway (MCP, OpenAPI and 402 on your domain), structured data, robots and answer engines.',
+    capaAeo: 'Answer engines only',
+    capaAeoDetalle: 'robots.txt by bot and your business card (Organization) in the head. No proxy, no charging. So ChatGPT, Perplexity and Google can read you; not so agents can pay you.',
+    promptIntroAeo: (originHost: string) =>
+      `Make my site (${originHost}) readable by answer engines. Do not connect any proxy or charging: only these blocks in the site repo:`,
+    promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
+      `Prepare this site (${originHost}) for answer engines with Peaje, ONLY the answer-engine layer: no proxy, no charging, no dependencies. Follow ${base}/kit/INSTALL.md?layers=aeo to the letter; the generated files are at ${base}/kit.json?layers=aeo. On Next.js the short path is \`npx @peaje/cli@1 init ${slug} --only aeo --yes --json\`.${
+        faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
+      } Do not rewrite the downloaded files. Once the deploy is live, read ${base}/kit/verify?layers=aeo and fix only what comes back false.`,
     promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Install Peaje in this site's repo (${originHost}). Follow ${base}/kit/INSTALL.md to the letter; the generated files are at ${base}/kit.json (add ?host=next|vercel|cloudflare|nginx|caddy for the host). On Next.js the short path is \`npx peaje@1 init ${slug} --yes --json\`.${
+      `Install Peaje in this site's repo (${originHost}). Follow ${base}/kit/INSTALL.md to the letter; the generated files are at ${base}/kit.json (add ?host=next|vercel|cloudflare|nginx|caddy for the host). On Next.js the short path is \`npx @peaje/cli@1 init ${slug} --yes --json\`.${
         faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
       } Do not rewrite the downloaded files and do not create static copies of what the proxy serves. Once the deploy is live, read ${base}/kit/verify and fix only what comes back false.`,
     implementaMidiendo: 'Measuring your domain…',

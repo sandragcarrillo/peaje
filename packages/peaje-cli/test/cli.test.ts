@@ -3,10 +3,11 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
+import { fusionarRobots } from '../src/aplicar'
 import { clean, init } from '../src/comandos'
 import { detectar } from '../src/detectar'
 import { descargarKitCon, urlKit, type DescargarKit } from '../src/kit'
-import { agregarImport, envolverNextConfig, insertarPeajeHead } from '../src/next'
+import { agregarDependencia, agregarImport, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead } from '../src/next'
 import type { Kit } from '../src/tipos'
 
 const FIXTURES = join(import.meta.dirname, 'fixtures')
@@ -26,11 +27,28 @@ function copia(nombre: string): string {
 }
 
 /** Kit falso: el mismo shape real, con el host que pidió el CLI. */
-const pedidos: { gateway: string; slug: string; host: string | null }[] = []
-const descargarKit: DescargarKit = async (gateway, slug, host) => {
-  pedidos.push({ gateway, slug, host })
+const pedidos: { gateway: string; slug: string; host: string | null; solo?: string }[] = []
+const descargarKit: DescargarKit = async (gateway, slug, host, solo) => {
+  pedidos.push({ gateway, slug, host, solo })
   if (slug === 'no-existe') throw new Error('No business with slug "no-existe"')
-  const kit: Kit = { ...kitBase, slug, host: host ?? 'unknown' }
+  if (solo === 'aeo') {
+    // El gateway con ?layers=aeo: solo head (Organization) y robots, sin proxy.
+    const org = `<script type="application/ld+json">\n${JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'Demo <b>', url: 'https://demo.test/' }, null, 2)}\n</script>`
+    return {
+      ...kitBase,
+      slug,
+      host: host ?? 'unknown',
+      layers: ['aeo'],
+      files: [
+        { path: 'peaje/head.html', mode: 'snippet', content: org, nota: 'head' },
+        kitBase.files.find((f) => f.path === 'public/robots.txt')!,
+      ],
+      remove: [],
+      manual: [],
+      paidPath: null,
+    }
+  }
+  const kit: Kit = { ...kitBase, slug, host: host ?? 'unknown', layers: kitBase.layers ?? ['agentes', 'aeo'] }
   if (host !== 'next') {
     // El gateway devuelve el proxy del host pedido; acá basta con renombrar el archivo.
     kit.files = kit.files.map((f) =>
@@ -97,9 +115,11 @@ test('fixture 2: config envuelta en withSentryConfig queda manual; layout sin <h
   assert.match(layout, /<html lang="en">\n(\s+)<head>\n\1  <PeajeHead slug="demo" \/>\n\1<\/head>\n\1<body className="dark">/)
   assert.ok(layout.startsWith(`import './globals.css'\nimport { PeajeHead } from '@peaje/next/head'\n`))
 
-  assert.equal(readFileSync(join(dir, 'public/robots.txt'), 'utf8'), 'User-agent: *\nDisallow: /\n', 'el robots existente no se pisa')
+  const robots2 = readFileSync(join(dir, 'public/robots.txt'), 'utf8')
+  assert.ok(robots2.startsWith('User-agent: *\nDisallow: /\n'), 'las reglas propias quedan primero e intactas')
+  assert.ok(robots2.includes('# peaje:begin') && robots2.includes('User-agent: OAI-SearchBot'), 'los bots que citan quedan permitidos por su propio grupo')
   assert.ok(resultado.manual.some((m) => m.includes('Disallow: /')))
-  assert.ok(existsSync(join(dir, 'peaje/robots.txt')))
+  assert.ok(!existsSync(join(dir, 'peaje/robots.txt')), 'ya no hace falta la copia de referencia: el bloque va fusionado')
   assert.ok(resultado.next.some((n) => n.startsWith('yarn add @peaje/next')))
 })
 
@@ -111,7 +131,7 @@ test('fixture 3: pages router: config CJS envuelta, head manual, robots existent
   assert.ok(config.startsWith(`const { withPeaje } = require('@peaje/next')\n`))
   assert.ok(config.includes(`module.exports = withPeaje(nextConfig, { slug: "demo" })`))
   assert.ok(resultado.manual.some((m) => m.includes('pages/_document.tsx')))
-  assert.ok(!resultado.written.includes('public/robots.txt'))
+  assert.ok(resultado.written.includes('public/robots.txt'), 'el robots existente recibe el bloque de Peaje')
   assert.ok(resultado.next.some((n) => n.startsWith('npm install @peaje/next')))
 })
 
@@ -219,4 +239,62 @@ test('descargarKitCon: mensajes de red, 404 y shape', async () => {
   const proxy = kit.files.find((f) => f.path === 'peaje/next.config.ts')?.content ?? ''
   assert.equal(proxy.split('source:').length, proxy.split('destination:').length)
   assert.ok(proxy.split('source:').length - 1 >= 15)
+})
+
+test('--only aeo en Next: JSON-LD estático en el layout, sin withPeaje, sin dependencia, sin borrados', async () => {
+  const dir = copia('next-app')
+  const { resultado, codigo } = await init({ ...base, slug: 'demo', dir, solo: 'aeo' })
+  assert.equal(codigo, 0)
+  assert.equal(pedidos.at(-1)?.solo, 'aeo')
+
+  const config = readFileSync(join(dir, 'next.config.ts'), 'utf8')
+  assert.ok(!config.includes('withPeaje'), 'no toca next.config')
+  const layout = readFileSync(join(dir, 'app/layout.tsx'), 'utf8')
+  assert.ok(!layout.includes('PeajeHead'))
+  assert.ok(layout.includes('data-peaje="organization"'))
+  assert.ok(layout.includes('dangerouslySetInnerHTML'))
+  assert.ok(!layout.includes('<b>'), 'el JSON va como literal JS escapado')
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  assert.equal(pkg.dependencies?.['@peaje/next'], undefined)
+  assert.equal(resultado.moved.length, 0, 'sin proxy no hay copias que mover')
+  assert.ok(existsSync(join(dir, 'public/openapi.json')), 'la copia estática queda donde estaba')
+  assert.ok(resultado.next.some((n) => n.includes('verify demo --only aeo')))
+  assert.ok(!resultado.manual.some((m) => m.includes('/developers')))
+
+  // idempotente
+  const segunda = await init({ ...base, slug: 'demo', dir, solo: 'aeo' })
+  assert.equal((readFileSync(join(dir, 'app/layout.tsx'), 'utf8').match(/data-peaje="organization"/g) ?? []).length, 1)
+  assert.equal(segunda.codigo, 0)
+})
+
+test('insertarJsonLdEstatico crea <head> cuando no existe y no duplica', () => {
+  const src = `export default function L({ children }) {\n  return (\n    <html lang="es">\n      <body>{children}</body>\n    </html>\n  )\n}\n`
+  const r = insertarJsonLdEstatico(src, '{"a":"</script>"}')
+  assert.ok(r.ok)
+  if (r.ok) {
+    assert.match(r.src, /<head>\n\s+<script type="application\/ld\+json" data-peaje="organization" dangerouslySetInnerHTML=\{\{ __html: "/)
+    assert.ok(!r.src.includes('</script>"'), 'el cierre de script queda escapado dentro del literal')
+    const otra = insertarJsonLdEstatico(r.src, '{}')
+    assert.equal(otra.ok, false)
+  }
+})
+
+test('fusionarRobots conserva lo del sitio, omite el grupo * y el Sitemap duplicado, y es idempotente', () => {
+  const propio = 'User-agent: *\nDisallow: /admin/\nSitemap: https://x.com/sitemap.xml\n'
+  const kit = '# Agents welcome.\n\nUser-agent: OAI-SearchBot\nUser-agent: Googlebot\nAllow: /\nDisallow: /r/menu\n\nUser-agent: *\nAllow: /\n\n# Where the catalogs live\nSitemap: https://x.com/sitemap.xml'
+  const r = fusionarRobots(propio, kit)!
+  assert.ok(r.startsWith(propio.trim()))
+  assert.ok(r.includes('User-agent: OAI-SearchBot') && r.includes('Disallow: /r/menu'))
+  assert.equal((r.match(/^User-agent: \*$/gm) ?? []).length, 1, 'no se duplica el grupo *')
+  assert.equal((r.match(/^Sitemap:/gm) ?? []).length, 1, 'no se duplica el Sitemap')
+  assert.equal(fusionarRobots(r, kit), null)
+})
+
+test('agregarDependencia inserta una sola línea sin reordenar el resto', () => {
+  const src = '{\n  "name": "x",\n  "dependencies": {\n    "next": "15.3.0",\n    "react": "19.1.0"\n  }\n}\n'
+  const out = agregarDependencia(src, '@peaje/next', '^0.1.0')!
+  assert.equal(out.split('\n').length, src.split('\n').length + 1)
+  assert.ok(out.includes('    "@peaje/next": "^0.1.0",\n    "next": "15.3.0"'))
+  assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.1.0')
+  assert.equal(agregarDependencia(out, '@peaje/next', '^0.1.0'), null)
 })

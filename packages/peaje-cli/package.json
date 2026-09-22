@@ -1,8 +1,15 @@
 {
-  "name": "peaje",
-  "version": "1.0.0",
+  "name": "@peaje/cli",
+  "version": "1.0.1",
   "description": "Install Peaje on your site in one command: proxy rewrites, head block, robots.txt, and a verifier that measures your own domain.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sandragcarrillo/peaje.git",
+    "directory": "packages/peaje-cli"
+  },
+  "homepage": "https://github.com/sandragcarrillo/peaje/tree/main/packages/peaje-cli#readme",
+  "bugs": "https://github.com/sandragcarrillo/peaje/issues",
   "type": "module",
   "bin": {
     "peaje": "./dist/cli.js"
@@ -10,6 +17,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },

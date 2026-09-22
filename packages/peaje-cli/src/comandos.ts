@@ -6,7 +6,7 @@
 import { rutasABorrar } from '@peaje/shared'
 import { ejecutar, planificar, planificarLimpieza } from './aplicar'
 import { detectar, mostrarRuta } from './detectar'
-import { descargarKit as descargarReal, type DescargarKit } from './kit'
+import { descargarKit as descargarReal, type DescargarKit, type Solo } from './kit'
 import { ErrorCli, type Deteccion, type Host, type Kit, type Plan, type Resultado } from './tipos'
 
 export type OpcionesInit = {
@@ -14,6 +14,8 @@ export type OpcionesInit = {
   dir: string
   gateway: string
   host?: Host
+  /** `aeo`: solo robots y Organization, sin proxy ni dependencia npm. */
+  solo?: Solo
   dryRun: boolean
   descargarKit?: DescargarKit
   timestamp?: string
@@ -55,11 +57,13 @@ export async function prepararInit(o: OpcionesInit): Promise<Omit<SalidaInit, 'r
     )
   }
   const host: Host | null = o.host ?? det.host
-  const kit = await (o.descargarKit ?? descargarReal)(o.gateway, o.slug, host)
+  const kit = await (o.descargarKit ?? descargarReal)(o.gateway, o.slug, host, o.solo)
   const plan = planificar(det, kit, { slug: o.slug, timestamp: o.timestamp })
   if (det.stack === 'unknown') {
     plan.manual.unshift(
-      `Stack not recognized in ${mostrarRuta(det.dir)}: no framework in package.json and no known host config. The full kit is under peaje/: pick the proxy file for your host, put head.html in your homepage <head>, serve robots.txt at the root.`,
+      kit.layers.includes('agentes')
+        ? `Stack not recognized in ${mostrarRuta(det.dir)}: no framework in package.json and no known host config. The full kit is under peaje/: pick the proxy file for your host, put head.html in your homepage <head>, serve robots.txt at the root.`
+        : `Stack not recognized in ${mostrarRuta(det.dir)}. The kit is under peaje/: put head.html in your homepage <head> and serve robots.txt at the root.`,
     )
   }
   return { det, kit, plan, codigo: det.stack === 'unknown' ? 3 : 0 }

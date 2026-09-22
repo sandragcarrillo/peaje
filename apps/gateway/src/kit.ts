@@ -14,6 +14,8 @@
 import type { Resource, Route, Tenant } from '@peaje/db'
 import {
   construirKit,
+  filtrarChequeos,
+  parsearCapas,
   KIT_VERSION,
   manifiestoProxy,
   dominioVerificable,
@@ -75,7 +77,7 @@ export function entidadDe(tenant: Tenant): Entidad {
   }
 }
 
-async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: boolean) {
+async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: boolean, layers?: string | null) {
   const [resources, routes, chequeos] = await Promise.all([
     store.listResources(tenant.id),
     store.listRoutes(tenant.id),
@@ -92,6 +94,7 @@ async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: bool
     chequeos: chequeos && chequeos[0]?.id !== 'dominio' ? chequeos : null,
     entidad: entidadDe(tenant),
     sinEntrenamiento: tenant.robotsBlockTraining,
+    capas: parsearCapas(layers),
   })
 }
 
@@ -99,7 +102,8 @@ kitRouter.get('/:slug/kit.json', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
   // `?all=1` trae todo aunque ya esté publicado (para el CLI en modo plan).
-  const kit = await armarKit(tenant, c.req.query('host') ?? null, c.req.query('all') !== '1')
+  // `?layers=aeo` deja fuera el proxy: solo lo que leen los motores de respuesta.
+  const kit = await armarKit(tenant, c.req.query('host') ?? null, c.req.query('all') !== '1', c.req.query('layers'))
   return c.json(kit)
 })
 
@@ -118,9 +122,11 @@ kitRouter.get('/:slug/kit/manifest.json', async (c) => {
 kitRouter.get('/:slug/kit/verify', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
-  const chequeos = await verificarConMemo(tenant)
+  const capas = parsearCapas(c.req.query('layers'))
+  const chequeos = filtrarChequeos(await verificarConMemo(tenant), capas)
   return c.json({
     domain: dominioVerificable(tenant.originUrl),
+    layers: capas,
     ok: chequeos.every((x) => x.ok),
     checks: chequeos,
     measuredAt: new Date().toISOString(),
@@ -130,6 +136,6 @@ kitRouter.get('/:slug/kit/verify', async (c) => {
 kitRouter.get('/:slug/kit/INSTALL.md', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.text('Tenant not found', 404)
-  const kit = await armarKit(tenant, c.req.query('host') ?? null, false)
+  const kit = await armarKit(tenant, c.req.query('host') ?? null, false, c.req.query('layers'))
   return c.text(installMd(kit), 200, { 'content-type': 'text/markdown; charset=utf-8' })
 })

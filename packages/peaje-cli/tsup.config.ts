@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 /**
- * Un solo archivo ESM con shebang y cero dependencias de runtime: `npx peaje@1`
+ * Un solo archivo ESM con shebang y cero dependencias de runtime: `npx @peaje/cli@1`
  * tiene que arrancar rápido en la máquina de un agente. `@peaje/shared` es
  * privado y va bundleado.
  */

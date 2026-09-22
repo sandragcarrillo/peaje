@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { basename, dirname, join, posix } from 'node:path'
 import { rutasABorrar } from '@peaje/shared'
 import { comandoInstalar } from './detectar'
-import { agregarDependencia, envolverNextConfig, insertarPeajeHead, nextConfigNuevo } from './next'
+import { agregarDependencia, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead, nextConfigNuevo } from './next'
 import type { Accion, Deteccion, Kit, Plan } from './tipos'
 
 export const VERSION_PEAJE_NEXT = '^0.1.0'
@@ -73,6 +73,8 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
   const manual: string[] = []
   const next: string[] = []
   const reconocido = stack !== 'unknown'
+  // Solo la capa de motores de respuesta: sin proxy, sin @peaje/next, sin borrados.
+  const soloAeo = !kit.layers.includes('agentes')
 
   // (c) archivos del kit
   for (const f of kit.files) {
@@ -93,13 +95,17 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
   }
 
   // (d) y (e): Next
-  if (stack === 'next') {
+  if (stack === 'next' && soloAeo) {
+    planificarNextAeo(det, kit, acciones, manual)
+  } else if (stack === 'next') {
     planificarNext(det, slug, acciones, manual, next)
   } else if (reconocido) {
     manual.push(
       `Put the tags from peaje/head.html inside the <head> of your homepage template${stack === 'static' ? '' : ` (${stack})`}. Keep any JSON-LD you already have; add this block next to it.`,
     )
-    if (kit.host === 'unknown') {
+    if (soloAeo) {
+      // nada más: no hay proxy que fusionar
+    } else if (kit.host === 'unknown') {
       manual.push('Pick the ONE proxy file under peaje/ that matches where the site is served (Vercel, Cloudflare, nginx, Caddy) and merge it into that config.')
     } else {
       const proxy = kit.files.find((f) => f.mode !== 'create' && basename(f.path) !== 'head.html')
@@ -107,8 +113,8 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     }
   }
 
-  // (g) copias que tapan al proxy
-  acciones.push(...planificarLimpieza(dir, kit.remove.length > 0 ? kit.remove : rutasABorrar(), timestamp))
+  // (g) copias que tapan al proxy. Sin capa de agentes no hay proxy que tapar.
+  if (!soloAeo) acciones.push(...planificarLimpieza(dir, kit.remove.length > 0 ? kit.remove : rutasABorrar(), timestamp))
 
   // Lo que el kit ya dice a mano, sin repetir lo que este CLI resolvió.
   for (const m of kit.manual) {
@@ -118,8 +124,8 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     manual.push(m)
   }
 
-  next.push(`Build and deploy. Nothing answers on your domain before the deploy is live.`)
-  next.push(`After the deploy: npx peaje@1 verify ${slug} --wait 600`)
+  next.push(soloAeo ? `Build and deploy.` : `Build and deploy. Nothing answers on your domain before the deploy is live.`)
+  next.push(`After the deploy: npx @peaje/cli@1 verify ${slug}${soloAeo ? ' --only aeo' : ''} --wait 600`)
   if (kit.paidPath) next.push(`Then: curl -sIL https://${kit.originHost}${kit.paidPath} should return 402.`)
 
   return { acciones, manual, next }
@@ -136,16 +142,40 @@ function planificarRobots(det: Deteccion, path: string, content: string, manual:
   }
   const existente = primeroQueExiste(dir, [destino, 'public/robots.txt', 'static/robots.txt'])
   if (existente) {
-    if (BLOQUEA_TODO.test(leer(dir, existente))) {
-      manual.push(`${existente} has a bare "Disallow: /" that also locks out answer engines. Allow Googlebot, Bingbot, OAI-SearchBot, PerplexityBot, Claude-SearchBot and Applebot by name (see peaje/robots.txt).`)
-      return [
-        { tipo: 'skip', path: existente, motivo: 'exists and blocks everything, left untouched' },
-        { tipo: 'write', path: 'peaje/robots.txt', content, motivo: 'reference: merge into the existing robots.txt' },
-      ]
+    const actual = leer(dir, existente)
+    const fusionado = fusionarRobots(actual, content)
+    if (fusionado === null) return [{ tipo: 'skip', path: existente, motivo: 'already has the peaje block' }]
+    if (BLOQUEA_TODO.test(actual)) {
+      manual.push(`${existente} keeps a bare "Disallow: /" for every other bot. The named answer-engine bots are now allowed by their own group; decide whether the rest should stay blocked.`)
     }
-    return [{ tipo: 'skip', path: existente, motivo: 'already exists, left untouched' }]
+    return [{ tipo: 'edit', path: existente, content: fusionado, motivo: 'appended the peaje block (named bots, paid paths); your rules untouched' }]
   }
   return [{ tipo: 'write', path: destino, content, motivo: 'no robots.txt found' }]
+}
+
+const ROBOTS_INICIO = '# peaje:begin'
+const ROBOTS_FIN = '# peaje:end'
+
+/**
+ * Suma al robots.txt del sitio el bloque de Peaje sin tocar lo que ya había.
+ * En robots.txt el grupo más específico gana: nombrar a los bots que citan
+ * los deja pasar aunque `User-agent: *` los bloquee. Se omite el grupo `*`
+ * del kit (el sitio ya tiene el suyo) y el Sitemap si ya está declarado.
+ * Idempotente por los marcadores.
+ */
+export function fusionarRobots(existente: string, kit: string): string | null {
+  if (existente.includes(ROBOTS_INICIO)) return null
+  const grupos = kit.split(/\n\s*\n/)
+  const conservar = grupos.filter((g) => {
+    const t = g.trim()
+    if (/^User-agent:\s*\*\s*$/m.test(t) && !/^User-agent:\s*[^*\s]/m.test(t)) return false
+    if (/^Sitemap:/im.test(t) && /^Sitemap:/im.test(existente)) return false
+    return t.length > 0
+  })
+  if (conservar.length === 0) return null
+  const bloque = [ROBOTS_INICIO, ...conservar.map((g) => g.trim()), ROBOTS_FIN].join('\n\n')
+  const base = existente.replace(/\s+$/, '')
+  return `${base}\n\n${bloque}\n`
 }
 
 function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual: string[], next: string[]): void {
@@ -201,6 +231,33 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
     if (nuevo) acciones.push({ tipo: 'edit', path: pkgPath, content: nuevo, motivo: 'added @peaje/next to dependencies' })
     next.unshift(`${comandoInstalar(det.gestor, '@peaje/next')}   # installs the dependency added to package.json`)
   }
+}
+
+/**
+ * Next con solo la capa AEO: el JSON-LD va como <script> estático en el root
+ * layout, sin componente ni dependencia. Es un Organization con los datos del
+ * dashboard; si cambian, se vuelve a correr `peaje init --only aeo`.
+ */
+function planificarNextAeo(det: Deteccion, kit: Kit, acciones: Accion[], manual: string[]): void {
+  const head = kit.files.find((f) => basename(f.path) === 'head.html')
+  const json = head ? extraerJsonLd(head.content) : null
+  if (!json) return
+  if (det.router === 'app' && det.layout) {
+    const r = insertarJsonLdEstatico(leer(det.dir, det.layout), json)
+    if (r.ok) acciones.push({ tipo: 'edit', path: det.layout, content: r.src, motivo: 'added Organization JSON-LD to <head>' })
+    else if (r.motivo === 'already') acciones.push({ tipo: 'skip', path: det.layout, motivo: 'already has a peaje JSON-LD block' })
+    else manual.push(`${det.layout} has no <head> and no <html>/<body> pair to anchor to. Paste the <script type="application/ld+json"> from peaje/head.html into the <head> of the root layout as JSX.`)
+  } else if (det.router === 'pages') {
+    manual.push(`Pages router: paste the <script type="application/ld+json"> from peaje/head.html into the <Head> of pages/_document.tsx.`)
+  } else {
+    manual.push(`No root layout found. Paste peaje/head.html into the <head> of the homepage.`)
+  }
+}
+
+/** El JSON de dentro del primer <script type="application/ld+json"> del snippet. */
+export function extraerJsonLd(html: string): string | null {
+  const m = /<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/.exec(html)
+  return m?.[1] ?? null
 }
 
 export type Ejecutado = { written: string[]; moved: string[] }

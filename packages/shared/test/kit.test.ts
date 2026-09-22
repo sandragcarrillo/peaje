@@ -3,6 +3,8 @@ import { test } from 'node:test'
 import {
   claveIndexNow,
   construirKit,
+  filtrarChequeos,
+  parsearCapas,
   evaluarBots,
   generarProxy,
   headJsonLd,
@@ -221,4 +223,34 @@ test('el Worker lee el manifiesto y conserva la lista embebida como respaldo', (
   const m = manifiestoProxy(base, 'v')
   assert.deepEqual(m.rutas, RUTAS_PROXY.map((r) => r.path))
   assert.deepEqual(m.prefijos, RUTAS_DINAMICAS.map((r) => r.prefijo))
+})
+
+test('capas: solo aeo trae Organization sin #api, robots sin 402 y nada del proxy', () => {
+  assert.deepEqual(parsearCapas(null), ['agentes', 'aeo'])
+  assert.deepEqual(parsearCapas('aeo'), ['aeo'])
+  assert.deepEqual(parsearCapas('agents'), ['agentes'])
+  assert.deepEqual(parsearCapas('basura'), ['agentes', 'aeo'])
+  const kit = construirKit({ slug: 's', nombre: 'S', originHost: 's.com', base, ofertas, host: 'next', capas: ['aeo'] })
+  assert.deepEqual(kit.layers, ['aeo'])
+  assert.deepEqual(kit.files.map((f) => f.path).sort(), ['peaje/head.html', 'public/robots.txt'])
+  const head = kit.files.find((f) => f.path === 'peaje/head.html')!.content
+  assert.ok(head.includes('"Organization"') && !head.includes('WebAPI') && !head.includes('makesOffer') && !head.includes('rel="service-desc"'))
+  const robots = kit.files.find((f) => f.path === 'public/robots.txt')!.content
+  assert.ok(robots.includes('OAI-SearchBot') && !robots.includes('Disallow: /r/menu') && !robots.includes('402'))
+  assert.deepEqual(kit.remove, [])
+  assert.equal(kit.paidPath, null)
+  assert.ok(kit.verifyUrl.endsWith('?layers=aeo'))
+  assert.ok(!kit.manual.some((m) => m.includes('<a href="/developers">')))
+  assert.ok(installMd(kit).includes('--only aeo'))
+  const filtrados = filtrarChequeos(
+    [
+      { id: 'proxy', ok: false, motivo: 'proxy-nada' },
+      { id: 'json-ld', ok: true, motivo: 'ok' },
+      { id: 'links', ok: false, motivo: 'links-falta' },
+      { id: 'robots', ok: true, motivo: 'ok' },
+      { id: 'bots', ok: true, motivo: 'ok' },
+    ],
+    ['aeo'],
+  )
+  assert.deepEqual(filtrados.map((c) => c.id), ['json-ld', 'robots', 'bots'])
 })

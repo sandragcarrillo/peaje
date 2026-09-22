@@ -3,7 +3,7 @@
  * códigos vienen de shared; acá solo se les pone texto.
  */
 import type { Chequeo, Motivo } from '@peaje/shared'
-import type { Fetch } from './kit'
+import type { Fetch, Solo } from './kit'
 import { ErrorCli } from './tipos'
 
 export type Verificacion = { domain: string | null; ok: boolean; checks: Chequeo[]; measuredAt: string }
@@ -38,8 +38,8 @@ const NOMBRES: Partial<Record<Chequeo['id'], string>> = {
   bots: 'answer engine bots can read the site',
 }
 
-export async function pedirVerificacion(gateway: string, slug: string, fetchFn: Fetch = fetch): Promise<Verificacion> {
-  const url = `${gateway}/${encodeURIComponent(slug)}/kit/verify`
+export async function pedirVerificacion(gateway: string, slug: string, fetchFn: Fetch = fetch, solo?: Solo): Promise<Verificacion> {
+  const url = `${gateway}/${encodeURIComponent(slug)}/kit/verify${solo ? `?layers=${solo}` : ''}`
   let res: Response
   try {
     res = await fetchFn(url, { signal: AbortSignal.timeout(60_000), headers: { accept: 'application/json' } })
@@ -78,12 +78,13 @@ export async function verificarConEspera(
   fetchFn: Fetch = fetch,
   onIntento?: (v: Verificacion, intento: number) => void,
   dormir: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  solo?: Solo,
 ): Promise<Verificacion> {
   const limite = Date.now() + esperaSeg * 1000
   let intento = 0
   for (;;) {
     intento++
-    const v = await pedirVerificacion(gateway, slug, fetchFn)
+    const v = await pedirVerificacion(gateway, slug, fetchFn, solo)
     onIntento?.(v, intento)
     if (v.ok || Date.now() + INTERVALO_MS > limite) return v
     await dormir(INTERVALO_MS)

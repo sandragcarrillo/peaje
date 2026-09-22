@@ -1,5 +1,5 @@
 /**
- * npx peaje@1 <init|plan|verify|clean> <slug> [flags]
+ * npx @peaje/cli@1 <init|plan|verify|clean> <slug> [flags]
  *
  * Pensado para que lo corra un coding agent: `--json` imprime un solo objeto
  * en stdout y nada más; sin TTY nunca espera input (sale con código 2 si
@@ -10,7 +10,7 @@ import { parseArgs } from 'node:util'
 import { esHost } from '@peaje/shared'
 import { aplicarPlan, clean, prepararInit } from './comandos'
 import { mostrarRuta } from './detectar'
-import { gatewayDe } from './kit'
+import { gatewayDe, type Solo } from './kit'
 import { ErrorCli, type Accion, type Deteccion, type Host, type Plan, type Resultado } from './tipos'
 import { lineasVerificacion, RECORDATORIO_VERIFY, verificarConEspera } from './verify'
 
@@ -25,6 +25,8 @@ Usage
 Flags
   --dir <path>        project directory (default: cwd; required in monorepos)
   --host <id>         next | vercel | cloudflare | nginx | caddy (default: detected)
+  --only <layer>      aeo: only robots.txt and the Organization JSON-LD (answer engines),
+                      no proxy and no npm dependency. agents: the opposite. Default: both.
   --gateway <url>     Peaje gateway (default: $PEAJE_GATEWAY_URL or production)
   --yes, -y           apply without asking
   --json              one JSON object on stdout, nothing else
@@ -107,6 +109,7 @@ async function main(argv: string[]): Promise<void> {
     options: {
       dir: { type: 'string' },
       host: { type: 'string' },
+      only: { type: 'string' },
       gateway: { type: 'string' },
       yes: { type: 'boolean', short: 'y', default: false },
       json: { type: 'boolean', default: false },
@@ -124,6 +127,8 @@ async function main(argv: string[]): Promise<void> {
   if (!['init', 'plan', 'verify', 'clean'].includes(comando)) throw new ErrorCli(`Unknown command "${comando}".\n\n${USO}`)
   if (!slug) throw new ErrorCli(`Missing <slug>. Usage: peaje ${comando} <slug>`)
   if (values.host !== undefined && !esHost(values.host)) throw new ErrorCli(`--host must be one of next, vercel, cloudflare, nginx, caddy.`)
+  if (values.only !== undefined && values.only !== 'aeo' && values.only !== 'agents') throw new ErrorCli(`--only must be aeo or agents.`)
+  const solo = values.only as Solo | undefined
 
   const gateway = gatewayDe(values.gateway)
   const dir = values.dir ?? process.cwd()
@@ -131,9 +136,17 @@ async function main(argv: string[]): Promise<void> {
   if (comando === 'verify') {
     const espera = values.wait ? Number(values.wait) : 0
     if (Number.isNaN(espera) || espera < 0) throw new ErrorCli('--wait expects a number of seconds.')
-    const v = await verificarConEspera(gateway, slug, espera, fetch, (parcial, intento) => {
-      if (!json && espera > 0 && !parcial.ok) console.error(`attempt ${intento}: not there yet, retrying in 15 s`)
-    })
+    const v = await verificarConEspera(
+      gateway,
+      slug,
+      espera,
+      fetch,
+      (parcial, intento) => {
+        if (!json && espera > 0 && !parcial.ok) console.error(`attempt ${intento}: not there yet, retrying in 15 s`)
+      },
+      undefined,
+      solo,
+    )
     if (json) imprimirJson(v)
     else {
       console.log(`peaje verify ${slug}: ${v.domain ?? 'no domain'} (${v.measuredAt})`)
@@ -161,7 +174,7 @@ async function main(argv: string[]): Promise<void> {
 
   // init y plan
   const dryRun = comando === 'plan'
-  const preparado = await prepararInit({ slug, dir, gateway, host: values.host as Host | undefined, dryRun })
+  const preparado = await prepararInit({ slug, dir, gateway, host: values.host as Host | undefined, solo, dryRun })
   const { det, kit, plan, codigo } = preparado
 
   if (!dryRun && !values.yes && codigo === 0) {
