@@ -1,0 +1,43 @@
+diff --git a/dist/server/Mppx.js b/dist/server/Mppx.js
+index 50b45253b1ef3b10a3c36fc133fcf4e497f9d926..1ff7e40aea62854ab55c5f3bcf153ac8c3277d2d 100644
+--- a/dist/server/Mppx.js
++++ b/dist/server/Mppx.js
+@@ -64,6 +64,10 @@ export function create(config) {
+         : undefined;
+     const handlers = {};
+     const intentCount = {};
++    // Peaje patch: several methods can share name/intent (e.g. one evm/charge per
++    // chain). Keyed lookups collapse them onto the last one registered, so keep
++    // each method's own handler.
++    const handlerByMethod = new Map();
+     for (const mi of methods) {
+         intentCount[mi.intent] = (intentCount[mi.intent] ?? 0) + 1;
+         if (mi.onPaymentSuccess) {
+@@ -101,6 +105,7 @@ export function create(config) {
+         const aliasKey = mi.alias ? `${mi.name}/${mi.alias}` : undefined;
+         if (mi.extensions)
+             Object.assign(fn, mi.extensions);
++        handlerByMethod.set(mi, fn);
+         if (!aliasKey || !handlers[wireKey])
+             handlers[wireKey] = fn;
+         if (aliasKey)
+@@ -120,8 +125,7 @@ export function create(config) {
+             const intentMethods = methods.filter((m) => m.intent === mi.intent);
+             handlers[mi.intent] = (options) => {
+                 const configured = intentMethods.map((m) => {
+-                    const key = `${m.name}/${m.intent}`;
+-                    const handlerFn = handlers[key];
++                    const handlerFn = handlerByMethod.get(m);
+                     return handlerFn(options);
+                 });
+                 return composeHandlers(configured, undefined, selectOffers);
+@@ -132,8 +136,7 @@ export function create(config) {
+     for (const mi of methods) {
+         if (!handlers[mi.name])
+             handlers[mi.name] = {};
+-        const key = mi.alias ? `${mi.name}/${mi.alias}` : `${mi.name}/${mi.intent}`;
+-        const fn = handlers[key];
++        const fn = handlerByMethod.get(mi);
+         fn._method = mi;
+         handlers[mi.name][mi.alias ?? mi.intent] = fn;
+     }
