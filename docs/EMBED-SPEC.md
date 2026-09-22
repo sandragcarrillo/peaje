@@ -1,10 +1,10 @@
 # Spec técnica · embed del widget (iframe)
 
-> **Fuera del alcance del MVP.** Ver la nota al final de [PLAN.md](./PLAN.md): el iframe queda como
-> roadmap para el caso plataforma (clientes con usuarios finales propios, modelo Stripe Connect).
-> El contrato de acá sigue válido tal cual.
+> **Fuera del alcance del MVP.** El iframe no aplica al caso base: los agentes hablan HTTP puro y el
+> dueño del negocio ya tiene el dashboard. Queda como roadmap para el caso plataforma (clientes con
+> usuarios finales propios, modelo Stripe Connect). El contrato de acá sigue válido tal cual.
 
-Complemento del [PLAN.md](./PLAN.md). Define el contrato del JWT, las rutas
+Define el contrato del JWT, las rutas
 del embed y el snippet exacto que se le entrega al cliente. Modelo de referencia: embed de Secret.
 
 ## 1. Modelo de seguridad

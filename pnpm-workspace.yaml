@@ -15,3 +15,6 @@ allowBuilds:
   esbuild: true
   keccak: true
   utf-8-validate: true
+
+patchedDependencies:
+  mppx@0.8.19: patches/mppx@0.8.19.patch

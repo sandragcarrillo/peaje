@@ -92,4 +92,3 @@ Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns
 - Real payments on Tempo testnet (pathUSD) and Arc testnet (USDC), verifiable on their explorers.
 - Buyer agent verified end to end: real weather data purchased for $0.02, delivered as a three-line human answer with receipt.
 - Withdrawals run against the chain and reconcile automatically.
-- Plan and specs in [docs/PLAN.md](./docs/PLAN.md)

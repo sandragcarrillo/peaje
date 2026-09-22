@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  mppx@0.8.19: 7914fa5b1bad4bde3fd0e158055518eeca9fd0fb4c3278f6664aa70b2a9fd7d6
+
 importers:
 
   .:
@@ -26,7 +29,7 @@ importers:
         version: 0.30.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       mppx:
         specifier: ^0.8.19
-        version: 0.8.19(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        version: 0.8.19(patch_hash=7914fa5b1bad4bde3fd0e158055518eeca9fd0fb4c3278f6664aa70b2a9fd7d6)(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -47,7 +50,7 @@ importers:
         version: 4.13.3
       mppx:
         specifier: ^0.8.19
-        version: 0.8.19(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        version: 0.8.19(patch_hash=7914fa5b1bad4bde3fd0e158055518eeca9fd0fb4c3278f6664aa70b2a9fd7d6)(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       tsx:
         specifier: ^4.20.0
         version: 4.23.12
@@ -142,7 +145,7 @@ importers:
         version: 4.13.3
       mppx:
         specifier: ^0.8.19
-        version: 0.8.19(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
+        version: 0.8.19(patch_hash=7914fa5b1bad4bde3fd0e158055518eeca9fd0fb4c3278f6664aa70b2a9fd7d6)(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
       tsx:
         specifier: ^4.20.0
         version: 4.23.12
@@ -9674,7 +9677,7 @@ snapshots:
       pkg-types: 1.3.1
       ufo: 1.6.4
 
-  mppx@0.8.19(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)):
+  mppx@0.8.19(patch_hash=7914fa5b1bad4bde3fd0e158055518eeca9fd0fb4c3278f6664aa70b2a9fd7d6)(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(express@5.2.1)(hono@4.13.3)(typescript@5.9.3)(viem@2.55.19(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)):
     dependencies:
       '@stripe/stripe-js': 9.13.0
       eventsource-parser: 3.1.1
