@@ -128,8 +128,15 @@ export type Pieza = { id: string; titulo: string; detalle: string; contenido: st
 export type Capa = 'todo' | 'aeo'
 
 export type MarcoPrompt = {
-  /** El prompt corto: una línea que apunta al kit del gateway. Es el principal. */
-  corto: (faltan: string[], capa: Capa) => string
+  /**
+   * Datos del prompt corto (una línea que apunta al kit del gateway, el
+   * principal). Van como datos y no como función: una función no cruza de un
+   * Server Component a uno de cliente, y el prompt depende de `faltan`, que
+   * solo se conoce acá después de verificar.
+   */
+  originHost: string
+  base: string
+  slug: string
   intro: string
   introAeo: string
   noCrearTitulo: string
@@ -201,7 +208,10 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
           marco.referencia,
         ]
   ).join('\n\n')
-  const prompt = marco.corto(faltan.map((f) => f.label), capa)
+  const etiquetas = faltan.map((f) => f.label)
+  const prompt = soloAeo
+    ? d.promptCortoAeo(marco.originHost, marco.base, marco.slug, etiquetas)
+    : d.promptCorto(marco.originHost, marco.base, marco.slug, etiquetas)
 
   const chip = (valor: Capa, label: string) => (
     <button

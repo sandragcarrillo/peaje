@@ -113,10 +113,9 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             })),
           ]}
           marco={{
-            corto: (faltan, capa) =>
-              capa === 'aeo'
-                ? d.promptCortoAeo(originHost, base, tenant.slug, faltan)
-                : d.promptCorto(originHost, base, tenant.slug, faltan),
+            originHost,
+            base,
+            slug: tenant.slug,
             intro: d.promptIntro(originHost, base),
             introAeo: d.promptIntroAeo(originHost),
             noCrearTitulo: d.promptNoCrearTitulo,
