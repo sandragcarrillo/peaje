@@ -1,3 +1,5 @@
+import { RAILS_LABEL } from '@/lib/config'
+
 export const landing = {
   es: {
     tickerMpp: 'Protocolo MPP',
@@ -20,7 +22,7 @@ export const landing = {
     // Status bar: el sitio reportando su propio estado. Todo cierto.
     status: [
       ['MPP', 'ACTIVO'],
-      ['RIELES', 'TEMPO + ARC'],
+      ['RIELES', RAILS_LABEL],
       ['PROTOCOLOS', '402 · X402 · ACP · UCP'],
       ['API-KEYS', '0'],
     ] as [string, string][],
@@ -67,7 +69,7 @@ export const landing = {
 
     status: [
       ['MPP', 'ACTIVE'],
-      ['RAILS', 'TEMPO + ARC'],
+      ['RAILS', RAILS_LABEL],
       ['PROTOCOLS', '402 · X402 · ACP · UCP'],
       ['API-KEYS', '0'],
     ] as [string, string][],

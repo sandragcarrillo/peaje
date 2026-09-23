@@ -1,6 +1,6 @@
 'use client'
 
-import { NETWORKS, isNetworkId } from '@peaje/shared'
+import { NETWORKS, isNetworkId, isSettlementNetwork } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
@@ -21,7 +21,10 @@ export function EnviarPanel({
 }) {
   const d = useDict()
   const router = useRouter()
-  const [network, setNetwork] = useState(balances.find((b) => Number(b.amount) > 0)?.network ?? 'tempo')
+  // En Arbitrum y Robinhood el gas es ETH y esta wallet no tiene: desde acá
+  // solo se envía por Tempo y Arc. Los saldos de esas redes se muestran igual.
+  const enviables = balances.filter((b) => isNetworkId(b.network) && !isSettlementNetwork(b.network))
+  const [network, setNetwork] = useState(enviables.find((b) => Number(b.amount) > 0)?.network ?? 'tempo')
   const [to, setTo] = useState('')
   const [amount, setAmount] = useState('')
   const [pending, setPending] = useState(false)
@@ -90,7 +93,7 @@ export function EnviarPanel({
               }}
               className="mt-1.5 w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-sm outline-none focus:border-accent"
             >
-              {balances.map((b) => (
+              {enviables.map((b) => (
                 <option key={b.network} value={b.network}>
                   {isNetworkId(b.network) ? NETWORKS[b.network].label : b.network} ({b.symbol})
                 </option>

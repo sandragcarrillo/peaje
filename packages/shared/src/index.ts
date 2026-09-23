@@ -123,6 +123,15 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
 
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
 
+/**
+ * Cadenas con riel de cobro, una vez cada una y en el orden de NETWORK_IDS.
+ * Arbitrum tiene dos rieles (USDC y USDG) pero es una sola cadena: las
+ * etiquetas para personas cuentan cadenas, no tokens.
+ */
+export const CHAIN_LABELS: string[] = [
+  ...new Map(NETWORK_IDS.map((id) => [NETWORKS[id].testnet.chainId, (NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)])).values(),
+]
+
 /** Redes donde los pagos se liquidan en PeajeSettlement y no en la treasury. */
 export const SETTLEMENT_NETWORKS = [
   'arbitrum',

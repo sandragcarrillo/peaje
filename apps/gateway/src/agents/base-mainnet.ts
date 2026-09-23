@@ -4,7 +4,7 @@ import { base } from 'viem/chains'
 /**
  * Base mainnet: la red donde vive el mercado real de x402 (el Bazaar de CDP
  * lista ~14.000 servicios y casi todos cobran USDC en Base). Los rieles
- * testnet (Tempo/Arc) se quedan para el demo Peaje-comprándole-a-Peaje; esta
+ * testnet de Peaje se quedan para el demo Peaje-comprándole-a-Peaje; esta
  * red es para comprar servicios de terceros con dinero real.
  *
  * OJO: acá el USDC es real. El tope duro sigue siendo el saldo de la wallet

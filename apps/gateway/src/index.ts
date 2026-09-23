@@ -1,7 +1,7 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import type { Tenant } from '@peaje/db'
-import { NETWORK_IDS, PEAJE_FETCH_HEADER } from '@peaje/shared'
+import { CHAIN_LABELS, NETWORK_IDS, PEAJE_FETCH_HEADER } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
 import { agentCard } from './agents/erc8004.js'
@@ -101,7 +101,7 @@ app.get('/:slug/openapi.json', async (c) => {
 
   // El discovery de pagos solo lista lo que cobra; lo gratis va en llms.txt.
   // La forma `handler` toma la metadata compuesta de la instancia MPP: emite
-  // una oferta por red (Tempo y Arc) en `x-payment-info.offers`.
+  // una oferta por riel en `x-payment-info.offers`.
   const routes = (await sellableRoutes(tenant.id)).filter((r) => Number(r.priceUsd) > 0)
   const doc = generate(mppx, {
       info: { title: `${tenant.name} · Peaje`, version: '1.0.0' },
@@ -411,7 +411,7 @@ app.post('/:slug/agentic_commerce/delegate_payment', async (c) => {
     acpError(
       'invalid_request',
       'unsupported_payment_method',
-      `${tenant.name} settles in stablecoin over HTTP 402, not cards. No card data is accepted or stored here. Call the resource, read the 402 terms, pay on Tempo or Arc: ${base}/auth.md`,
+      `${tenant.name} settles in stablecoin over HTTP 402, not cards. No card data is accepted or stored here. Call the resource, read the 402 terms, pay on any rail it lists (${CHAIN_LABELS.join(', ')}): ${base}/auth.md`,
       '$.payment_method.type',
     ),
     400,

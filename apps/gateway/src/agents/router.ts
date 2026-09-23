@@ -178,7 +178,7 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
 
   const body = await c.req.json<{ amount?: string; network?: string; fromSlug?: string }>()
-  // La persona elige la red del fondeo (Tempo o Arc) y de qué negocio suyo
+  // La persona elige la red del fondeo (cualquier riel) y de qué negocio suyo
   // sale la plata. El dashboard ya verificó que ambos negocios son del mismo
   // usuario; esta API es interna y solo la llama el dashboard.
   const network = isNetworkId(body.network ?? '') ? (body.network as NetworkId) : isNetworkId(agent.network) ? agent.network : 'arc'

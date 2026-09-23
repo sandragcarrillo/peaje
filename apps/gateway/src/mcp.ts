@@ -16,7 +16,7 @@ import { llmsTxt, pricingMd } from './wellknown.js'
 /**
  * Instancia MPP con transporte MCP: los Challenges viajan como error JSON-RPC
  * -32042 y los Receipts en `_meta`, en vez de headers HTTP. Mismos métodos de
- * cobro (Tempo + Arc) que la instancia HTTP: ver methods.ts.
+ * cobro (todos los rieles) que la instancia HTTP: ver methods.ts.
  */
 const mcpMppx = Mppx.create({
   secretKey: env.mppSecretKey,

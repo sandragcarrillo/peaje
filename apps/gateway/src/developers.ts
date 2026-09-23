@@ -137,7 +137,7 @@ ${jsonParaScript(webPage)}
     <p>Three requests, no account. The whole flow is standard HTTP.</p>
     <div class="paso"><b>1</b><div><p>Ask for the resource. The 402 is not an error: it is the price, with one offer per network in <code>WWW-Authenticate</code>.</p>
 <pre><code>curl -i ${base}${esc(ejemplo)}
-# HTTP/2 402 · offer: ${precioEjemplo} in pathUSD (Tempo) or USDC (Arc)</code></pre></div></div>
+# HTTP/2 402 · one offer per rail: ${precioEjemplo} in ${NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} (${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)})`).join(', ')}</code></pre></div></div>
     <div class="paso"><b>2</b><div><p>Pay the challenge and retry. The reference client does both, testnet wallet included:</p>
 <pre><code>npx mppx@latest ${base}${esc(ejemplo)}</code></pre></div></div>
     <div class="paso"><b>3</b><div><p>Read the resource. The response carries <code>Payment-Receipt</code> as proof. If the origin ever fails after you paid, the refund is automatic and on-chain.</p></div></div>

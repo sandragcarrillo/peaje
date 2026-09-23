@@ -58,7 +58,7 @@ export type Candidato = {
   feedbacks: number
   aceptaPagos: boolean
   /**
-   * true = el agente puede pagarlo HOY con sus rieles (Tempo/Arc testnet).
+   * true = el agente puede pagarlo HOY con sus rieles (ver REDES_PAGABLES).
    * Un servicio real en Base mainnet es señal de mercado, no una compra.
    */
   pagable: boolean

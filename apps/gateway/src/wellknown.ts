@@ -14,8 +14,11 @@ import { env } from './env.js'
 
 type Ctx = { tenant: Tenant; routes: Route[]; base: string }
 
-/** "pathUSD on Tempo or USDC on Arc" — para prosa de discovery. */
-const RAILS = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${NETWORKS[id].label}`).join(' or ')
+/** "pathUSD on Tempo, USDC on Arc, ... or USDG on Robinhood": para prosa de discovery. */
+const RAILS = (() => {
+  const rieles = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)}`)
+  return rieles.length > 1 ? `${rieles.slice(0, -1).join(', ')} or ${rieles.at(-1)}` : rieles.join('')
+})()
 
 /**
  * Header con el que leemos el origen sin que el proxy del negocio nos

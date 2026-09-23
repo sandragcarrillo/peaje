@@ -40,7 +40,7 @@ export async function ejecutarMision(agent: Agent, opts: OpcionesCorrida = {}): 
     store.recordAgentRun({ agentId: agent.id, ...run })
 
   // 1. Techo duro: lo que el agente tiene en su wallet, POR RIEL. La misma
-  //    address firma en testnet (Tempo/Arc, demo) y en Base mainnet (mercado
+  //    address firma en su riel de testnet (el que eligió al crearse) y en Base mainnet (mercado
   //    real de x402 con USDC de verdad). Si un RPC falla, ese riel queda en
   //    cero y el otro sigue disponible.
   const address = agent.walletAddress as `0x${string}`

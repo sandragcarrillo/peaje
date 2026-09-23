@@ -20,7 +20,7 @@ Try the live payment cycle right now (a real priced route, weather data proxied 
 curl -i "https://peaje-gateway.up.railway.app/clima-andino/v1/forecast?latitude=4.71&longitude=-74.07&daily=temperature_2m_max&forecast_days=5"
 ```
 
-It answers `402 Payment Required` with both rails (Tempo pathUSD and Arc USDC) in the challenge; an MPP/x402-capable agent pays and gets the data.
+It answers `402 Payment Required` with one offer per rail in the challenge (Tempo pathUSD, Arc USDC, Arbitrum Sepolia USDC and USDG, Robinhood Chain USDG); an MPP/x402-capable agent picks one, pays and gets the data.
 
 ## What it is
 
@@ -40,8 +40,8 @@ Peaje started at Platanus Hack 26 (Bogotá) as the selling side. During ETHOnlin
 - **Agent commerce protocols**: UCP profile (`/.well-known/ucp`), ACP checkout sessions, and AP2 cart mandates signed with ES256 (key published in the UCP profile).
 - **Per-tenant developer portal** generated from the DB, plus a paid-tools MCP server per business.
 - **The buyer agent**, redesigned around ask → plan → approve:
-  - Discovers across three sources: the Peaje directory (Tempo/Arc), the **x402 Bazaar** (Coinbase's index, ~15,000 real third-party services, fully indexed and cached), and the **ERC-8004 identity registry via The Graph** (on-chain reputation feeds every decision).
-  - Pays via **MPP on Tempo and Arc** (testnet) and via **x402 with real USDC on Base mainnet**, from the same Privy server wallet.
+  - Discovers across three sources: the Peaje directory (every Peaje rail), the **x402 Bazaar** (Coinbase's index, ~15,000 real third-party services, fully indexed and cached), and the **ERC-8004 identity registry via The Graph** (on-chain reputation feeds every decision).
+  - Pays via **MPP on Tempo, Arc, Arbitrum Sepolia and Robinhood Chain** (testnet) and via **x402 with real USDC on Base mainnet**, from the same Privy server wallet.
   - An LLM veto runs before any payment: if the best match does not answer the request, nothing is spent. Buying nothing beats buying garbage.
   - Your request is translated into the service's actual query (city coordinates, forecast variables, date ranges) and the purchased content is synthesized into a readable answer in your language.
   - Funding from any of your businesses' balances or straight from your personal wallet, on the network you choose.
@@ -51,11 +51,12 @@ Peaje started at Platanus Hack 26 (Bogotá) as the selling side. During ETHOnlin
 
 ```
 [Agent] ──HTTP/MCP──> [Gateway Hono + mppx · Railway] ──proxy──> [Business site/API]
-                         │  402 → on-chain payment (Tempo/Arc) → receipt
+                         │  402 → on-chain payment (Tempo · Arc · Arbitrum · Robinhood) → receipt
+                         ├─ PeajeSettlement (Arbitrum, Robinhood): merchant/fee split on-chain
                          └─ Ledger (Supabase) credits each tenant (net of fee)
 
 [Buyer agent] ─ discovery: Peaje directory + x402 Bazaar + ERC-8004 (The Graph)
-              ─ pays: MPP (Tempo/Arc testnet) · x402 (Base mainnet, USDC)
+              ─ pays: MPP (Tempo · Arc · Arbitrum · Robinhood, testnet) · x402 (Base mainnet, USDC)
               ─ wallet: Privy server wallet per agent (balance = hard budget)
 
 [Dashboard Next.js · Vercel] ─ email onboarding (Privy), prices, score,
@@ -77,18 +78,20 @@ pnpm --filter @peaje/gateway dev      # :8787
 pnpm --filter @peaje/dashboard dev    # :3100
 ```
 
-Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns the 402 challenge with both rails.
+Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns the 402 challenge with every rail.
 
 ## Sponsor tech
 
 - **Tempo**: MPP/402 charging, pathUSD settlements on both sides of the loop (charge, fund, buy).
 - **Circle / Arc**: USDC rail with EIP-3009 authorizations for charging, funding and buying.
-- **The Graph**: ERC-8004 subgraphs feed identity and on-chain reputation into every purchase decision.
+- **Arbitrum**: [PeajeSettlement](./contracts) on Arbitrum Sepolia settles USDC and USDG, crediting the merchant and the platform fee on-chain in the same transaction; merchants withdraw without gas.
+- **Robinhood Chain**: the same contract settles USDG on Robinhood Chain testnet.
+- **The Graph**: ERC-8004 subgraphs feed identity and on-chain reputation into every purchase decision, and a PeajeSettlement subgraph indexes every settlement and withdrawal.
 - **Privy**: server wallets for businesses and agents; email-only onboarding.
 - **Base / x402**: the real third-party market the buyer agent purchases from with real USDC.
 
 ## Status
 
-- Real payments on Tempo testnet (pathUSD) and Arc testnet (USDC), verifiable on their explorers.
+- Real payments on Tempo testnet (pathUSD), Arc testnet (USDC) and Arbitrum Sepolia (USDC through PeajeSettlement), verifiable on their explorers. PeajeSettlement is also deployed and verified on Robinhood Chain testnet.
 - Buyer agent verified end to end: real weather data purchased for $0.02, delivered as a three-line human answer with receipt.
 - Withdrawals run against the chain and reconcile automatically.

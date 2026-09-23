@@ -1,4 +1,4 @@
-import { NETWORK_IDS, NETWORKS } from '@peaje/shared'
+import { CHAIN_LABELS } from '@peaje/shared'
 export const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8787'
 
 export function money(value: string | number): string {
@@ -12,13 +12,8 @@ export function microMoney(value: string | number): string {
   return money(n)
 }
 
-/**
- * Cadenas donde se cobra, una vez cada una. Arbitrum tiene dos rieles (USDC y
- * USDG) pero es una sola cadena: la etiqueta cuenta cadenas, no tokens.
- */
-export const CHAINS = [
-  ...new Map(NETWORK_IDS.map((id) => [NETWORKS[id].testnet.chainId, NETWORKS[id].label.split(' · ')[0].toUpperCase()])).values(),
-]
+/** Cadenas donde se cobra, una vez cada una (ver CHAIN_LABELS en @peaje/shared). */
+export const CHAINS = CHAIN_LABELS.map((c) => c.toUpperCase())
 
 /** Rieles de cobro activos, para las etiquetas del panel. */
 export const RAILS_LABEL = CHAINS.join(' + ')
