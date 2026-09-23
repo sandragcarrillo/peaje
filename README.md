@@ -47,6 +47,22 @@ Peaje started at Platanus Hack 26 (Bogotá) as the selling side. During ETHOnlin
   - Funding from any of your businesses' balances or straight from your personal wallet, on the network you choose.
 - **Platform fee**: Peaje takes a configurable take rate per transaction (default 2%, `PEAJE_FEE_PCT`). Agents pay the listed price; the business is credited the net; the difference stays in the treasury.
 
+## Install cost for the coding agent, measured
+
+The kit used to be a 2,300-token prompt (o200k) that walked a coding agent through 19 rewrites, a delete list and six curl checks. It is now one line: `npx @peaje/cli@1 init <slug>`, 195 tokens, and the CLI does the deterministic part itself.
+
+We measured both on the same Next.js test repo (existing rewrites, an i18n middleware matcher, a custom robots.txt and a stale `openapi.json`) with Claude Code headless on Sonnet 5, three runs each, no deploy allowed. Cost and turns are what Claude Code reports.
+
+| Per install | Old prompt | `@peaje/cli` | Change |
+|---|---|---|---|
+| Prompt size (tokens) | 2,267 | 195 | -91% |
+| Agent turns | 19.0 | 10.0 | -47% |
+| Output tokens | 11,582 | 2,699 | -77% |
+| Cost per session | $0.269 | $0.118 | -56% |
+| Wall time | 122 s | 39 s | -68% |
+
+The old prompt left the JSON-LD out in one of three runs. The CLI never missed the proxy, the head block or the cleanup. One CLI run was excluded because Claude Code spawned a subagent and ended the session waiting for it; the table averages the other two. Not measured: other models, other coding agents, or a session with a real deploy. Full write-up and per-run data in [docs/improvements](./docs/improvements/2026-09-22-kit-cli.md).
+
 ## Architecture
 
 ```

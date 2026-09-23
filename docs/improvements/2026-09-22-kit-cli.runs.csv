@@ -1,0 +1,10 @@
+variant,run,status,turns,uncached_input_tokens,cache_read_tokens,output_tokens,cost_usd,duration_s,included_in_average
+A,1,success,20,26,471468,9110,0.2497,98,yes
+A,2,success,19,20,377609,12014,0.2647,123,yes
+A,3,success,18,20,390576,13623,0.2909,147,yes
+B,1,success,26,22,394154,7873,0.2282,90,yes
+B,2,success,24,16,287504,9764,0.2306,92,yes
+B,3,success,24,24,477693,6585,0.2416,84,yes
+B2,1,success,10,16,235574,2996,0.1156,40,yes
+B2,2,success,10,20,296771,2402,0.1198,38,yes
+B2,3,success,4,8,142468,1622,0.2363,21,no (agent spawned a subagent and ended the session waiting for it)
