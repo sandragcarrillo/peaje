@@ -9,15 +9,18 @@ import type {
   NewResource,
   NewRoute,
   NewTenant,
+  NewVisit,
   Resource,
   Payment,
   Route,
   Store,
   Tenant,
   TenantEntityUpdate,
+  VisitStats,
   Withdrawal,
   WithdrawalStatus,
 } from './types'
+import { aggregateVisits } from './visits'
 
 /**
  * Store en memoria. Corre el gateway y el dashboard sin Supabase, con la misma
@@ -416,5 +419,31 @@ export class MemoryStore implements Store {
       .filter((r) => r.agentId === agentId)
       .slice(-limit)
       .reverse()
+  }
+
+  // ---- visitas de agentes ----
+
+  #visits: NewVisit[] = []
+
+  async recordVisit(visit: NewVisit) {
+    this.#visits.push(visit)
+  }
+
+  async recordVisits(visits: NewVisit[]) {
+    this.#visits.push(...visits)
+  }
+
+  async visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats> {
+    const rows = this.#visits
+      .filter((v) => v.tenantId === tenantId)
+      .map((v) => ({
+        ...v,
+        agentWallet: v.paymentId ? this.#payments.find((p) => p.id === v.paymentId)?.agentWallet ?? null : null,
+      }))
+    return aggregateVisits(rows, opts.days)
+  }
+
+  async findPaymentByReceiptRef(receiptRef: string) {
+    return this.#payments.find((p) => p.receiptRef === receiptRef) ?? null
   }
 }

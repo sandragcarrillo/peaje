@@ -12,6 +12,7 @@ import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { contextoCobro, nuevoContexto } from './contexto.js'
 import { iniciarCostoRed } from './costoRed.js'
+import { registrarVisita } from './visitas.js'
 import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
@@ -148,6 +149,14 @@ app.use('/:slug/*', async (c, next) => {
   const slug = c.req.param('slug')
   const tenant = slug ? await store.getTenantBySlug(slug) : null
   if (!tenant) return
+  // Toda request a un tenant cuenta como visita, pague o no (ver visitas.ts).
+  registrarVisita({
+    tenantId: tenant.id,
+    method: c.req.method,
+    path: new URL(c.req.url).pathname.slice(`/${slug}`.length) || '/',
+    headers: c.req.raw.headers,
+    response: c.res,
+  })
   const b = docsBase(tenant)
   c.res.headers.append(
     'Link',

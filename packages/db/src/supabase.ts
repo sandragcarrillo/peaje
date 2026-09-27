@@ -10,15 +10,18 @@ import type {
   NewResource,
   NewRoute,
   NewTenant,
+  NewVisit,
   Resource,
   Payment,
   Route,
   Store,
   Tenant,
   TenantEntityUpdate,
+  VisitStats,
   Withdrawal,
   WithdrawalStatus,
 } from './types'
+import { aggregateVisits, type VisitRow } from './visits'
 
 type Row = Record<string, any>
 
@@ -662,5 +665,71 @@ export class SupabaseStore implements Store {
       .limit(limit)
     this.#fail('listAgentRuns', error)
     return (data ?? []).map(agentRunFrom)
+  }
+
+  // ---- visitas de agentes ----
+
+  async recordVisit(visit: NewVisit) {
+    await this.recordVisits([visit])
+  }
+
+  async recordVisits(visits: NewVisit[]) {
+    if (visits.length === 0) return
+    const { error } = await this.#db.from('agent_visits').insert(
+      visits.map((v) => ({
+        tenant_id: v.tenantId,
+        at: v.at,
+        path: v.path,
+        method: v.method,
+        user_agent: v.userAgent,
+        agent_kind: v.agentKind,
+        paid: v.paid,
+        network: v.network,
+        amount: v.amount,
+        payment_id: v.paymentId,
+        status: v.status,
+      })),
+    )
+    this.#fail('recordVisits', error)
+  }
+
+  async visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats> {
+    const since = new Date(Date.now() - opts.days * 86_400_000).toISOString()
+    // La wallet del agente vive en el ledger: se trae por la FK payment_id.
+    const { data, error } = await this.#db
+      .from('agent_visits')
+      .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, payments(agent_wallet)')
+      .eq('tenant_id', tenantId)
+      .gte('at', since)
+      .order('at', { ascending: false })
+      .limit(20_000)
+    this.#fail('visitStats', error)
+    const rows: VisitRow[] = ((data ?? []) as Row[]).map((r) => ({
+      tenantId,
+      at: String(r.at),
+      path: r.path,
+      method: r.method,
+      userAgent: r.user_agent ?? null,
+      agentKind: r.agent_kind,
+      paid: Boolean(r.paid),
+      network: r.network ?? null,
+      amount: r.amount === null || r.amount === undefined ? null : String(r.amount),
+      paymentId: r.payment_id ?? null,
+      status: Number(r.status),
+      agentWallet: r.payments?.agent_wallet ?? null,
+    }))
+    return aggregateVisits(rows, opts.days)
+  }
+
+  async findPaymentByReceiptRef(receiptRef: string): Promise<Payment | null> {
+    const { data, error } = await this.#db
+      .from('payments')
+      .select()
+      .eq('receipt_ref', receiptRef)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    this.#fail('findPaymentByReceiptRef', error)
+    return data ? paymentFrom(data as Row) : null
   }
 }

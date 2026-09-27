@@ -39,6 +39,7 @@ export function Sidebar({
     { href: '/rutas', label: d.panel.navRutas, valor: valores.rutas },
     { href: '/kit', label: d.panel.navKit },
     { href: '/clientes', label: d.panel.navClientes },
+    { href: '/agentes-visitas', label: d.panel.navVisitas },
     { href: '/retirar', label: d.panel.navRetirar, valor: valores.retirar, acento: true },
   ]
 

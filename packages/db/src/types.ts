@@ -206,6 +206,45 @@ export type NewRoute = {
   description?: string | null
 }
 
+// ---- visitas de agentes (pagas o no) ----
+
+export const AGENT_KINDS = [
+  'mpp-client',
+  'x402-client',
+  'openai-searchbot',
+  'perplexitybot',
+  'googlebot',
+  'claudebot',
+  'gptbot',
+  'other',
+] as const
+export type AgentKind = (typeof AGENT_KINDS)[number]
+
+/** Una request a un tenant, haya pagado o no. La escribe el gateway en lotes. */
+export type NewVisit = {
+  tenantId: string
+  at: string
+  path: string
+  method: string
+  userAgent: string | null
+  agentKind: AgentKind
+  paid: boolean
+  network: string | null
+  amount: string | null
+  paymentId: string | null
+  status: number
+}
+
+export type VisitStats = {
+  days: number
+  totals: { visits: number; paid: number; unpaid: number; revenue: string }
+  byKind: { kind: AgentKind; visits: number; paid: number }[]
+  topPaths: { path: string; visits: number; paid: number; revenue: string }[]
+  daily: { date: string; visits: number; paid: number }[]
+  /** Wallets distintas que pagaron en la ventana (sale del ledger vía payment_id). */
+  agentWallets: string[]
+}
+
 /** Contrato de persistencia. Lo implementan MemoryStore y SupabaseStore. */
 export interface Store {
   // tenants
@@ -297,4 +336,12 @@ export interface Store {
   recordAgentRun(input: NewAgentRun): Promise<AgentRun>
   markRunDelivered(runId: string, error?: string | null): Promise<void>
   listAgentRuns(agentId: string, limit?: number): Promise<AgentRun[]>
+
+  // visitas de agentes
+  recordVisit(visit: NewVisit): Promise<void>
+  /** Inserta en lote: el gateway acumula y descarga cada 2 s o 50 filas. */
+  recordVisits(visits: NewVisit[]): Promise<void>
+  visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats>
+  /** Pago por referencia de receipt: liga la visita con el ledger. */
+  findPaymentByReceiptRef(receiptRef: string): Promise<Payment | null>
 }

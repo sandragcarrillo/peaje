@@ -49,6 +49,7 @@ export const panel = {
     navRutas: 'Agregar rutas',
     navKit: 'Haz que te encuentren',
     navClientes: 'Clientes',
+    navVisitas: 'Visitas de agentes',
     navRetirar: 'Retirar',
     navWallet: 'Mi wallet',
 
@@ -237,6 +238,7 @@ export const panel = {
     navRutas: 'Add routes',
     navKit: 'Get discovered',
     navClientes: 'Customers',
+    navVisitas: 'Agent visits',
     navRetirar: 'Withdraw',
     navWallet: 'My wallet',
 
