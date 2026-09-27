@@ -23,7 +23,7 @@ export function EnviarPanel({
   const router = useRouter()
   // En Arbitrum y Robinhood el gas es ETH y esta wallet no tiene: desde acá
   // solo se envía por Tempo y Arc. Los saldos de esas redes se muestran igual.
-  const enviables = balances.filter((b) => isNetworkId(b.network) && !isSettlementNetwork(b.network))
+  const enviables = balances.filter((b) => isNetworkId(b.network) && (!isSettlementNetwork(b.network) || b.network === 'arc'))
   const [network, setNetwork] = useState(enviables.find((b) => Number(b.amount) > 0)?.network ?? 'tempo')
   const [to, setTo] = useState('')
   const [amount, setAmount] = useState('')

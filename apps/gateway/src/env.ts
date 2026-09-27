@@ -38,6 +38,7 @@ export const env = {
     arbitrum: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl,
     'arbitrum-usdg': process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS['arbitrum-usdg'].testnet.rpcUrl,
     robinhood: process.env.ROBINHOOD_TESTNET_RPC_URL ?? NETWORKS.robinhood.testnet.rpcUrl,
+    arc: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
   } satisfies Record<SettlementNetwork, string>,
   /**
    * PeajeSettlement por red. Por defecto la dirección desplegada que trae el
@@ -47,6 +48,7 @@ export const env = {
     arbitrum: settlementAddress('ARBITRUM_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.arbitrum),
     'arbitrum-usdg': settlementAddress('ARBITRUM_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS['arbitrum-usdg']),
     robinhood: settlementAddress('ROBINHOOD_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.robinhood),
+    arc: settlementAddress('ARC_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.arc),
   } satisfies Record<SettlementNetwork, `0x${string}` | null>,
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,

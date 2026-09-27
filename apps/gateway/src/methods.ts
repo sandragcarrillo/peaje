@@ -1,6 +1,5 @@
 import { NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
-import { settleArcAuthorization } from './arc.js'
 import { settleAuthorization } from './settlement.js'
 import { conCostoRed } from './costoRed.js'
 import { parseUnits } from 'viem'
@@ -10,12 +9,11 @@ import { env } from './env.js'
 
 /**
  * Métodos de cobro del gateway, compartidos por las instancias HTTP y MCP.
- * Un solo challenge 402 lleva las dos ofertas: el agente elige en qué red
- * paga (Tempo con pathUSD o Arc con USDC); al negocio le da igual el rail.
+ * Un solo challenge 402 lleva una oferta por riel: el agente elige dónde
+ * paga (Tempo con pathUSD, o USDC/USDG vía PeajeSettlement en Arbitrum,
+ * Robinhood y Arc); al negocio le da igual el rail.
  */
 export function chargeMethods() {
-  const arc = NETWORKS.arc
-
   const depegGuard = async (rail: string) => {
     const { depegged, price } = await usdcStatus()
     if (depegged) throw new Error(`Rail de ${rail} pausado: USDC despegado ($${price}). Paga por Tempo.`)
@@ -25,25 +23,6 @@ export function chargeMethods() {
     testnet: env.testnet,
     currency: env.currency,
     recipient: env.treasuryAddress,
-  })
-
-  const arcRail = evm.charge({
-    currency: arc.token,
-    chainId: arc.testnet.chainId,
-    decimals: arc.decimals,
-    authorization: arc.eip3009!,
-    recipient: env.treasuryAddress,
-    // Sin facilitator externo: el gateway broadcastea la autorización
-    // EIP-3009 él mismo (ver arc.ts) y la referencia es el hash de la tx.
-    // El depeg guard corta acá también: cubre el MCP (que no tiene
-    // selectOffers) y la ventana entre challenge emitido y pago.
-    settle: async ({ payload }) => {
-      await depegGuard('Arc')
-      const settled = await settleArcAuthorization(payload)
-      const contexto = contextoCobro.getStore()
-      if (contexto) contexto.network = 'arc'
-      return settled
-    },
   })
 
   // Una oferta por red con PeajeSettlement configurado. El recipient es el
@@ -78,7 +57,7 @@ export function chargeMethods() {
     ]
   })
 
-  // El tipo de la tupla no cambia con los rieles de settlement: todos comparten
-  // el método `evm` con Arc, que es lo que mppx usa para tipar `mppx.charge`.
-  return [tempoRail, arcRail, ...settlementRails] as unknown as readonly [typeof tempoRail, typeof arcRail]
+  // Todos los rieles EVM comparten el método `evm`: la tupla que mppx usa para
+  // tipar `mppx.charge` es Tempo más un EVM, sin importar cuántos haya.
+  return [tempoRail, ...settlementRails] as unknown as readonly [typeof tempoRail, (typeof settlementRails)[number]]
 }

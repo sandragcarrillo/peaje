@@ -1,7 +1,7 @@
 import { PrivyClient } from '@privy-io/node'
 import { createViemAccount } from '@privy-io/node/viem'
 import { fromBaseUnits, isSettlementNetwork, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
-import { createClient, createWalletClient, erc20Abi, http, parseUnits, type LocalAccount } from 'viem'
+import { createClient, http, parseUnits, type LocalAccount } from 'viem'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPublicClient, arcTestnet } from '../arc.js'
@@ -54,18 +54,10 @@ export function agentAccount(walletId: string, address: `0x${string}`): LocalAcc
 
 /** Saldo del agente en la red donde opera, en decimal. */
 export async function agentBalance(address: `0x${string}`, network: NetworkId): Promise<string> {
+  // Arc también cuenta: su USDC se lee por el mismo cliente del settlement.
   if (isSettlementNetwork(network)) {
     const { tokenBalance } = await import('../settlement.js')
     return tokenBalance(network, address)
-  }
-  if (network === 'arc') {
-    const raw = await arcPublicClient.readContract({
-      address: NETWORKS.arc.token,
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [address],
-    })
-    return fromBaseUnits(raw, NETWORKS.arc.decimals)
   }
   const balance = await Actions.token.getBalance(publicClient, { account: address, token: TOKENS.pathUsd })
   return balance.formatted ?? fromBaseUnits(balance.amount, NETWORKS.tempo.decimals)
@@ -96,19 +88,10 @@ export async function sweepAgent(
   }
 
   if (isSettlementNetwork(network)) {
-    // El agente no tiene ETH para gas: firma y el relayer somete.
+    // El agente no tiene ETH para gas (en Arc sí podría, pero el camino
+    // relayado sirve igual): firma EIP-3009 y el relayer somete.
     const { relayTokenTransfer } = await import('../settlement.js')
     return relayTokenTransfer(network, account, to, monto)
-  }
-
-  if (network === 'arc') {
-    const wallet = createWalletClient({ account, chain: arcTestnet, transport: http() })
-    return wallet.writeContract({
-      address: NETWORKS.arc.token,
-      abi: erc20Abi,
-      functionName: 'transfer',
-      args: [to, parseUnits(monto, decimals)],
-    })
   }
 
   const wallet = createClient({

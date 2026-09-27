@@ -137,6 +137,7 @@ export const SETTLEMENT_NETWORKS = [
   'arbitrum',
   'arbitrum-usdg',
   'robinhood',
+  'arc',
 ] as const satisfies readonly NetworkId[]
 export type SettlementNetwork = (typeof SETTLEMENT_NETWORKS)[number]
 
@@ -153,13 +154,16 @@ export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
   // v2 (settle con costo de red). USDC y USDG comparten cadena y contrato.
   arbitrum: '0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231',
   'arbitrum-usdg': '0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231',
-  // Robinhood sigue con el contrato v1 (0x583C…), cuyo `settle` no acepta
-  // costo de red: el riel queda apagado hasta el redeploy v2.
+  robinhood: '0xcfe4837a55fcf45c697f61b4577ddb894aa46eb7',
+  // Arc pasa de la treasury al contrato: el gas se paga en USDC nativo.
+  arc: '0xc0a98a8091a987bbb86f149f61253094e663d0ed',
 }
 
 /** Bloque del deploy: desde ahí indexa el subgraph. */
 export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
   arbitrum: 313383460,
+  robinhood: 125368290,
+  arc: 64332716,
 }
 
 export const CLAIMABLE_ABI = [

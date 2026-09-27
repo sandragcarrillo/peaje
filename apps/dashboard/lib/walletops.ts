@@ -88,7 +88,10 @@ export async function sendFromMerchantWallet(
 
   // En las redes con settlement el saldo del negocio vive en PeajeSettlement y
   // el gas es ETH: esos retiros los hace el gateway con un retiro firmado.
-  if (isSettlementNetwork(network)) {
+  // Arc también liquida por contrato, pero la wallet puede enviar por su
+  // cuenta: el gas se paga en el mismo USDC. En Arbitrum y Robinhood el gas
+  // es ETH y esta wallet no tiene.
+  if (isSettlementNetwork(network) && network !== 'arc') {
     throw new Error(`${NETWORKS[network].label} withdrawals go through Peaje: use Withdraw in your business dashboard.`)
   }
 

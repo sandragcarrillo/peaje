@@ -26,6 +26,7 @@ const TOPE_USD: Record<SettlementNetwork, number> = {
   arbitrum: 0.05,
   'arbitrum-usdg': 0.05,
   robinhood: 0.05,
+  arc: 0.01,
 }
 const REFRESCO_MS = 30_000
 
@@ -55,10 +56,10 @@ export function conCostoRed(precioUsd: string | number, network: SettlementNetwo
 async function calcular(network: SettlementNetwork): Promise<number> {
   const rpcUrl = env.settlementRpcUrls[network]
   const gasPrice = await cliente(rpcUrl).getGasPrice()
-  // Gas en ETH en todas las redes con settlement hoy. Arc pagará en USDC
-  // nativo (18 decimales) y no necesitará el precio de ETH.
-  const eth = await ethUsd()
-  const usd = (Number(GAS_SETTLE * gasPrice) / 1e18) * eth * MARGEN
+  // En Arc el gas se paga en USDC nativo (18 decimales): el costo ya está en
+  // dólares. En las demás redes es ETH y hay que convertirlo.
+  const nativoEnUsd = Number(GAS_SETTLE * gasPrice) / 1e18
+  const usd = (network === 'arc' ? nativoEnUsd : nativoEnUsd * (await ethUsd())) * MARGEN
   const tope = TOPE_USD[network]
   return Math.min(tope, Math.ceil(usd * 1e6) / 1e6)
 }
