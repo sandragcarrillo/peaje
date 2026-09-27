@@ -1,10 +1,11 @@
-import { isSettlementNetwork, NETWORKS, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
+import { isGatewayRail, isNetworkId, isSettlementNetwork, NETWORKS, railLabel, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
 import { createClient, http, parseUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPayoutConfirmed, arcTreasuryBalance, sendArcPayout } from './arc.js'
 import { sendTreasuryPayout, treasuryTokenBalance, txConfirmed, withdrawFromSettlement } from './settlement.js'
+import { retirarGateway, retiroGatewayConfirmado, saldoGatewayTreasury } from './circle.js'
 import { publicClient } from './chain.js'
 import { env } from './env.js'
 
@@ -52,10 +53,12 @@ async function tempoPayoutConfirmed(hash: `0x${string}`): Promise<boolean | null
 
 /** Manda `amount` (decimal, ej "12.45") del token de la red a `to`. Devuelve el hash. */
 export async function sendPayout(
-  network: NetworkId,
+  network: NetworkId | string,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
+  if (isGatewayRail(network)) return retirarGateway(network, to, amount)
+  if (!isNetworkId(network)) throw new Error(`Red desconocida: ${network}`)
   switch (network) {
     case 'tempo':
       return sendTempoPayout(to, amount)
@@ -69,7 +72,9 @@ export async function sendPayout(
 }
 
 /** Saldo de la treasury en decimal, en la red indicada. */
-export async function treasuryBalance(network: NetworkId): Promise<string> {
+export async function treasuryBalance(network: NetworkId | string): Promise<string> {
+  if (isGatewayRail(network)) return saldoGatewayTreasury(network)
+  if (!isNetworkId(network)) throw new Error(`Red desconocida: ${network}`)
   switch (network) {
     case 'tempo':
       return tempoTreasuryBalance()
@@ -84,9 +89,11 @@ export async function treasuryBalance(network: NetworkId): Promise<string> {
 
 /** true si la tx ya está minada y salió bien. null si todavía no aparece. */
 export async function payoutConfirmed(
-  network: NetworkId,
+  network: NetworkId | string,
   hash: `0x${string}`,
 ): Promise<boolean | null> {
+  if (isGatewayRail(network)) return retiroGatewayConfirmado(network, hash)
+  if (!isNetworkId(network)) return null
   switch (network) {
     case 'tempo':
       return tempoPayoutConfirmed(hash)
@@ -106,11 +113,11 @@ export async function payoutConfirmed(
  */
 export async function payoutFromTenant(
   tenant: { payoutWallet: string | null },
-  network: NetworkId,
+  network: NetworkId | string,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
   if (!isSettlementNetwork(network)) return sendPayout(network, to, amount)
-  if (!tenant.payoutWallet) throw new Error(`El negocio no tiene wallet de cobro en ${NETWORKS[network].label}`)
+  if (!tenant.payoutWallet) throw new Error(`El negocio no tiene wallet de cobro en ${railLabel(network)}`)
   return withdrawFromSettlement(network, tenant.payoutWallet as `0x${string}`, to, amount)
 }

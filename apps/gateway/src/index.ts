@@ -268,6 +268,7 @@ app.get('/:slug/r/:rslug', async (c) => {
   const gratis = Number(resource.priceUsd) <= 0
 
   const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
+  cobro.x402Header = c.req.header('payment-signature') ?? null
   const result = gratis
     ? null
     : await contextoCobro.run(cobro, () =>
@@ -308,6 +309,7 @@ app.get('/:slug/r/:rslug', async (c) => {
     priceUsd: resource.priceUsd,
     network: cobro.network,
     networkFee: cobro.networkFee,
+    payer: cobro.payer,
   })
 
   // Pago condicionado: origin caído = plata de vuelta al agente.
@@ -565,6 +567,7 @@ app.all('/:slug/*', async (c) => {
   if (!match) return proxyToOrigin(c.req.raw, tenant, path)
 
   const cobro = nuevoContexto(tenant.payoutWallet, match.route.priceUsd)
+  cobro.x402Header = c.req.header('payment-signature') ?? null
   const result = await contextoCobro.run(cobro, () =>
     mppx.charge({
       amount: match.route.priceUsd,
@@ -601,6 +604,7 @@ app.all('/:slug/*', async (c) => {
     priceUsd: match.route.priceUsd,
     network: cobro.network,
     networkFee: cobro.networkFee,
+    payer: cobro.payer,
   })
 
   if (originFallo && payment) {

@@ -166,6 +166,77 @@ export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
   arc: 64332716,
 }
 
+/**
+ * Rieles de Circle Nanopayments (Gateway). No son redes nuevas: son la misma
+ * cadena y el mismo USDC, pero el agente paga desde un saldo depositado en el
+ * contrato Gateway de Circle, sin gas y sin transacción por pago. Van aparte
+ * de NETWORKS porque no se leen ni se fondean como una wallet: el saldo del
+ * negocio sale del ledger y los retiros del saldo Gateway de la treasury.
+ */
+export type GatewayRailId = 'gateway-arbitrum' | 'gateway-arc'
+
+export type GatewayRail = {
+  id: GatewayRailId
+  label: string
+  chainId: number
+  rpcUrl: string
+  token: `0x${string}`
+  decimals: number
+  /** Contrato Gateway Wallet de Circle contra el que firma el agente (testnet). */
+  verifyingContract: `0x${string}`
+  facilitatorUrl: string
+  /** Nombre de cadena que usa el SDK de Circle. */
+  sdkChain: string
+  explorerUrl: string
+}
+
+export const GATEWAY_RAILS: Record<GatewayRailId, GatewayRail> = {
+  'gateway-arbitrum': {
+    id: 'gateway-arbitrum',
+    label: 'Arbitrum · Nanopayments',
+    chainId: 421614,
+    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    token: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    decimals: 6,
+    verifyingContract: '0x0077777d7EBA4688BDeF3E311b846F25870A19B9',
+    facilitatorUrl: 'https://gateway-api-testnet.circle.com/v1/x402',
+    sdkChain: 'arbitrumSepolia',
+    explorerUrl: 'https://sepolia.arbiscan.io',
+  },
+  'gateway-arc': {
+    id: 'gateway-arc',
+    label: 'Arc · Nanopayments',
+    chainId: 5042002,
+    rpcUrl: 'https://rpc.testnet.arc.network',
+    token: '0x3600000000000000000000000000000000000000',
+    decimals: 6,
+    verifyingContract: '0x0077777d7EBA4688BDeF3E311b846F25870A19B9',
+    facilitatorUrl: 'https://gateway-api-testnet.circle.com/v1/x402',
+    sdkChain: 'arcTestnet',
+    explorerUrl: 'https://testnet.arcscan.app',
+  },
+}
+
+export const GATEWAY_RAIL_IDS = Object.keys(GATEWAY_RAILS) as GatewayRailId[]
+
+export function isGatewayRail(value: string): value is GatewayRailId {
+  return value in GATEWAY_RAILS
+}
+
+/** Link al explorer de una tx en cualquier red o riel. */
+export function railExplorerTxUrl(network: string, hash: string, testnet: boolean): string | null {
+  if (isNetworkId(network)) return explorerTxUrl(network, hash, testnet)
+  if (isGatewayRail(network)) return `${GATEWAY_RAILS[network].explorerUrl}/tx/${hash}`
+  return null
+}
+
+/** Etiqueta para personas de cualquier red o riel del ledger. */
+export function railLabel(network: string): string {
+  if (isNetworkId(network)) return NETWORKS[network].label
+  if (isGatewayRail(network)) return GATEWAY_RAILS[network].label
+  return network
+}
+
 export const CLAIMABLE_ABI = [
   {
     type: 'function',

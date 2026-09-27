@@ -1,7 +1,8 @@
-import { NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
+import { GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
 import { settleAuthorization } from './settlement.js'
 import { conCostoRed } from './costoRed.js'
+import { settleGateway } from './circle.js'
 import { parseUnits } from 'viem'
 import { usdcStatus } from './chainlink.js'
 import { contextoCobro } from './contexto.js'
@@ -57,7 +58,29 @@ export function chargeMethods() {
     ]
   })
 
+  // Circle Nanopayments: una oferta x402 por cadena soportada. El agente firma
+  // contra el Gateway Wallet de Circle (no contra el token), Circle liquida en
+  // lote y el gas es de ellos: sin costo de red. Van al final para que un
+  // cliente MPP nativo, que toma la primera oferta de su cadena, use el
+  // contrato; el cliente de Circle busca la oferta por su dominio.
+  const gatewayRails = GATEWAY_RAIL_IDS.map((rail) => {
+    const def = GATEWAY_RAILS[rail]
+    return evm.charge({
+      currency: def.token,
+      chainId: def.chainId,
+      decimals: def.decimals,
+      authorization: { name: 'GatewayWalletBatched', version: '1', verifyingContract: def.verifyingContract } as { name: string; version: string },
+      recipient: env.treasuryAddress,
+      // Circle exige autorizaciones válidas 7 días; el cliente firma con este valor.
+      x402: { maxTimeoutSeconds: 604_900 },
+      settle: async ({ request }) => {
+        await depegGuard(def.label)
+        return settleGateway(rail)({ request })
+      },
+    })
+  })
+
   // Todos los rieles EVM comparten el método `evm`: la tupla que mppx usa para
   // tipar `mppx.charge` es Tempo más un EVM, sin importar cuántos haya.
-  return [tempoRail, ...settlementRails] as unknown as readonly [typeof tempoRail, (typeof settlementRails)[number]]
+  return [tempoRail, ...settlementRails, ...gatewayRails] as unknown as readonly [typeof tempoRail, (typeof settlementRails)[number]]
 }

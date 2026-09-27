@@ -1,3 +1,26 @@
+diff --git a/dist/evm/Types.js b/dist/evm/Types.js
+index 2a9d29c36668e2105ed3a52937360769cb0548b5..89e88bf81def9972b22337fa92b98a92a36fd146 100644
+--- a/dist/evm/Types.js
++++ b/dist/evm/Types.js
+@@ -15,6 +15,9 @@ const atomicAmount = z.string().check(z.regex(/^\d+$/, 'Invalid atomic amount'))
+ export const AuthorizationConfigSchema = z.object({
+     name: z.string().check(z.minLength(1)),
+     version: z.string().check(z.minLength(1)),
++    // Peaje patch: some rails sign against a contract other than the token
++    // (Circle Gateway signs against its GatewayWallet, not USDC).
++    verifyingContract: z.optional(z.string()),
+ });
+ /** EVM-specific charge method details. */
+ export const MethodDetailsSchema = z.object({
+@@ -81,7 +84,7 @@ export function authorizationDomain(parameters) {
+     return {
+         chainId: parameters.chainId,
+         name: parameters.authorization.name,
+-        verifyingContract: parameters.currency,
++        verifyingContract: parameters.authorization.verifyingContract ?? parameters.currency,
+         version: parameters.authorization.version,
+     };
+ }
 diff --git a/dist/server/Mppx.js b/dist/server/Mppx.js
 index 50b45253b1ef3b10a3c36fc133fcf4e497f9d926..01659efb104d0411f73f0fba8185e7d89abdb2c8 100644
 --- a/dist/server/Mppx.js
@@ -46,3 +69,32 @@ index 50b45253b1ef3b10a3c36fc133fcf4e497f9d926..01659efb104d0411f73f0fba8185e7d8
          fn._method = mi;
          handlers[mi.name][mi.alias ?? mi.intent] = fn;
      }
+diff --git a/dist/x402/server/EvmCharge.js b/dist/x402/server/EvmCharge.js
+index e6c6e2b3638325780a27c35e0741b3fa071495fc..b4f1d3f69ed783fa4413e53c3a63dcaac9981538 100644
+--- a/dist/x402/server/EvmCharge.js
++++ b/dist/x402/server/EvmCharge.js
+@@ -225,11 +225,19 @@ export function toPaymentRequirements(request, config) {
+     return {
+         amount: request.amount,
+         asset: request.currency,
+-        extra: {
+-            assetTransferMethod: Types.eip3009,
+-            name: config.authorization.name,
+-            version: config.authorization.version,
+-        },
++        // Peaje patch: a rail with its own verifying contract (Circle Gateway)
++        // advertises exactly what that facilitator expects.
++        extra: config.authorization.verifyingContract
++            ? {
++                name: config.authorization.name,
++                verifyingContract: config.authorization.verifyingContract,
++                version: config.authorization.version,
++            }
++            : {
++                assetTransferMethod: Types.eip3009,
++                name: config.authorization.name,
++                version: config.authorization.version,
++            },
+         maxTimeoutSeconds: config.maxTimeoutSeconds,
+         network: Types.networkOf(request.methodDetails.chainId),
+         payTo: request.recipient,

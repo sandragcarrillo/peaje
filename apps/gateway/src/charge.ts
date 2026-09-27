@@ -18,8 +18,10 @@ export type ChargeContext = {
   routeId: string | null
   path: string
   priceUsd: string
-  /** Red donde se liquidó, si el settlement la anotó (ver contexto.ts). */
-  network?: NetworkId | null
+  /** Red o riel donde se liquidó, si el settlement lo anotó (ver contexto.ts). */
+  network?: string | null
+  /** Wallet del agente si el settlement ya la conoce (rieles Gateway). */
+  payer?: string | null
   /** Costo de red pagado por el agente, si el settlement lo anotó. */
   networkFee?: string | null
 }
@@ -35,7 +37,7 @@ export type ReceiptInfo = {
  * La red sale del método del Receipt: `tempo` → tempo, `evm` → arc.
  */
 export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): Promise<Payment> {
-  const network = ctx.network ?? networkFromReceiptMethod(receipt.method)
+  const network: string = ctx.network ?? networkFromReceiptMethod(receipt.method)
 
   // El agente pagó el precio listado (bruto). El negocio recibe el neto; la
   // diferencia es el take rate de Peaje y se queda en la treasury, donde el
@@ -48,7 +50,7 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
     tenantId: ctx.tenantId,
     routeId: ctx.routeId,
     path: ctx.path,
-    agentWallet: null,
+    agentWallet: ctx.payer ?? null,
     amount: neto.toFixed(6),
     receiptRef: receipt.reference,
     method: receipt.method,
@@ -68,10 +70,13 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
     network,
   })
 
-  // La wallet del agente sale de la tx on-chain; no bloqueamos la respuesta por eso.
-  void resolvePayer(network, receipt.reference).then((wallet) => {
-    if (wallet) void store.setPaymentWallet(payment.id, wallet).catch(() => {})
-  })
+  // La wallet del agente sale de la tx on-chain; no bloqueamos la respuesta por
+  // eso. En los rieles Gateway ya vino en el payload y no hay tx que leer.
+  if (!ctx.payer && isNetworkId(network)) {
+    void resolvePayer(network, receipt.reference).then((wallet) => {
+      if (wallet) void store.setPaymentWallet(payment.id, wallet).catch(() => {})
+    })
+  }
 
   return payment
 }

@@ -99,7 +99,7 @@ Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns
 ## Sponsor tech
 
 - **Tempo**: MPP/402 charging, pathUSD settlements on both sides of the loop (charge, fund, buy).
-- **Circle / Arc**: USDC rail with EIP-3009 authorizations for charging, funding and buying.
+- **Circle / Arc**: USDC rail with EIP-3009 authorizations for charging, funding and buying. **Circle Nanopayments** on Arbitrum Sepolia and Arc: an agent deposits USDC once into Circle Gateway and then pays each request with a signature, no gas, no transaction; Circle settles in batches. Measured at 250 ms per payment ([details](./docs/improvements/2026-09-27-nanopayments.md)).
 - **Arbitrum**: [PeajeSettlement](./contracts) on Arbitrum Sepolia settles USDC and USDG, crediting the merchant and the platform fee on-chain in the same transaction; merchants withdraw without gas.
 - **Robinhood Chain**: the same contract settles USDG on Robinhood Chain testnet.
 - **The Graph**: ERC-8004 subgraphs feed identity and on-chain reputation into every purchase decision, and a PeajeSettlement subgraph indexes every settlement and withdrawal.

@@ -1,6 +1,6 @@
 'use client'
 
-import { NETWORKS, isNetworkId, isSettlementNetwork } from '@peaje/shared'
+import { NETWORKS, isNetworkId, isSettlementNetwork, railLabel } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { money, shortWallet } from '@/lib/config'
@@ -71,7 +71,7 @@ export function EnviarPanel({
           {balances.map((b) => (
             <div key={b.network} className="rounded-lg border border-border p-3">
               <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-                {isNetworkId(b.network) ? NETWORKS[b.network].label : b.network}
+                {railLabel(b.network)}
               </p>
               <p className="mt-1 text-xl tabular-nums">
                 {money(b.amount)} <span className="text-xs text-muted">{b.symbol}</span>
@@ -95,7 +95,7 @@ export function EnviarPanel({
             >
               {enviables.map((b) => (
                 <option key={b.network} value={b.network}>
-                  {isNetworkId(b.network) ? NETWORKS[b.network].label : b.network} ({b.symbol})
+                  {railLabel(b.network)} ({b.symbol})
                 </option>
               ))}
             </select>

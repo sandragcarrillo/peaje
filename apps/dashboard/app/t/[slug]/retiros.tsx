@@ -1,7 +1,8 @@
+import { railLabel } from '@peaje/shared'
 'use client'
 
 import type { Withdrawal } from '@peaje/db'
-import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
+import { explorerTxUrl, isNetworkId, NETWORKS, isGatewayRail } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { money, shortWallet, RAILS_LABEL } from '@/lib/config'
@@ -101,8 +102,8 @@ export function RetirosPanel({
       {redesConSaldo.length > 0 ? (
         <div className="grid grid-cols-1 gap-3">
           {redesConSaldo.map((b) => {
-            const label = isNetworkId(b.network) ? NETWORKS[b.network].label : b.network
-            const symbol = isNetworkId(b.network) ? NETWORKS[b.network].tokenSymbol : ''
+            const label = railLabel(b.network)
+            const symbol = isNetworkId(b.network) ? NETWORKS[b.network].tokenSymbol : isGatewayRail(b.network) ? 'USDC' : ''
             return (
               <div
                 key={b.network}
@@ -165,7 +166,7 @@ export function RetirosPanel({
               <Badge status={w.status} />
               <span>{money(w.amount)}</span>
               <span className="text-muted">
-                {isNetworkId(w.network) ? NETWORKS[w.network].label : w.network}
+                {railLabel(w.network)}
               </span>
               <span>→ {shortWallet(w.toWallet)}</span>
               {w.txRef && isNetworkId(w.network) ? (

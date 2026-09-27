@@ -1,3 +1,4 @@
+import { railLabel } from '@peaje/shared'
 'use client'
 
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
@@ -124,7 +125,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                   <p className="text-3xl font-medium tabular-nums">{money(total)}</p>
                   <p className="mt-1 text-xs text-muted">
                     {data.balances
-                      .map((b) => `${money(b.amount)} ${b.symbol} · ${isNetworkId(b.network) ? NETWORKS[b.network].label : b.network}`)
+                      .map((b) => `${money(b.amount)} ${b.symbol} · ${railLabel(b.network)}`)
                       .join('  ·  ')}
                   </p>
                 </div>

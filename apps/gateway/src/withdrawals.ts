@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { explorerTxUrl, isNetworkId, NETWORK_IDS, type NetworkId } from '@peaje/shared'
+import { GATEWAY_RAIL_IDS, isGatewayRail, isNetworkId, NETWORK_IDS, railExplorerTxUrl, type NetworkId } from '@peaje/shared'
 import { env } from './env.js'
 import { saldosPorRed } from './saldos.js'
 import { store } from './store.js'
@@ -29,7 +29,7 @@ withdrawals.get('/:slug/ledger', async (c) => {
     balanceByNetwork: await saldosPorRed(tenant),
     payments: payments.map((p) => ({
       ...p,
-      explorer: isNetworkId(p.network) ? explorerTxUrl(p.network, p.receiptRef, env.testnet) : null,
+      explorer: isNetworkId(p.network) ? railExplorerTxUrl(p.network, p.receiptRef, env.testnet) : null,
     })),
   })
 })
@@ -45,8 +45,8 @@ withdrawals.post('/:slug/withdraw', async (c) => {
   }
 
   const network = body.network ?? 'tempo'
-  if (!isNetworkId(network)) {
-    return c.json({ error: `Red inválida. Soportadas: ${NETWORK_IDS.join(', ')}` }, 400)
+  if (!isNetworkId(network) && !isGatewayRail(network)) {
+    return c.json({ error: `Red inválida. Soportadas: ${[...NETWORK_IDS, ...GATEWAY_RAIL_IDS].join(', ')}` }, 400)
   }
 
   // El saldo disponible es POR RED: el payout sale de la treasury de esa red.
@@ -75,7 +75,7 @@ withdrawals.post('/:slug/withdraw', async (c) => {
     const updated = await store.updateWithdrawal(withdrawal.id, { txRef: hash })
     return c.json({
       withdrawal: updated,
-      explorerUrl: explorerTxUrl(network, hash, env.testnet),
+      explorerUrl: railExplorerTxUrl(network, hash, env.testnet),
     })
   } catch (error) {
     await store.updateWithdrawal(withdrawal.id, { status: 'failed' })
@@ -94,7 +94,7 @@ withdrawals.get('/:slug/withdrawals/:id', async (c) => {
   }
 
   const network: NetworkId = isNetworkId(withdrawal.network) ? withdrawal.network : 'tempo'
-  const explorer = (hash: string) => explorerTxUrl(network, hash, env.testnet)
+  const explorer = (hash: string) => railExplorerTxUrl(network, hash, env.testnet)
 
   // Si sigue pending y hay tx, consultamos la chain y actualizamos.
   if (withdrawal.status === 'pending' && withdrawal.txRef) {
@@ -118,7 +118,7 @@ withdrawals.get('/:slug/withdrawals/:id', async (c) => {
 withdrawals.get('/treasury/balance', async (c) => {
   const balances = Object.fromEntries(
     await Promise.all(
-      NETWORK_IDS.map(async (network) => {
+      [...NETWORK_IDS, ...GATEWAY_RAIL_IDS].map(async (network) => {
         const balance = await treasuryBalance(network).catch(() => null)
         return [network, balance] as const
       }),

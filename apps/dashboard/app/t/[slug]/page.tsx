@@ -1,3 +1,4 @@
+import { railLabel } from '@peaje/shared'
 import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
 import { gatewayUrl, money, shortWallet, RAILS_LABEL } from '@/lib/config'
 import { TerminalBuffer } from '@/components/chrome'
@@ -170,7 +171,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
                             aria-hidden
                             className={`h-1.5 w-1.5 ${p.network === 'tempo' ? 'bg-accent' : 'bg-faint'}`}
                           />
-                          {isNetworkId(p.network) ? NETWORKS[p.network].label : p.network}
+                          {railLabel(p.network)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-3.5 text-right font-bold">
@@ -206,7 +207,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
             hour: '2-digit',
             minute: '2-digit',
           })
-          const red = isNetworkId(p.network) ? NETWORKS[p.network].label : p.network
+          const red = railLabel(p.network)
           return `[${hora}] +${money(p.amount)} · ${p.path} · ${red} · ${shortWallet(p.agentWallet)}`
         })}
       />
