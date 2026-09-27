@@ -2,6 +2,8 @@ import { NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
 import { settleArcAuthorization } from './arc.js'
 import { settleAuthorization } from './settlement.js'
+import { conCostoRed } from './costoRed.js'
+import { parseUnits } from 'viem'
 import { usdcStatus } from './chainlink.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
@@ -50,17 +52,28 @@ export function chargeMethods() {
     const contrato = env.settlementContracts[network]
     if (!contrato) return []
     const def = NETWORKS[network]
+    const rail = evm.charge({
+      currency: def.token,
+      chainId: def.testnet.chainId,
+      decimals: def.decimals,
+      authorization: def.eip3009!,
+      recipient: contrato,
+      settle: async ({ payload, request }) => {
+        if (def.tokenSymbol === 'USDC') await depegGuard(def.label)
+        // El agente firmó precio + costo de red. El contrato acredita al
+        // negocio el precio menos el 2% y a Peaje el 2% más el costo de red.
+        const contexto = contextoCobro.getStore()
+        const precio = contexto?.priceUsd ? parseUnits(contexto.priceUsd, def.decimals) : BigInt(request.amount)
+        const networkFee = BigInt(request.amount) > precio ? BigInt(request.amount) - precio : 0n
+        return settleAuthorization(network, payload, networkFee)
+      },
+    })
+    // El recargo es por riel (cada cadena cuesta distinto), así que este
+    // método ajusta el monto de la oferta antes de que mppx la arme. El hook
+    // `adjust` viene del parche a mppx (patches/mppx@0.8.19.patch).
     return [
-      evm.charge({
-        currency: def.token,
-        chainId: def.testnet.chainId,
-        decimals: def.decimals,
-        authorization: def.eip3009!,
-        recipient: contrato,
-        settle: async ({ payload }) => {
-          if (def.tokenSymbol === 'USDC') await depegGuard(def.label)
-          return settleAuthorization(network, payload)
-        },
+      Object.assign(rail, {
+        adjust: (opciones: { amount: string | number }) => ({ ...opciones, amount: conCostoRed(opciones.amount, network) }),
       }),
     ]
   })

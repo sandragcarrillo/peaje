@@ -22,6 +22,7 @@ contract PeajeSettlementTest is Test {
     address internal agent;
 
     uint16 internal constant FEE_BPS = 200;
+    uint256 internal constant MAX_NETWORK_FEE = 10_000;
 
     function setUp() public {
         agent = vm.addr(agentKey);
@@ -30,7 +31,7 @@ contract PeajeSettlementTest is Test {
 
         vm.startPrank(owner);
         settlement.setRelayer(relayer, true);
-        settlement.setAcceptedToken(address(usdc), true);
+        settlement.setAcceptedToken(address(usdc), true, MAX_NETWORK_FEE);
         vm.stopPrank();
 
         usdc.mint(agent, 1_000e6);
@@ -66,7 +67,13 @@ contract PeajeSettlementTest is Test {
     function _settle(uint256 value, bytes32 nonce) internal returns (uint256) {
         PeajeSettlement.Authorization memory auth = _authorize(usdc, value, nonce);
         vm.prank(relayer);
-        return settlement.settle(address(usdc), merchant, auth);
+        return settlement.settle(address(usdc), merchant, auth, 0);
+    }
+
+    function _settleWith(uint256 value, uint256 networkFee, bytes32 nonce) internal returns (uint256) {
+        PeajeSettlement.Authorization memory auth = _authorize(usdc, value, nonce);
+        vm.prank(relayer);
+        return settlement.settle(address(usdc), merchant, auth, networkFee);
     }
 
     function _signWithdraw(uint256 key, address account, uint256 amount, address to, uint256 deadline)
@@ -106,10 +113,10 @@ contract PeajeSettlementTest is Test {
         PeajeSettlement.Authorization memory auth = _authorize(usdc, 20_000, keccak256("pay-1"));
 
         vm.expectEmit(address(settlement));
-        emit PeajeSettlement.PaymentSettled(keccak256("pay-1"), address(usdc), merchant, agent, 20_000, 400);
+        emit PeajeSettlement.PaymentSettled(keccak256("pay-1"), address(usdc), merchant, agent, 20_000, 400, 0);
 
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_ZeroFeeCreditsFullAmount() public {
@@ -127,7 +134,7 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.NotRelayer.selector, stranger));
         vm.prank(stranger);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_RevertsForUnacceptedToken() public {
@@ -137,7 +144,7 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.TokenNotAccepted.selector, address(other)));
         vm.prank(relayer);
-        settlement.settle(address(other), merchant, auth);
+        settlement.settle(address(other), merchant, auth, 0);
     }
 
     function test_Settle_RevertsForZeroMerchant() public {
@@ -145,7 +152,7 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(PeajeSettlement.ZeroAddress.selector);
         vm.prank(relayer);
-        settlement.settle(address(usdc), address(0), auth);
+        settlement.settle(address(usdc), address(0), auth, 0);
     }
 
     function test_Settle_RevertsForZeroValue() public {
@@ -153,16 +160,16 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(PeajeSettlement.ZeroAmount.selector);
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_RevertsOnReplayedAuthorization() public {
         PeajeSettlement.Authorization memory auth = _authorize(usdc, 20_000, keccak256("pay-1"));
         vm.startPrank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
 
         vm.expectRevert(MockEIP3009.AuthorizationUsed.selector);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
         vm.stopPrank();
     }
 
@@ -172,7 +179,7 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(MockEIP3009.AuthorizationExpired.selector);
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_RevertsWhenSignatureIsForAnotherAmount() public {
@@ -181,19 +188,19 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(MockEIP3009.InvalidSignature.selector);
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_RevertsWhenTokenDeliversLessThanSigned() public {
         MockFeeOnTransferEIP3009 lossy = new MockFeeOnTransferEIP3009();
         lossy.mint(agent, 1e6);
         vm.prank(owner);
-        settlement.setAcceptedToken(address(lossy), true);
+        settlement.setAcceptedToken(address(lossy), true, 0);
         PeajeSettlement.Authorization memory auth = _authorize(lossy, 1e6, keccak256("pay-1"));
 
         vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.UnexpectedAmountReceived.selector, 1e6, 990_000));
         vm.prank(relayer);
-        settlement.settle(address(lossy), merchant, auth);
+        settlement.settle(address(lossy), merchant, auth, 0);
     }
 
     function test_Settle_RevertsWhenPaused() public {
@@ -203,7 +210,7 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
     }
 
     function test_Settle_RevertsAfterRelayerIsRevoked() public {
@@ -213,7 +220,68 @@ contract PeajeSettlementTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.NotRelayer.selector, relayer));
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, 0);
+    }
+
+    // ---- network fee ----
+
+    function test_Settle_NetworkFeeGoesToFeeRecipient() public {
+        uint256 net = _settleWith(28_000, 8_000, keccak256("pay-1"));
+
+        assertEq(net, 19_600);
+        assertEq(settlement.claimable(address(usdc), merchant), 19_600);
+        assertEq(settlement.claimable(address(usdc), treasury), 8_400);
+        assertEq(settlement.totalOwed(address(usdc)), 28_000);
+    }
+
+    function test_Settle_EmitsNetworkFee() public {
+        PeajeSettlement.Authorization memory auth = _authorize(usdc, 28_000, keccak256("pay-1"));
+
+        vm.expectEmit(address(settlement));
+        emit PeajeSettlement.PaymentSettled(keccak256("pay-1"), address(usdc), merchant, agent, 28_000, 400, 8_000);
+
+        vm.prank(relayer);
+        settlement.settle(address(usdc), merchant, auth, 8_000);
+    }
+
+    function test_Settle_RevertsWhenNetworkFeeAboveCap() public {
+        PeajeSettlement.Authorization memory auth = _authorize(usdc, 40_000, keccak256("pay-1"));
+
+        vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.NetworkFeeTooHigh.selector, 10_001, 10_000));
+        vm.prank(relayer);
+        settlement.settle(address(usdc), merchant, auth, 10_001);
+    }
+
+    function test_Settle_RevertsWhenValueOnlyCoversNetworkFee() public {
+        PeajeSettlement.Authorization memory auth = _authorize(usdc, 5_000, keccak256("pay-1"));
+
+        vm.expectRevert(PeajeSettlement.ZeroAmount.selector);
+        vm.prank(relayer);
+        settlement.settle(address(usdc), merchant, auth, 5_000);
+    }
+
+    function test_Settle_NetworkFeeWithZeroPercentage() public {
+        vm.prank(owner);
+        settlement.setFee(0, treasury);
+
+        _settleWith(20_500, 500, keccak256("pay-1"));
+
+        assertEq(settlement.claimable(address(usdc), merchant), 20_000);
+        assertEq(settlement.claimable(address(usdc), treasury), 500);
+    }
+
+    function test_SetAcceptedToken_UpdatesMaxNetworkFee() public {
+        vm.expectEmit(address(settlement));
+        emit PeajeSettlement.TokenUpdated(address(usdc), true, 250);
+        vm.prank(owner);
+        settlement.setAcceptedToken(address(usdc), true, 250);
+
+        assertEq(settlement.maxNetworkFee(address(usdc)), 250);
+
+        PeajeSettlement.Authorization memory auth = _authorize(usdc, 20_000, keccak256("pay-1"));
+        vm.expectRevert(abi.encodeWithSelector(PeajeSettlement.NetworkFeeTooHigh.selector, 251, 250));
+        vm.prank(relayer);
+        settlement.settle(address(usdc), merchant, auth, 251);
     }
 
     // ---- withdraw ----
@@ -247,7 +315,7 @@ contract PeajeSettlementTest is Test {
     function test_Withdraw_WorksAfterTokenIsDelisted() public {
         _settle(20_000, keccak256("pay-1"));
         vm.prank(owner);
-        settlement.setAcceptedToken(address(usdc), false);
+        settlement.setAcceptedToken(address(usdc), false, 0);
 
         vm.prank(merchant);
         settlement.withdraw(address(usdc), 19_600, merchant);
@@ -370,7 +438,7 @@ contract PeajeSettlementTest is Test {
 
         vm.prank(relayer);
         vm.expectRevert(MockEIP3009.AuthorizationUsed.selector);
-        settlement.settle(address(usdc), merchant, direct);
+        settlement.settle(address(usdc), merchant, direct, 0);
 
         vm.prank(owner);
         settlement.recoverSurplus(address(usdc), owner);
@@ -415,7 +483,7 @@ contract PeajeSettlementTest is Test {
         vm.expectRevert(unauthorized);
         settlement.setRelayer(stranger, true);
         vm.expectRevert(unauthorized);
-        settlement.setAcceptedToken(address(usdc), false);
+        settlement.setAcceptedToken(address(usdc), false, 0);
         vm.expectRevert(unauthorized);
         settlement.pause();
         vm.stopPrank();
@@ -440,7 +508,7 @@ contract PeajeSettlementTest is Test {
         vm.expectRevert(PeajeSettlement.ZeroAddress.selector);
         settlement.setRelayer(address(0), true);
         vm.expectRevert(PeajeSettlement.ZeroAddress.selector);
-        settlement.setAcceptedToken(address(0), true);
+        settlement.setAcceptedToken(address(0), true, 0);
         vm.expectRevert(PeajeSettlement.ZeroAddress.selector);
         settlement.recoverSurplus(address(usdc), address(0));
         vm.stopPrank();
@@ -477,17 +545,20 @@ contract PeajeSettlementTest is Test {
 
     // ---- fuzz ----
 
-    function testFuzz_Settle_FeeAndNetAddUp(uint256 value, uint16 feeBps) public {
-        value = bound(value, 1, 1_000e6);
+    function testFuzz_Settle_FeeAndNetAddUp(uint256 value, uint16 feeBps, uint256 networkFee) public {
+        networkFee = bound(networkFee, 0, MAX_NETWORK_FEE);
+        value = bound(value, networkFee + 1, 1_000e6);
         feeBps = uint16(bound(feeBps, 0, settlement.MAX_FEE_BPS()));
         vm.prank(owner);
         settlement.setFee(feeBps, treasury);
 
-        uint256 net = _settle(value, keccak256(abi.encode(value, feeBps)));
-        uint256 fee = settlement.claimable(address(usdc), treasury);
+        uint256 net = _settleWith(value, networkFee, keccak256(abi.encode(value, feeBps, networkFee)));
+        uint256 platform = settlement.claimable(address(usdc), treasury);
+        uint256 price = value - networkFee;
 
-        assertEq(net + fee, value);
-        assertLe(fee * 10_000, value * feeBps);
+        assertEq(net + platform, value);
+        assertLe((platform - networkFee) * 10_000, price * feeBps);
+        assertGe(net * 10_000 + 10_000, price * (10_000 - feeBps));
         assertEq(settlement.totalOwed(address(usdc)), value);
     }
 }

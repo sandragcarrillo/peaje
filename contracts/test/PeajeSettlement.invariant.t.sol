@@ -43,14 +43,15 @@ contract SettlementHandler is Test {
             vm.sign(AGENT_KEY, keccak256(abi.encodePacked("\x19\x01", usdc.DOMAIN_SEPARATOR(), structHash)));
     }
 
-    function settle(uint256 value, uint256 merchantSeed) external {
-        value = bound(value, 1, 10_000e6);
+    function settle(uint256 value, uint256 merchantSeed, uint256 networkFee) external {
+        networkFee = bound(networkFee, 0, 10_000);
+        value = bound(value, networkFee + 1, 10_000e6);
         address merchant = accounts[bound(merchantSeed, 1, accounts.length - 1)];
         usdc.mint(agent, value);
 
         PeajeSettlement.Authorization memory auth = _signed(value, bytes32(++nonceCounter));
         vm.prank(relayer);
-        settlement.settle(address(usdc), merchant, auth);
+        settlement.settle(address(usdc), merchant, auth, networkFee);
     }
 
     function withdraw(uint256 accountSeed, uint256 amount) external {
@@ -83,7 +84,7 @@ contract PeajeSettlementInvariantTest is Test {
         settlement = new PeajeSettlement(owner, feeRecipient, 200);
         vm.startPrank(owner);
         settlement.setRelayer(relayer, true);
-        settlement.setAcceptedToken(address(usdc), true);
+        settlement.setAcceptedToken(address(usdc), true, 10_000);
         vm.stopPrank();
 
         handler = new SettlementHandler(settlement, usdc, relayer, feeRecipient);

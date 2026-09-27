@@ -2,6 +2,7 @@ type Account @entity(immutable: false) {
   id: Bytes!
   totalReceived: BigInt!
   totalFees: BigInt!
+  totalNetworkFees: BigInt!
   totalWithdrawn: BigInt!
   paymentCount: Int!
   payments: [Payment!]! @derivedFrom(field: "merchant")
@@ -16,6 +17,7 @@ type Payment @entity(immutable: true) {
   payer: Bytes!
   amount: BigInt!
   fee: BigInt!
+  networkFee: BigInt!
   net: BigInt!
   blockNumber: BigInt!
   timestamp: BigInt!

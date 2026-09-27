@@ -5,6 +5,7 @@ import type {
   NetworkBalance,
   NewAgent,
   NewAgentRun,
+  NewPayment,
   NewResource,
   NewRoute,
   NewTenant,
@@ -198,12 +199,14 @@ export class MemoryStore implements Store {
     if (row) row.active = false
   }
 
-  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>) {
+  async recordPayment(payment: NewPayment) {
     const existing = this.#payments.find(
       (p) => p.receiptRef === payment.receiptRef && p.network === payment.network,
     )
     if (existing) return existing
     const row: Payment = {
+      platformFee: '0',
+      networkFee: '0',
       ...payment,
       id: this.#id('pay'),
       refundTx: null,

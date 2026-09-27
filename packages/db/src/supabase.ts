@@ -5,6 +5,7 @@ import type {
   Balance,
   NewAgent,
   NewAgentRun,
+  NewPayment,
   NetworkBalance,
   NewResource,
   NewRoute,
@@ -82,6 +83,8 @@ function paymentFrom(row: Row): Payment {
     method: row.method,
     network: row.network ?? 'tempo',
     refundTx: row.refund_tx ?? null,
+    platformFee: String(row.platform_fee ?? '0'),
+    networkFee: String(row.network_fee ?? '0'),
     createdAt: row.created_at,
   }
 }
@@ -351,7 +354,7 @@ export class SupabaseStore implements Store {
     this.#fail('deleteResource', error)
   }
 
-  async recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>): Promise<Payment> {
+  async recordPayment(payment: NewPayment): Promise<Payment> {
     // (network, receipt_ref) es único: si el Receipt ya se acreditó, devolvemos el existente.
     const { data, error } = await this.#db
       .from('payments')
@@ -365,6 +368,8 @@ export class SupabaseStore implements Store {
           receipt_ref: payment.receiptRef,
           method: payment.method,
           network: payment.network,
+          platform_fee: payment.platformFee ?? '0',
+          network_fee: payment.networkFee ?? '0',
         },
         { onConflict: 'network,receipt_ref' },
       )

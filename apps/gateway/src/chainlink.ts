@@ -11,6 +11,8 @@ import { mainnet } from 'viem/chains'
  */
 
 const FEED = '0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6' as const
+/** ETH/USD, mismo proveedor: https://data.chain.link/feeds/ethereum/mainnet/eth-usd */
+const FEED_ETH = '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419' as const
 const FEED_DECIMALS = 8
 
 /** Umbral en basis points bajo $1.00 (default 50 = $0.9950). */
@@ -76,4 +78,20 @@ export async function usdcStatus(): Promise<UsdcStatus> {
 
   cache = { status, at: Date.now() }
   return status
+}
+
+let ethCache: { price: number; at: number } | null = null
+
+/**
+ * Precio de ETH en USD, cacheado 60 s. Sirve para traducir el gas de las
+ * redes con settlement a dólares (costoRed.ts). Lanza si el feed no responde:
+ * quien lo llama decide si absorbe el costo o reintenta.
+ */
+export async function ethUsd(): Promise<number> {
+  if (ethCache && Date.now() - ethCache.at < CACHE_MS) return ethCache.price
+  const [, answer] = await client.readContract({ address: FEED_ETH, abi: aggregatorAbi, functionName: 'latestRoundData' })
+  const price = Number(answer) / 10 ** FEED_DECIMALS
+  if (!(price > 0)) throw new Error(`precio ETH/USD inválido: ${price}`)
+  ethCache = { price, at: Date.now() }
+  return price
 }

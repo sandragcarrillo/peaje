@@ -17,6 +17,12 @@ import {IERC3009} from "./interfaces/IERC3009.sol";
 /// @dev `settle` is relayer-only: an EIP-3009 authorization binds the payer, amount and nonce,
 ///      but not the merchant, so an open `settle` would let anyone redirect a signed payment.
 ///      Withdrawals can be relayed with an EIP-712 signature so merchants never need gas.
+///
+///      A payment is `price + networkFee`. The agent pays both; the merchant is credited the
+///      price net of the percentage fee; the fee recipient is credited the percentage fee plus
+///      the network fee, which is what the relayer spends in gas to settle. The network fee is
+///      chosen by the relayer per payment and capped per token by the owner, so a relayer can
+///      never take more than the cap on top of the percentage.
 contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Nonces {
     using SafeERC20 for IERC20;
 
@@ -40,6 +46,7 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     address public feeRecipient;
 
     mapping(address token => bool) public isAcceptedToken;
+    mapping(address token => uint256) public maxNetworkFee;
     mapping(address account => bool) public isRelayer;
     mapping(address token => mapping(address account => uint256)) public claimable;
     mapping(address token => uint256) public totalOwed;
@@ -50,12 +57,13 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         address indexed merchant,
         address payer,
         uint256 amount,
-        uint256 fee
+        uint256 fee,
+        uint256 networkFee
     );
     event Withdrawn(address indexed token, address indexed account, address indexed to, uint256 amount);
     event FeeUpdated(uint16 feeBps, address indexed feeRecipient);
     event RelayerUpdated(address indexed relayer, bool allowed);
-    event TokenUpdated(address indexed token, bool accepted);
+    event TokenUpdated(address indexed token, bool accepted, uint256 maxNetworkFee);
     event SurplusRecovered(address indexed token, address indexed to, uint256 amount);
 
     error NotRelayer(address caller);
@@ -63,6 +71,7 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     error ZeroAddress();
     error ZeroAmount();
     error FeeTooHigh(uint16 feeBps);
+    error NetworkFeeTooHigh(uint256 networkFee, uint256 max);
     error UnexpectedAmountReceived(uint256 expected, uint256 received);
     error InsufficientBalance(uint256 available, uint256 requested);
     error NoSurplus();
@@ -82,9 +91,11 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         _setFee(feeBps_, feeRecipient_);
     }
 
-    /// @notice Pulls a signed EIP-3009 payment into the contract and credits the merchant, net of fee.
-    /// @return net Amount credited to the merchant.
-    function settle(address token, address merchant, Authorization calldata auth)
+    /// @notice Pulls a signed EIP-3009 payment into the contract and credits the merchant.
+    /// @param networkFee Part of `auth.value` that covers the relayer's gas. Must not exceed
+    ///        `maxNetworkFee[token]`. The rest of the value is the price the merchant set.
+    /// @return net Amount credited to the merchant: the price minus the percentage fee.
+    function settle(address token, address merchant, Authorization calldata auth, uint256 networkFee)
         external
         onlyRelayer
         whenNotPaused
@@ -93,16 +104,22 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     {
         if (!isAcceptedToken[token]) revert TokenNotAccepted(token);
         if (merchant == address(0)) revert ZeroAddress();
-        if (auth.value == 0) revert ZeroAmount();
+        if (networkFee > maxNetworkFee[token]) revert NetworkFeeTooHigh(networkFee, maxNetworkFee[token]);
+        if (auth.value <= networkFee) revert ZeroAmount();
 
-        uint256 fee = (auth.value * feeBps) / BPS_DENOMINATOR;
-        net = auth.value - fee;
+        uint256 fee = ((auth.value - networkFee) * feeBps) / BPS_DENOMINATOR;
+        net = auth.value - networkFee - fee;
 
         claimable[token][merchant] += net;
-        if (fee != 0) claimable[token][feeRecipient] += fee;
+        if (fee + networkFee != 0) claimable[token][feeRecipient] += fee + networkFee;
         totalOwed[token] += auth.value;
-        emit PaymentSettled(auth.nonce, token, merchant, auth.from, auth.value, fee);
+        emit PaymentSettled(auth.nonce, token, merchant, auth.from, auth.value, fee, networkFee);
 
+        _pull(token, auth);
+    }
+
+    /// @dev Pulls the authorized amount and reverts unless the token delivered exactly that much.
+    function _pull(address token, Authorization calldata auth) private {
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
         IERC3009(token).transferWithAuthorization(
             auth.from,
@@ -174,10 +191,13 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         emit RelayerUpdated(relayer, allowed);
     }
 
-    function setAcceptedToken(address token, bool accepted) external onlyOwner {
+    /// @notice Lists or delists a token and sets the most a relayer may charge as network fee
+    ///         on a single payment in that token (in the token's own units).
+    function setAcceptedToken(address token, bool accepted, uint256 maxNetworkFee_) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
         isAcceptedToken[token] = accepted;
-        emit TokenUpdated(token, accepted);
+        maxNetworkFee[token] = maxNetworkFee_;
+        emit TokenUpdated(token, accepted, maxNetworkFee_);
     }
 
     function pause() external onlyOwner {

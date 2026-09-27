@@ -5,6 +5,7 @@ One file per big change, with the numbers that justify it. The point is to be ab
 | Date | Change | Headline number |
 |---|---|---|
 | 2026-09-22 | [Kit as a CLI (`@peaje/cli`)](./2026-09-22-kit-cli.md) | Install cost for the coding agent: $0.269 to $0.118 per session (-56%) |
+| 2026-09-27 | [Settlement v2: the agent pays the network cost](./2026-09-27-network-fee.md) | Peaje margin on a $0.02 payment: -$0.0076 to +$0.0004 |
 
 ## How to add one
 

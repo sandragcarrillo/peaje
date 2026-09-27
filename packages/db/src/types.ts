@@ -60,8 +60,16 @@ export type Payment = {
   network: string
   /** Hash del refund al agente si el origin falló. No-null = no cuenta para el balance. */
   refundTx: string | null
+  /** El 2% de Peaje sobre el precio, en USD decimal. */
+  platformFee: string
+  /** Costo de red pagado por el agente encima del precio (solo redes con contrato). */
+  networkFee: string
   createdAt: string
 }
+
+/** Alta de pago: las comisiones son opcionales (0 en rieles sin contrato). */
+export type NewPayment = Omit<Payment, 'id' | 'createdAt' | 'refundTx' | 'platformFee' | 'networkFee'> &
+  Partial<Pick<Payment, 'platformFee' | 'networkFee'>>
 
 export type Withdrawal = {
   id: string
@@ -233,7 +241,7 @@ export interface Store {
   deleteResource(tenantId: string, resourceId: string): Promise<void>
 
   // ledger
-  recordPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'refundTx'>): Promise<Payment>
+  recordPayment(payment: NewPayment): Promise<Payment>
   setPaymentWallet(paymentId: string, wallet: string): Promise<void>
   markPaymentRefunded(paymentId: string, txRef: string): Promise<void>
   listPayments(tenantId: string, limit?: number): Promise<Payment[]>

@@ -8,9 +8,9 @@ dataSources:
     name: PeajeSettlement
     network: arbitrum-sepolia
     source:
-      address: "0x583Cd05d8C13E6a160B09B8BF5704e9E32962225"
+      address: "0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231"
       abi: PeajeSettlement
-      startBlock: 311342003
+      startBlock: 313383460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -23,7 +23,7 @@ dataSources:
         - name: PeajeSettlement
           file: ./abis/PeajeSettlement.json
       eventHandlers:
-        - event: PaymentSettled(indexed bytes32,indexed address,indexed address,address,uint256,uint256)
+        - event: PaymentSettled(indexed bytes32,indexed address,indexed address,address,uint256,uint256,uint256)
           handler: handlePaymentSettled
         - event: Withdrawn(indexed address,indexed address,indexed address,uint256)
           handler: handleWithdrawn

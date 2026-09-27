@@ -150,15 +150,16 @@ export function isSettlementNetwork(network: string): network is SettlementNetwo
  * el ledger. Deploys: contracts/broadcast/DeployPeajeSettlement.s.sol/<chainId>.
  */
 export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
-  // Misma dirección en las dos redes: mismo deployer, mismo nonce.
-  arbitrum: '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
-  'arbitrum-usdg': '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
-  robinhood: '0x583Cd05d8C13E6a160B09B8BF5704e9E32962225',
+  // v2 (settle con costo de red). USDC y USDG comparten cadena y contrato.
+  arbitrum: '0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231',
+  'arbitrum-usdg': '0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231',
+  // Robinhood sigue con el contrato v1 (0x583C…), cuyo `settle` no acepta
+  // costo de red: el riel queda apagado hasta el redeploy v2.
 }
 
 /** Bloque del deploy: desde ahí indexa el subgraph. */
 export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
-  arbitrum: 311342003,
+  arbitrum: 313383460,
 }
 
 export const CLAIMABLE_ABI = [

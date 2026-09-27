@@ -111,3 +111,4 @@ Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns
 - Real payments on Tempo testnet (pathUSD), Arc testnet (USDC) and Arbitrum Sepolia (USDC through PeajeSettlement), verifiable on their explorers. PeajeSettlement is also deployed and verified on Robinhood Chain testnet.
 - Buyer agent verified end to end: real weather data purchased for $0.02, delivered as a three-line human answer with receipt.
 - Withdrawals run against the chain and reconcile automatically.
+- Measured improvements: [docs/improvements](./docs/improvements/README.md).

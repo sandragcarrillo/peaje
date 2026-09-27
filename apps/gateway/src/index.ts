@@ -11,6 +11,7 @@ import { usdcStatus } from './chainlink.js'
 import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { contextoCobro, nuevoContexto } from './contexto.js'
+import { iniciarCostoRed } from './costoRed.js'
 import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
@@ -257,7 +258,7 @@ app.get('/:slug/r/:rslug', async (c) => {
   // Precio 0 = link gratis: se sirve directo, sin 402.
   const gratis = Number(resource.priceUsd) <= 0
 
-  const cobro = nuevoContexto(tenant.payoutWallet)
+  const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
   const result = gratis
     ? null
     : await contextoCobro.run(cobro, () =>
@@ -297,6 +298,7 @@ app.get('/:slug/r/:rslug', async (c) => {
     path: `/r/${resource.slug}`,
     priceUsd: resource.priceUsd,
     network: cobro.network,
+    networkFee: cobro.networkFee,
   })
 
   // Pago condicionado: origin caído = plata de vuelta al agente.
@@ -553,7 +555,7 @@ app.all('/:slug/*', async (c) => {
 
   if (!match) return proxyToOrigin(c.req.raw, tenant, path)
 
-  const cobro = nuevoContexto(tenant.payoutWallet)
+  const cobro = nuevoContexto(tenant.payoutWallet, match.route.priceUsd)
   const result = await contextoCobro.run(cobro, () =>
     mppx.charge({
       amount: match.route.priceUsd,
@@ -589,6 +591,7 @@ app.all('/:slug/*', async (c) => {
     path,
     priceUsd: match.route.priceUsd,
     network: cobro.network,
+    networkFee: cobro.networkFee,
   })
 
   if (originFallo && payment) {
@@ -605,6 +608,7 @@ app.all('/:slug/*', async (c) => {
   return sealed
 })
 
+iniciarCostoRed()
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[gateway] escuchando en http://localhost:${info.port}`)
   console.log(`[gateway] treasury ${env.treasuryAddress} · currency ${env.currency}`)

@@ -28,11 +28,11 @@ import { env } from './env.js'
 
 export const settlementAbi = parseAbi([
   'struct Authorization { address from; uint256 value; uint256 validAfter; uint256 validBefore; bytes32 nonce; uint8 v; bytes32 r; bytes32 s; }',
-  'function settle(address token, address merchant, Authorization auth) returns (uint256)',
+  'function settle(address token, address merchant, Authorization auth, uint256 networkFee) returns (uint256)',
   'function withdrawWithSignature(address token, address account, uint256 amount, address to, uint256 deadline, bytes signature)',
   'function claimable(address token, address account) view returns (uint256)',
   'function nonces(address owner) view returns (uint256)',
-  'event PaymentSettled(bytes32 indexed nonce, address indexed token, address indexed merchant, address payer, uint256 amount, uint256 fee)',
+  'event PaymentSettled(bytes32 indexed nonce, address indexed token, address indexed merchant, address payer, uint256 amount, uint256 fee, uint256 networkFee)',
 ])
 
 const eip3009Abi = parseAbi([
@@ -104,8 +104,9 @@ function vrs(signature: `0x${string}`) {
 export async function settleAuthorization(
   network: SettlementNetwork,
   payload: Authorization,
+  networkFee: bigint,
 ): Promise<{ reference: string }> {
-  const { publicClient, relayerClient, token } = riel(network)
+  const { publicClient, relayerClient, token, decimals } = riel(network)
   const contexto = contextoCobro.getStore()
   const merchant = contexto?.merchant ?? relayer.address
 
@@ -129,13 +130,17 @@ export async function settleAuthorization(
         nonce: payload.nonce as `0x${string}`,
         ...vrs(signature),
       },
+      networkFee,
     ],
   })
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 })
   if (receipt.status !== 'success') throw new Error(`[${network}] settlement revertido: ${hash}`)
 
-  if (contexto) contexto.network = network
+  if (contexto) {
+    contexto.network = network
+    contexto.networkFee = fromBaseUnits(networkFee, decimals)
+  }
   return { reference: hash }
 }
 

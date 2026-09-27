@@ -20,6 +20,8 @@ export type ChargeContext = {
   priceUsd: string
   /** Red donde se liquidó, si el settlement la anotó (ver contexto.ts). */
   network?: NetworkId | null
+  /** Costo de red pagado por el agente, si el settlement lo anotó. */
+  networkFee?: string | null
 }
 
 export type ReceiptInfo = {
@@ -51,6 +53,9 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
     receiptRef: receipt.reference,
     method: receipt.method,
     network,
+    platformFee: fee.toFixed(6),
+    // Costo de red que pagó el agente encima del precio (lo anota el settlement).
+    networkFee: ctx.networkFee ?? '0',
   })
 
   console.log('[charge] pago acreditado', {

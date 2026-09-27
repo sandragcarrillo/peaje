@@ -8,6 +8,7 @@ function loadAccount(address: Bytes): Account {
     account = new Account(address)
     account.totalReceived = BigInt.zero()
     account.totalFees = BigInt.zero()
+    account.totalNetworkFees = BigInt.zero()
     account.totalWithdrawn = BigInt.zero()
     account.paymentCount = 0
   }
@@ -15,11 +16,12 @@ function loadAccount(address: Bytes): Account {
 }
 
 export function handlePaymentSettled(event: PaymentSettled): void {
-  const net = event.params.amount.minus(event.params.fee)
+  const net = event.params.amount.minus(event.params.fee).minus(event.params.networkFee)
 
   const merchant = loadAccount(event.params.merchant)
   merchant.totalReceived = merchant.totalReceived.plus(net)
   merchant.totalFees = merchant.totalFees.plus(event.params.fee)
+  merchant.totalNetworkFees = merchant.totalNetworkFees.plus(event.params.networkFee)
   merchant.paymentCount = merchant.paymentCount + 1
   merchant.save()
 
@@ -30,6 +32,7 @@ export function handlePaymentSettled(event: PaymentSettled): void {
   payment.payer = event.params.payer
   payment.amount = event.params.amount
   payment.fee = event.params.fee
+  payment.networkFee = event.params.networkFee
   payment.net = net
   payment.blockNumber = event.block.number
   payment.timestamp = event.block.timestamp

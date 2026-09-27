@@ -182,7 +182,7 @@ function buildServer(
           return { content: [{ type: 'text' as const, text: await libre.text() }] }
         }
 
-        const cobro = nuevoContexto(tenant.payoutWallet)
+        const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
         const result = await contextoCobro.run(cobro, () => mcpMppx.charge({ amount: resource.priceUsd, description: titulo })(extra))
         if (result.status === 402) throw result.challenge
 
@@ -210,7 +210,7 @@ function buildServer(
         }
         if (receipt.reference) {
           const payment = await creditPayment(
-            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network },
+            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network, networkFee: cobro.networkFee },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
           if (originFallo) await refundOriginFailure(payment)
@@ -243,7 +243,7 @@ function buildServer(
         },
       },
       async (args: Record<string, unknown>, extra) => {
-        const cobro = nuevoContexto(tenant.payoutWallet)
+        const cobro = nuevoContexto(tenant.payoutWallet, route.priceUsd)
         const result = await contextoCobro.run(cobro, () =>
           mcpMppx.charge({
             amount: route.priceUsd,
@@ -293,6 +293,7 @@ function buildServer(
               path: `mcp:${toolName(route)}`,
               priceUsd: route.priceUsd,
               network: cobro.network,
+              networkFee: cobro.networkFee,
             },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
