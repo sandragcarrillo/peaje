@@ -1,8 +1,7 @@
-import { railLabel } from '@peaje/shared'
 'use client'
 
 import type { Withdrawal } from '@peaje/db'
-import { explorerTxUrl, isNetworkId, NETWORKS, isGatewayRail } from '@peaje/shared'
+import { explorerTxUrl, isGatewayRail, isNetworkId, NETWORKS, railLabel } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { money, shortWallet, RAILS_LABEL } from '@/lib/config'

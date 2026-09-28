@@ -1,7 +1,6 @@
-import { railLabel } from '@peaje/shared'
 'use client'
 
-import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
+import { explorerTxUrl, isNetworkId, NETWORKS, railLabel } from '@peaje/shared'
 import Link from 'next/link'
 import { useState } from 'react'
 import { resumenWallet, type ResumenWallet } from '@/app/t/[slug]/actions'
