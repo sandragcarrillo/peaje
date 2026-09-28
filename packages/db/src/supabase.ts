@@ -23,6 +23,11 @@ import type {
   Withdrawal,
   WithdrawalStatus,
   UpdateRoute,
+  AgentTask,
+  AgentTaskPatch,
+  NewAgentTask,
+  TaskCheck,
+  TaskStatus,
 } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
 
@@ -63,6 +68,27 @@ function routeFrom(row: Row): Route {
     priceUsd: String(row.price_usd),
     description: row.description,
     active: row.active,
+  }
+}
+
+function taskFrom(row: Row): AgentTask {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    key: row.key,
+    kind: row.kind,
+    title: row.title,
+    summary: row.summary ?? '',
+    body: row.body,
+    acceptance: (row.acceptance ?? []) as TaskCheck[],
+    status: row.status,
+    source: row.source ?? 'agent',
+    note: row.note ?? null,
+    doneUrl: row.done_url ?? null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    doneAt: row.done_at ?? null,
+    verifiedAt: row.verified_at ?? null,
   }
 }
 
@@ -251,6 +277,67 @@ export class SupabaseStore implements Store {
     if (Object.keys(fila).length === 0) return
     const { error } = await this.#db.from('tenants').update(fila).eq('id', tenantId)
     this.#fail('updateTenantEntity', error)
+  }
+
+  async setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void> {
+    const { error } = await this.#db.from('tenants').update({ api_key_hash: hash, api_key_prefix: prefix }).eq('id', tenantId)
+    this.#fail('setTenantApiKey', error)
+  }
+
+  async upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }> {
+    const { data: previa, error: e1 } = await this.#db
+      .from('agent_tasks')
+      .select()
+      .eq('tenant_id', task.tenantId)
+      .eq('key', task.key)
+      .maybeSingle()
+    this.#fail('upsertTask(select)', e1)
+    const contenido = { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance }
+    if (previa) {
+      // Solo se refresca el contenido de una tarea que nadie tomó todavía.
+      if ((previa as Row).status !== 'open') return { task: taskFrom(previa as Row), created: false }
+      const { data, error } = await this.#db
+        .from('agent_tasks')
+        .update({ ...contenido, updated_at: new Date().toISOString() })
+        .eq('id', (previa as Row).id)
+        .select()
+        .single()
+      this.#fail('upsertTask(update)', error)
+      return { task: taskFrom(data as Row), created: false }
+    }
+    const { data, error } = await this.#db
+      .from('agent_tasks')
+      .insert({ tenant_id: task.tenantId, key: task.key, source: task.source ?? 'agent', ...contenido })
+      .select()
+      .single()
+    this.#fail('upsertTask(insert)', error)
+    return { task: taskFrom(data as Row), created: true }
+  }
+
+  async listTasks(tenantId: string, opts: { statuses?: TaskStatus[] } = {}): Promise<AgentTask[]> {
+    let q = this.#db.from('agent_tasks').select().eq('tenant_id', tenantId)
+    if (opts.statuses && opts.statuses.length > 0) q = q.in('status', opts.statuses)
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(200)
+    this.#fail('listTasks', error)
+    return (data ?? []).map(taskFrom)
+  }
+
+  async getTask(tenantId: string, id: string): Promise<AgentTask | null> {
+    const { data, error } = await this.#db.from('agent_tasks').select().eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+    this.#fail('getTask', error)
+    return data ? taskFrom(data as Row) : null
+  }
+
+  async updateTask(tenantId: string, id: string, patch: AgentTaskPatch): Promise<AgentTask> {
+    const fila: Row = { updated_at: new Date().toISOString() }
+    if (patch.status !== undefined) fila.status = patch.status
+    if (patch.note !== undefined) fila.note = patch.note
+    if (patch.doneUrl !== undefined) fila.done_url = patch.doneUrl
+    if (patch.doneAt !== undefined) fila.done_at = patch.doneAt
+    if (patch.verifiedAt !== undefined) fila.verified_at = patch.verifiedAt
+    const { data, error } = await this.#db.from('agent_tasks').update(fila).eq('tenant_id', tenantId).eq('id', id).select().single()
+    this.#fail('updateTask', error)
+    return taskFrom(data as Row)
   }
 
   async setBaselineScore(tenantId: string, score: number): Promise<void> {

@@ -10,7 +10,7 @@ import { useDict } from '@/lib/i18n/client'
 /**
  * Menú de cuenta: se abre desde el email en el navbar. Arriba la wallet
  * (balance, enviar/recibir, actividad) y abajo el submenu de navegación
- * personal (Mis negocios, Mis agentes). La vista completa vive en /wallet.
+ * personal (Mis negocios). El agente vive dentro de cada negocio (Mi agente). La vista completa vive en /wallet.
  */
 export function AccountMenu({ slug, email }: { slug: string; email: string }) {
   const d = useDict()
@@ -103,13 +103,6 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                     className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-text"
                   >
                     {nav.negocios}
-                  </Link>
-                  <Link
-                    href="/agentes"
-                    onClick={() => setOpen(false)}
-                    className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-text"
-                  >
-                    {nav.agentes}
                   </Link>
                 </nav>
 

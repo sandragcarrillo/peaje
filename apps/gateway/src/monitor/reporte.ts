@@ -25,6 +25,9 @@ export type Reporte = {
   pagos: { count: number; revenue: string; porRuta: { path: string; count: number; revenue: string }[] }
   visitas: { total: number; pagadas: number; bots: string[] } | null
   contenido: { pregunta: string; respuesta: string; porQue: string; fuente: string }[]
+  /** Tareas abiertas para el coding agent del dueño, y dónde verlas. */
+  tareas: { titulo: string; tipo: string; estado: string }[]
+  agenteUrl: string
 }
 
 const DIAS = 7
@@ -154,5 +157,9 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
     pagos: { count: pagos.length, revenue: pagos.reduce((s, p) => s + Number(p.amount), 0).toFixed(4), porRuta },
     visitas,
     contenido: opciones.conContenido ? await sugerirContenido(tenant, dominio) : [],
+    tareas: (await store.listTasks(tenant.id, { statuses: ['open', 'in_progress', 'done'] }).catch(() => []))
+      .slice(0, 8)
+      .map((t) => ({ titulo: t.title, tipo: t.kind, estado: t.status })),
+    agenteUrl: `${DASHBOARD}/t/${tenant.slug}/agente`,
   }
 }

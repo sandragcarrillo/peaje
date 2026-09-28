@@ -40,6 +40,20 @@ Everything is measured on the business domain, not on the gateway. Run it only a
 
 Only the backup step: moves static copies and route handlers that shadow the proxy to `.peaje-backup/`.
 
+
+### `peaje tasks`, `peaje task <id>`, `peaje done <id>`
+
+Peaje's agent (the "My agent" page of each business in the dashboard) leaves tasks for your coding agent: fixes for failing checks, pages that answer engines would cite, routes that agents asked for and got a 404. It never touches your site; these commands are how your coding agent picks them up.
+
+```sh
+export PEAJE_AGENT_KEY=peaje_live_...   # created in the dashboard, "My agent"
+npx @peaje/cli@1 tasks                  # open tasks
+npx @peaje/cli@1 task <id>              # the full prompt, to implement in this repo
+npx @peaje/cli@1 done <id> --url <live url>   # after deploying; Peaje verifies it on the live site
+```
+
+`done` exits 0 when Peaje verified the task on the live site and 1 when it is marked done but not live yet (Peaje checks again every day). The same tasks are available over MCP at `https://peaje-gateway.up.railway.app/_owner/mcp` with `Authorization: Bearer <agent key>`; the dashboard shows the exact line for Claude Code and Cursor.
+
 ## What it touches and what it does not
 
 Touches: `next.config.*` (only when it is a plain `export default X` or `module.exports = X`), the root `app/layout.*`, `package.json` dependencies, `public/robots.txt` (only if missing), files under `peaje/`, and moves shadowing copies to `.peaje-backup/`.

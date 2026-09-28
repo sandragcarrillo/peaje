@@ -50,6 +50,7 @@ export const panel = {
     navKit: 'Haz que te encuentren',
     navClientes: 'Clientes',
     navVisitas: 'Visitas de agentes',
+    navAgente: 'Mi agente',
     navRetirar: 'Retirar',
     navWallet: 'Mi wallet',
 
@@ -259,6 +260,7 @@ export const panel = {
     navKit: 'Get discovered',
     navClientes: 'Customers',
     navVisitas: 'Agent visits',
+    navAgente: 'My agent',
     navRetirar: 'Withdraw',
     navWallet: 'My wallet',
 

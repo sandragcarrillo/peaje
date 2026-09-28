@@ -160,3 +160,26 @@ export function deleteAgent(slug: string, id: string) {
 export function listAgentRuns(slug: string, id: string) {
   return internal<{ runs: AgentRunConExplorer[] }>(`/${slug}/agents/${id}/runs`)
 }
+
+// ---- tareas del agente Pro ----
+
+export type ResultadoBusqueda = { creadas: number; actualizadas: number; cerradas: number } | { error: 'too-soon'; retryInSeconds: number }
+
+/** Busca tareas nuevas. 429 no es error para la UI: trae cuánto esperar. */
+export async function buscarTareas(slug: string): Promise<ResultadoBusqueda> {
+  const res = await fetch(`${base}/_internal/${slug}/tasks/generate`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${secret}` },
+    cache: 'no-store',
+  })
+  const data = (await res.json()) as ResultadoBusqueda & { error?: string }
+  if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
+  return data
+}
+
+export function completarTarea(slug: string, id: string, url?: string) {
+  return internal<{ task: { status: string; note: string | null } }>(`/${slug}/tasks/${id}/done`, {
+    method: 'POST',
+    body: JSON.stringify(url ? { url } : {}),
+  })
+}

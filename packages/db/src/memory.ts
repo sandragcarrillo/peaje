@@ -22,6 +22,10 @@ import type {
   Withdrawal,
   WithdrawalStatus,
   UpdateRoute,
+  AgentTask,
+  AgentTaskPatch,
+  NewAgentTask,
+  TaskStatus,
 } from './types'
 import { aggregateVisits } from './visits'
 
@@ -138,6 +142,63 @@ export class MemoryStore implements Store {
       t.baselineScore = score
       t.baselineScoreAt = new Date().toISOString()
     }
+  }
+
+  async setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void> {
+    const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
+    if (!t) return
+    for (const [h, id] of this.#hashes) if (id === tenantId) this.#hashes.delete(h)
+    this.#hashes.set(hash, tenantId)
+    t.apiKeyPrefix = prefix
+  }
+
+  #tasks: AgentTask[] = []
+
+  async upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }> {
+    const previa = this.#tasks.find((t) => t.tenantId === task.tenantId && t.key === task.key)
+    const ahora = new Date().toISOString()
+    if (previa) {
+      if (previa.status !== 'open') return { task: previa, created: false }
+      Object.assign(previa, { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance, updatedAt: ahora })
+      return { task: previa, created: false }
+    }
+    const nueva: AgentTask = {
+      id: this.#id('tsk'),
+      tenantId: task.tenantId,
+      key: task.key,
+      kind: task.kind,
+      title: task.title,
+      summary: task.summary,
+      body: task.body,
+      acceptance: task.acceptance,
+      status: 'open',
+      source: task.source ?? 'agent',
+      note: null,
+      doneUrl: null,
+      createdAt: ahora,
+      updatedAt: ahora,
+      doneAt: null,
+      verifiedAt: null,
+    }
+    this.#tasks.push(nueva)
+    return { task: nueva, created: true }
+  }
+
+  async listTasks(tenantId: string, opts: { statuses?: TaskStatus[] } = {}): Promise<AgentTask[]> {
+    return this.#tasks
+      .filter((t) => t.tenantId === tenantId && (!opts.statuses?.length || opts.statuses.includes(t.status)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
+  async getTask(tenantId: string, id: string): Promise<AgentTask | null> {
+    return this.#tasks.find((t) => t.tenantId === tenantId && t.id === id) ?? null
+  }
+
+  async updateTask(tenantId: string, id: string, patch: AgentTaskPatch): Promise<AgentTask> {
+    const t = this.#tasks.find((x) => x.tenantId === tenantId && x.id === id)
+    if (!t) throw new Error('Tarea no encontrada')
+    Object.assign(t, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)), { updatedAt: new Date().toISOString() })
+    return t
   }
 
   async listRoutes(tenantId: string) {

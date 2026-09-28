@@ -214,6 +214,41 @@ export type UpdateRoute = {
   description?: string | null
 }
 
+// ---- tareas del agente Pro ----
+
+export const TASK_KINDS = ['content', 'route', 'fix'] as const
+export type TaskKind = (typeof TASK_KINDS)[number]
+export const TASK_STATUSES = ['open', 'in_progress', 'done', 'verified', 'dismissed'] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+
+/** Un criterio que Peaje revisa al marcar la tarea hecha. */
+export type TaskCheck =
+  | { type: 'check'; id: string }
+  | { type: 'url'; url: string; contains?: string; notStatus?: number }
+
+export type AgentTask = {
+  id: string
+  tenantId: string
+  key: string
+  kind: TaskKind
+  title: string
+  summary: string
+  body: string
+  acceptance: TaskCheck[]
+  status: TaskStatus
+  source: string
+  note: string | null
+  doneUrl: string | null
+  createdAt: string
+  updatedAt: string
+  doneAt: string | null
+  verifiedAt: string | null
+}
+
+export type NewAgentTask = Pick<AgentTask, 'tenantId' | 'key' | 'kind' | 'title' | 'summary' | 'body' | 'acceptance'> & { source?: string }
+
+export type AgentTaskPatch = Partial<Pick<AgentTask, 'status' | 'note' | 'doneUrl' | 'doneAt' | 'verifiedAt'>>
+
 // ---- monitoreo: una corrida del verificador por tenant ----
 
 export type Verificacion = {
@@ -302,6 +337,13 @@ export interface Store {
   setPayoutWallet(tenantId: string, wallet: string): Promise<void>
   /** Datos de entidad del kit (JSON-LD Organization, toggle de robots). Solo pisa lo que viene definido. */
   updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void>
+  /** La clave con la que el coding agent del dueño entra al MCP y al CLI. Solo el hash. */
+  setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void>
+  /** Crea la tarea, o actualiza su contenido si sigue abierta. Nunca reabre una descartada o verificada. */
+  upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }>
+  listTasks(tenantId: string, opts?: { statuses?: TaskStatus[] }): Promise<AgentTask[]>
+  getTask(tenantId: string, id: string): Promise<AgentTask | null>
+  updateTask(tenantId: string, id: string, patch: AgentTaskPatch): Promise<AgentTask>
 
   // origins permitidos para el iframe
   listAllowedOrigins(tenantId: string): Promise<string[]>

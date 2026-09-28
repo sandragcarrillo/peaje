@@ -35,6 +35,7 @@ export function Sidebar({
 
   const items: { href: string; label: string; valor?: string; acento?: boolean }[] = [
     { href: '', label: d.panel.navDashboard },
+    { href: '/agente', label: d.panel.navAgente },
     { href: '/score', label: d.panel.navScore, valor: valores.score },
     { href: '/rutas', label: d.panel.navRutas, valor: valores.rutas },
     { href: '/kit', label: d.panel.navKit },

@@ -5,6 +5,7 @@ import { store } from '../store.js'
 import { correrTenant, eventosAlertables } from './correr.js'
 import { enviarCorreo, htmlAlerta, htmlSemanal } from './email.js'
 import { armarReporte } from './reporte.js'
+import { generarTareas, reverificarHechas, sincronizarFixes } from '../tareas/generar.js'
 
 /**
  * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
@@ -29,6 +30,9 @@ async function corridaConAlerta(slug: string) {
   if (!tenant) return { slug, error: 'not found' }
   const corrida = await correrTenant(tenant)
   if (!corrida) return { slug, skipped: 'sin dominio público' }
+  // Tareas de arreglo al día con la corrida, y las hechas que esperaban el deploy.
+  const tareas = await sincronizarFixes(tenant).catch(() => null)
+  await reverificarHechas(tenant).catch(() => 0)
   const alertables = eventosAlertables(corrida.eventos)
   let alerted: string[] = []
   if (alertables.length > 0 && esPro(tenant)) {
@@ -42,7 +46,7 @@ async function corridaConAlerta(slug: string) {
       console.error('[monitor] no se pudo alertar a', slug, error instanceof Error ? error.message : error)
     }
   }
-  return { slug, ok: corrida.verificacion.ok, score: corrida.verificacion.score, eventos: corrida.eventos, alerted }
+  return { slug, ok: corrida.verificacion.ok, score: corrida.verificacion.score, eventos: corrida.eventos, alerted, tareas }
 }
 
 monitorRouter.post('/run/:slug', async (c) => c.json(await corridaConAlerta(c.req.param('slug'))))
@@ -70,7 +74,10 @@ monitorRouter.post('/weekly', async (c) => {
     try {
       const actual = (await store.lastVerification(t.id)) ?? (await correrTenant(t))?.verificacion
       if (!actual) continue
-      const reporte = await armarReporte(t, actual, { conContenido: true })
+      // Las sugerencias de contenido entran como tareas (una sola llamada a Opus);
+      // el correo lista las tareas abiertas.
+      await generarTareas(t, { conContenido: true })
+      const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)
       await enviarCorreo(t.email!, subject, html)
       enviados.push(t.slug)

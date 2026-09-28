@@ -1,5 +1,6 @@
 /**
  * npx @peaje/cli@1 <init|plan|verify|clean> <slug> [flags]
+ * npx @peaje/cli@1 <tasks|task|done> [id] --key <agent key>
  *
  * Pensado para que lo corra un coding agent: `--json` imprime un solo objeto
  * en stdout y nada más; sin TTY nunca espera input (sale con código 2 si
@@ -13,6 +14,7 @@ import { mostrarRuta } from './detectar'
 import { gatewayDe, type Solo } from './kit'
 import { ErrorCli, type Accion, type Deteccion, type Host, type Plan, type Resultado } from './tipos'
 import { lineasVerificacion, RECORDATORIO_VERIFY, verificarConEspera } from './verify'
+import { claveDe, lineasTareas, listarTareas, marcarHecha, verTarea } from './tareas'
 
 const USO = `peaje: install Peaje on your site
 
@@ -21,6 +23,9 @@ Usage
   peaje plan <slug>    same as init, without writing anything
   peaje verify <slug>  measure what is live on the business domain
   peaje clean <slug>   move static copies that shadow the proxy to .peaje-backup/
+  peaje tasks          tasks Peaje's agent left for this site (needs the agent key)
+  peaje task <id>      the full prompt of one task, to implement in this repo
+  peaje done <id>      mark it done after deploying; Peaje verifies it on the live site
 
 Flags
   --dir <path>        project directory (default: cwd; required in monorepos)
@@ -31,6 +36,9 @@ Flags
   --yes, -y           apply without asking
   --json              one JSON object on stdout, nothing else
   --wait <seconds>    verify: retry every 15 s until it passes or time runs out
+  --key <key>         tasks: the agent key from the dashboard ("My agent"), or $PEAJE_AGENT_KEY
+  --url <url>         done: the live URL of what you built
+  --status <s>        tasks: open,in_progress,done,verified,dismissed or all
   --help, -h
 
 Exit codes: 0 ok, 1 error or failed verification, 2 confirmation needed (no TTY), 3 stack not recognized.
@@ -114,6 +122,9 @@ async function main(argv: string[]): Promise<void> {
       yes: { type: 'boolean', short: 'y', default: false },
       json: { type: 'boolean', default: false },
       wait: { type: 'string' },
+      key: { type: 'string' },
+      url: { type: 'string' },
+      status: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
     },
   })
@@ -123,6 +134,27 @@ async function main(argv: string[]): Promise<void> {
   if (values.help || !comando) {
     process.stdout.write(USO)
     return salir(comando ? 0 : 1)
+  }
+  if (['tasks', 'task', 'done'].includes(comando)) {
+    const gw = gatewayDe(values.gateway)
+    const clave = claveDe(values.key)
+    if (comando === 'tasks') {
+      const r = await listarTareas(gw, clave, values.status)
+      if (json) imprimirJson(r)
+      else for (const l of lineasTareas(r)) console.log(l)
+      return salir(0)
+    }
+    if (!slug) throw new ErrorCli(`Missing <id>. Usage: peaje ${comando} <id>`)
+    if (comando === 'task') {
+      const { task } = await verTarea(gw, clave, slug)
+      if (json) imprimirJson(task)
+      else console.log(`${task.prompt}\n\n---\nTask ${task.id} · ${task.status}\nAcceptance, checked by Peaje on the live site: ${JSON.stringify(task.acceptance)}\nWhen deployed: peaje done ${task.id}${task.kind === 'fix' ? '' : ' --url <live url>'}`)
+      return salir(0)
+    }
+    const { task } = await marcarHecha(gw, clave, slug, values.url)
+    if (json) imprimirJson(task)
+    else console.log(task.status === 'verified' ? `Verified on the live site. ${task.note ?? ''}` : `Marked done. ${task.note ?? ''}`)
+    return salir(task.status === 'verified' ? 0 : 1)
   }
   if (!['init', 'plan', 'verify', 'clean'].includes(comando)) throw new ErrorCli(`Unknown command "${comando}".\n\n${USO}`)
   if (!slug) throw new ErrorCli(`Missing <slug>. Usage: peaje ${comando} <slug>`)
