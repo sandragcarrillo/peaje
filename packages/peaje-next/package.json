@@ -1,7 +1,7 @@
 {
   "name": "@peaje/next",
-  "version": "0.1.0",
-  "description": "Peaje for Next.js: proxy rewrites and the head block that make your site speak MPP, MCP and OpenAPI on your own domain.",
+  "version": "0.2.0",
+  "description": "Peaje for Next.js: runtime proxy, rewrites and the head block that make your site answer 402 (MPP, x402), MCP and OpenAPI on your own domain.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -30,6 +30,16 @@
       "require": {
         "types": "./dist/head.d.cts",
         "default": "./dist/head.cjs"
+      }
+    },
+    "./proxy": {
+      "import": {
+        "types": "./dist/proxy.d.ts",
+        "default": "./dist/proxy.js"
+      },
+      "require": {
+        "types": "./dist/proxy.d.cts",
+        "default": "./dist/proxy.cjs"
       }
     }
   },
@@ -67,5 +77,8 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
     "typescript": "^5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

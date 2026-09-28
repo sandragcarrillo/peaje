@@ -26,6 +26,8 @@ export type Tenant = {
   entityDescription: string | null
   /** Bloquear bots de entrenamiento en robots.txt. No afecta la citación. */
   robotsBlockTraining: boolean
+  /** 'free' | 'pro'. Pro recibe alertas y el reporte semanal por correo. */
+  plan: string
   createdAt: string
 }
 
@@ -206,6 +208,32 @@ export type NewRoute = {
   description?: string | null
 }
 
+/** Lo que se puede cambiar de una ruta sin recrearla: precio y descripción. */
+export type UpdateRoute = {
+  priceUsd?: string
+  description?: string | null
+}
+
+// ---- monitoreo: una corrida del verificador por tenant ----
+
+export type Verificacion = {
+  id: string
+  tenantId: string
+  runAt: string
+  /** Los Chequeo[] de @peaje/shared tal cual (id, ok, motivo, faltantes, total). */
+  checks: unknown[]
+  ok: boolean
+  score: number | null
+  robotsHash: string | null
+  llmsHash: string | null
+  /** Eventos ya avisados en esta corrida, p. ej. "fallo_nuevo:bots". */
+  alerted: string[]
+  /** Fallos nuevos que esperan una segunda medición antes de avisar. */
+  pending: string[]
+}
+
+export type NewVerificacion = Omit<Verificacion, 'id' | 'runAt'>
+
 // ---- visitas de agentes (pagas o no) ----
 
 export const AGENT_KINDS = [
@@ -233,14 +261,29 @@ export type NewVisit = {
   amount: string | null
   paymentId: string | null
   status: number
+  /** La ruta con precio que matcheó (null para links `/r/` y paths libres). */
+  routeId: string | null
+  /** El precio que el agente vio en el 402 (o pagó). Null si no había cobro. */
+  priceUsd: string | null
+  /** Trajo una credencial de pago: entendió el 402 e intentó pagar. */
+  attempted: boolean
 }
 
 export type VisitStats = {
   days: number
   totals: { visits: number; paid: number; unpaid: number; revenue: string }
   byKind: { kind: AgentKind; visits: number; paid: number }[]
-  topPaths: { path: string; visits: number; paid: number; revenue: string }[]
+  topPaths: { path: string; visits: number; served402: number; attempted: number; paid: number; revenue: string }[]
   daily: { date: string; visits: number; paid: number }[]
+  /**
+   * El embudo de cobro: cuántos 402 se sirvieron, cuántas requests trajeron
+   * una credencial (entendieron el 402) y cuántas terminaron pagadas.
+   */
+  funnel: { served402: number; attempted: number; paid: number }
+  /** Paths con precio que se miraron y no se pagaron, con cuántos agentes distintos (por UA) lo hicieron. */
+  unpaidDemand: { path: string; served402: number; agents: number; priceUsd: string | null }[]
+  /** Paths pedidos por agentes que el origen no tiene (404): demanda de rutas que no existen. */
+  notFound: { path: string; visits: number }[]
   /** Wallets distintas que pagaron en la ventana (sale del ledger vía payment_id). */
   agentWallets: string[]
 }
@@ -271,6 +314,7 @@ export interface Store {
   // rutas y precios
   listRoutes(tenantId: string): Promise<Route[]>
   createRoute(input: NewRoute): Promise<Route>
+  updateRoute(tenantId: string, routeId: string, patch: UpdateRoute): Promise<Route>
   deleteRoute(tenantId: string, routeId: string): Promise<void>
 
   // links con precio (URLs absolutas detrás de 402)
@@ -336,6 +380,12 @@ export interface Store {
   recordAgentRun(input: NewAgentRun): Promise<AgentRun>
   markRunDelivered(runId: string, error?: string | null): Promise<void>
   listAgentRuns(agentId: string, limit?: number): Promise<AgentRun[]>
+
+  // monitoreo
+  recordVerification(v: NewVerificacion): Promise<Verificacion>
+  lastVerification(tenantId: string): Promise<Verificacion | null>
+  verificationHistory(tenantId: string, limit: number): Promise<Verificacion[]>
+  markAlerted(id: string, events: string[]): Promise<void>
 
   // visitas de agentes
   recordVisit(visit: NewVisit): Promise<void>

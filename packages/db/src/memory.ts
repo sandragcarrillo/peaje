@@ -9,6 +9,7 @@ import type {
   NewResource,
   NewRoute,
   NewTenant,
+  NewVerificacion,
   NewVisit,
   Resource,
   Payment,
@@ -16,9 +17,11 @@ import type {
   Store,
   Tenant,
   TenantEntityUpdate,
+  Verificacion,
   VisitStats,
   Withdrawal,
   WithdrawalStatus,
+  UpdateRoute,
 } from './types'
 import { aggregateVisits } from './visits'
 
@@ -61,6 +64,7 @@ export class MemoryStore implements Store {
       entitySameAs: [],
       entityDescription: null,
       robotsBlockTraining: false,
+      plan: 'free',
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -157,6 +161,14 @@ export class MemoryStore implements Store {
     if (duplicate) throw new Error(`Ya existe una ruta ${route.method} ${route.pathPattern}`)
     list.push(route)
     this.#routes.set(input.tenantId, list)
+    return route
+  }
+
+  async updateRoute(tenantId: string, routeId: string, patch: UpdateRoute): Promise<Route> {
+    const route = (this.#routes.get(tenantId) ?? []).find((r) => r.id === routeId && r.active)
+    if (!route) throw new Error('Ruta no encontrada')
+    if (patch.priceUsd !== undefined) route.priceUsd = patch.priceUsd
+    if (patch.description !== undefined) route.description = patch.description
     return route
   }
 
@@ -419,6 +431,29 @@ export class MemoryStore implements Store {
       .filter((r) => r.agentId === agentId)
       .slice(-limit)
       .reverse()
+  }
+
+  // ---- monitoreo ----
+
+  #verificaciones: Verificacion[] = []
+
+  async recordVerification(v: NewVerificacion): Promise<Verificacion> {
+    const row: Verificacion = { ...v, id: this.#id('ver'), runAt: new Date().toISOString() }
+    this.#verificaciones.unshift(row)
+    return row
+  }
+
+  async lastVerification(tenantId: string) {
+    return this.#verificaciones.find((v) => v.tenantId === tenantId) ?? null
+  }
+
+  async verificationHistory(tenantId: string, limit: number) {
+    return this.#verificaciones.filter((v) => v.tenantId === tenantId).slice(0, limit)
+  }
+
+  async markAlerted(id: string, events: string[]) {
+    const v = this.#verificaciones.find((x) => x.id === id)
+    if (v) v.alerted = events
   }
 
   // ---- visitas de agentes ----

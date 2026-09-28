@@ -17,6 +17,10 @@ export type Deteccion = {
   /** Rutas relativas a `dir`. */
   nextConfig: string | null
   layout: string | null
+  /** Solo Next: el middleware que ya existe (`proxy.ts` en 16, `middleware.ts` antes), si hay. */
+  middleware: string | null
+  /** Solo Next: versión mayor declarada en package.json (null si no se pudo leer). */
+  nextMajor: number | null
   gestor: Gestor
   /** Paquetes con framework encontrados en un monorepo. Más de uno: hay que elegir con --dir. */
   candidatos: string[]

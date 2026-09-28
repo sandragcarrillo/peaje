@@ -6,12 +6,12 @@ import { defineConfig } from 'tsup'
  * peers externos (el host ya los tiene).
  */
 export default defineConfig({
-  entry: { index: 'src/index.ts', head: 'src/head.tsx' },
+  entry: { index: 'src/index.ts', head: 'src/head.tsx', proxy: 'src/proxy.ts' },
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: false,
   clean: true,
   target: 'es2022',
   noExternal: ['@peaje/shared'],
-  external: ['next', 'next/headers', 'react', 'react/jsx-runtime'],
+  external: ['next', 'next/headers', 'next/server', 'react', 'react/jsx-runtime'],
 })

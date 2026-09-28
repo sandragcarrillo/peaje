@@ -138,6 +138,26 @@ export const panel = {
     rutasDescripcion:
       'Ponle precio a links de tu web. El gateway responde 402 y el agente paga solo.',
 
+    // rutas de API
+    rutasApiTitulo: 'Rutas de API con precio',
+    rutasApiIntro:
+      'Endpoints que ya existen en tu servidor. Peaje responde 402 en tu dominio (con el proxy del kit puesto) y reenvía al origen cuando el agente pagó.',
+    rutasApiVacio: 'Todavía no hay rutas de API. Agrega la primera con el path que ya sirve tu servidor.',
+    rutasApiMetodo: 'Método',
+    rutasApiPath: 'Path',
+    rutasApiPathPlaceholder: '/api/forecast o /api/history/:city',
+    rutasApiDescripcion: 'Descripción para agentes',
+    rutasApiDescripcionPlaceholder: 'Pronóstico a 5 días por ciudad, JSON',
+    rutasApiPrecio: 'Precio (USD)',
+    rutasApiAgregar: 'Publicar ruta',
+    rutasApiGuardar: 'Guardar',
+    rutasApiQuitar: 'Quitar',
+    rutasApiEditar: 'Editar',
+    rutasApiCancelar: 'Cancelar',
+    rutasApiNota: 'Los cambios entran al instante en openapi.json, llms.txt, /developers y el MCP. En Next.js con el proxy del kit, tu dominio los reenvía en un minuto; en Vercel, nginx y Caddy hace falta regenerar el kit y redesplegar.',
+    rutasApiErrorDuplicada: 'Ya existe una ruta con ese método y path.',
+    rutasApiErrorPath: 'El path no puede tener espacios ni "..".',
+
     // errores de server actions
     errorRutaSlash: 'La ruta tiene que empezar con /',
     errorPrecioMayorCero: 'El precio tiene que ser mayor a 0',
@@ -326,6 +346,26 @@ export const panel = {
     rutasTitulo: 'Let agents pay you',
     rutasDescripcion:
       'Put a price on links from your site. The gateway answers 402 and the agent pays on its own.',
+
+    // API routes
+    rutasApiTitulo: 'Priced API routes',
+    rutasApiIntro:
+      'Endpoints your server already serves. Peaje answers 402 on your domain (with the kit proxy in place) and forwards to your origin once the agent paid.',
+    rutasApiVacio: 'No API routes yet. Add the first one with a path your server already serves.',
+    rutasApiMetodo: 'Method',
+    rutasApiPath: 'Path',
+    rutasApiPathPlaceholder: '/api/forecast or /api/history/:city',
+    rutasApiDescripcion: 'Description for agents',
+    rutasApiDescripcionPlaceholder: '5-day forecast by city, JSON',
+    rutasApiPrecio: 'Price (USD)',
+    rutasApiAgregar: 'Publish route',
+    rutasApiGuardar: 'Save',
+    rutasApiQuitar: 'Remove',
+    rutasApiEditar: 'Edit',
+    rutasApiCancelar: 'Cancel',
+    rutasApiNota: 'Changes reach openapi.json, llms.txt, /developers and the MCP instantly. On Next.js with the kit proxy your domain forwards them within a minute; on Vercel, nginx and Caddy you regenerate the kit and redeploy.',
+    rutasApiErrorDuplicada: 'A route with that method and path already exists.',
+    rutasApiErrorPath: 'The path cannot contain spaces or "..".',
 
     // errores de server actions
     errorRutaSlash: 'The route has to start with /',

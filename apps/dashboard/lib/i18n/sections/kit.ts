@@ -1,5 +1,12 @@
 export const kit = {
   es: {
+    monitorUltima: 'Última verificación',
+    secretoTitulo: 'Secreto del sitio',
+    secretoIntro: 'Ponlo como variable de entorno en tu hosting (Vercel, Railway, Cloudflare). Con él, tus rutas de API con precio cobran en tu dominio: el gateway lo manda cuando el agente ya pagó y tu sitio sabe que puede responder.',
+    secretoNota: 'No lo publiques en el repo. Si se filtra, cualquiera puede llamar tus rutas de API sin pagar.',
+    monitorNunca: 'todavía no corrió; el monitor revisa tu dominio cada día',
+    monitorOk: (ok: number, total: number) => `${ok} de ${total} chequeos ok`,
+    monitorHace: (min: number) => (min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} d`),
     // Página
     necesitasSesion: 'Necesitás iniciar sesión.',
     entrar: 'Entrar',
@@ -231,6 +238,13 @@ npx @ora-ai/ax@latest audit ${domain}
       'Los bloques que siguen son el respaldo para cuando no se puede tocar la configuración del host: cubren menos, porque los checks de MCP y de pagos exigen estar en el origen.',
   },
   en: {
+    monitorUltima: 'Last check',
+    secretoTitulo: 'Site secret',
+    secretoIntro: 'Set it as an environment variable in your hosting (Vercel, Railway, Cloudflare). With it, your priced API routes charge on your domain: the gateway sends it once the agent paid, and your site knows it can answer.',
+    secretoNota: 'Do not commit it to the repo. If it leaks, anyone can call your API routes without paying.',
+    monitorNunca: 'not run yet; the monitor checks your domain daily',
+    monitorOk: (ok: number, total: number) => `${ok} of ${total} checks ok`,
+    monitorHace: (min: number) => (min < 60 ? `${min} min ago` : min < 1440 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} d ago`),
     // Página
     necesitasSesion: 'You need to sign in.',
     entrar: 'Sign in',

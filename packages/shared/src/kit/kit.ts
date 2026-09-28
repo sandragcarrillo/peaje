@@ -20,7 +20,7 @@ import {
   type Entidad,
   type Oferta,
 } from './bloques'
-import { esHost, generarProxy, HOSTS, rutasABorrar, type Host } from './rutas'
+import { esHost, generarProxy, HOSTS, rutasABorrar, type Host, type Patron } from './rutas'
 import type { Chequeo } from './verificar'
 
 export const KIT_VERSION = '2026-09-22'
@@ -86,6 +86,8 @@ export type EntradaKit = {
   /** `${gatewayPublicUrl}/${slug}` */
   base: string
   ofertas: Oferta[]
+  /** Rutas de API con precio (tabla routes): van al proxy para que cobren en el dominio. */
+  patrones?: Patron[]
   host?: string | null
   /** Resultado del verificador, para incluir solo lo que falta. */
   chequeos?: Chequeo[] | null
@@ -109,15 +111,18 @@ export function construirKit(e: EntradaKit): Kit {
   if (conAgentes && falta('proxy')) {
     if (host === 'unknown') {
       // Sin host conocido, mandamos todos: el agente elige por lo que ve en el repo.
-      for (const h of HOSTS) files.push(archivoProxy(h.id, h.archivo, e.base))
+      for (const h of HOSTS) files.push(archivoProxy(h.id, h.archivo, e.base, e.patrones ?? []))
       manual.push('Pick the ONE proxy file that matches the host (see INSTALL.md) and ignore the others.')
     } else {
       const h = HOSTS.find((x) => x.id === host)!
-      files.push(archivoProxy(h.id, h.archivo, e.base))
+      files.push(archivoProxy(h.id, h.archivo, e.base, e.patrones ?? []))
+    }
+    if (host === 'cloudflare' || host === 'unknown') {
+      manual.push('Cloudflare Worker: add PEAJE_ORIGIN_SECRET as a Worker secret (`wrangler secret put PEAJE_ORIGIN_SECRET`, value from the Kit page of the dashboard) so priced API routes are charged on your domain.')
     }
     if (host === 'next' || host === 'unknown') {
       manual.push(
-        'If middleware.ts or proxy.ts has a `matcher`, exclude mcp, r/, discovery/, checkout_sessions, agentic_commerce/ and docs from it: it runs before rewrites.',
+        'Next.js: add `peajeProxy({ slug })` from @peaje/next/proxy as your proxy.ts (Next 16) or middleware.ts, or wrap the one you have, and set PEAJE_ORIGIN_SECRET (Kit page of the dashboard) in the hosting environment. That charges the priced API routes on your domain at runtime; the rewrites alone only cover the fixed catalog paths and /r/ links.',
       )
     }
   }
@@ -197,7 +202,7 @@ export function headJsonLd(e: Pick<EntradaKit, 'nombre' | 'slug' | 'originHost' 
   return scriptJsonLdGraph([org, webApi])
 }
 
-function archivoProxy(host: Host, archivo: string, base: string): ArchivoKit {
+function archivoProxy(host: Host, archivo: string, base: string, patrones: Patron[]): ArchivoKit {
   const notas: Record<Host, string> = {
     next: 'Merge into the existing next.config.*: spread these rules into `rewrites().beforeFiles`. If rewrites() returns an array today, convert it to { beforeFiles: [...these], afterFiles: [...existing] }. Or use `withPeaje()` from @peaje/next and skip the merge.',
     vercel: 'Merge into vercel.json: append to the "rewrites" array. Ignored on Next.js projects (use next.config instead).',
@@ -206,7 +211,7 @@ function archivoProxy(host: Host, archivo: string, base: string): ArchivoKit {
     caddy: 'Drop the matchers and reverse_proxy lines inside your existing site block and reload.',
   }
   const mode: ModoArchivo = host === 'nginx' || host === 'caddy' ? 'include' : 'snippet'
-  return { path: `peaje/${archivo}`, mode, content: generarProxy(host, base), nota: notas[host] }
+  return { path: `peaje/${archivo}`, mode, content: generarProxy(host, base, undefined, patrones), nota: notas[host] }
 }
 
 function rutaSinSlug(url: string, slug: string): string {

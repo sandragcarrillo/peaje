@@ -24,6 +24,11 @@ const BOTS: [RegExp, AgentKind][] = [
 /** Nuestro propio verificador no cuenta como visita. */
 const IGNORAR_UA = /peaje-verificador/i
 
+/** La request trae una credencial de pago: el agente entendió el 402 y volvió a intentar. */
+export function traeCredencial(headers: Headers): boolean {
+  return headers.has('payment-signature') || headers.has('x-payment') || (headers.get('authorization') ?? '').startsWith('Payment ')
+}
+
 export function clasificarAgente(headers: Headers): AgentKind {
   // Credencial primero: un cliente de pago se reconoce por cómo paga, no
   // por su user-agent (que suele ser el de fetch de Node).
@@ -32,6 +37,17 @@ export function clasificarAgente(headers: Headers): AgentKind {
   const ua = headers.get('user-agent') ?? ''
   for (const [re, kind] of BOTS) if (re.test(ua)) return kind
   return 'other'
+}
+
+/**
+ * Qué ruta y qué precio vio esta request. Lo anota el handler que cobra y lo
+ * lee el middleware de visitas después de `next()`: los dos tienen el mismo
+ * `Request` crudo, así que no hace falta pasar nada por el contexto de Hono.
+ */
+const cobros = new WeakMap<Request, { routeId: string | null; priceUsd: string }>()
+
+export function marcarCobro(req: Request, cobro: { routeId: string | null; priceUsd: string }): void {
+  cobros.set(req, cobro)
 }
 
 type Pendiente = Omit<NewVisit, 'paid' | 'network' | 'amount' | 'paymentId'> & { receiptRef: string | null }
@@ -89,6 +105,8 @@ export function registrarVisita(input: {
   path: string
   headers: Headers
   response: Response
+  /** El `Request` crudo, para leer la marca que dejó el handler que cobra. */
+  request?: Request
 }): void {
   const ua = input.headers.get('user-agent')
   if (ua && IGNORAR_UA.test(ua)) return
@@ -101,6 +119,7 @@ export function registrarVisita(input: {
       receiptRef = null
     }
   }
+  const cobro = input.request ? cobros.get(input.request) : undefined
   encolar({
     tenantId: input.tenantId,
     at: new Date().toISOString(),
@@ -109,6 +128,9 @@ export function registrarVisita(input: {
     userAgent: ua ? ua.slice(0, 300) : null,
     agentKind: clasificarAgente(input.headers),
     status: input.response.status,
+    routeId: cobro?.routeId ?? null,
+    priceUsd: cobro?.priceUsd ?? null,
+    attempted: traeCredencial(input.headers),
     receiptRef,
   })
 }

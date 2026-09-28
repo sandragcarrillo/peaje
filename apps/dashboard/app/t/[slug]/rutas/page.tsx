@@ -4,17 +4,26 @@ import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { FooterStrip, PageHeader } from '@/components/chrome'
 import { LinksPanel } from '../links'
+import { RutasApiPanel } from '../rutas-api'
 import { saldoTotal } from '@/lib/saldos'
 
 export default async function Rutas({ params }: PageProps<'/t/[slug]/rutas'>) {
   const { slug } = await params
   const tenant = await requireTenant(slug)
-  const [resources, balance, d] = await Promise.all([
+  const [resources, routes, balance, d] = await Promise.all([
     store.listResources(tenant.id).catch(() => []),
+    store.listRoutes(tenant.id).catch(() => []),
     saldoTotal(tenant),
     getDict(),
   ])
   const base = `${gatewayUrl}/${tenant.slug}`
+  const dominio = (() => {
+    try {
+      return new URL(tenant.originUrl).origin
+    } catch {
+      return base
+    }
+  })()
 
   return (
     <div className="space-y-6">
@@ -24,6 +33,7 @@ export default async function Rutas({ params }: PageProps<'/t/[slug]/rutas'>) {
         sub={d.panel.rutasDescripcion}
       />
       <LinksPanel slug={tenant.slug} resources={resources} base={base} />
+      <RutasApiPanel slug={tenant.slug} routes={routes} dominio={dominio} />
 
       <FooterStrip
         items={[

@@ -56,6 +56,14 @@ export function hostDe(dir: string, stack: Stack): Host | null {
 }
 
 const CONFIGS_NEXT = ['next.config.ts', 'next.config.mjs', 'next.config.js', 'next.config.cjs', 'next.config.mts']
+const MIDDLEWARES = ['proxy.ts', 'proxy.js', 'middleware.ts', 'middleware.js', 'src/proxy.ts', 'src/proxy.js', 'src/middleware.ts', 'src/middleware.js']
+
+/** `^15.3.0`, `~16.0.0`, `16.1.2`, `canary`: la mayor si se puede leer. */
+export function nextMajorDe(pkg: PackageJson | null): number | null {
+  const v = pkg?.dependencies?.next ?? pkg?.devDependencies?.next
+  const m = v ? /(\d+)\./.exec(v) : null
+  return m ? Number(m[1]) : null
+}
 const LAYOUTS = ['app/layout.tsx', 'app/layout.jsx', 'app/layout.js', 'src/app/layout.tsx', 'src/app/layout.jsx', 'src/app/layout.js']
 
 /** El lockfile puede estar arriba (monorepo): subimos hasta cinco niveles. */
@@ -136,7 +144,7 @@ export function detectar(dirEntrada: string): Deteccion {
   if (stack === 'unknown') {
     const candidatos = candidatosDe(dir, pkg)
     if (candidatos.length > 1) {
-      return { dir, stack, host: null, router: null, nextConfig: null, layout: null, gestor: gestorDe(dir), candidatos }
+      return { dir, stack, host: null, router: null, nextConfig: null, layout: null, middleware: null, nextMajor: null, gestor: gestorDe(dir), candidatos }
     }
     if (candidatos.length === 1) {
       // Un solo paquete con framework: lo tomamos y lo decimos.
@@ -150,15 +158,19 @@ export function detectar(dirEntrada: string): Deteccion {
   let router: Deteccion['router'] = null
   let nextConfig: string | null = null
   let layout: string | null = null
+  let middleware: string | null = null
+  let nextMajor: number | null = null
   if (stack === 'next') {
     nextConfig = existeAlguno(dir, CONFIGS_NEXT)
     layout = existeAlguno(dir, LAYOUTS)
+    middleware = existeAlguno(dir, MIDDLEWARES)
+    nextMajor = nextMajorDe(pkg)
     if (layout) router = 'app'
     else if (existeAlguno(dir, ['pages', 'src/pages'])) router = 'pages'
     else if (existeAlguno(dir, ['app', 'src/app'])) router = 'app'
   }
 
-  return { dir, stack, host, router, nextConfig, layout, gestor: gestorDe(dir), candidatos: [] }
+  return { dir, stack, host, router, nextConfig, layout, middleware, nextMajor, gestor: gestorDe(dir), candidatos: [] }
 }
 
 /** Para mensajes: rutas relativas al cwd cuando caben, absolutas si no. */

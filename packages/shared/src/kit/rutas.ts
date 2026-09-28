@@ -57,6 +57,36 @@ export const RUTAS_DINAMICAS = [
  */
 export const PEAJE_FETCH_HEADER = 'x-peaje-fetch'
 
+/**
+ * Una ruta de API con precio del negocio (tabla `routes`), tal como la publica
+ * el manifiesto: método y patrón (`/api/x`, `/api/x/:id`, `/api/x/*`). El proxy
+ * la reenvía al gateway para que el 402 salga en el dominio del negocio.
+ */
+export type Patron = { method: string; path: string }
+
+/** `:param` → `[^/]+`, `*` de cola → `.*`. Para nginx y para el Worker. */
+export function patronARegex(path: string): string {
+  const cuerpo = path
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => (seg === '*' ? '.*' : seg.startsWith(':') ? '[^/]+' : seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    .join('/')
+  return `^/${cuerpo}$`
+}
+
+/** `:param` se queda, `*` de cola → `:rest*`. Para Next y Vercel. */
+export function patronANext(path: string): string {
+  return path.replace(/\/\*$/, '/:rest*')
+}
+
+/** Los concretos: `/*` y `/:x` a la raíz mandarían todo el sitio al gateway. */
+export function patronesReenviables(patrones: Patron[]): Patron[] {
+  return patrones.filter((p) => {
+    const segs = p.path.split('/').filter(Boolean)
+    return segs.length > 0 && !(segs.length === 1 && (segs[0] === '*' || segs[0]!.startsWith(':')))
+  })
+}
+
 /** Paths que el proxy sirve y que alguien podría recrear a mano como archivo. */
 export function rutasDelProxy(): string[] {
   return RUTAS_PROXY.map((r) => r.path)
@@ -98,7 +128,15 @@ export const COMENTARIOS_EN: Comentarios = {
   rutaPaga: 'Priced links: this is where your domain returns the 402.',
 }
 
-export function generarProxy(host: Host, base: string, c: Comentarios = COMENTARIOS_EN): string {
+/**
+ * Los archivos de proxy son públicos (salen de `kit.json` sin auth), así que
+ * no pueden llevar el secreto del negocio. Por eso las rutas de API con
+ * precio no van en Next estático, vercel.json, nginx ni Caddy: sin secreto el
+ * reenvío se esquiva con un header. Las cobran el middleware de Next
+ * (`@peaje/next/proxy`, lee PEAJE_ORIGIN_SECRET del entorno) y el Worker
+ * (lee `env.PEAJE_ORIGIN_SECRET`). `patrones` queda en la firma para eso.
+ */
+export function generarProxy(host: Host, base: string, c: Comentarios = COMENTARIOS_EN, _patrones: Patron[] = []): string {
   switch (host) {
     case 'next':
       return next(base, c)
@@ -150,6 +188,7 @@ const nextConfig = {
 ${reglas}
         // ${c.rutaPaga}
 ${dinamicas}
+        // Priced API routes: @peaje/next/proxy (proxy.ts or middleware.ts) forwards them at runtime.
       ],
     }
   },
@@ -174,14 +213,15 @@ ${reglas}
 }
 
 /** Manifiesto de rutas que el gateway sirve en `/:slug/kit/manifest.json`. */
-export type ManifiestoProxy = { version: string; base: string; rutas: string[]; prefijos: string[] }
+export type ManifiestoProxy = { version: string; base: string; rutas: string[]; prefijos: string[]; patrones: Patron[] }
 
-export function manifiestoProxy(base: string, version: string): ManifiestoProxy {
+export function manifiestoProxy(base: string, version: string, patrones: Patron[] = []): ManifiestoProxy {
   return {
     version,
     base,
     rutas: RUTAS_PROXY.map((r) => r.path),
     prefijos: RUTAS_DINAMICAS.map((r) => r.prefijo),
+    patrones: patronesReenviables(patrones),
   }
 }
 
@@ -207,7 +247,20 @@ ${lista}
 // ${c.rutaPaga}
 const PREFIJOS = [${RUTAS_DINAMICAS.map((r) => `'${r.prefijo}'`).join(', ')}]
 
-let cache = { at: 0, rutas: RUTAS, prefijos: PREFIJOS }
+let cache = { at: 0, rutas: RUTAS, prefijos: PREFIJOS, patrones: [] }
+
+// Priced API routes from the manifest: ':param' matches one segment, a trailing '*' the rest.
+function coincide(patron, pathname) {
+  const p = patron.split('/').filter(Boolean)
+  const parts = pathname.split('/').filter(Boolean)
+  for (let i = 0; i < p.length; i++) {
+    if (p[i] === '*') return true
+    if (parts[i] === undefined) return false
+    if (p[i].startsWith(':')) continue
+    if (p[i] !== parts[i]) return false
+  }
+  return p.length === parts.length
+}
 
 async function listas(ctx) {
   const ahora = Date.now()
@@ -216,7 +269,7 @@ async function listas(ctx) {
     .then((r) => (r.ok ? r.json() : null))
     .then((m) => {
       if (m && Array.isArray(m.rutas) && Array.isArray(m.prefijos)) {
-        cache = { at: Date.now(), rutas: m.rutas, prefijos: m.prefijos }
+        cache = { at: Date.now(), rutas: m.rutas, prefijos: m.prefijos, patrones: Array.isArray(m.patrones) ? m.patrones : [] }
       } else {
         cache = { ...cache, at: Date.now() }
       }
@@ -233,11 +286,17 @@ async function listas(ctx) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url)
-    const { rutas, prefijos } = await listas(ctx)
+    // PEAJE_ORIGIN_SECRET (Worker secret, from your Peaje dashboard): the gateway
+    // sends it when it delivers an already-paid request. Only then the request
+    // goes to your origin; without the secret, priced API routes are not forwarded.
+    const secreto = env && env.PEAJE_ORIGIN_SECRET
+    if (secreto && request.headers.get('x-peaje-origin') === secreto) return fetch(request)
+    const { rutas, prefijos, patrones } = await listas(ctx)
     const esFetchDePeaje = request.headers.get('${PEAJE_FETCH_HEADER}') !== null
     const proxear =
       (!esFetchDePeaje && rutas.includes(url.pathname)) ||
-      prefijos.some((p) => url.pathname.startsWith(p))
+      prefijos.some((p) => url.pathname.startsWith(p)) ||
+      (Boolean(secreto) && patrones.some((p) => p.method.toUpperCase() === request.method && coincide(p.path, url.pathname)))
     if (!proxear) return fetch(request)
     const destino = new URL(PEAJE + url.pathname + url.search)
     const headers = new Headers(request.headers)

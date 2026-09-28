@@ -19,6 +19,7 @@ import {
   KIT_VERSION,
   manifiestoProxy,
   dominioVerificable,
+  type Patron,
   installMd,
   verificarIntegracion,
   type Chequeo,
@@ -62,6 +63,11 @@ export function ofertasDe(tenant: Tenant, resources: Resource[], routes: Route[]
   return [...links, ...apis]
 }
 
+/** Rutas de API con precio, para el proxy del negocio (manifiesto y archivos del kit). */
+export function patronesDe(routes: Route[]): Patron[] {
+  return routes.filter((r) => r.active && Number(r.priceUsd) > 0).map((r) => ({ method: r.method, path: r.pathPattern }))
+}
+
 function originHostDe(tenant: Tenant): string {
   return dominioVerificable(tenant.originUrl) ?? new URL(tenant.originUrl).hostname
 }
@@ -89,6 +95,7 @@ async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: bool
     originHost: originHostDe(tenant),
     base: gatewayBase(tenant),
     ofertas: ofertasDe(tenant, resources, routes),
+    patrones: patronesDe(routes),
     host,
     // Sin dominio público no hay nada que medir: va el kit completo.
     chequeos: chequeos && chequeos[0]?.id !== 'dominio' ? chequeos : null,
@@ -114,8 +121,10 @@ kitRouter.get('/:slug/kit.json', async (c) => {
 kitRouter.get('/:slug/kit/manifest.json', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
-  return c.json(manifiestoProxy(gatewayBase(tenant), KIT_VERSION), 200, {
-    'cache-control': 'public, max-age=300',
+  const routes = await store.listRoutes(tenant.id)
+  // Un minuto: es lo que tarda una ruta nueva en cobrar en el dominio del negocio.
+  return c.json(manifiestoProxy(gatewayBase(tenant), KIT_VERSION, patronesDe(routes)), 200, {
+    'cache-control': 'public, max-age=60',
   })
 })
 

@@ -12,14 +12,17 @@ import { sendFromMerchantWallet } from '@/lib/walletops'
 export async function crearRuta(slug: string, formData: FormData) {
   const tenant = await requireTenant(slug)
   const pathPattern = String(formData.get('pathPattern') ?? '').trim()
-  const priceUsd = String(formData.get('priceUsd') ?? '').trim()
+  const priceUsd = String(formData.get('priceUsd') ?? '').replace(',', '.').trim()
   const method = String(formData.get('method') ?? 'GET').toUpperCase()
-  const description = String(formData.get('description') ?? '').trim()
+  const description = String(formData.get('description') ?? '').trim().slice(0, 300)
 
   const d = await getDict()
   if (!pathPattern.startsWith('/')) throw new Error(d.panel.errorRutaSlash)
+  if (pathPattern.length > 200 || /\s/.test(pathPattern) || pathPattern.includes('..')) throw new Error(d.panel.rutasApiErrorPath)
   const price = Number(priceUsd)
   if (!Number.isFinite(price) || price <= 0) throw new Error(d.panel.errorPrecioMayorCero)
+  const existentes = await store.listRoutes(tenant.id)
+  if (existentes.some((r) => r.method === method && r.pathPattern === pathPattern)) throw new Error(d.panel.rutasApiErrorDuplicada)
 
   await store.createRoute({
     tenantId: tenant.id,
@@ -29,6 +32,18 @@ export async function crearRuta(slug: string, formData: FormData) {
     description: description || null,
   })
   // Cambió la tabla de precios: que Bing recrawlee /developers y /pricing.md.
+  avisarIndexNow(tenant)
+  revalidatePath(`/t/${slug}`)
+}
+
+export async function editarRuta(slug: string, routeId: string, formData: FormData) {
+  const tenant = await requireTenant(slug)
+  const d = await getDict()
+  const priceUsd = String(formData.get('priceUsd') ?? '').replace(',', '.').trim()
+  const price = Number(priceUsd)
+  if (!Number.isFinite(price) || price <= 0) throw new Error(d.panel.errorPrecioMayorCero)
+  const description = String(formData.get('description') ?? '').trim().slice(0, 300)
+  await store.updateRoute(tenant.id, routeId, { priceUsd: price.toFixed(6), description: description || null })
   avisarIndexNow(tenant)
   revalidatePath(`/t/${slug}`)
 }

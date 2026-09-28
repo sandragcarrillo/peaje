@@ -35,6 +35,29 @@ export function envolverNextConfig(src: string, slug: string): Edicion {
   return { ok: false, motivo: 'complex' }
 }
 
+/**
+ * El middleware de Peaje cuando el proyecto no tiene ninguno. `proxy.ts` desde
+ * Next 16 (donde `middleware.ts` está deprecado); `middleware.ts` antes. Va en
+ * `src/` si el proyecto usa esa carpeta para el app router.
+ */
+export function proxyNuevo(slug: string, typescript: boolean, nextMajor: number | null, enSrc: boolean): { path: string; content: string } {
+  const nombre = (nextMajor ?? 16) >= 16 ? 'proxy' : 'middleware'
+  const path = `${enSrc ? 'src/' : ''}${nombre}.${typescript ? 'ts' : 'js'}`
+  const content = `import { peajeProxy } from '@peaje/next/proxy'
+
+// Peaje: answers 402 on your own domain for the priced routes in your dashboard.
+// Reads the route list from your gateway at runtime (cached 60 s): a route you
+// publish later works without a redeploy. Priced API routes also need
+// PEAJE_ORIGIN_SECRET in your environment (Kit page of the dashboard).
+export default peajeProxy({ slug: ${JSON.stringify(slug)} })
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+`
+  return { path, content }
+}
+
 /** Config nueva cuando el proyecto no tiene ninguna. */
 export function nextConfigNuevo(slug: string, typescript: boolean): { path: string; content: string } {
   const opciones = `{ slug: ${JSON.stringify(slug)} }`

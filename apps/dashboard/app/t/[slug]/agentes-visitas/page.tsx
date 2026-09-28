@@ -101,23 +101,85 @@ export default async function VisitasPage({
           </section>
 
           <section className="flex flex-col gap-3">
+            <Cabecera texto={t.embudo} />
+            <p className="text-xs text-muted">{t.embudoNota}</p>
+            <div className="grid grid-cols-3 border border-border bg-bg">
+              {[
+                [t.embudoServidos, stats.funnel.served402],
+                [t.embudoIntentaron, stats.funnel.attempted],
+                [t.embudoPagaron, stats.funnel.paid],
+              ].map(([label, valor], i) => (
+                <div key={String(label)} className={`p-5 ${i < 2 ? 'border-r border-border' : ''}`}>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{label}</span>
+                  <div className="mt-3 text-2xl font-bold">
+                    {valor}
+                    {i > 0 && stats.funnel.served402 > 0 ? (
+                      <span className="ml-2 font-mono text-xs font-normal text-muted">{Math.round((Number(valor) / stats.funnel.served402) * 100)}%</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
             <Cabecera texto={t.rutas} />
             <div className="hidden grid-cols-12 gap-4 border border-border bg-panel-2 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-faint md:grid">
-              <div className="col-span-6">{t.colRuta}</div>
+              <div className="col-span-4">{t.colRuta}</div>
               <div className="col-span-2 text-right">{t.colVisitas}</div>
+              <div className="col-span-2 text-right">{t.colServidos}</div>
               <div className="col-span-2 text-right">{t.colPagadas}</div>
               <div className="col-span-2 text-right">{t.colIngresos}</div>
             </div>
             <ul className="divide-y divide-border border border-border">
               {stats.topPaths.map((p) => (
                 <li key={p.path} className="grid grid-cols-12 gap-4 px-4 py-2.5 text-sm">
-                  <div className="col-span-6 truncate font-mono text-xs">{p.path}</div>
+                  <div className="col-span-4 truncate font-mono text-xs">{p.path}</div>
                   <div className="col-span-2 text-right font-mono text-xs">{p.visits}</div>
+                  <div className="col-span-2 text-right font-mono text-xs">{p.served402}</div>
                   <div className="col-span-2 text-right font-mono text-xs">{p.paid}</div>
                   <div className="col-span-2 text-right font-mono text-xs">{money(p.revenue)}</div>
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <Cabecera texto={t.noAtendida} />
+            <p className="text-xs text-muted">{t.noAtendidaNota}</p>
+            {stats.unpaidDemand.length === 0 && stats.notFound.length === 0 ? (
+              <p className="text-sm text-muted">{t.noAtendidaVacio}</p>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t.noAtendidaMiradas}</span>
+                  <ul className="mt-2 divide-y divide-border border border-border">
+                    {stats.unpaidDemand.map((p) => (
+                      <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="truncate font-mono text-xs">{p.path}</span>
+                        <span className="font-mono text-xs text-muted">
+                          {p.priceUsd ? `${money(p.priceUsd)} · ` : ''}
+                          {p.served402} × 402 · {p.agents} {t.noAtendidaAgentes}
+                        </span>
+                      </li>
+                    ))}
+                    {stats.unpaidDemand.length === 0 ? <li className="px-4 py-2.5 text-xs text-muted">{t.noAtendidaVacio}</li> : null}
+                  </ul>
+                </div>
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t.noAtendidaInexistentes}</span>
+                  <ul className="mt-2 divide-y divide-border border border-border">
+                    {stats.notFound.map((p) => (
+                      <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="truncate font-mono text-xs">{p.path}</span>
+                        <span className="font-mono text-xs text-muted">{p.visits}</span>
+                      </li>
+                    ))}
+                    {stats.notFound.length === 0 ? <li className="px-4 py-2.5 text-xs text-muted">{t.noAtendidaVacio}</li> : null}
+                  </ul>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="flex flex-col gap-3">

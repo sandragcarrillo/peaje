@@ -10,6 +10,7 @@ import type {
   NewResource,
   NewRoute,
   NewTenant,
+  NewVerificacion,
   NewVisit,
   Resource,
   Payment,
@@ -17,9 +18,11 @@ import type {
   Store,
   Tenant,
   TenantEntityUpdate,
+  Verificacion,
   VisitStats,
   Withdrawal,
   WithdrawalStatus,
+  UpdateRoute,
 } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
 
@@ -44,6 +47,7 @@ function tenantFrom(row: Row): Tenant {
     entitySameAs: Array.isArray(row.entity_same_as) ? row.entity_same_as : [],
     entityDescription: row.entity_description ?? null,
     robotsBlockTraining: row.robots_block_training ?? false,
+    plan: row.plan ?? 'free',
     email: row.email,
     privyUserId: row.privy_user_id,
     createdAt: row.created_at,
@@ -89,6 +93,21 @@ function paymentFrom(row: Row): Payment {
     platformFee: String(row.platform_fee ?? '0'),
     networkFee: String(row.network_fee ?? '0'),
     createdAt: row.created_at,
+  }
+}
+
+function verificacionFrom(row: Row): Verificacion {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    runAt: row.run_at,
+    checks: (row.checks ?? []) as unknown[],
+    ok: Boolean(row.ok),
+    score: row.score === null || row.score === undefined ? null : Number(row.score),
+    robotsHash: row.robots_hash ?? null,
+    llmsHash: row.llms_hash ?? null,
+    alerted: (row.alerted ?? []) as string[],
+    pending: (row.pending ?? []) as string[],
   }
 }
 
@@ -293,6 +312,22 @@ export class SupabaseStore implements Store {
       .select()
       .single()
     this.#fail('createRoute', error)
+    return routeFrom(data as Row)
+  }
+
+  async updateRoute(tenantId: string, routeId: string, patch: UpdateRoute): Promise<Route> {
+    const cambios: Record<string, unknown> = {}
+    if (patch.priceUsd !== undefined) cambios.price_usd = patch.priceUsd
+    if (patch.description !== undefined) cambios.description = patch.description
+    const { data, error } = await this.#db
+      .from('routes')
+      .update(cambios)
+      .eq('tenant_id', tenantId)
+      .eq('id', routeId)
+      .eq('active', true)
+      .select()
+      .single()
+    this.#fail('updateRoute', error)
     return routeFrom(data as Row)
   }
 
@@ -667,6 +702,48 @@ export class SupabaseStore implements Store {
     return (data ?? []).map(agentRunFrom)
   }
 
+  // ---- monitoreo ----
+
+  async recordVerification(v: NewVerificacion): Promise<Verificacion> {
+    const { data, error } = await this.#db
+      .from('verificaciones')
+      .insert({
+        tenant_id: v.tenantId,
+        checks: v.checks,
+        ok: v.ok,
+        score: v.score,
+        robots_hash: v.robotsHash,
+        llms_hash: v.llmsHash,
+        alerted: v.alerted,
+        pending: v.pending,
+      })
+      .select()
+      .single()
+    this.#fail('recordVerification', error)
+    return verificacionFrom(data as Row)
+  }
+
+  async lastVerification(tenantId: string): Promise<Verificacion | null> {
+    const rows = await this.verificationHistory(tenantId, 1)
+    return rows[0] ?? null
+  }
+
+  async verificationHistory(tenantId: string, limit: number): Promise<Verificacion[]> {
+    const { data, error } = await this.#db
+      .from('verificaciones')
+      .select()
+      .eq('tenant_id', tenantId)
+      .order('run_at', { ascending: false })
+      .limit(limit)
+    this.#fail('verificationHistory', error)
+    return ((data ?? []) as Row[]).map(verificacionFrom)
+  }
+
+  async markAlerted(id: string, events: string[]): Promise<void> {
+    const { error } = await this.#db.from('verificaciones').update({ alerted: events }).eq('id', id)
+    this.#fail('markAlerted', error)
+  }
+
   // ---- visitas de agentes ----
 
   async recordVisit(visit: NewVisit) {
@@ -688,6 +765,9 @@ export class SupabaseStore implements Store {
         amount: v.amount,
         payment_id: v.paymentId,
         status: v.status,
+        route_id: v.routeId,
+        price_usd: v.priceUsd,
+        attempted: v.attempted,
       })),
     )
     this.#fail('recordVisits', error)
@@ -698,7 +778,7 @@ export class SupabaseStore implements Store {
     // La wallet del agente vive en el ledger: se trae por la FK payment_id.
     const { data, error } = await this.#db
       .from('agent_visits')
-      .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, payments(agent_wallet)')
+      .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, route_id, price_usd, attempted, payments(agent_wallet)')
       .eq('tenant_id', tenantId)
       .gte('at', since)
       .order('at', { ascending: false })
@@ -716,6 +796,9 @@ export class SupabaseStore implements Store {
       amount: r.amount === null || r.amount === undefined ? null : String(r.amount),
       paymentId: r.payment_id ?? null,
       status: Number(r.status),
+      routeId: r.route_id ?? null,
+      priceUsd: r.price_usd === null || r.price_usd === undefined ? null : String(r.price_usd),
+      attempted: Boolean(r.attempted),
       agentWallet: r.payments?.agent_wallet ?? null,
     }))
     return aggregateVisits(rows, opts.days)

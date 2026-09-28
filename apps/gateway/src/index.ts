@@ -12,10 +12,12 @@ import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
 import { contextoCobro, nuevoContexto } from './contexto.js'
 import { iniciarCostoRed } from './costoRed.js'
-import { registrarVisita } from './visitas.js'
+import { marcarCobro, registrarVisita } from './visitas.js'
+import { monitorRouter } from './monitor/index.js'
 import { mppx } from './mpp.js'
 import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
+import { rutasRouter } from './rutas.js'
 import { store } from './store.js'
 import {
   ACP_VERSION_HEADER,
@@ -139,6 +141,8 @@ app.get('/:slug/openapi.json', async (c) => {
 // middleware de auth (antes estaba acá afuera y quedaba expuesto sin token).
 app.route('/_internal', withdrawals)
 app.route('/_internal', agentsRouter)
+app.route('/_internal', rutasRouter)
+app.route('/internal/monitor', monitorRouter)
 
 /**
  * Link headers (RFC 8288) en todas las respuestas de tenant: los agentes
@@ -156,6 +160,7 @@ app.use('/:slug/*', async (c, next) => {
     path: new URL(c.req.url).pathname.slice(`/${slug}`.length) || '/',
     headers: c.req.raw.headers,
     response: c.res,
+    request: c.req.raw,
   })
   const b = docsBase(tenant)
   c.res.headers.append(
@@ -266,6 +271,7 @@ app.get('/:slug/r/:rslug', async (c) => {
 
   // Precio 0 = link gratis: se sirve directo, sin 402.
   const gratis = Number(resource.priceUsd) <= 0
+  if (!gratis) marcarCobro(c.req.raw, { routeId: null, priceUsd: resource.priceUsd })
 
   const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
   cobro.x402Header = c.req.header('payment-signature') ?? null
@@ -565,6 +571,7 @@ app.all('/:slug/*', async (c) => {
   const match = matchRoute(routes, c.req.method, path)
 
   if (!match) return proxyToOrigin(c.req.raw, tenant, path)
+  marcarCobro(c.req.raw, { routeId: match.route.id, priceUsd: match.route.priceUsd })
 
   const cobro = nuevoContexto(tenant.payoutWallet, match.route.priceUsd)
   cobro.x402Header = c.req.header('payment-signature') ?? null

@@ -19,7 +19,7 @@ Requires Node 20 or newer. No runtime dependencies.
 3. Writes it:
    - new files (`public/robots.txt`) only if they do not exist;
    - snippets to merge (`peaje/next.config.ts`, `peaje/head.html`, ...) always under `peaje/`, exactly as the gateway sent them.
-4. Next.js: wraps a plain `next.config.*` with `withPeaje()` from `@peaje/next`, adds `@peaje/next` to `package.json` (you run the install; the command is printed) and renders `<PeajeHead slug="..." />` in the `<head>` of the app router root layout. Configs wrapped in `withSentryConfig(...)` or similar, and the pages router, are left for you with an exact instruction.
+4. Next.js: wraps a plain `next.config.*` with `withPeaje()` from `@peaje/next`, writes `proxy.ts` (Next 16) or `middleware.ts` (older) with `peajeProxy()` so priced API routes answer 402 on your domain at runtime (if you already have one, you get the one-line wrap as an instruction), adds `@peaje/next` to `package.json` (you run the install; the command is printed) and renders `<PeajeHead slug="..." />` in the `<head>` of the app router root layout. Configs wrapped in `withSentryConfig(...)` or similar, and the pages router, are left for you with an exact instruction.
 5. Moves static copies that would shadow the proxy (`public/openapi.json`, `app/mcp/route.ts`, ...) to `.peaje-backup/<timestamp>/`. Nothing is ever deleted.
 
 Without `--yes` it prints the plan and asks for confirmation on a TTY. Without a TTY and without `--yes` it exits with code 2 instead of hanging.

@@ -15,6 +15,8 @@ import {
 import { MotoresDeRespuesta } from './motores'
 import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
 import { BloqueProxy } from './proxy'
+import { UltimaVerificacion } from './ultima-verificacion'
+import { SecretoOrigen } from './secreto-origen'
 import { generarProxy, type Entidad } from '@peaje/shared'
 
 type Kit = Dict['kit']
@@ -95,6 +97,9 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             </>
           }
         />
+
+        <UltimaVerificacion tenantId={tenant.id} />
+        <SecretoOrigen embedSecret={tenant.embedSecret} />
 
         <ImplementarPeaje
           piezas={[

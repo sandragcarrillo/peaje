@@ -40,9 +40,11 @@ create table if not exists routes (
   price_usd numeric(18, 6) not null,
   description text,
   active boolean not null default true,
-  created_at timestamptz not null default now(),
-  unique (tenant_id, method, path_pattern)
+  created_at timestamptz not null default now()
 );
+-- Único solo entre activas: una ruta borrada (active=false) se puede recrear.
+create unique index if not exists routes_active_unique
+  on routes (tenant_id, method, path_pattern) where active;
 
 create table if not exists payments (
   id uuid primary key default gen_random_uuid(),

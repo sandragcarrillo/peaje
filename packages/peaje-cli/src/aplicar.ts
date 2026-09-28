@@ -7,10 +7,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { basename, dirname, join, posix } from 'node:path'
 import { rutasABorrar } from '@peaje/shared'
 import { comandoInstalar } from './detectar'
-import { agregarDependencia, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead, nextConfigNuevo } from './next'
+import { agregarDependencia, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead, nextConfigNuevo, proxyNuevo } from './next'
 import type { Accion, Deteccion, Kit, Plan } from './tipos'
 
-export const VERSION_PEAJE_NEXT = '^0.1.0'
+export const VERSION_PEAJE_NEXT = '^0.2.0'
 export const CARPETA_BACKUP = '.peaje-backup'
 
 const BLOQUEA_TODO = /^Disallow:\s*\/\s*$/m
@@ -121,6 +121,8 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     if (/in `remove` exists|Delete that static copy/.test(m) && acciones.some((a) => a.tipo === 'move')) continue
     if (/^Deploy\./.test(m)) continue
     if (/^Pick the ONE proxy file/.test(m) && manual.some((x) => x.startsWith('Pick the ONE proxy file'))) continue
+    // En Next el CLI ya escribió o pidió envolver el middleware, y ya avisó del secreto.
+    if (/^Next\.js: add `peajeProxy/.test(m) && det.stack === 'next') continue
     manual.push(m)
   }
 
@@ -202,6 +204,27 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
     acciones.push({ tipo: 'write', path: nuevo.path, content: nuevo.content, motivo: 'no next.config found, created with withPeaje()' })
     tocaInstalar = true
   }
+
+  // (d2) el middleware: es lo que pone el 402 de las rutas de API en el dominio,
+  // en runtime, leyendo la lista del gateway. Sin él solo cobran los links /r/.
+  if (det.middleware) {
+    if (/\bpeajeProxy\b/.test(leer(dir, det.middleware))) {
+      acciones.push({ tipo: 'skip', path: det.middleware, motivo: 'already uses peajeProxy' })
+    } else {
+      manual.push(
+        `${det.middleware} exists. Wrap it so Peaje runs first: \`import { peajeProxy } from '@peaje/next/proxy'\` and \`export default peajeProxy({ slug: ${JSON.stringify(slug)} }, yourMiddleware)\`. Without it, priced API routes only answer 402 at the gateway URL, not on your domain.`,
+      )
+      tocaInstalar = true
+    }
+  } else {
+    const enSrc = Boolean(det.layout?.startsWith('src/'))
+    const nuevo = proxyNuevo(slug, existe(dir, 'tsconfig.json'), det.nextMajor, enSrc)
+    acciones.push({ tipo: 'write', path: nuevo.path, content: nuevo.content, motivo: 'runtime proxy: priced API routes answer 402 on your domain' })
+    tocaInstalar = true
+  }
+  manual.push(
+    'Set PEAJE_ORIGIN_SECRET in your hosting environment variables (copy it from the Kit page of your Peaje dashboard). Without it, priced API routes are not charged on your domain; discovery files and /r/ links work anyway.',
+  )
 
   // (e) head
   if (det.router === 'app' && det.layout) {

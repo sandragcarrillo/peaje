@@ -74,6 +74,12 @@ test('fixture 1: Next app router con rewrites() array y <head>', async () => {
   assert.ok(config.startsWith(`import { withPeaje } from '@peaje/next'\n`))
   assert.ok(config.includes(`export default withPeaje(nextConfig, { slug: "demo" })`))
   assert.ok(config.includes(`async rewrites()`), 'los rewrites originales quedan')
+  // Next 15 en el fixture: el middleware se llama middleware.ts; desde 16, proxy.ts.
+  const mw = readFileSync(join(dir, 'middleware.ts'), 'utf8')
+  assert.ok(mw.includes(`import { peajeProxy } from '@peaje/next/proxy'`))
+  assert.ok(mw.includes(`peajeProxy({ slug: "demo" })`))
+  assert.ok(!existsSync(join(dir, 'proxy.ts')))
+  assert.equal(det.nextMajor, 15)
 
   const layout = readFileSync(join(dir, 'app/layout.tsx'), 'utf8')
   assert.ok(layout.includes(`import { PeajeHead } from '@peaje/next/head'`))
@@ -82,7 +88,7 @@ test('fixture 1: Next app router con rewrites() array y <head>', async () => {
   assert.match(layout, /<head>\n\s+<PeajeHead slug="demo" \/>\n\s+<meta name="theme-color"/)
 
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/next'], '^0.1.0')
+  assert.equal(pkg.dependencies['@peaje/next'], '^0.2.0')
   assert.ok(resultado.next.some((n) => n.startsWith('pnpm add @peaje/next')))
 
   // robots nuevo, snippets bajo peaje/, copia estática movida al backup
@@ -292,9 +298,9 @@ test('fusionarRobots conserva lo del sitio, omite el grupo * y el Sitemap duplic
 
 test('agregarDependencia inserta una sola línea sin reordenar el resto', () => {
   const src = '{\n  "name": "x",\n  "dependencies": {\n    "next": "15.3.0",\n    "react": "19.1.0"\n  }\n}\n'
-  const out = agregarDependencia(src, '@peaje/next', '^0.1.0')!
+  const out = agregarDependencia(src, '@peaje/next', '^0.2.0')!
   assert.equal(out.split('\n').length, src.split('\n').length + 1)
-  assert.ok(out.includes('    "@peaje/next": "^0.1.0",\n    "next": "15.3.0"'))
-  assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.1.0')
-  assert.equal(agregarDependencia(out, '@peaje/next', '^0.1.0'), null)
+  assert.ok(out.includes('    "@peaje/next": "^0.2.0",\n    "next": "15.3.0"'))
+  assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.2.0')
+  assert.equal(agregarDependencia(out, '@peaje/next', '^0.2.0'), null)
 })

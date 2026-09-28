@@ -1,4 +1,5 @@
 import type { Tenant } from '@peaje/db'
+import { PEAJE_ORIGIN_HEADER, secretoOrigen } from '@peaje/shared'
 
 /** Headers que no se reenvían al origin del tenant. */
 const STRIP = new Set([
@@ -28,6 +29,9 @@ export async function proxyToOrigin(
     if (!STRIP.has(key.toLowerCase())) headers.set(key, value)
   })
   headers.set('x-peaje-tenant', tenant.slug)
+  // Prueba ante el sitio de que esta request ya pagó (ver proxy-runtime.ts):
+  // el middleware del negocio la deja pasar al handler en vez de reenviarla.
+  headers.set(PEAJE_ORIGIN_HEADER, await secretoOrigen(tenant.embedSecret))
   headers.set('x-forwarded-host', incoming.host)
   if (context.paymentRef) headers.set('x-peaje-payment-ref', context.paymentRef)
 
