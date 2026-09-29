@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState, useTransition } from 'react'
 import type { Citacion } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
 import { agregarPregunta, borrarPregunta, medirAhora } from './actions'
@@ -13,6 +14,20 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
   const [msj, setMsj] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const [midiendo, setMidiendo] = useState(false)
+  const router = useRouter()
+  // Preguntas elegidas pero sin resultado: la primera medición corre en el
+  // gateway. Se relee cada 15 s, hasta 4 minutos.
+  const esperando = !!datos && datos.prompts.length > 0 && !datos.summary.measuredAt
+  useEffect(() => {
+    if (!esperando) return
+    let vueltas = 0
+    const id = setInterval(() => {
+      vueltas += 1
+      router.refresh()
+      if (vueltas >= 16) clearInterval(id)
+    }, 15_000)
+    return () => clearInterval(id)
+  }, [esperando, router])
   if (!datos) return null
   const s = datos.summary
   const faltan = s.engines.filter((e) => !e.configured).map((e) => e.name)
@@ -73,6 +88,8 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
           </table>
           <p className="mt-2 text-xs text-muted">✓ {t.citCitado} · ~ {t.citMencion} · ✗ {t.citNo}</p>
         </div>
+      ) : esperando ? (
+        <p className="text-sm">{t.citMidiendoFondo}</p>
       ) : (
         <p className="text-sm text-muted">{t.citSinMedir}</p>
       )}

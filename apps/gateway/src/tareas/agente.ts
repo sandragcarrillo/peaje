@@ -8,6 +8,7 @@ import { MODEL } from '../monitor/reporte.js'
 import { generarPlan, medirMetricas, planConAvance } from './plan.js'
 import { buscarTareas, medirAhora, tareaPublica } from './router.js'
 import { MAX_PROMPTS, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+import { revisarAcceso } from '../acceso/revisar.js'
 
 /**
  * El agente Pro que conversa con el dueño (dashboard hoy, Telegram después).
@@ -197,6 +198,14 @@ const HERRAMIENTAS: Herramienta[] = [
     },
   },
   {
+    name: 'check_site_access',
+    description: 'Open the site as each AI bot does (ChatGPT search, Perplexity, Claude, Google, Bing): whether robots.txt or a firewall blocks the ones that answer, versus the ones that only train, and how old the key pages look (visible dates, sitemap). Takes about 20 seconds.',
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant }) {
+      return (await revisarAcceso(tenant)) ?? { error: 'the business has no public domain' }
+    },
+  },
+  {
     name: 'list_routes',
     description: 'Priced API routes and priced links: method, path, price in USD, description agents read.',
     input_schema: { type: 'object', properties: {} },
@@ -322,6 +331,7 @@ const ESTADOS: Record<string, { es: string; en: string }> = {
   propose_route_change: { es: 'Preparando la propuesta…', en: 'Preparing the proposal…' },
   read_site_page: { es: 'Leyendo tu sitio…', en: 'Reading your site…' },
   get_citations: { es: 'Revisando qué dicen de ti los asistentes de IA…', en: 'Checking what AI assistants say about you…' },
+  check_site_access: { es: 'Entrando a tu sitio como lo hacen ChatGPT, Perplexity y Google…', en: 'Opening your site the way ChatGPT, Perplexity and Google do…' },
   manage_questions: { es: 'Ajustando las preguntas que medimos…', en: 'Updating the questions we track…' },
   run_citation_check: { es: 'Preguntándole a ChatGPT, Claude y los demás (1 a 3 minutos)…', en: 'Asking ChatGPT, Claude and the others (1 to 3 minutes)…' },
   offer_choices: { es: 'Casi listo…', en: 'Almost there…' },

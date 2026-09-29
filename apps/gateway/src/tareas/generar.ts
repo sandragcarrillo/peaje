@@ -5,6 +5,7 @@ import { store } from '../store.js'
 import { NOMBRE_CHEQUEO, TEXTO_MOTIVO } from '../monitor/email.js'
 import { sugerirContenido } from '../monitor/reporte.js'
 import { completarTarea } from './verificar.js'
+import { revisarAcceso } from '../acceso/revisar.js'
 
 /**
  * Las tareas que el agente deja para el coding agent del dueño. Tres fuentes:
@@ -79,6 +80,58 @@ function promptRuta(tenant: Tenant, dominio: string, path: string, visitas: numb
   ].join('\n')
 }
 
+function promptBloqueo(dominio: string, bot: string, producto: string, por: 'robots' | 'firewall'): string {
+  return por === 'robots'
+    ? [
+        `# Let ${producto} read ${dominio}`,
+        '',
+        `\`https://${dominio}/robots.txt\` tells \`${bot}\` not to read the site. ${producto} uses that bot to read pages before citing them, so right now it cannot recommend you with a link.`,
+        '',
+        '## What to do',
+        '',
+        `Add a group for it at the top of robots.txt (or in app/robots.ts if the site generates it):`,
+        '',
+        '```',
+        `User-agent: ${bot}`,
+        'Allow: /',
+        '```',
+        '',
+        'If you want to keep AI companies from training on the site, block the training bots instead (GPTBot, ClaudeBot, Google-Extended, CCBot). That does not affect recommendations.',
+        '',
+        'Deploy, then mark this task done.',
+      ].join('\n')
+    : [
+        `# Your firewall blocks ${producto}`,
+        '',
+        `Peaje opened https://${dominio}/ with the user-agent of \`${bot}\` and got blocked (403, 429 or a challenge page), while a normal browser gets the page. ${producto} cannot read or cite what it cannot open.`,
+        '',
+        '## What to do',
+        '',
+        '- Cloudflare: Security, Bots. "Block AI bots" blocks the bots that answer as well as the ones that train. Turn it off and block only training bots with a WAF rule, or allow verified bots. Check "Bot Fight Mode" too.',
+        '- Vercel: Firewall, check that no rule or Attack Challenge Mode blocks this user-agent.',
+        '- Other hosts or a WAF: allow this user-agent on the pages you want recommended.',
+        '',
+        'Then mark this task done. Peaje opens the site as that bot again.',
+      ].join('\n')
+}
+
+function promptFrescura(url: string, fecha: string | null): string {
+  return [
+    `# ${fecha ? 'Refresh' : 'Date'} ${url}`,
+    '',
+    fecha
+      ? `The newest date on this page is ${fecha}. Pages AI assistants cite tend to be recent, and they read the date on the page.`
+      : 'This page shows no date a reader or an AI assistant can see. Pages AI assistants cite tend to show when they were last updated.',
+    '',
+    '## What to do',
+    '',
+    '1. Review the facts on the page (prices, numbers, names, links) and update anything that changed. Use only real facts from the business.',
+    '2. Add a visible line near the top: "Updated <month> <year>", and the same date in a `<time datetime="YYYY-MM-DD">` tag.',
+    '3. If the site has a sitemap, update this page\'s `<lastmod>`.',
+    '4. Deploy and mark this task done.',
+  ].join('\n')
+}
+
 /** Tareas de arreglo: una por chequeo que falla; las que ya pasan se cierran solas. */
 export async function sincronizarFixes(tenant: Tenant): Promise<{ creadas: number; cerradas: number }> {
   const v = await store.lastVerification(tenant.id)
@@ -132,6 +185,36 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
   creadas += fixes.creadas
 
   if (dominio) {
+    // Acceso y frescura: bots que responden bloqueados y páginas sin fecha o viejas.
+    const acceso = await revisarAcceso(tenant).catch(() => null)
+    for (const b of acceso?.bloqueados ?? []) {
+      const r = await store.upsertTask({
+        tenantId: tenant.id,
+        key: `fix:${b.por}:${b.bot}`,
+        kind: 'fix',
+        title: b.por === 'robots' ? `Let ${b.producto} read the site (robots.txt blocks ${b.bot})` : `Your firewall blocks ${b.producto} (${b.bot})`,
+        summary: b.por === 'robots' ? `robots.txt tells ${b.bot} not to read the site, so ${b.producto} cannot cite it.` : `${b.bot} gets blocked at the edge, so ${b.producto} cannot read or cite the site.`,
+        body: promptBloqueo(dominio, b.bot, b.producto, b.por),
+        acceptance: [{ type: 'check', id: 'bots' }],
+        source: 'access',
+      })
+      r.created ? (creadas += 1) : (actualizadas += 1)
+    }
+    for (const p of (acceso?.paginas ?? []).filter((x) => x.vieja).slice(0, 5)) {
+      const ruta = new URL(p.url).pathname
+      const r = await store.upsertTask({
+        tenantId: tenant.id,
+        key: `content:refresh:${ruta}`,
+        kind: 'content',
+        title: p.fecha ? `Refresh ${ruta}: last dated ${p.fecha}` : `Add a visible date to ${ruta}`,
+        summary: p.fecha ? `The page looks ${Math.round((p.dias ?? 0) / 30)} months old; AI assistants favor recent pages.` : 'No readable date on the page; AI assistants favor pages that show when they were updated.',
+        body: promptFrescura(p.url, p.fecha),
+        acceptance: [{ type: 'url', url: p.url }],
+        source: 'access',
+      })
+      r.created ? (creadas += 1) : (actualizadas += 1)
+    }
+
     // Rutas pedidas que no existen: al menos dos pedidos en 30 días.
     const stats = await store.visitStats(tenant.id, { days: 30 }).catch(() => null)
     for (const nf of stats?.notFound ?? []) {

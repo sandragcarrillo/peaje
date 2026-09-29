@@ -1,6 +1,7 @@
 'use client'
 
 import type { AgentAction, AgentMessage } from '@peaje/db'
+import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useDict } from '@/lib/i18n/client'
 import { empezarDeNuevo, resolverAccion } from './actions'
@@ -13,6 +14,7 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const [estado, setEstado] = useState<string | null>(null)
+  const router = useRouter()
   const fin = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,6 +33,8 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
       try {
         const respuesta = await conversarEnVivo(slug, limpio, setEstado)
         setMensajes((m) => [...m, respuesta])
+        // El agente pudo armar el plan, crear tareas o lanzar la medición: se vuelve a leer lo de abajo.
+        router.refresh()
       } catch (e) {
         const msj = e instanceof Error ? e.message : String(e)
         setError(/fetch failed|ECONNREFUSED|gateway-unreachable/i.test(msj) ? t.sinGateway : msj)
@@ -128,11 +132,13 @@ function Accion({ slug, messageId, accion, alCambiar }: { slug: string; messageI
   const { miAgente: t } = useDict()
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
+  const router = useRouter()
   const resolver = (aplicar: boolean) =>
     start(async () => {
       setError(null)
       try {
         alCambiar(await resolverAccion(slug, messageId, accion.id, aplicar))
+        router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       }
