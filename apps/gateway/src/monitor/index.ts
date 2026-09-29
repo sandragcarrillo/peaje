@@ -6,6 +6,8 @@ import { correrTenant, eventosAlertables } from './correr.js'
 import { enviarCorreo, htmlAlerta, htmlSemanal } from './email.js'
 import { armarReporte } from './reporte.js'
 import { generarTareas, reverificarHechas, sincronizarFixes } from '../tareas/generar.js'
+import { tocaCorreo } from '../tareas/plan.js'
+import { correrRonda } from '../citacion/medir.js'
 
 /**
  * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
@@ -74,9 +76,13 @@ monitorRouter.post('/weekly', async (c) => {
     try {
       const actual = (await store.lastVerification(t.id)) ?? (await correrTenant(t))?.verificacion
       if (!actual) continue
+      // La cadencia la eligió el dueño en su plan: quincenal o solo a pedido no reciben todas las semanas.
+      if (!tocaCorreo(await store.getPlan(t.id))) continue
       // Las sugerencias de contenido entran como tareas (una sola llamada a Opus);
       // el correo lista las tareas abiertas.
       await generarTareas(t, { conContenido: true })
+      // Citación: una ronda por semana con las preguntas del negocio (si tiene).
+      if ((await store.listCitationPrompts(t.id)).length > 0) await correrRonda(t).catch((e) => console.warn('[monitor] citación', t.slug, e instanceof Error ? e.message : e))
       const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)
       await enviarCorreo(t.email!, subject, html)

@@ -183,3 +183,62 @@ export function completarTarea(slug: string, id: string, url?: string) {
     body: JSON.stringify(url ? { url } : {}),
   })
 }
+
+export type PlanDelNegocio = {
+  goal: string
+  goalDetail: string
+  capacity: string[]
+  cadence: string
+  summary: string
+  createdAt: string
+  steps: { title: string; why: string; deliverable: string; metric: string; target: number; baseline: number | null; current: number | null; done: boolean }[]
+}
+
+export async function leerPlan(slug: string) {
+  return (await internal<{ plan: PlanDelNegocio | null }>(`/${slug}/tasks/plan`)).plan
+}
+
+export function armarPlan(slug: string, body: { goal: string; goalDetail: string; capacity: string[]; cadence: string; language: string }) {
+  return internal<{ plan: PlanDelNegocio }>(`/${slug}/tasks/plan`, { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function enviarAlAgente(slug: string, text: string, language: string) {
+  return internal<{ message: import('@peaje/db').AgentMessage }>(`/${slug}/tasks/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ text, language, channel: 'dashboard' }),
+  })
+}
+
+export type Citacion = {
+  prompts: { id: string; text: string; source: string }[]
+  summary: {
+    measuredAt: string | null
+    engines: { id: string; name: string; configured: boolean }[]
+    share: number | null
+    mentionShare: number | null
+    previousShare: number | null
+    byEngine: { engine: string; cited: number; mentioned: number; total: number }[]
+    byPrompt: { prompt: string; engines: Record<string, { cited: boolean; mentioned: boolean; error: boolean }> }[]
+    competitors: { domain: string; count: number }[]
+  }
+}
+
+export function leerCitacion(slug: string) {
+  return internal<Citacion>(`/${slug}/tasks/citations`)
+}
+
+export function agregarPreguntas(slug: string, body: { texts?: string[]; suggest?: boolean }) {
+  return internal<{ added: unknown[] }>(`/${slug}/tasks/citations/prompts`, { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function quitarPregunta(slug: string, id: string) {
+  return internal<{ ok: boolean }>(`/${slug}/tasks/citations/prompts/${id}`, { method: 'DELETE' })
+}
+
+/** 429 trae cuánto esperar; no es error para la UI. */
+export async function medirCitacion(slug: string): Promise<{ error?: 'too-soon'; retryInSeconds?: number }> {
+  const res = await fetch(`${base}/_internal/${slug}/tasks/citations/run`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, cache: 'no-store' })
+  const data = (await res.json()) as { error?: string; retryInSeconds?: number }
+  if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
+  return data as { error?: 'too-soon'; retryInSeconds?: number }
+}

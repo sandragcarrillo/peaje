@@ -84,6 +84,14 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
   const fallando = r.fallando.length
     ? `<p><strong>What to fix</strong></p><ul>${r.fallando.map((f) => `<li>${esc(NOMBRE_CHEQUEO[f.id] ?? f.id)}: ${esc(f.texto)}</li>`).join('')}</ul><pre style="${mono}">${esc(r.comando)}</pre>`
     : `<p><strong>Technical status</strong>: all ${r.chequeosTotal} checks pass. Nothing to fix.</p>`
+  const fmt = (n: number | null) => (n === null ? 'not measured yet' : String(n))
+  const plan = r.plan
+    ? `<p><strong>Your plan</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <span style="color:#666">· ${esc(p.metrica.replace(/_/g, ' '))}: ${fmt(p.antes)} → ${fmt(p.ahora)} (target ${p.meta})</span></li>`).join('')}</ol>`
+    : `<p><strong>No plan yet.</strong> <a href="${esc(r.agenteUrl)}">Tell the agent your goal</a> and it builds one for this business.</p>`
+  const pct = (x: number | null) => (x === null ? 'n/a' : `${Math.round(x * 100)}%`)
+  const citacion = r.citacion
+    ? `<p><strong>Answer engines</strong>: they cite your site in ${pct(r.citacion.share)} of the answers to your questions${r.citacion.previa !== null ? ` (${pct(r.citacion.previa)} last time)` : ''}.${r.citacion.competidores.length ? ` Showing up instead: ${esc(r.citacion.competidores.join(', '))}.` : ''}</p>`
+    : ''
   const tareas = r.tareas.length
     ? `<p><strong>Tasks for your coding agent</strong> (${r.tareas.length} open). Connect Claude Code or Cursor to Peaje once and ask it to "work through the Peaje tasks": it reads each one, applies it in your repo, and Peaje checks it on the live site.</p><ol>${r.tareas.map((t) => `<li>${esc(t.titulo)} <span style="color:#666">· ${esc(t.tipo)}${t.estado === 'done' ? ' · waiting for the deploy' : t.estado === 'in_progress' ? ' · in progress' : ''}</span></li>`).join('')}</ol><p><a href="${esc(r.agenteUrl)}">See the tasks and how to connect</a></p>`
     : ''
@@ -92,10 +100,12 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
     : ''
   const html = `<div style="${estilo}">
 <p>Your week at <strong>${esc(r.dominio)}</strong>.</p>
+${plan}
 <p><strong>Agent-readiness score</strong>: ${r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} vs last week)` : ''}` : 'not available'}.</p>
 ${fallando}
 <p><strong>Payments</strong>: ${r.pagos.count} paid requests, $${r.pagos.revenue} for you${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}
 ${visitas}
+${citacion}
 ${tareas}
 ${contenido}
 <p><a href="${esc(r.kitUrl)}">Open your dashboard</a>. Reply to this email if you want the Peaje agent to look at something specific.</p>

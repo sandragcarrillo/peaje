@@ -249,6 +249,83 @@ export type NewAgentTask = Pick<AgentTask, 'tenantId' | 'key' | 'kind' | 'title'
 
 export type AgentTaskPatch = Partial<Pick<AgentTask, 'status' | 'note' | 'doneUrl' | 'doneAt' | 'verifiedAt'>>
 
+// ---- plan del agente Pro ----
+
+export const PLAN_GOALS = ['recommendations', 'agent-sales', 'both'] as const
+export type PlanGoal = (typeof PLAN_GOALS)[number]
+export const PLAN_CAPACITIES = ['content', 'code', 'config'] as const
+export type PlanCapacity = (typeof PLAN_CAPACITIES)[number]
+export const PLAN_CADENCES = ['daily', 'weekly', 'biweekly', 'on-demand'] as const
+export type PlanCadence = (typeof PLAN_CADENCES)[number]
+/** Métricas que Peaje ya mide. `citation_share` se llena desde el milestone de citación. */
+export const PLAN_METRICS = ['checks_passing', 'answer_bot_visits_7d', 'paid_requests_7d', 'revenue_7d', 'payment_attempt_rate', 'tasks_verified', 'citation_share'] as const
+export type PlanMetric = (typeof PLAN_METRICS)[number]
+
+export type PlanStep = { title: string; why: string; deliverable: string; metric: PlanMetric; target: number }
+
+export type AgentPlan = {
+  tenantId: string
+  goal: PlanGoal
+  goalDetail: string
+  capacity: PlanCapacity[]
+  cadence: PlanCadence
+  language: string
+  summary: string
+  steps: PlanStep[]
+  baseline: Partial<Record<PlanMetric, number | null>>
+  createdAt: string
+  updatedAt: string
+}
+
+export type NewAgentPlan = Omit<AgentPlan, 'createdAt' | 'updatedAt'>
+
+// ---- conversación con el agente Pro ----
+
+/** Un cambio que el agente propone y el dueño aplica con un botón. */
+export type AgentAction = {
+  id: string
+  type: 'route.create' | 'route.update' | 'route.delete'
+  summary: string
+  params: { routeId?: string; method?: string; path?: string; priceUsd?: string; description?: string | null }
+  status: 'pending' | 'applied' | 'dismissed'
+  result?: string
+}
+
+export type AgentMessage = {
+  id: string
+  tenantId: string
+  role: 'user' | 'assistant'
+  text: string
+  actions: AgentAction[]
+  /** Respuestas rápidas que el agente ofrece; tocar una la manda como mensaje. */
+  options: string[]
+  channel: string
+  createdAt: string
+}
+
+export type NewAgentMessage = Pick<AgentMessage, 'tenantId' | 'role' | 'text'> & { actions?: AgentAction[]; options?: string[]; channel?: string }
+
+// ---- medición de citación ----
+
+export type CitationPrompt = { id: string; tenantId: string; text: string; source: 'agent' | 'owner'; active: boolean; createdAt: string }
+
+export type CitationRun = {
+  id: string
+  tenantId: string
+  roundId: string
+  promptId: string | null
+  promptText: string
+  engine: string
+  runAt: string
+  cited: boolean
+  mentioned: boolean
+  domains: string[]
+  answerExcerpt: string | null
+  error: string | null
+}
+
+export type NewCitationRun = Omit<CitationRun, 'id' | 'runAt'>
+
 // ---- monitoreo: una corrida del verificador por tenant ----
 
 export type Verificacion = {
@@ -344,6 +421,21 @@ export interface Store {
   listTasks(tenantId: string, opts?: { statuses?: TaskStatus[] }): Promise<AgentTask[]>
   getTask(tenantId: string, id: string): Promise<AgentTask | null>
   updateTask(tenantId: string, id: string, patch: AgentTaskPatch): Promise<AgentTask>
+  /** Últimos mensajes, del más viejo al más nuevo. */
+  listMessages(tenantId: string, limit: number): Promise<AgentMessage[]>
+  addMessage(m: NewAgentMessage): Promise<AgentMessage>
+  getMessage(tenantId: string, id: string): Promise<AgentMessage | null>
+  setMessageActions(tenantId: string, id: string, actions: AgentAction[]): Promise<void>
+  clearMessages(tenantId: string): Promise<void>
+  listCitationPrompts(tenantId: string): Promise<CitationPrompt[]>
+  addCitationPrompts(tenantId: string, texts: string[], source: CitationPrompt['source']): Promise<CitationPrompt[]>
+  removeCitationPrompt(tenantId: string, id: string): Promise<void>
+  recordCitationRuns(runs: NewCitationRun[]): Promise<void>
+  /** Todas las corridas de las últimas `rounds` rondas, de la más nueva a la más vieja. */
+  listCitationRuns(tenantId: string, rounds: number): Promise<CitationRun[]>
+  getPlan(tenantId: string): Promise<AgentPlan | null>
+  /** Reemplaza el plan del negocio (uno por negocio). */
+  savePlan(plan: NewAgentPlan): Promise<AgentPlan>
 
   // origins permitidos para el iframe
   listAllowedOrigins(tenantId: string): Promise<string[]>

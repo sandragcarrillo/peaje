@@ -26,6 +26,14 @@ import type {
   AgentTaskPatch,
   NewAgentTask,
   TaskStatus,
+  AgentPlan,
+  NewAgentPlan,
+  AgentAction,
+  AgentMessage,
+  NewAgentMessage,
+  CitationPrompt,
+  CitationRun,
+  NewCitationRun,
 } from './types'
 import { aggregateVisits } from './visits'
 
@@ -199,6 +207,72 @@ export class MemoryStore implements Store {
     if (!t) throw new Error('Tarea no encontrada')
     Object.assign(t, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)), { updatedAt: new Date().toISOString() })
     return t
+  }
+
+  #messages: AgentMessage[] = []
+
+  async listMessages(tenantId: string, limit: number): Promise<AgentMessage[]> {
+    return this.#messages.filter((m) => m.tenantId === tenantId).slice(-limit)
+  }
+
+  async addMessage(m: NewAgentMessage): Promise<AgentMessage> {
+    const nuevo: AgentMessage = { id: this.#id('msg'), tenantId: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], channel: m.channel ?? 'dashboard', createdAt: new Date().toISOString() }
+    this.#messages.push(nuevo)
+    return nuevo
+  }
+
+  async getMessage(tenantId: string, id: string): Promise<AgentMessage | null> {
+    return this.#messages.find((m) => m.tenantId === tenantId && m.id === id) ?? null
+  }
+
+  async setMessageActions(tenantId: string, id: string, actions: AgentAction[]): Promise<void> {
+    const m = this.#messages.find((x) => x.tenantId === tenantId && x.id === id)
+    if (m) m.actions = actions
+  }
+
+  #prompts: CitationPrompt[] = []
+  #runs: CitationRun[] = []
+
+  async listCitationPrompts(tenantId: string): Promise<CitationPrompt[]> {
+    return this.#prompts.filter((p) => p.tenantId === tenantId && p.active)
+  }
+
+  async addCitationPrompts(tenantId: string, texts: string[], source: CitationPrompt['source']): Promise<CitationPrompt[]> {
+    const nuevos = texts.map((text) => ({ id: this.#id('cpr'), tenantId, text, source, active: true, createdAt: new Date().toISOString() }))
+    this.#prompts.push(...nuevos)
+    return nuevos
+  }
+
+  async removeCitationPrompt(tenantId: string, id: string): Promise<void> {
+    const p = this.#prompts.find((x) => x.tenantId === tenantId && x.id === id)
+    if (p) p.active = false
+  }
+
+  async recordCitationRuns(runs: NewCitationRun[]): Promise<void> {
+    this.#runs.unshift(...runs.map((r) => ({ ...r, id: this.#id('crn'), runAt: new Date().toISOString() })))
+  }
+
+  async listCitationRuns(tenantId: string, rounds: number): Promise<CitationRun[]> {
+    const filas = this.#runs.filter((r) => r.tenantId === tenantId)
+    const rondas = [...new Set(filas.map((r) => r.roundId))].slice(0, rounds)
+    return filas.filter((r) => rondas.includes(r.roundId))
+  }
+
+  async clearMessages(tenantId: string): Promise<void> {
+    this.#messages = this.#messages.filter((m) => m.tenantId !== tenantId)
+  }
+
+  #plans = new Map<string, AgentPlan>()
+
+  async getPlan(tenantId: string): Promise<AgentPlan | null> {
+    return this.#plans.get(tenantId) ?? null
+  }
+
+  async savePlan(plan: NewAgentPlan): Promise<AgentPlan> {
+    const ahora = new Date().toISOString()
+    const guardado = { ...plan, createdAt: ahora, updatedAt: ahora }
+    this.#plans.set(plan.tenantId, guardado)
+    return guardado
   }
 
   async listRoutes(tenantId: string) {

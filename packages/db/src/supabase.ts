@@ -28,6 +28,15 @@ import type {
   NewAgentTask,
   TaskCheck,
   TaskStatus,
+  AgentPlan,
+  NewAgentPlan,
+  PlanStep,
+  AgentAction,
+  AgentMessage,
+  NewAgentMessage,
+  CitationPrompt,
+  CitationRun,
+  NewCitationRun,
 } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
 
@@ -89,6 +98,56 @@ function taskFrom(row: Row): AgentTask {
     updatedAt: String(row.updated_at),
     doneAt: row.done_at ?? null,
     verifiedAt: row.verified_at ?? null,
+  }
+}
+
+function promptFrom(row: Row): CitationPrompt {
+  return { id: row.id, tenantId: row.tenant_id, text: row.text, source: row.source, active: row.active, createdAt: String(row.created_at) }
+}
+
+function runFrom(row: Row): CitationRun {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    roundId: row.round_id,
+    promptId: row.prompt_id ?? null,
+    promptText: row.prompt_text,
+    engine: row.engine,
+    runAt: String(row.run_at),
+    cited: Boolean(row.cited),
+    mentioned: Boolean(row.mentioned),
+    domains: row.domains ?? [],
+    answerExcerpt: row.answer_excerpt ?? null,
+    error: row.error ?? null,
+  }
+}
+
+function messageFrom(row: Row): AgentMessage {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    role: row.role,
+    text: row.text,
+    actions: (row.actions ?? []) as AgentAction[],
+    options: row.options ?? [],
+    channel: row.channel ?? 'dashboard',
+    createdAt: String(row.created_at),
+  }
+}
+
+function planFrom(row: Row): AgentPlan {
+  return {
+    tenantId: row.tenant_id,
+    goal: row.goal,
+    goalDetail: row.goal_detail ?? '',
+    capacity: row.capacity ?? [],
+    cadence: row.cadence,
+    language: row.language ?? 'en',
+    summary: row.summary ?? '',
+    steps: (row.steps ?? []) as PlanStep[],
+    baseline: row.baseline ?? {},
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
   }
 }
 
@@ -338,6 +397,122 @@ export class SupabaseStore implements Store {
     const { data, error } = await this.#db.from('agent_tasks').update(fila).eq('tenant_id', tenantId).eq('id', id).select().single()
     this.#fail('updateTask', error)
     return taskFrom(data as Row)
+  }
+
+  async listMessages(tenantId: string, limit: number): Promise<AgentMessage[]> {
+    const { data, error } = await this.#db
+      .from('agent_messages')
+      .select()
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    this.#fail('listMessages', error)
+    return (data ?? []).map(messageFrom).reverse()
+  }
+
+  async addMessage(m: NewAgentMessage): Promise<AgentMessage> {
+    const { data, error } = await this.#db
+      .from('agent_messages')
+      .insert({ tenant_id: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], channel: m.channel ?? 'dashboard' })
+      .select()
+      .single()
+    this.#fail('addMessage', error)
+    return messageFrom(data as Row)
+  }
+
+  async getMessage(tenantId: string, id: string): Promise<AgentMessage | null> {
+    const { data, error } = await this.#db.from('agent_messages').select().eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+    this.#fail('getMessage', error)
+    return data ? messageFrom(data as Row) : null
+  }
+
+  async setMessageActions(tenantId: string, id: string, actions: AgentAction[]): Promise<void> {
+    const { error } = await this.#db.from('agent_messages').update({ actions }).eq('tenant_id', tenantId).eq('id', id)
+    this.#fail('setMessageActions', error)
+  }
+
+  async listCitationPrompts(tenantId: string): Promise<CitationPrompt[]> {
+    const { data, error } = await this.#db.from('citation_prompts').select().eq('tenant_id', tenantId).eq('active', true).order('created_at')
+    this.#fail('listCitationPrompts', error)
+    return (data ?? []).map(promptFrom)
+  }
+
+  async addCitationPrompts(tenantId: string, texts: string[], source: CitationPrompt['source']): Promise<CitationPrompt[]> {
+    if (texts.length === 0) return []
+    const { data, error } = await this.#db
+      .from('citation_prompts')
+      .insert(texts.map((text) => ({ tenant_id: tenantId, text, source })))
+      .select()
+    this.#fail('addCitationPrompts', error)
+    return (data ?? []).map(promptFrom)
+  }
+
+  async removeCitationPrompt(tenantId: string, id: string): Promise<void> {
+    const { error } = await this.#db.from('citation_prompts').update({ active: false }).eq('tenant_id', tenantId).eq('id', id)
+    this.#fail('removeCitationPrompt', error)
+  }
+
+  async recordCitationRuns(runs: NewCitationRun[]): Promise<void> {
+    if (runs.length === 0) return
+    const { error } = await this.#db.from('citation_runs').insert(
+      runs.map((r) => ({
+        tenant_id: r.tenantId,
+        round_id: r.roundId,
+        prompt_id: r.promptId,
+        prompt_text: r.promptText,
+        engine: r.engine,
+        cited: r.cited,
+        mentioned: r.mentioned,
+        domains: r.domains,
+        answer_excerpt: r.answerExcerpt,
+        error: r.error,
+      })),
+    )
+    this.#fail('recordCitationRuns', error)
+  }
+
+  async listCitationRuns(tenantId: string, rounds: number): Promise<CitationRun[]> {
+    const { data, error } = await this.#db.from('citation_runs').select().eq('tenant_id', tenantId).order('run_at', { ascending: false }).limit(2000)
+    this.#fail('listCitationRuns', error)
+    const filas = (data ?? []).map(runFrom)
+    const rondas = [...new Set(filas.map((r) => r.roundId))].slice(0, rounds)
+    return filas.filter((r) => rondas.includes(r.roundId))
+  }
+
+  async clearMessages(tenantId: string): Promise<void> {
+    const { error } = await this.#db.from('agent_messages').delete().eq('tenant_id', tenantId)
+    this.#fail('clearMessages', error)
+  }
+
+  async getPlan(tenantId: string): Promise<AgentPlan | null> {
+    const { data, error } = await this.#db.from('agent_plans').select().eq('tenant_id', tenantId).maybeSingle()
+    this.#fail('getPlan', error)
+    return data ? planFrom(data as Row) : null
+  }
+
+  async savePlan(plan: NewAgentPlan): Promise<AgentPlan> {
+    const { data, error } = await this.#db
+      .from('agent_plans')
+      .upsert(
+        {
+          tenant_id: plan.tenantId,
+          goal: plan.goal,
+          goal_detail: plan.goalDetail,
+          capacity: plan.capacity,
+          cadence: plan.cadence,
+          language: plan.language,
+          summary: plan.summary,
+          steps: plan.steps,
+          baseline: plan.baseline,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'tenant_id' },
+      )
+      .select()
+      .single()
+    this.#fail('savePlan', error)
+    return planFrom(data as Row)
   }
 
   async setBaselineScore(tenantId: string, score: number): Promise<void> {

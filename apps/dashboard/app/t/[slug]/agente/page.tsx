@@ -5,6 +5,10 @@ import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Buscar, Clave, ListaTareas } from './partes'
+import { Plan } from './plan'
+import { Chat } from './chat'
+import { leerCitacion, leerPlan } from '@/lib/gateway'
+import { CitacionPanel } from './citacion'
 
 /**
  * Mi agente: el agente Pro de este negocio. Propone tareas; el coding agent
@@ -15,7 +19,12 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const t = d.miAgente
-  const tareas: AgentTask[] = await store.listTasks(tenant.id).catch(() => [])
+  const [tareas, plan, mensajes] = await Promise.all([
+    store.listTasks(tenant.id).catch((): AgentTask[] => []),
+    leerPlan(tenant.slug).catch(() => null),
+    store.listMessages(tenant.id, 50).catch(() => []),
+  ])
+  const citacion = await leerCitacion(tenant.slug).catch(() => null)
   const mcpUrl = `${gatewayUrl}/_owner/mcp`
 
   const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress')
@@ -27,10 +36,20 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
 
       <section className="space-y-3">
-        <SectionBar label={t.conectar} />
-        <p className="text-sm text-muted">{t.conectarIntro}</p>
-        <Clave slug={tenant.slug} prefijo={tenant.apiKeyPrefix} mcpUrl={mcpUrl} gateway={gatewayUrl} />
+        <SectionBar label={t.chatTitulo} />
+        <Chat slug={tenant.slug} inicial={mensajes} />
       </section>
+
+      <section className="space-y-3">
+        <SectionBar label={t.citTitulo} />
+        <CitacionPanel slug={tenant.slug} datos={citacion} />
+      </section>
+
+      <section className="space-y-3">
+        <SectionBar label={t.planTitulo} />
+        <Plan plan={plan} />
+      </section>
+
 
       <section className="space-y-3">
         <SectionBar label={t.tareas} meta={String(abiertas.length)} />
@@ -40,6 +59,14 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
         <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas />
       </section>
+
+      <details className="border border-border p-4">
+        <summary className="cursor-pointer text-sm">{t.avanzado}</summary>
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-muted">{t.conectarIntro}</p>
+          <Clave slug={tenant.slug} prefijo={tenant.apiKeyPrefix} mcpUrl={mcpUrl} gateway={gatewayUrl} />
+        </div>
+      </details>
     </div>
   )
 }

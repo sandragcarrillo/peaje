@@ -5,6 +5,8 @@ import { dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { TEXTO_MOTIVO } from './email.js'
+import { planConAvance } from '../tareas/plan.js'
+import { resumenCitacion } from '../citacion/medir.js'
 
 /**
  * El reporte semanal del agente de Peaje para un negocio: estado técnico con
@@ -28,11 +30,14 @@ export type Reporte = {
   /** Tareas abiertas para el coding agent del dueño, y dónde verlas. */
   tareas: { titulo: string; tipo: string; estado: string }[]
   agenteUrl: string
+  /** Avance del plan del dueño, paso por paso. Null si todavía no armó plan. */
+  citacion: { share: number | null; previa: number | null; competidores: string[]; medido: string | null } | null
+  plan: { resumen: string; pasos: { titulo: string; metrica: string; antes: number | null; ahora: number | null; meta: number; hecho: boolean }[] } | null
 }
 
 const DIAS = 7
-const MODEL = process.env.MONITOR_MODEL ?? 'claude-opus-5'
-const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app').replace(/\/$/, '')
+export const MODEL = process.env.MONITOR_MODEL ?? 'claude-opus-5'
+export const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app').replace(/\/$/, '')
 
 const SugerenciasSchema = z.object({
   paginas: z.array(
@@ -49,7 +54,7 @@ const SugerenciasSchema = z.object({
 let anthropic: Anthropic | null = null
 
 /** Texto plano de la home y hasta 5 páginas internas, acotado. */
-async function leerSitio(dominio: string): Promise<string> {
+export async function leerSitio(dominio: string): Promise<string> {
   const limpiar = (html: string) =>
     html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -161,5 +166,15 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
       .slice(0, 8)
       .map((t) => ({ titulo: t.title, tipo: t.kind, estado: t.status })),
     agenteUrl: `${DASHBOARD}/t/${tenant.slug}/agente`,
+    citacion: await resumenCitacion(tenant)
+      .then((c) => (c.measuredAt ? { share: c.share, previa: c.previousShare, competidores: c.competitors.slice(0, 5).map((x) => x.domain), medido: c.measuredAt } : null))
+      .catch(() => null),
+    plan: await planConAvance(tenant)
+      .then((p) =>
+        p
+          ? { resumen: p.summary, pasos: p.steps.map((s) => ({ titulo: s.title, metrica: s.metric, antes: s.baseline, ahora: s.current, meta: s.target, hecho: s.done })) }
+          : null,
+      )
+      .catch(() => null),
   }
 }

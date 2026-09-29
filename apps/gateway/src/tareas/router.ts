@@ -8,6 +8,10 @@ import { store } from '../store.js'
 import { generarTareas } from './generar.js'
 import { handleOwnerMcp } from './mcp.js'
 import { completarTarea } from './verificar.js'
+import { generarPlan, planConAvance } from './plan.js'
+import { conversar } from './agente.js'
+import { correrRonda, MAX_PROMPTS, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
 
 /**
  * Tareas del agente Pro.
@@ -109,6 +113,8 @@ tareasRouter.post('/_owner/mcp', async (c) => {
   return RESPONSE_ALREADY_SENT
 })
 
+tareasRouter.get('/_owner/plan', async (c) => c.json({ plan: await planConAvance(c.get('tenant')) }))
+
 tareasRouter.get('/_owner/mcp', (c) => c.json({ error: 'Use POST (MCP Streamable HTTP, stateless).' }, 405, { allow: 'POST' }))
 
 // ---- interno (dashboard) ----
@@ -146,6 +152,69 @@ tareasRouter.post('/_internal/:slug/tasks/:id/done', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { url?: string }
   return c.json({ task: await completarTarea(tenant, t, urlValida(body.url), store) })
 })
+
+tareasRouter.get('/_internal/:slug/tasks/plan', async (c) => c.json({ plan: await planConAvance(c.get('tenant')) }))
+
+/** Arma (o rehace) el plan: una llamada a Opus, cuenta dentro del mismo límite de búsqueda. */
+tareasRouter.post('/_internal/:slug/tasks/plan', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const goal = PLAN_GOALS.find((g) => g === b.goal)
+  const cadence = PLAN_CADENCES.find((x) => x === b.cadence) ?? 'weekly'
+  const capacity = Array.isArray(b.capacity) ? PLAN_CAPACITIES.filter((x) => (b.capacity as unknown[]).includes(x)) : []
+  if (!goal) return c.json({ error: 'goal must be recommendations, agent-sales or both' }, 400)
+  const tenant = c.get('tenant')
+  await generarPlan(tenant, { goal, goalDetail: String(b.goalDetail ?? ''), capacity, cadence, language: b.language === 'es' ? 'es' : 'en' })
+  return c.json({ plan: await planConAvance(tenant) })
+})
+
+/** Un mensaje del dueño al agente; devuelve la respuesta ya guardada. */
+tareasRouter.post('/_internal/:slug/tasks/chat', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { text?: string; language?: string; channel?: string }
+  const texto = String(b.text ?? '').trim()
+  if (!texto) return c.json({ error: 'empty message' }, 400)
+  const mensaje = await conversar(c.get('tenant'), texto, { idioma: b.language === 'es' ? 'es' : 'en', canal: b.channel })
+  return c.json({ message: mensaje })
+})
+
+// ---- citación ----
+
+tareasRouter.get('/_internal/:slug/tasks/citations', async (c) => {
+  const tenant = c.get('tenant')
+  const [prompts, resumen] = await Promise.all([store.listCitationPrompts(tenant.id), resumenCitacion(tenant)])
+  return c.json({ prompts, summary: resumen })
+})
+
+tareasRouter.post('/_internal/:slug/tasks/citations/prompts', async (c) => {
+  const tenant = c.get('tenant')
+  const b = (await c.req.json().catch(() => ({}))) as { texts?: unknown; suggest?: boolean }
+  const textos = b.suggest ? await sugerirPrompts(tenant) : Array.isArray(b.texts) ? b.texts.map((t) => String(t).trim().slice(0, 200)).filter(Boolean) : []
+  const actuales = await store.listCitationPrompts(tenant.id)
+  const vistos = new Set(actuales.map((p) => p.text.toLowerCase()))
+  const nuevos = textos.filter((t) => !vistos.has(t.toLowerCase())).slice(0, Math.max(0, MAX_PROMPTS - actuales.length))
+  return c.json({ added: await store.addCitationPrompts(tenant.id, nuevos, b.suggest ? 'agent' : 'owner') })
+})
+
+tareasRouter.delete('/_internal/:slug/tasks/citations/prompts/:id', async (c) => {
+  await store.removeCitationPrompt(c.get('tenant').id, c.req.param('id'))
+  return c.json({ ok: true })
+})
+
+tareasRouter.post('/_internal/:slug/tasks/citations/run', async (c) => {
+  const r = await medirAhora(c.get('tenant'))
+  return c.json(r, 'error' in r ? 429 : 200)
+})
+
+/** Una ronda a pedido por negocio cada 6 horas: cada ronda son preguntas × motores consultas pagas. */
+const ultimaRonda = new Map<string, number>()
+export async function medirAhora(tenant: Tenant) {
+  const antes = ultimaRonda.get(tenant.id) ?? 0
+  const espera = 6 * 3_600_000
+  if (Date.now() - antes < espera) return { error: 'too-soon' as const, retryInSeconds: Math.ceil((espera - (Date.now() - antes)) / 1000) }
+  ultimaRonda.set(tenant.id, Date.now())
+  if ((await store.listCitationPrompts(tenant.id)).length === 0) await store.addCitationPrompts(tenant.id, await sugerirPrompts(tenant), 'agent')
+  await correrRonda(tenant)
+  return resumenCitacion(tenant)
+}
 
 export function urlValida(u: unknown): string | null {
   if (typeof u !== 'string' || !u) return null

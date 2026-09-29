@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { store } from '../store.js'
 import { buscarTareas, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
+import { planConAvance } from './plan.js'
 
 /**
  * MCP del dueño: el coding agent del negocio (Claude Code, Cursor) lee las
@@ -21,7 +22,7 @@ function construir(tenant: Tenant): McpServer {
   const server = new McpServer(
     { name: `peaje-${tenant.slug}`, version: '1.0.0' },
     {
-      instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. Work through them in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
+      instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. Start with peaje_plan to see the owner's goal and priorities. Then work through the tasks in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
     },
   )
 
@@ -44,6 +45,12 @@ function construir(tenant: Tenant): McpServer {
         last7Days: visitas ? { agentRequests: visitas.totals.visits, paid: visitas.totals.paid, revenueUsd: visitas.totals.revenue, funnel: visitas.funnel } : null,
       })
     },
+  )
+
+  server.registerTool(
+    'peaje_plan',
+    { description: "The owner's goal and Peaje's plan for it: steps in priority order, each with a metric, its current value and the target. Read it first to know which tasks matter most.", inputSchema: {}, annotations: { readOnlyHint: true } },
+    async () => texto((await planConAvance(tenant)) ?? 'No plan yet. The owner creates it in the Peaje dashboard, "My agent".'),
   )
 
   server.registerTool(
