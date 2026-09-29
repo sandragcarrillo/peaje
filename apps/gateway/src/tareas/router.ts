@@ -1,6 +1,7 @@
 import type { AgentTask, Tenant } from '@peaje/db'
 import { hashApiKey, TASK_STATUSES_PUBLICOS } from './comun.js'
 import { Hono } from 'hono'
+import { streamSSE } from 'hono/streaming'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import type { HttpBindings } from '@hono/node-server'
 import { env } from '../env.js'
@@ -215,6 +216,32 @@ export async function medirAhora(tenant: Tenant) {
   await correrRonda(tenant)
   return resumenCitacion(tenant)
 }
+
+/**
+ * Lo mismo que /chat, en vivo: eventos `status` con lo que el agente está
+ * haciendo (una línea por herramienta) y un `message` final con la respuesta
+ * guardada. Un `error` si algo falla.
+ */
+tareasRouter.post('/_internal/:slug/tasks/chat/stream', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { text?: string; language?: string; channel?: string }
+  const texto = String(b.text ?? '').trim()
+  if (!texto) return c.json({ error: 'empty message' }, 400)
+  const tenant = c.get('tenant')
+  const idioma = b.language === 'es' ? 'es' : 'en'
+  return streamSSE(c, async (stream) => {
+    try {
+      await stream.writeSSE({ event: 'status', data: idioma === 'es' ? 'Leyendo tu mensaje…' : 'Reading your message…' })
+      const mensaje = await conversar(tenant, texto, {
+        idioma,
+        canal: b.channel,
+        alEstado: (e) => void stream.writeSSE({ event: 'status', data: e }),
+      })
+      await stream.writeSSE({ event: 'message', data: JSON.stringify(mensaje) })
+    } catch (error) {
+      await stream.writeSSE({ event: 'error', data: error instanceof Error ? error.message : String(error) })
+    }
+  })
+})
 
 export function urlValida(u: unknown): string | null {
   if (typeof u !== 'string' || !u) return null
