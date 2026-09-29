@@ -1,11 +1,13 @@
 import type { Chequeo } from '@peaje/shared'
 import type { NewAgentTask, Tenant } from '@peaje/db'
-import { dominioVerificable, slugify } from '@peaje/shared'
+import { dominioVerificable } from '@peaje/shared'
 import { store } from '../store.js'
 import { NOMBRE_CHEQUEO, TEXTO_MOTIVO } from '../monitor/email.js'
-import { sugerirContenido } from '../monitor/reporte.js'
+import { leerSitio, sugerirContenido } from '../monitor/reporte.js'
 import { completarTarea } from './verificar.js'
 import { revisarAcceso } from '../acceso/revisar.js'
+import { cuerpoConBorrador, MAX_BORRADORES, redactarBorrador, slugDePregunta, tieneBorrador } from '../ciclo/borrador.js'
+import { agendarSeguimientos } from '../ciclo/seguimiento.js'
 
 /**
  * Las tareas que el agente deja para el coding agent del dueño. Tres fuentes:
@@ -151,7 +153,13 @@ export async function sincronizarFixes(tenant: Tenant): Promise<{ creadas: numbe
       acceptance: [{ type: 'check', id: c.id }],
       source: 'monitor',
     }
-    if ((await store.upsertTask(nueva)).created) creadas += 1
+    const r = await store.upsertTask(nueva)
+    if (r.created) creadas += 1
+    // Estaba arreglado y se volvió a romper: se reabre, con la fecha, en vez de quedar verificado.
+    else if (r.task.status === 'verified') {
+      await store.updateTask(tenant.id, r.task.id, { status: 'open', verifiedAt: null, note: `Broke again, found on ${new Date().toISOString().slice(0, 10)}.` })
+      creadas += 1
+    }
   }
   // Las que pasan en la última corrida: cerradas por el propio monitor.
   let cerradas = 0
@@ -160,7 +168,9 @@ export async function sincronizarFixes(tenant: Tenant): Promise<{ creadas: numbe
     if (t.kind !== 'fix') continue
     const id = t.key.slice('fix:'.length)
     if (!ok.has(id)) continue
-    await store.updateTask(tenant.id, t.id, { status: 'verified', verifiedAt: new Date().toISOString(), note: 'Passes in the latest daily check.' })
+    const verificada = await store.updateTask(tenant.id, t.id, { status: 'verified', verifiedAt: new Date().toISOString(), note: 'Passes in the latest daily check.' })
+    // Ciclo cerrado: re-medir a las 2 y 6 semanas.
+    await agendarSeguimientos(tenant, verificada)
     cerradas += 1
   }
   return { creadas, cerradas }
@@ -233,15 +243,45 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
     }
 
     if (opciones.conContenido) {
-      for (const s of await sugerirContenido(tenant, dominio)) {
-        const slug = slugify(s.pregunta).slice(0, 60) || 'faq'
+      const sugerencias = await sugerirContenido(tenant, dominio)
+      const previas = new Map((await store.listTasks(tenant.id)).map((t) => [t.key, t]))
+      // Borrador completo para hasta MAX_BORRADORES preguntas nuevas (o abiertas
+      // sin borrador), en paralelo; el resto queda con instrucciones.
+      const conBorrador = sugerencias
+        .filter((s) => {
+          const p = previas.get(`content:${slugDePregunta(s.pregunta)}`)
+          return !p || (p.status === 'open' && !tieneBorrador(p))
+        })
+        .slice(0, MAX_BORRADORES)
+      const sitio = conBorrador.length ? await leerSitio(dominio).catch(() => '') : ''
+      const borradores = new Map(
+        await Promise.all(
+          conBorrador.map(async (s) => {
+            try {
+              return [s.pregunta, await redactarBorrador(tenant, s.pregunta, { sitio, porQue: s.porQue, fuente: s.fuente })] as const
+            } catch (error) {
+              console.warn('[tareas] sin borrador', tenant.slug, error instanceof Error ? error.message : error)
+              return [s.pregunta, null] as const
+            }
+          }),
+        ),
+      )
+      for (const s of sugerencias) {
+        const slug = slugDePregunta(s.pregunta)
+        const previa = previas.get(`content:${slug}`)
+        const b = borradores.get(s.pregunta)
+        const body = b
+          ? cuerpoConBorrador(tenant, dominio, s.pregunta, slug, b, s.porQue)
+          : previa && tieneBorrador(previa)
+            ? previa.body
+            : promptContenido(tenant, dominio, s, slug)
         const r = await store.upsertTask({
           tenantId: tenant.id,
           key: `content:${slug}`,
           kind: 'content',
           title: s.pregunta,
           summary: s.porQue,
-          body: promptContenido(tenant, dominio, s, slug),
+          body,
           acceptance: [{ type: 'url', url: `https://${dominio}/${slug}` }],
           source: 'agent',
         })

@@ -7,6 +7,8 @@ import { store } from '../store.js'
 import { TEXTO_MOTIVO } from './email.js'
 import { planConAvance } from '../tareas/plan.js'
 import { resumenCitacion } from '../citacion/medir.js'
+// ---- M6 ----
+import { resultados } from '../ciclo/seguimiento.js'
 
 /**
  * El reporte semanal del agente de Peaje para un negocio: estado técnico con
@@ -33,6 +35,10 @@ export type Reporte = {
   /** Avance del plan del dueño, paso por paso. Null si todavía no armó plan. */
   citacion: { share: number | null; previa: number | null; competidores: string[]; medido: string | null } | null
   plan: { resumen: string; pasos: { titulo: string; metrica: string; antes: number | null; ahora: number | null; meta: number; hecho: boolean }[] } | null
+  // ---- M6: qué se publicó o arregló y qué movió (seguimientos a 2 y 6 semanas) ----
+  movido?: { titulo: string; tipo: string; url: string | null; linea: string }[]
+  // ---- M7: comprador misterioso (última corrida de la semana) ----
+  comprador?: { resumen: string; veredictos: string[]; problemas: string[] } | null
 }
 
 const DIAS = 7
@@ -176,5 +182,28 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
           : null,
       )
       .catch(() => null),
+    // ---- M6 ----
+    movido: await lineasMovido(tenant, desde).catch(() => []),
+    // ---- M7 ----
+    comprador: await store
+      .lastMysteryRun(tenant.id)
+      .then((r) => (r && new Date(r.runAt).getTime() >= desde && r.summary ? { resumen: r.summary, veredictos: r.missions.map((m) => m.verdict), problemas: r.issues.filter((i) => !i.startsWith("On Peaje's side")) } : null))
+      .catch(() => null),
   }
 }
+
+// ---- M6: "Qué se movió" en el correo semanal ----
+/** Tareas verificadas en la semana y seguimientos con resultado en la semana. */
+async function lineasMovido(tenant: Tenant, desde: number): Promise<NonNullable<Reporte['movido']>> {
+  const lineas: NonNullable<Reporte['movido']> = []
+  for (const r of await resultados(tenant, 30)) {
+    const base = { titulo: r.title, tipo: r.kind, url: r.url }
+    if (r.verifiedAt && new Date(r.verifiedAt).getTime() >= desde) {
+      const proximo = r.checks.find((c) => !c.doneAt)
+      lineas.push({ ...base, linea: `Verified on the live site this week.${proximo ? ` Peaje measures again on ${proximo.dueAt.slice(0, 10)}.` : ''}` })
+    }
+    for (const c of r.checks) if (c.doneAt && new Date(c.doneAt).getTime() >= desde && c.verdict) lineas.push({ ...base, linea: `After ${c.kind === '2w' ? '2' : '6'} weeks: ${c.verdict}` })
+  }
+  return lineas.slice(0, 10)
+}
+// ---- fin M6 ----

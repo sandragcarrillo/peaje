@@ -1,5 +1,6 @@
 import type { AgentTask, Tenant } from '@peaje/db'
 import { verificarIntegracion } from '@peaje/shared'
+import { agendarSeguimientos } from '../ciclo/seguimiento.js'
 
 /**
  * Revisa los criterios de aceptación de una tarea contra el sitio en vivo.
@@ -45,11 +46,14 @@ export async function verificarTarea(tenant: Tenant, task: AgentTask, url?: stri
 export async function completarTarea(tenant: Tenant, task: AgentTask, url: string | null, store: { updateTask: (t: string, id: string, p: Partial<AgentTask>) => Promise<AgentTask> }) {
   const ahora = new Date().toISOString()
   const r = await verificarTarea(tenant, task, url)
-  return store.updateTask(tenant.id, task.id, {
+  const actualizada = await store.updateTask(tenant.id, task.id, {
     status: r.ok ? 'verified' : 'done',
     note: r.ok ? r.note : `Not live yet: ${r.note}. Peaje checks again every day.`,
     doneUrl: url ?? task.doneUrl,
     doneAt: task.doneAt ?? ahora,
     verifiedAt: r.ok ? ahora : null,
   })
+  // Ciclo cerrado: al quedar verificada, re-medir a las 2 y 6 semanas (idempotente).
+  if (r.ok) await agendarSeguimientos(tenant, actualizada)
+  return actualizada
 }

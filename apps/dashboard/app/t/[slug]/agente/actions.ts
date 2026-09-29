@@ -103,3 +103,13 @@ export async function medirAhora(slug: string) {
   revalidatePath(`/t/${slug}/agente`)
   return r
 }
+
+// ---- M7: comprador misterioso ----
+export async function probarComprador(slug: string) {
+  await requireTenant(slug)
+  const { correrComprador } = await import('@/lib/gateway')
+  const r = await correrComprador(slug)
+  revalidatePath(`/t/${slug}/agente`)
+  return { error: r.error, retryInSeconds: r.retryInSeconds }
+}
+// ---- fin M7 ----

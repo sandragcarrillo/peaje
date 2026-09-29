@@ -9,6 +9,11 @@ import { generarPlan, medirMetricas, planConAvance } from './plan.js'
 import { buscarTareas, medirAhora, tareaPublica } from './router.js'
 import { MAX_PROMPTS, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
 import { revisarAcceso } from '../acceso/revisar.js'
+// ---- M6 ----
+import { tareaConBorrador } from '../ciclo/borrador.js'
+import { resultados } from '../ciclo/seguimiento.js'
+// ---- M7 ----
+import { probarAhora, resultadoPublico } from '../comprador/misterioso.js'
 
 /**
  * El agente Pro que conversa con el dueño (dashboard hoy, Telegram después).
@@ -281,6 +286,65 @@ const HERRAMIENTAS: Herramienta[] = [
   },
 ]
 
+// ---- M6: borrador completo de página y resultados del ciclo ----
+HERRAMIENTAS.push(
+  {
+    name: 'draft_page',
+    description:
+      'Write the complete page (markdown) that answers one question customers ask AI assistants, from the facts on the site: the exact question as title, the direct answer first, a real number with its source, 3 to 5 follow-up sections, a visible updated date and sources. Missing facts come out as [TODO: ...]. Saves it as a content task for their developer or AI coding tool (creates it or updates an open one) and returns its id and title. Takes about a minute and costs money: only when the owner wants the page.',
+    input_schema: { type: 'object', properties: { question: { type: 'string', description: 'The exact question, in the language of the site' } }, required: ['question'] },
+    async correr(i, { tenant }) {
+      const pregunta = String(i.question ?? '').trim()
+      if (pregunta.length < 8) return { error: 'question is too short' }
+      const r = await tareaConBorrador(tenant, pregunta)
+      if (!r.created && !r.updated) return { id: r.task.id, title: r.task.title, status: r.task.status, note: 'A task for this question already exists and is past "open"; the draft was not changed.' }
+      return { id: r.task.id, title: r.task.title, created: r.created, missingFacts: r.todos, excerpt: r.task.body.split('\n## Draft\n')[1]?.slice(0, 600) }
+    },
+  },
+  {
+    name: 'get_results',
+    description:
+      'What was published or fixed (tasks verified on the live site) and what moved afterwards: Peaje measures again 2 and 6 weeks after each one (whether AI assistants cite the page for its question, visits from their bots, whether a fix still works). Use it for "did it work?", "what changed?", "results".',
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant, idioma }) {
+      const r = await resultados(tenant)
+      if (r.length === 0) return 'Nothing verified yet, so there are no results to measure.'
+      return r.map((x) => ({
+        title: x.title,
+        kind: x.kind,
+        url: x.url,
+        verifiedAt: x.verifiedAt,
+        measurements: x.checks.map((c) => ({ after: c.kind === '2w' ? '2 weeks' : '6 weeks', due: c.dueAt.slice(0, 10), done: !!c.doneAt, verdict: (idioma === 'es' ? c.verdictEs : null) ?? c.verdict })),
+      }))
+    },
+  },
+)
+// ---- fin M6 ----
+
+// ---- M7: comprador misterioso ----
+HERRAMIENTAS.push(
+  {
+    name: 'run_mystery_shopper',
+    description:
+      'Run the mystery shopper now: a synthetic buying agent gets 3 realistic jobs this business should win, searches the market the way real buying agents do (Peaje directory, the x402 Bazaar, the ERC-8004 registry), and records whether it found the business, in what position, what it picked instead and why. Then it requests a priced URL without paying and checks the payment step like a strict client. It never pays. Problems the owner can fix become tasks. Takes about a minute and costs money: at most once every 6 hours.',
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant }) {
+      const r = await probarAhora(tenant)
+      if ('error' in r) return { ...r, lastRun: resultadoPublico(await store.lastMysteryRun(tenant.id)) }
+      return { ...resultadoPublico(r), nothingToBuy: r.nothingToBuy, tasksCreated: r.tasks.creadas, tasksClosed: r.tasks.cerradas }
+    },
+  },
+  {
+    name: 'get_mystery_results',
+    description: 'The last mystery shopper run: per buying job, whether an agent found the business, its position, whether it would buy, what it picked instead and why; and the problems in the payment step.',
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant }) {
+      return resultadoPublico(await store.lastMysteryRun(tenant.id)) ?? 'The mystery shopper has not run yet.'
+    },
+  },
+)
+// ---- fin M7 ----
+
 function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primeraVez: boolean): string {
   return [
     `You are the Peaje agent for ${tenant.name} (${dominioVerificable(tenant.originUrl) ?? tenant.originUrl}). You talk with the owner of this business, who is usually not technical.`,
@@ -313,6 +377,10 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
+    // M6: borrador y resultados
+    'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site and saves it as a task. Tell them what facts are missing, if any. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
+    // M7: comprador misterioso
+    'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.',
     `Reply in ${idioma === 'es' ? 'Spanish (neutral Latin American, tú)' : 'English'} unless the owner writes in another language.`,
   ].join('\n')
 }
@@ -336,6 +404,18 @@ const ESTADOS: Record<string, { es: string; en: string }> = {
   run_citation_check: { es: 'Preguntándole a ChatGPT, Claude y los demás (1 a 3 minutos)…', en: 'Asking ChatGPT, Claude and the others (1 to 3 minutes)…' },
   offer_choices: { es: 'Casi listo…', en: 'Almost there…' },
 }
+// ---- M6 ----
+Object.assign(ESTADOS, {
+  draft_page: { es: 'Escribiendo la página completa con los datos de tu sitio (un minuto)…', en: 'Writing the full page from the facts on your site (about a minute)…' },
+  get_results: { es: 'Revisando qué cambió después de lo que publicaste…', en: 'Checking what changed after what you published…' },
+})
+// ---- fin M6 ----
+// ---- M7 ----
+Object.assign(ESTADOS, {
+  run_mystery_shopper: { es: 'Probando si un agente comprador te encuentra y te elige (un minuto)…', en: 'Checking whether a buying agent finds you and picks you (about a minute)…' },
+  get_mystery_results: { es: 'Revisando la última prueba del agente comprador…', en: 'Checking the last buying agent test…' },
+})
+// ---- fin M7 ----
 
 let anthropic: Anthropic | null = null
 

@@ -242,3 +242,20 @@ export async function medirCitacion(slug: string): Promise<{ error?: 'too-soon';
   if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
   return data as { error?: 'too-soon'; retryInSeconds?: number }
 }
+
+// ---- M7: comprador misterioso ----
+
+export type CorridaComprador = import('@peaje/db').MysteryRun
+
+export async function leerComprador(slug: string) {
+  return (await internal<{ run: CorridaComprador | null }>(`/${slug}/mystery`)).run
+}
+
+/** Corre el comprador misterioso. 429 trae cuánto esperar; no es error para la UI. */
+export async function correrComprador(slug: string): Promise<{ run?: CorridaComprador; error?: 'too-soon'; retryInSeconds?: number }> {
+  const res = await fetch(`${base}/_internal/${slug}/mystery/run`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, cache: 'no-store' })
+  const data = (await res.json()) as { run?: CorridaComprador; error?: string; retryInSeconds?: number }
+  if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
+  return data as { run?: CorridaComprador; error?: 'too-soon'; retryInSeconds?: number }
+}
+// ---- fin M7 ----

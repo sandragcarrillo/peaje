@@ -326,6 +326,39 @@ export type CitationRun = {
 
 export type NewCitationRun = Omit<CitationRun, 'id' | 'runAt'>
 
+// ---- M6: ciclo cerrado (re-medición a 2 y 6 semanas de una tarea verificada) ----
+
+export type FollowupKind = '2w' | '6w'
+
+/** Foto de lo que Peaje mide sobre una tarea, al verificarla y al vencer cada seguimiento. */
+export type FollowupSnapshot = {
+  at: string
+  /** La pregunta de la página (tareas de contenido). */
+  question?: string | null
+  /** Por motor: si cita el sitio y si nombra al negocio. Null si la pregunta todavía no se medía. */
+  citation?: Record<string, { cited: boolean; mentioned: boolean }> | null
+  answerBotVisits7d?: number | null
+  /** Tareas de arreglo y de ruta: si los criterios siguen pasando en el sitio en vivo. */
+  passes?: boolean | null
+  detail?: string | null
+  /** El veredicto en español; la columna `verdict` lo guarda en inglés. */
+  verdictEs?: string | null
+}
+
+export type TaskFollowup = {
+  id: string
+  tenantId: string
+  taskId: string
+  dueAt: string
+  kind: FollowupKind
+  doneAt: string | null
+  before: FollowupSnapshot
+  after: FollowupSnapshot | null
+  verdict: string | null
+  createdAt: string
+}
+// ---- fin M6 ----
+
 // ---- monitoreo: una corrida del verificador por tenant ----
 
 export type Verificacion = {
@@ -345,6 +378,60 @@ export type Verificacion = {
 }
 
 export type NewVerificacion = Omit<Verificacion, 'id' | 'runAt'>
+
+// ---- M7: comprador misterioso ----
+
+/** Una misión del comprador misterioso: si el negocio apareció, en qué puesto y a quién eligió en su lugar. */
+export type MysteryMission = {
+  mission: string
+  /** El negocio estaba entre los candidatos comprables. */
+  found: boolean
+  /** Puesto entre los comprables (1 = primero). Null si no apareció. */
+  rank: number | null
+  /** El comprador lo habría comprado. */
+  chosen: boolean
+  /** Lo que eligió en su lugar, si no fue el negocio. */
+  instead: { name: string; host: string; priceUsd: number | null } | null
+  /** Por qué: los motivos del puntaje o el texto del veto del modelo. */
+  reason: string
+  /** El veredicto en palabras simples (inglés) y en español. */
+  verdict: string
+  verdictEs: string
+}
+
+/**
+ * Un problema del 402 que vería un cliente estricto. `side`: 'owner' lo
+ * arregla el dueño (sale como tarea); 'peaje' es del gateway de Peaje.
+ */
+export type MysteryIssue = { id: string; side: 'owner' | 'peaje'; text: string; es: string }
+
+/** La prueba del 402 sobre una URL con precio del negocio. */
+export type MysteryProbeTarget = {
+  via: 'domain' | 'gateway'
+  url: string
+  status: number | null
+  ok: boolean
+  issues: MysteryIssue[]
+}
+
+export type MysteryProbe = {
+  /** Qué se cobró para probar: la ruta o el link con precio. */
+  item: { kind: 'route' | 'link'; path: string; priceUsd: string } | null
+  targets: MysteryProbeTarget[]
+}
+
+export type MysteryRun = {
+  id: string
+  tenantId: string
+  runAt: string
+  missions: MysteryMission[]
+  probe: MysteryProbe | null
+  issues: string[]
+  summary: string | null
+}
+
+export type NewMysteryRun = Omit<MysteryRun, 'id' | 'runAt'>
+// ---- fin M7 ----
 
 // ---- visitas de agentes (pagas o no) ----
 
@@ -436,6 +523,15 @@ export interface Store {
   getPlan(tenantId: string): Promise<AgentPlan | null>
   /** Reemplaza el plan del negocio (uno por negocio). */
   savePlan(plan: NewAgentPlan): Promise<AgentPlan>
+  // ---- M6: seguimientos de tareas verificadas ----
+  /** Agenda los seguimientos a 14 y 42 días. Idempotente por tarea: devuelve los que ya existían si los hay. */
+  scheduleFollowups(taskId: string, tenantId: string, before: FollowupSnapshot): Promise<TaskFollowup[]>
+  /** Seguimientos pendientes con fecha vencida, de todos los negocios (o de uno). */
+  listDueFollowups(now: string, tenantId?: string): Promise<TaskFollowup[]>
+  completeFollowup(id: string, after: FollowupSnapshot, verdict: string): Promise<void>
+  /** Los del negocio, del vencimiento más nuevo al más viejo. */
+  listFollowups(tenantId: string, limit: number): Promise<TaskFollowup[]>
+  // ---- fin M6 ----
 
   // origins permitidos para el iframe
   listAllowedOrigins(tenantId: string): Promise<string[]>
@@ -528,4 +624,9 @@ export interface Store {
   visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats>
   /** Pago por referencia de receipt: liga la visita con el ledger. */
   findPaymentByReceiptRef(receiptRef: string): Promise<Payment | null>
+
+  // ---- M7: comprador misterioso ----
+  recordMysteryRun(run: NewMysteryRun): Promise<MysteryRun>
+  lastMysteryRun(tenantId: string): Promise<MysteryRun | null>
+  // ---- fin M7 ----
 }

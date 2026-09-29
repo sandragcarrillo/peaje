@@ -70,10 +70,20 @@ index 50b45253b1ef3b10a3c36fc133fcf4e497f9d926..01659efb104d0411f73f0fba8185e7d8
          handlers[mi.name][mi.alias ?? mi.intent] = fn;
      }
 diff --git a/dist/x402/server/EvmCharge.js b/dist/x402/server/EvmCharge.js
-index e6c6e2b3638325780a27c35e0741b3fa071495fc..b4f1d3f69ed783fa4413e53c3a63dcaac9981538 100644
+index e6c6e2b3638325780a27c35e0741b3fa071495fc..4cc10c1de2a8c40c99dcf76b5d9a4185e0c162e2 100644
 --- a/dist/x402/server/EvmCharge.js
 +++ b/dist/x402/server/EvmCharge.js
-@@ -225,11 +225,19 @@ export function toPaymentRequirements(request, config) {
+@@ -143,7 +143,8 @@ export function createPath(config) {
+                 accepts: [toPaymentRequirements(request, config)],
+                 error: options.error?.message ?? `${x402_Types.paymentSignatureHeader} header is required`,
+                 extensions: routeExtensions(options.challenge, options.input),
+-                resource: { url: options.input.url },
++                // Peaje: la descripción de la ruta también en x402 (antes solo viajaba en MPP).
++                resource: { url: options.input.url, ...(options.challenge.description ? { description: options.challenge.description } : {}) },
+                 x402Version: 2,
+             }));
+             return new Response(response.body, {
+@@ -225,11 +226,19 @@ export function toPaymentRequirements(request, config) {
      return {
          amount: request.amount,
          asset: request.currency,

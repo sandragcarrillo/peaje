@@ -21,15 +21,15 @@ const PARALELO = 3
 export const MAX_PROMPTS = 20
 
 /** El dominio propio sin subdominio de API: api.open-meteo.com cuenta como open-meteo.com. */
-function raizDe(tenant: Tenant): string | null {
+export function raizDe(tenant: Tenant): string | null {
   return dominioVerificable(tenant.originUrl)
 }
 
-function esPropio(dominio: string, raiz: string): boolean {
+export function esPropio(dominio: string, raiz: string): boolean {
   return dominio === raiz || dominio.endsWith(`.${raiz}`)
 }
 
-function marcas(tenant: Tenant, raiz: string | null): string[] {
+export function marcas(tenant: Tenant, raiz: string | null): string[] {
   const base = raiz ? raiz.split('.')[0]! : null
   return [tenant.name, base].filter((x): x is string => !!x && x.length >= 4).map((x) => x.toLowerCase())
 }

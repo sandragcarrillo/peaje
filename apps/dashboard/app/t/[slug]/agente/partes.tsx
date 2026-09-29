@@ -1,8 +1,8 @@
 'use client'
 
-import type { AgentTask } from '@peaje/db'
+import type { AgentTask, TaskFollowup } from '@peaje/db'
 import { useState, useTransition } from 'react'
-import { useDict } from '@/lib/i18n/client'
+import { useDict, useLocale } from '@/lib/i18n/client'
 import { buscarTareasAhora, crearClaveAgente, descartarTarea, tareaHecha } from './actions'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
@@ -79,7 +79,19 @@ export function Buscar({ slug }: { slug: string }) {
   )
 }
 
-export function ListaTareas({ slug, titulo, tareas, cerradas = false }: { slug: string; titulo: string; tareas: AgentTask[]; cerradas?: boolean }) {
+export function ListaTareas({
+  slug,
+  titulo,
+  tareas,
+  cerradas = false,
+  seguimientos = [],
+}: {
+  slug: string
+  titulo: string
+  tareas: AgentTask[]
+  cerradas?: boolean
+  seguimientos?: TaskFollowup[]
+}) {
   const { miAgente: t } = useDict()
   if (tareas.length === 0) return null
   return (
@@ -87,7 +99,7 @@ export function ListaTareas({ slug, titulo, tareas, cerradas = false }: { slug: 
       <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{titulo}</span>
       <ul className="mt-2 divide-y divide-border border border-border">
         {tareas.map((x) => (
-          <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} />
+          <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
         ))}
       </ul>
       {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
@@ -95,7 +107,7 @@ export function ListaTareas({ slug, titulo, tareas, cerradas = false }: { slug: 
   )
 }
 
-function Tarea({ slug, tarea, cerrada }: { slug: string; tarea: AgentTask; cerrada: boolean }) {
+function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: AgentTask; cerrada: boolean; seguimientos: TaskFollowup[] }) {
   const { miAgente: t } = useDict()
   const [abierto, setAbierto] = useState(false)
   const [modo, setModo] = useState<'nada' | 'hecha' | 'descartar'>('nada')
@@ -127,6 +139,7 @@ function Tarea({ slug, tarea, cerrada }: { slug: string; tarea: AgentTask; cerra
             {tarea.summary ? ` · ${tarea.summary}` : ''}
           </p>
           {tarea.note ? <p className="mt-1 text-xs text-muted">{tarea.note}</p> : null}
+          {tarea.status === 'verified' ? <Resultado seguimientos={seguimientos} /> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button className={boton} onClick={() => setAbierto(!abierto)}>
@@ -175,4 +188,22 @@ function Tarea({ slug, tarea, cerrada }: { slug: string; tarea: AgentTask; cerra
       {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
     </li>
   )
+}
+
+/** El último veredicto del ciclo (2 o 6 semanas después de verificada), o cuándo se mide. */
+function Resultado({ seguimientos }: { seguimientos: TaskFollowup[] }) {
+  const { miAgente: t } = useDict()
+  const locale = useLocale()
+  const hechos = seguimientos.filter((f) => f.doneAt && f.verdict).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
+  const ultimo = hechos[0]
+  if (ultimo) {
+    const texto = (locale === 'es' ? ultimo.after?.verdictEs : null) ?? ultimo.verdict
+    return (
+      <p className="mt-2 border-l-2 border-border pl-2 text-xs">
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.resultadoTras(ultimo.kind)}</span> {texto}
+      </p>
+    )
+  }
+  const proximo = seguimientos.filter((f) => !f.doneAt).sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0]
+  return proximo ? <p className="mt-1 text-xs text-muted">{t.proximaMedicion(proximo.dueAt.slice(0, 10))}</p> : null
 }

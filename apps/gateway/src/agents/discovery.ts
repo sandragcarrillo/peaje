@@ -358,6 +358,14 @@ export function elegir(evaluados: Evaluado[]): Evaluado | null {
  * con la capa de lenguaje antes de pagar: si el primero es basura pertinente
  * (docs que mencionan el tema), cae al siguiente en vez de comprarla.
  */
+const hostGateway = (() => {
+  try {
+    return new URL(env.publicUrl).hostname
+  } catch {
+    return ''
+  }
+})()
+
 export function elegirVarios(evaluados: Evaluado[], n: number): Evaluado[] {
   // Un host por cupo: tres endpoints del mismo proveedor no son tres
   // opciones, y taparían alternativas reales en la lista corta.
@@ -365,9 +373,13 @@ export function elegirVarios(evaluados: Evaluado[], n: number): Evaluado[] {
   const out: Evaluado[] = []
   for (const e of evaluados) {
     if (!(e.score > 0 && e.url !== null && e.precio !== null && e.pagable)) continue
+    // En el gateway de Peaje todos los negocios comparten host: el primer
+    // segmento (el slug) es el proveedor. Sin esto el comprador veía un solo
+    // negocio de Peaje por lista corta (hallazgo del comprador misterioso).
     let host = e.url
     try {
-      host = new URL(e.url).hostname
+      const u = new URL(e.url)
+      host = u.hostname === hostGateway ? `${u.hostname}/${u.pathname.split('/')[1] ?? ''}` : u.hostname
     } catch {}
     if (hosts.has(host)) continue
     hosts.add(host)

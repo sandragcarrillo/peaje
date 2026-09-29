@@ -98,14 +98,26 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
   const contenido = r.contenido.length
     ? `<p><strong>Content to create</strong> (pages answer engines would cite):</p><ol>${r.contenido.map((c) => `<li><strong>${esc(c.pregunta)}</strong><br>${esc(c.respuesta)}<br><span style="color:#666">${esc(c.porQue)} · <a href="${esc(c.fuente)}">source</a></span></li>`).join('')}</ol>`
     : ''
+  // ---- M6: qué se publicó o arregló y qué movió, al frente ----
+  const movido = r.movido?.length
+    ? `<p><strong>What moved</strong></p><ul>${r.movido.map((m) => `<li><strong>${m.url ? `<a href="${esc(m.url)}">${esc(m.titulo)}</a>` : esc(m.titulo)}</strong><br>${esc(m.linea)}</li>`).join('')}</ul>`
+    : ''
+  // ---- fin M6 ----
+  // ---- M7: comprador misterioso, un párrafo ----
+  const comprador = r.comprador
+    ? `<p><strong>Would a buying agent pick you?</strong> ${esc(r.comprador.resumen)}${r.comprador.veredictos[0] ? ` For example: ${esc(r.comprador.veredictos.find((v) => !v.includes('would buy from you')) ?? r.comprador.veredictos[0])}` : ''}${r.comprador.problemas[0] ? ` Most urgent fix: ${esc(r.comprador.problemas[0])}` : ''}</p>`
+    : ''
+  // ---- fin M7 ----
   const html = `<div style="${estilo}">
 <p>Your week at <strong>${esc(r.dominio)}</strong>.</p>
+${movido}
 ${plan}
 <p><strong>Agent-readiness score</strong>: ${r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} vs last week)` : ''}` : 'not available'}.</p>
 ${fallando}
 <p><strong>Payments</strong>: ${r.pagos.count} paid requests, $${r.pagos.revenue} for you${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}
 ${visitas}
 ${citacion}
+${comprador}
 ${tareas}
 ${contenido}
 <p><a href="${esc(r.kitUrl)}">Open your dashboard</a>. Reply to this email if you want the Peaje agent to look at something specific.</p>

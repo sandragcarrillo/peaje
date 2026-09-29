@@ -9,6 +9,8 @@ import { Plan } from './plan'
 import { Chat } from './chat'
 import { leerCitacion, leerPlan } from '@/lib/gateway'
 import { CitacionPanel } from './citacion'
+// ---- M7 ----
+import { CompradorPanel } from './comprador'
 
 /**
  * Mi agente: el agente Pro de este negocio. Propone tareas; el coding agent
@@ -25,6 +27,10 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
     store.listMessages(tenant.id, 50).catch(() => []),
   ])
   const citacion = await leerCitacion(tenant.slug).catch(() => null)
+  // ---- M6: resultado a 2 y 6 semanas de cada tarea verificada ----
+  const seguimientos = await store.listFollowups(tenant.id, 200).catch(() => [])
+  // ---- M7: última corrida del comprador misterioso ----
+  const comprador = await store.lastMysteryRun(tenant.id).catch(() => null)
   const mcpUrl = `${gatewayUrl}/_owner/mcp`
 
   const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress')
@@ -45,6 +51,12 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
         <CitacionPanel slug={tenant.slug} datos={citacion} />
       </section>
 
+      {/* ---- M7: comprador misterioso ---- */}
+      <section className="space-y-3">
+        <SectionBar label={t.compTitulo} />
+        <CompradorPanel slug={tenant.slug} run={comprador} />
+      </section>
+
       <section className="space-y-3">
         <SectionBar label={t.planTitulo} />
         <Plan plan={plan} />
@@ -57,7 +69,7 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
         {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
         <ListaTareas slug={tenant.slug} titulo={t.grupoAbiertas} tareas={abiertas} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
-        <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas />
+        <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
       </section>
 
       <details className="border border-border p-4">

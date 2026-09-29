@@ -19,6 +19,8 @@ import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
 import { rutasRouter } from './rutas.js'
 import { tareasRouter } from './tareas/router.js'
+// ---- M7: comprador misterioso ----
+import { compradorRouter } from './comprador/router.js'
 import { store } from './store.js'
 import {
   ACP_VERSION_HEADER,
@@ -143,6 +145,8 @@ app.get('/:slug/openapi.json', async (c) => {
 app.route('/_internal', withdrawals)
 app.route('/_internal', agentsRouter)
 app.route('/_internal', rutasRouter)
+// ---- M7: comprador misterioso ----
+app.route('/_internal', compradorRouter)
 app.route('/', tareasRouter)
 app.route('/internal/monitor', monitorRouter)
 

@@ -35,7 +35,11 @@ import type {
   CitationRun,
   NewCitationRun,
 } from './types'
+// ---- M6 ----
+import type { FollowupSnapshot, TaskFollowup } from './types'
 import { aggregateVisits } from './visits'
+// ---- M7 ----
+import type { MysteryRun, NewMysteryRun } from './types'
 
 /**
  * Store en memoria. Corre el gateway y el dashboard sin Supabase, con la misma
@@ -261,6 +265,46 @@ export class MemoryStore implements Store {
   async clearMessages(tenantId: string): Promise<void> {
     this.#messages = this.#messages.filter((m) => m.tenantId !== tenantId)
   }
+
+  // ---- M6: seguimientos de tareas verificadas ----
+  #followups: TaskFollowup[] = []
+
+  async scheduleFollowups(taskId: string, tenantId: string, before: FollowupSnapshot): Promise<TaskFollowup[]> {
+    const previos = this.#followups.filter((f) => f.taskId === taskId)
+    if (previos.length > 0) return previos
+    const base = Date.now()
+    const nuevos = ([['2w', 14], ['6w', 42]] as const).map(([kind, dias]) => ({
+      id: this.#id('fup'),
+      tenantId,
+      taskId,
+      dueAt: new Date(base + dias * 86_400_000).toISOString(),
+      kind,
+      doneAt: null,
+      before,
+      after: null,
+      verdict: null,
+      createdAt: new Date(base).toISOString(),
+    }))
+    this.#followups.push(...nuevos)
+    return nuevos
+  }
+
+  async listDueFollowups(now: string, tenantId?: string): Promise<TaskFollowup[]> {
+    return this.#followups.filter((f) => !f.doneAt && f.dueAt <= now && (!tenantId || f.tenantId === tenantId)).sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+  }
+
+  async completeFollowup(id: string, after: FollowupSnapshot, verdict: string): Promise<void> {
+    const f = this.#followups.find((x) => x.id === id)
+    if (f) Object.assign(f, { after, verdict, doneAt: new Date().toISOString() })
+  }
+
+  async listFollowups(tenantId: string, limit: number): Promise<TaskFollowup[]> {
+    return this.#followups
+      .filter((f) => f.tenantId === tenantId)
+      .sort((a, b) => b.dueAt.localeCompare(a.dueAt))
+      .slice(0, limit)
+  }
+  // ---- fin M6 ----
 
   #plans = new Map<string, AgentPlan>()
 
@@ -616,4 +660,18 @@ export class MemoryStore implements Store {
   async findPaymentByReceiptRef(receiptRef: string) {
     return this.#payments.find((p) => p.receiptRef === receiptRef) ?? null
   }
+
+  // ---- M7: comprador misterioso ----
+  #mystery: MysteryRun[] = []
+
+  async recordMysteryRun(run: NewMysteryRun): Promise<MysteryRun> {
+    const fila: MysteryRun = { ...run, id: this.#id('mys'), runAt: new Date().toISOString() }
+    this.#mystery.unshift(fila)
+    return fila
+  }
+
+  async lastMysteryRun(tenantId: string): Promise<MysteryRun | null> {
+    return this.#mystery.find((r) => r.tenantId === tenantId) ?? null
+  }
+  // ---- fin M7 ----
 }

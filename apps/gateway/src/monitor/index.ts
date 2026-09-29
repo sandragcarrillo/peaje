@@ -8,6 +8,10 @@ import { armarReporte } from './reporte.js'
 import { generarTareas, reverificarHechas, sincronizarFixes } from '../tareas/generar.js'
 import { tocaCorreo } from '../tareas/plan.js'
 import { correrRonda } from '../citacion/medir.js'
+// ---- M6 ----
+import { procesarSeguimientos } from '../ciclo/seguimiento.js'
+// ---- M7 ----
+import { correrComprador } from '../comprador/misterioso.js'
 
 /**
  * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
@@ -35,6 +39,9 @@ async function corridaConAlerta(slug: string) {
   // Tareas de arreglo al día con la corrida, y las hechas que esperaban el deploy.
   const tareas = await sincronizarFixes(tenant).catch(() => null)
   await reverificarHechas(tenant).catch(() => 0)
+  // ---- M6: seguimientos vencidos (re-medición a 2 y 6 semanas) ----
+  const seguimientos = await procesarSeguimientos(tenant).catch((e) => ({ procesados: 0, veredictos: [], error: e instanceof Error ? e.message : String(e) }))
+  // ---- fin M6 ----
   const alertables = eventosAlertables(corrida.eventos)
   let alerted: string[] = []
   if (alertables.length > 0 && esPro(tenant)) {
@@ -48,7 +55,7 @@ async function corridaConAlerta(slug: string) {
       console.error('[monitor] no se pudo alertar a', slug, error instanceof Error ? error.message : error)
     }
   }
-  return { slug, ok: corrida.verificacion.ok, score: corrida.verificacion.score, eventos: corrida.eventos, alerted, tareas }
+  return { slug, ok: corrida.verificacion.ok, score: corrida.verificacion.score, eventos: corrida.eventos, alerted, tareas, seguimientos }
 }
 
 monitorRouter.post('/run/:slug', async (c) => c.json(await corridaConAlerta(c.req.param('slug'))))
@@ -83,6 +90,10 @@ monitorRouter.post('/weekly', async (c) => {
       await generarTareas(t, { conContenido: true })
       // Citación: una ronda por semana con las preguntas del negocio (si tiene).
       if ((await store.listCitationPrompts(t.id)).length > 0) await correrRonda(t).catch((e) => console.warn('[monitor] citación', t.slug, e instanceof Error ? e.message : e))
+      // ---- M7: comprador misterioso, solo si el objetivo incluye vender a agentes ----
+      const objetivo = (await store.getPlan(t.id))?.goal
+      if (objetivo === 'agent-sales' || objetivo === 'both') await correrComprador(t).catch((e) => console.warn('[monitor] comprador misterioso', t.slug, e instanceof Error ? e.message : e))
+      // ---- fin M7 ----
       const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)
       await enviarCorreo(t.email!, subject, html)

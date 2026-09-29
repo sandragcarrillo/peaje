@@ -38,7 +38,11 @@ import type {
   CitationRun,
   NewCitationRun,
 } from './types'
+// ---- M6 ----
+import type { FollowupSnapshot, TaskFollowup } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
+// ---- M7 ----
+import type { MysteryRun, NewMysteryRun } from './types'
 
 type Row = Record<string, any>
 
@@ -478,6 +482,59 @@ export class SupabaseStore implements Store {
     const rondas = [...new Set(filas.map((r) => r.roundId))].slice(0, rounds)
     return filas.filter((r) => rondas.includes(r.roundId))
   }
+
+  // ---- M6: seguimientos de tareas verificadas ----
+  #followupFrom(row: Row): TaskFollowup {
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      taskId: row.task_id,
+      dueAt: String(row.due_at),
+      kind: row.kind,
+      doneAt: row.done_at ?? null,
+      before: (row.before ?? { at: String(row.created_at) }) as FollowupSnapshot,
+      after: (row.after ?? null) as FollowupSnapshot | null,
+      verdict: row.verdict ?? null,
+      createdAt: String(row.created_at),
+    }
+  }
+
+  async scheduleFollowups(taskId: string, tenantId: string, before: FollowupSnapshot): Promise<TaskFollowup[]> {
+    const base = Date.now()
+    const filas = ([['2w', 14], ['6w', 42]] as const).map(([kind, dias]) => ({
+      tenant_id: tenantId,
+      task_id: taskId,
+      kind,
+      due_at: new Date(base + dias * 86_400_000).toISOString(),
+      before,
+    }))
+    // unique (task_id, kind): si ya estaban agendados no se tocan.
+    const { error } = await this.#db.from('task_followups').upsert(filas, { onConflict: 'task_id,kind', ignoreDuplicates: true })
+    this.#fail('scheduleFollowups', error)
+    const { data, error: e2 } = await this.#db.from('task_followups').select().eq('task_id', taskId).order('due_at')
+    this.#fail('scheduleFollowups(select)', e2)
+    return (data ?? []).map((r) => this.#followupFrom(r as Row))
+  }
+
+  async listDueFollowups(now: string, tenantId?: string): Promise<TaskFollowup[]> {
+    let q = this.#db.from('task_followups').select().is('done_at', null).lte('due_at', now)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data, error } = await q.order('due_at').limit(200)
+    this.#fail('listDueFollowups', error)
+    return (data ?? []).map((r) => this.#followupFrom(r as Row))
+  }
+
+  async completeFollowup(id: string, after: FollowupSnapshot, verdict: string): Promise<void> {
+    const { error } = await this.#db.from('task_followups').update({ after, verdict, done_at: new Date().toISOString() }).eq('id', id)
+    this.#fail('completeFollowup', error)
+  }
+
+  async listFollowups(tenantId: string, limit: number): Promise<TaskFollowup[]> {
+    const { data, error } = await this.#db.from('task_followups').select().eq('tenant_id', tenantId).order('due_at', { ascending: false }).limit(limit)
+    this.#fail('listFollowups', error)
+    return (data ?? []).map((r) => this.#followupFrom(r as Row))
+  }
+  // ---- fin M6 ----
 
   async clearMessages(tenantId: string): Promise<void> {
     const { error } = await this.#db.from('agent_messages').delete().eq('tenant_id', tenantId)
@@ -1076,5 +1133,37 @@ export class SupabaseStore implements Store {
       .maybeSingle()
     this.#fail('findPaymentByReceiptRef', error)
     return data ? paymentFrom(data as Row) : null
+  }
+
+  // ---- M7: comprador misterioso ----
+
+  async recordMysteryRun(run: NewMysteryRun): Promise<MysteryRun> {
+    const { data, error } = await this.#db
+      .from('mystery_runs')
+      .insert({ tenant_id: run.tenantId, missions: run.missions, probe: run.probe, issues: run.issues, summary: run.summary })
+      .select()
+      .single()
+    this.#fail('recordMysteryRun', error)
+    return mysteryRunFrom(data as Row)
+  }
+
+  async lastMysteryRun(tenantId: string): Promise<MysteryRun | null> {
+    const { data, error } = await this.#db.from('mystery_runs').select().eq('tenant_id', tenantId).order('run_at', { ascending: false }).limit(1).maybeSingle()
+    this.#fail('lastMysteryRun', error)
+    return data ? mysteryRunFrom(data as Row) : null
+  }
+  // ---- fin M7 ----
+}
+
+// ---- M7 ----
+function mysteryRunFrom(row: Row): MysteryRun {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    runAt: String(row.run_at),
+    missions: row.missions ?? [],
+    probe: row.probe ?? null,
+    issues: row.issues ?? [],
+    summary: row.summary ?? null,
   }
 }
