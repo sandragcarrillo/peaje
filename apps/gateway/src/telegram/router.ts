@@ -74,6 +74,7 @@ export async function registrarWebhook(): Promise<void> {
   await tg('setMyCommands', {
     commands: [
       { command: 'help', description: 'What I can do' },
+      { command: 'businesses', description: 'Switch business (if you have more than one)' },
       { command: 'stop', description: 'Disconnect this chat' },
     ],
   })

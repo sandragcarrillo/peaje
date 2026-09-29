@@ -312,7 +312,7 @@ export class MemoryStore implements Store {
   // ---- fin M6 ----
 
   #tgCodes = new Map<string, { tenantId: string; expiresAt: string }>()
-  #tgLinks = new Map<number, TelegramLink>()
+  #tgLinks: TelegramLink[] = []
 
   async createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void> {
     this.#tgCodes.set(code, { tenantId, expiresAt })
@@ -324,20 +324,31 @@ export class MemoryStore implements Store {
     return c && new Date(c.expiresAt).getTime() > Date.now() ? c.tenantId : null
   }
 
-  async linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void> {
-    this.#tgLinks.set(link.chatId, { ...link, linkedAt: new Date().toISOString() })
+  async linkTelegram(link: Omit<TelegramLink, 'linkedAt' | 'active'>): Promise<void> {
+    this.#tgLinks = this.#tgLinks.filter((l) => !(l.chatId === link.chatId && l.tenantId === link.tenantId))
+    this.#tgLinks.push({ ...link, linkedAt: new Date().toISOString(), active: true })
+    await this.setActiveTelegram(link.chatId, link.tenantId)
   }
 
   async getTelegramLink(chatId: number): Promise<TelegramLink | null> {
-    return this.#tgLinks.get(chatId) ?? null
+    const todos = await this.listTelegramChat(chatId)
+    return todos.find((l) => l.active) ?? todos[0] ?? null
+  }
+
+  async listTelegramChat(chatId: number): Promise<TelegramLink[]> {
+    return this.#tgLinks.filter((l) => l.chatId === chatId)
+  }
+
+  async setActiveTelegram(chatId: number, tenantId: string): Promise<void> {
+    for (const l of this.#tgLinks) if (l.chatId === chatId) l.active = l.tenantId === tenantId
   }
 
   async listTelegramLinks(tenantId: string): Promise<TelegramLink[]> {
-    return [...this.#tgLinks.values()].filter((l) => l.tenantId === tenantId)
+    return this.#tgLinks.filter((l) => l.tenantId === tenantId)
   }
 
   async unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void> {
-    for (const [id, l] of this.#tgLinks) if ((filter.chatId === undefined || id === filter.chatId) && (filter.tenantId === undefined || l.tenantId === filter.tenantId)) this.#tgLinks.delete(id)
+    this.#tgLinks = this.#tgLinks.filter((l) => !((filter.chatId === undefined || l.chatId === filter.chatId) && (filter.tenantId === undefined || l.tenantId === filter.tenantId)))
   }
 
   #plans = new Map<string, AgentPlan>()

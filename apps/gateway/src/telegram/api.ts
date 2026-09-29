@@ -34,9 +34,9 @@ let usuarioBot: string | null = null
 /** El @usuario del bot, para armar el enlace t.me. */
 export async function nombreBot(): Promise<string> {
   if (usuarioBot) return usuarioBot
-  if (modoPrueba()) return (usuarioBot = process.env.TELEGRAM_BOT_USERNAME ?? 'peaje_agent_bot')
+  if (modoPrueba()) return (usuarioBot = process.env.TELEGRAM_BOT_USERNAME ?? 'PeajeAgentBot')
   const me = await tg<{ username: string }>('getMe', {})
-  usuarioBot = me?.username ?? process.env.TELEGRAM_BOT_USERNAME ?? 'peaje_agent_bot'
+  usuarioBot = me?.username ?? process.env.TELEGRAM_BOT_USERNAME ?? 'PeajeAgentBot'
   return usuarioBot
 }
 

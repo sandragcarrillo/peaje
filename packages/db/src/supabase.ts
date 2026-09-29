@@ -141,7 +141,7 @@ function messageFrom(row: Row): AgentMessage {
 }
 
 function telegramFrom(row: Row): TelegramLink {
-  return { chatId: Number(row.chat_id), tenantId: row.tenant_id, username: row.username ?? null, language: row.language ?? 'en', linkedAt: String(row.linked_at) }
+  return { chatId: Number(row.chat_id), tenantId: row.tenant_id, username: row.username ?? null, language: row.language ?? 'en', linkedAt: String(row.linked_at), active: row.active !== false }
 }
 
 function planFrom(row: Row): AgentPlan {
@@ -571,17 +571,30 @@ export class SupabaseStore implements Store {
     return new Date(String((data as Row).expires_at)).getTime() > Date.now() ? String((data as Row).tenant_id) : null
   }
 
-  async linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void> {
+  async linkTelegram(link: Omit<TelegramLink, 'linkedAt' | 'active'>): Promise<void> {
     const { error } = await this.#db
       .from('telegram_links')
-      .upsert({ chat_id: link.chatId, tenant_id: link.tenantId, username: link.username, language: link.language, linked_at: new Date().toISOString() }, { onConflict: 'chat_id' })
+      .upsert({ chat_id: link.chatId, tenant_id: link.tenantId, username: link.username, language: link.language, linked_at: new Date().toISOString(), active: true }, { onConflict: 'chat_id,tenant_id' })
     this.#fail('linkTelegram', error)
+    await this.setActiveTelegram(link.chatId, link.tenantId)
   }
 
   async getTelegramLink(chatId: number): Promise<TelegramLink | null> {
-    const { data, error } = await this.#db.from('telegram_links').select().eq('chat_id', chatId).maybeSingle()
-    this.#fail('getTelegramLink', error)
-    return data ? telegramFrom(data as Row) : null
+    const todos = await this.listTelegramChat(chatId)
+    return todos.find((l) => l.active) ?? todos[0] ?? null
+  }
+
+  async listTelegramChat(chatId: number): Promise<TelegramLink[]> {
+    const { data, error } = await this.#db.from('telegram_links').select().eq('chat_id', chatId).order('linked_at')
+    this.#fail('listTelegramChat', error)
+    return (data ?? []).map(telegramFrom)
+  }
+
+  async setActiveTelegram(chatId: number, tenantId: string): Promise<void> {
+    const { error: e1 } = await this.#db.from('telegram_links').update({ active: false }).eq('chat_id', chatId).neq('tenant_id', tenantId)
+    this.#fail('setActiveTelegram', e1)
+    const { error: e2 } = await this.#db.from('telegram_links').update({ active: true }).eq('chat_id', chatId).eq('tenant_id', tenantId)
+    this.#fail('setActiveTelegram', e2)
   }
 
   async listTelegramLinks(tenantId: string): Promise<TelegramLink[]> {

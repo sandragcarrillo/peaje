@@ -361,7 +361,7 @@ export type TaskFollowup = {
 
 // ---- Telegram ----
 
-export type TelegramLink = { chatId: number; tenantId: string; username: string | null; language: string; linkedAt: string }
+export type TelegramLink = { chatId: number; tenantId: string; username: string | null; language: string; linkedAt: string; active: boolean }
 
 // ---- monitoreo: una corrida del verificador por tenant ----
 
@@ -530,8 +530,13 @@ export interface Store {
   createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void>
   /** Consume el código: devuelve el negocio si existe y no venció, y lo borra. */
   consumeTelegramCode(code: string): Promise<string | null>
-  linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void>
+  /** Liga el negocio al chat y lo deja como activo (los otros del chat quedan inactivos). */
+  linkTelegram(link: Omit<TelegramLink, 'linkedAt' | 'active'>): Promise<void>
+  /** El negocio activo del chat. */
   getTelegramLink(chatId: number): Promise<TelegramLink | null>
+  /** Todos los negocios de un chat. */
+  listTelegramChat(chatId: number): Promise<TelegramLink[]>
+  setActiveTelegram(chatId: number, tenantId: string): Promise<void>
   listTelegramLinks(tenantId: string): Promise<TelegramLink[]>
   unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void>
   getPlan(tenantId: string): Promise<AgentPlan | null>
