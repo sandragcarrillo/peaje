@@ -7,6 +7,7 @@ import { enviarCorreo, htmlAlerta, htmlSemanal } from './email.js'
 import { armarReporte } from './reporte.js'
 import { generarTareas, reverificarHechas, sincronizarFixes } from '../tareas/generar.js'
 import { tocaCorreo } from '../tareas/plan.js'
+import { avisarPorTelegram } from '../telegram/bot.js'
 import { correrRonda } from '../citacion/medir.js'
 // ---- M6 ----
 import { procesarSeguimientos } from '../ciclo/seguimiento.js'
@@ -49,6 +50,8 @@ async function corridaConAlerta(slug: string) {
       const reporte = await armarReporte(tenant, corrida.verificacion)
       const { subject, html } = htmlAlerta(tenant, reporte, alertables)
       await enviarCorreo(tenant.email!, subject, html)
+      // La misma alerta, corta, en Telegram si el dueño lo conectó.
+      await avisarPorTelegram(tenant.id, `${subject}\n\n${reporte.comando}`, [{ text: 'Mi agente / My agent', url: reporte.agenteUrl }]).catch(() => 0)
       alerted = alertables
       await store.markAlerted(corrida.verificacion.id, alerted)
     } catch (error) {
@@ -97,6 +100,11 @@ monitorRouter.post('/weekly', async (c) => {
       const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)
       await enviarCorreo(t.email!, subject, html)
+      // Resumen corto por Telegram: el avance del plan y lo abierto, con el enlace.
+      const pasos = reporte.plan?.pasos.map((p) => `${p.hecho ? '✓' : '·'} ${p.titulo}`).join('\n') ?? ''
+      await avisarPorTelegram(t.id, [subject, reporte.plan ? `\n**Plan**\n${pasos}` : '', reporte.tareas.length ? `\n${reporte.tareas.length} tareas abiertas / open tasks` : ''].filter(Boolean).join('\n'), [
+        { text: 'Mi agente / My agent', url: reporte.agenteUrl },
+      ]).catch(() => 0)
       enviados.push(t.slug)
     } catch (error) {
       errores.push({ slug: t.slug, error: error instanceof Error ? error.message : String(error) })

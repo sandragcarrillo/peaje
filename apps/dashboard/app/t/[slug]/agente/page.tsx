@@ -7,7 +7,8 @@ import { store } from '@/lib/store'
 import { Buscar, Clave, ListaTareas } from './partes'
 import { Plan } from './plan'
 import { Chat } from './chat'
-import { leerCitacion, leerPlan } from '@/lib/gateway'
+import { TelegramPanel } from './telegram'
+import { leerCitacion, leerPlan, leerTelegram } from '@/lib/gateway'
 import { CitacionPanel } from './citacion'
 // ---- M7 ----
 import { CompradorPanel } from './comprador'
@@ -26,7 +27,7 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
     leerPlan(tenant.slug).catch(() => null),
     store.listMessages(tenant.id, 50).catch(() => []),
   ])
-  const citacion = await leerCitacion(tenant.slug).catch(() => null)
+  const [citacion, telegram] = await Promise.all([leerCitacion(tenant.slug).catch(() => null), leerTelegram(tenant.slug).catch(() => null)])
   // ---- M6: resultado a 2 y 6 semanas de cada tarea verificada ----
   const seguimientos = await store.listFollowups(tenant.id, 200).catch(() => [])
   // ---- M7: última corrida del comprador misterioso ----
@@ -44,6 +45,11 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
       <section className="space-y-3">
         <SectionBar label={t.chatTitulo} />
         <Chat slug={tenant.slug} inicial={mensajes} />
+      </section>
+
+      <section className="space-y-3">
+        <SectionBar label={t.tgTitulo} />
+        <TelegramPanel slug={tenant.slug} estado={telegram} />
       </section>
 
       <section className="space-y-3">

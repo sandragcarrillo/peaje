@@ -23,7 +23,11 @@ import { probarAhora, resultadoPublico } from '../comprador/misterioso.js'
  * aplica con un botón.
  */
 
-const AGENT_MODEL = process.env.AGENT_MODEL ?? MODEL
+// El chat corre en Sonnet: responde casi igual y cuesta bastante menos por
+// mensaje. Opus queda para lo que se piensa una vez: plan, borradores, misiones.
+const AGENT_MODEL = process.env.AGENT_MODEL ?? 'claude-sonnet-5'
+/** Tope de mensajes del dueño por mes calendario (Pro a US$29). */
+const TOPE_MENSUAL = Number(process.env.AGENT_MONTHLY_MESSAGES ?? 150)
 const HISTORIAL = 20
 const MAX_VUELTAS = 8
 
@@ -436,7 +440,17 @@ export async function conversar(
   opciones: { idioma: 'es' | 'en'; canal?: string; alEstado?: (estado: string) => void },
 ): Promise<AgentMessage> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
-  if (!dentroDelLimite(tenant.id)) throw new Error('Too many messages this hour. Try again later.')
+  if (!dentroDelLimite(tenant.id)) throw new Error(opciones.idioma === 'es' ? 'Muchos mensajes en esta hora. Prueba en un rato.' : 'Too many messages this hour. Try again later.')
+  const inicioMes = new Date()
+  inicioMes.setUTCDate(1)
+  inicioMes.setUTCHours(0, 0, 0, 0)
+  if ((await store.countUserMessagesSince(tenant.id, inicioMes.toISOString())) >= TOPE_MENSUAL) {
+    throw new Error(
+      opciones.idioma === 'es'
+        ? `Llegaste a los ${TOPE_MENSUAL} mensajes de este mes. El agente sigue trabajando solo (medición, tareas, correo) y el chat vuelve el 1 del mes.`
+        : `You reached the ${TOPE_MENSUAL} messages for this month. The agent keeps working on its own (tracking, tasks, email) and the chat comes back on the 1st.`,
+    )
+  }
   const canal = opciones.canal ?? 'dashboard'
   const previos = await store.listMessages(tenant.id, HISTORIAL)
   await store.addMessage({ tenantId: tenant.id, role: 'user', text: texto.slice(0, 4_000), channel: canal })
@@ -456,8 +470,10 @@ export async function conversar(
     const res = await anthropic.messages.create({
       model: AGENT_MODEL,
       max_tokens: 8_000,
-      system: sistema(tenant, opciones.idioma, tienePlan, previos.length === 0),
-      tools: HERRAMIENTAS.map(({ correr: _c, ...t }) => t),
+      // Caché de prompt: instrucciones y herramientas son iguales en cada vuelta
+      // y cada mensaje; se cobran a una fracción después de la primera.
+      system: [{ type: 'text', text: sistema(tenant, opciones.idioma, tienePlan, previos.length === 0), cache_control: { type: 'ephemeral' } }],
+      tools: HERRAMIENTAS.map(({ correr: _c, ...t }, i, todas) => (i === todas.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t)),
       messages: mensajes,
     })
     mensajes.push({ role: 'assistant', content: res.content })

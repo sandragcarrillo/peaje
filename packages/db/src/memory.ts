@@ -34,6 +34,7 @@ import type {
   CitationPrompt,
   CitationRun,
   NewCitationRun,
+  TelegramLink,
 } from './types'
 // ---- M6 ----
 import type { FollowupSnapshot, TaskFollowup } from './types'
@@ -262,6 +263,10 @@ export class MemoryStore implements Store {
     return filas.filter((r) => rondas.includes(r.roundId))
   }
 
+  async countUserMessagesSince(tenantId: string, since: string): Promise<number> {
+    return this.#messages.filter((m) => m.tenantId === tenantId && m.role === 'user' && m.createdAt >= since).length
+  }
+
   async clearMessages(tenantId: string): Promise<void> {
     this.#messages = this.#messages.filter((m) => m.tenantId !== tenantId)
   }
@@ -305,6 +310,35 @@ export class MemoryStore implements Store {
       .slice(0, limit)
   }
   // ---- fin M6 ----
+
+  #tgCodes = new Map<string, { tenantId: string; expiresAt: string }>()
+  #tgLinks = new Map<number, TelegramLink>()
+
+  async createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void> {
+    this.#tgCodes.set(code, { tenantId, expiresAt })
+  }
+
+  async consumeTelegramCode(code: string): Promise<string | null> {
+    const c = this.#tgCodes.get(code)
+    this.#tgCodes.delete(code)
+    return c && new Date(c.expiresAt).getTime() > Date.now() ? c.tenantId : null
+  }
+
+  async linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void> {
+    this.#tgLinks.set(link.chatId, { ...link, linkedAt: new Date().toISOString() })
+  }
+
+  async getTelegramLink(chatId: number): Promise<TelegramLink | null> {
+    return this.#tgLinks.get(chatId) ?? null
+  }
+
+  async listTelegramLinks(tenantId: string): Promise<TelegramLink[]> {
+    return [...this.#tgLinks.values()].filter((l) => l.tenantId === tenantId)
+  }
+
+  async unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void> {
+    for (const [id, l] of this.#tgLinks) if ((filter.chatId === undefined || id === filter.chatId) && (filter.tenantId === undefined || l.tenantId === filter.tenantId)) this.#tgLinks.delete(id)
+  }
 
   #plans = new Map<string, AgentPlan>()
 

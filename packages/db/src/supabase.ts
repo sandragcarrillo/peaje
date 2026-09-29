@@ -37,6 +37,7 @@ import type {
   CitationPrompt,
   CitationRun,
   NewCitationRun,
+  TelegramLink,
 } from './types'
 // ---- M6 ----
 import type { FollowupSnapshot, TaskFollowup } from './types'
@@ -137,6 +138,10 @@ function messageFrom(row: Row): AgentMessage {
     channel: row.channel ?? 'dashboard',
     createdAt: String(row.created_at),
   }
+}
+
+function telegramFrom(row: Row): TelegramLink {
+  return { chatId: Number(row.chat_id), tenantId: row.tenant_id, username: row.username ?? null, language: row.language ?? 'en', linkedAt: String(row.linked_at) }
 }
 
 function planFrom(row: Row): AgentPlan {
@@ -536,9 +541,61 @@ export class SupabaseStore implements Store {
   }
   // ---- fin M6 ----
 
+  async countUserMessagesSince(tenantId: string, since: string): Promise<number> {
+    const { count, error } = await this.#db
+      .from('agent_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('role', 'user')
+      .gte('created_at', since)
+    this.#fail('countUserMessagesSince', error)
+    return count ?? 0
+  }
+
   async clearMessages(tenantId: string): Promise<void> {
     const { error } = await this.#db.from('agent_messages').delete().eq('tenant_id', tenantId)
     this.#fail('clearMessages', error)
+  }
+
+  // ---- Telegram ----
+
+  async createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void> {
+    const { error } = await this.#db.from('telegram_codes').insert({ code, tenant_id: tenantId, expires_at: expiresAt })
+    this.#fail('createTelegramCode', error)
+  }
+
+  async consumeTelegramCode(code: string): Promise<string | null> {
+    const { data, error } = await this.#db.from('telegram_codes').delete().eq('code', code).select().maybeSingle()
+    this.#fail('consumeTelegramCode', error)
+    if (!data) return null
+    return new Date(String((data as Row).expires_at)).getTime() > Date.now() ? String((data as Row).tenant_id) : null
+  }
+
+  async linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void> {
+    const { error } = await this.#db
+      .from('telegram_links')
+      .upsert({ chat_id: link.chatId, tenant_id: link.tenantId, username: link.username, language: link.language, linked_at: new Date().toISOString() }, { onConflict: 'chat_id' })
+    this.#fail('linkTelegram', error)
+  }
+
+  async getTelegramLink(chatId: number): Promise<TelegramLink | null> {
+    const { data, error } = await this.#db.from('telegram_links').select().eq('chat_id', chatId).maybeSingle()
+    this.#fail('getTelegramLink', error)
+    return data ? telegramFrom(data as Row) : null
+  }
+
+  async listTelegramLinks(tenantId: string): Promise<TelegramLink[]> {
+    const { data, error } = await this.#db.from('telegram_links').select().eq('tenant_id', tenantId)
+    this.#fail('listTelegramLinks', error)
+    return (data ?? []).map(telegramFrom)
+  }
+
+  async unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void> {
+    let q = this.#db.from('telegram_links').delete()
+    if (filter.chatId !== undefined) q = q.eq('chat_id', filter.chatId)
+    if (filter.tenantId !== undefined) q = q.eq('tenant_id', filter.tenantId)
+    const { error } = await q
+    this.#fail('unlinkTelegram', error)
   }
 
   async getPlan(tenantId: string): Promise<AgentPlan | null> {

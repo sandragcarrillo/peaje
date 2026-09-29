@@ -359,6 +359,10 @@ export type TaskFollowup = {
 }
 // ---- fin M6 ----
 
+// ---- Telegram ----
+
+export type TelegramLink = { chatId: number; tenantId: string; username: string | null; language: string; linkedAt: string }
+
 // ---- monitoreo: una corrida del verificador por tenant ----
 
 export type Verificacion = {
@@ -514,12 +518,22 @@ export interface Store {
   getMessage(tenantId: string, id: string): Promise<AgentMessage | null>
   setMessageActions(tenantId: string, id: string, actions: AgentAction[]): Promise<void>
   clearMessages(tenantId: string): Promise<void>
+  /** Mensajes del dueño desde una fecha: el tope mensual del chat. */
+  countUserMessagesSince(tenantId: string, since: string): Promise<number>
   listCitationPrompts(tenantId: string): Promise<CitationPrompt[]>
   addCitationPrompts(tenantId: string, texts: string[], source: CitationPrompt['source']): Promise<CitationPrompt[]>
   removeCitationPrompt(tenantId: string, id: string): Promise<void>
   recordCitationRuns(runs: NewCitationRun[]): Promise<void>
   /** Todas las corridas de las últimas `rounds` rondas, de la más nueva a la más vieja. */
   listCitationRuns(tenantId: string, rounds: number): Promise<CitationRun[]>
+  /** Código de un solo uso para ligar un chat de Telegram al negocio. */
+  createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void>
+  /** Consume el código: devuelve el negocio si existe y no venció, y lo borra. */
+  consumeTelegramCode(code: string): Promise<string | null>
+  linkTelegram(link: Omit<TelegramLink, 'linkedAt'>): Promise<void>
+  getTelegramLink(chatId: number): Promise<TelegramLink | null>
+  listTelegramLinks(tenantId: string): Promise<TelegramLink[]>
+  unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void>
   getPlan(tenantId: string): Promise<AgentPlan | null>
   /** Reemplaza el plan del negocio (uno por negocio). */
   savePlan(plan: NewAgentPlan): Promise<AgentPlan>

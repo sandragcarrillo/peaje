@@ -2,7 +2,7 @@
 
 import { apiKeyPrefix, generateApiKey, hashApiKey } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
-import { agregarPreguntas, buscarTareas, completarTarea, enviarAlAgente, medirCitacion, quitarPregunta } from '@/lib/gateway'
+import { desconectarTelegram, enlaceTelegram, agregarPreguntas, buscarTareas, completarTarea, enviarAlAgente, medirCitacion, quitarPregunta } from '@/lib/gateway'
 import { avisarIndexNow } from '@/lib/indexnow'
 import { getLocale } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
@@ -113,3 +113,14 @@ export async function probarComprador(slug: string) {
   return { error: r.error, retryInSeconds: r.retryInSeconds }
 }
 // ---- fin M7 ----
+
+export async function conectarTelegram(slug: string) {
+  await requireTenant(slug)
+  return enlaceTelegram(slug)
+}
+
+export async function quitarTelegram(slug: string) {
+  await requireTenant(slug)
+  await desconectarTelegram(slug)
+  revalidatePath(`/t/${slug}/agente`)
+}

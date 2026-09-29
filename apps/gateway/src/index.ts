@@ -19,6 +19,7 @@ import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
 import { rutasRouter } from './rutas.js'
 import { tareasRouter } from './tareas/router.js'
+import { registrarWebhook, telegramRouter } from './telegram/router.js'
 // ---- M7: comprador misterioso ----
 import { compradorRouter } from './comprador/router.js'
 import { store } from './store.js'
@@ -148,6 +149,7 @@ app.route('/_internal', rutasRouter)
 // ---- M7: comprador misterioso ----
 app.route('/_internal', compradorRouter)
 app.route('/', tareasRouter)
+app.route('/', telegramRouter)
 app.route('/internal/monitor', monitorRouter)
 
 /**
@@ -635,6 +637,7 @@ app.all('/:slug/*', async (c) => {
 })
 
 iniciarCostoRed()
+void registrarWebhook()
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[gateway] escuchando en http://localhost:${info.port}`)
   console.log(`[gateway] treasury ${env.treasuryAddress} · currency ${env.currency}`)

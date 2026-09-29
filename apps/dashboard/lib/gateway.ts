@@ -259,3 +259,19 @@ export async function correrComprador(slug: string): Promise<{ run?: CorridaComp
   return data as { run?: CorridaComprador; error?: 'too-soon'; retryInSeconds?: number }
 }
 // ---- fin M7 ----
+
+// ---- Telegram ----
+
+export type EstadoTelegram = { configured: boolean; links: { username: string | null; language: string; linkedAt: string }[] }
+
+export function leerTelegram(slug: string) {
+  return internal<EstadoTelegram>(`/${slug}/telegram`)
+}
+
+export function enlaceTelegram(slug: string) {
+  return internal<{ url: string; expiresAt: string }>(`/${slug}/telegram/link`, { method: 'POST' })
+}
+
+export function desconectarTelegram(slug: string) {
+  return internal<{ ok: boolean }>(`/${slug}/telegram`, { method: 'DELETE' })
+}
