@@ -1,9 +1,9 @@
-import { GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS } from '@peaje/shared'
+import { GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS, splitPrecio, TOKEN_DECIMALS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
 import { settleAuthorization } from './settlement.js'
 import { conCostoRed } from './costoRed.js'
 import { settleGateway } from './circle.js'
-import { parseUnits } from 'viem'
+import { formatUnits, parseUnits } from 'viem'
 import { usdcStatus } from './chainlink.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
@@ -24,6 +24,36 @@ export function chargeMethods() {
     testnet: env.testnet,
     currency: env.currency,
     recipient: env.treasuryAddress,
+  })
+
+  // ---- Tempo splits ----
+  // Si el negocio tiene wallet de cobro, la oferta de Tempo usa el split
+  // nativo de mppx: una sola transacción del agente con dos transfers, el neto
+  // a la wallet del negocio y el 2% a la treasury. mppx verifica que la
+  // transacción traiga exactamente esos transfers (y el reparto va en la parte
+  // del challenge que no puede cambiar entre el 402 y el pago), así que un
+  // cliente que ignore el split no puede pagarle solo a uno. Sin wallet de
+  // cobro (o sin contexto, como el cobro de planes) queda el Tempo custodial.
+  // El gas lo paga el agente en su propia transacción: no hay costo de red.
+  Object.assign(tempoRail, {
+    adjust: (opciones: { amount: string | number }) => {
+      const contexto = contextoCobro.getStore()
+      const merchant = contexto?.merchant
+      if (!contexto || !merchant || !/^0x[0-9a-fA-F]{40}$/.test(merchant)) return opciones
+      if (merchant.toLowerCase() === env.treasuryAddress.toLowerCase()) return opciones
+      const { netMicro, feeMicro } = splitPrecio(
+        parseUnits(String(opciones.amount), TOKEN_DECIMALS),
+        BigInt(Math.round(env.feePct * 10_000)),
+      )
+      contexto.tempoSplit = { neto: formatUnits(netMicro, TOKEN_DECIMALS), fee: formatUnits(feeMicro, TOKEN_DECIMALS) }
+      return {
+        ...opciones,
+        recipient: merchant,
+        ...(feeMicro > 0n
+          ? { splits: [{ recipient: env.treasuryAddress, amount: formatUnits(feeMicro, TOKEN_DECIMALS) }] }
+          : {}),
+      }
+    },
   })
 
   // Una oferta por red con PeajeSettlement configurado. El recipient es el

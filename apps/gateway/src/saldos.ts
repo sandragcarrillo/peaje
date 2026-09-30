@@ -1,5 +1,5 @@
 import type { NetworkBalance, Tenant } from '@peaje/db'
-import { isSettlementNetwork } from '@peaje/shared'
+import { isDirectRail, isSettlementNetwork } from '@peaje/shared'
 import { claimableEnContrato } from './settlement.js'
 import { env } from './env.js'
 import { store } from './store.js'
@@ -13,6 +13,10 @@ export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'payoutWallet'>):
   const ledger = await store.balanceByNetwork(tenant.id)
   return Promise.all(
     ledger.map(async (b) => {
+      // ---- Tempo splits ----
+      // Lo cobrado por split directo ya está en la wallet del negocio: es
+      // ingreso (revenue), nunca saldo retirable de la treasury.
+      if (isDirectRail(b.network)) return { ...b, available: '0' }
       if (!isSettlementNetwork(b.network) || !env.settlementContracts[b.network] || !tenant.payoutWallet) return b
       try {
         return { ...b, available: await claimableEnContrato(b.network, tenant.payoutWallet as `0x${string}`) }

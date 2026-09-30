@@ -227,6 +227,7 @@ export function isGatewayRail(value: string): value is GatewayRailId {
 export function railExplorerTxUrl(network: string, hash: string, testnet: boolean): string | null {
   if (isNetworkId(network)) return explorerTxUrl(network, hash, testnet)
   if (isGatewayRail(network)) return `${GATEWAY_RAILS[network].explorerUrl}/tx/${hash}`
+  if (isDirectRail(network)) return explorerTxUrl('tempo', hash, testnet)
   return null
 }
 
@@ -234,7 +235,32 @@ export function railExplorerTxUrl(network: string, hash: string, testnet: boolea
 export function railLabel(network: string): string {
   if (isNetworkId(network)) return NETWORKS[network].label
   if (isGatewayRail(network)) return GATEWAY_RAILS[network].label
+  if (isDirectRail(network)) return 'Tempo · Direct'
   return network
+}
+
+// ---- Tempo splits ----
+
+/**
+ * Riel de ledger para pagos de Tempo liquidados con split nativo: en la misma
+ * transacción el neto llega a la wallet de cobro del negocio y el fee a Peaje.
+ * No es una NetworkId (no se fondea ni se retira): ese dinero ya está en la
+ * wallet del negocio, así que su saldo retirable es siempre 0. Los pagos
+ * custodiales de Tempo siguen bajo 'tempo' y se retiran como siempre.
+ */
+export const TEMPO_SPLIT_RAIL = 'tempo-split'
+
+export function isDirectRail(network: string): boolean {
+  return network === TEMPO_SPLIT_RAIL
+}
+
+/**
+ * Reparto de un precio en micro-USD entre negocio y Peaje, con el mismo
+ * redondeo que PeajeSettlement (el fee se trunca).
+ */
+export function splitPrecio(priceMicro: bigint, feeBps: bigint): { netMicro: bigint; feeMicro: bigint } {
+  const feeMicro = (priceMicro * feeBps) / 10_000n
+  return { netMicro: priceMicro - feeMicro, feeMicro }
 }
 
 export const CLAIMABLE_ABI = [

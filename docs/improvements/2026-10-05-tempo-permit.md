@@ -1,8 +1,51 @@
-# Tempo on PeajeSettlement: settlement by EIP-2612 permit
+# Tempo: on-chain 2% split (native splits shipped; permit contract as groundwork)
+
+**What shipped (option D below):** a Tempo payment to a business with a payout wallet is now one transaction from the agent with two TIP-20 transfers: price × 0.98 straight to `tenant.payoutWallet` and the 2% to the Peaje treasury. No custody, no contract, no change for any MPP client. Tenants without a payout wallet (and plan billing) keep the custodial `tempo.charge` as before. The permit contract below is deployed and tested but not used by the gateway.
+
+## Shipped: Tempo native splits
+
+### How the split is enforced (mppx 0.8.19, verified in the installed dist)
+
+- The gateway sets `recipient = payoutWallet` and `splits = [{ recipient: treasury, amount: 2% }]` per request (the `adjust` hook of Peaje's mppx patch, reading the charge context). They travel in the challenge `request` (`methodDetails.splits`), which is HMAC-bound, and `chargeBinding` pins `recipient` and `splits` between the 402 and the paid call.
+- On verification the server rebuilds the expected transfers (primary = amount − splits, plus each split) and requires every one of them: in the signed transaction's calls (pull) or in the receipt's Transfer logs (push). Nothing is broadcast until that passes.
+- Checked live: a client that signed a transaction paying the full $0.01 to the business and ignoring Peaje's split, presented against the real challenge, got `402 verification-failed: no matching payment call found (amount 9800, recipient <business>)`; no transaction was broadcast.
+- The agent pays its own Tempo gas in the same transaction (fee token pathUSD), so there is no network cost for Peaje to recover: `network_fee = 0`.
+
+### Ledger, balances, withdrawals, refunds
+
+| | Custodial Tempo (`tempo`) | Split Tempo (`tempo-split`) | Contract rails |
+|---|---|---|---|
+| Where the merchant's money is | treasury | merchant's payout wallet, at payment time | `claimable` in PeajeSettlement |
+| Ledger row | amount = net, platform_fee = 2% | same, amounts exactly as transferred on-chain | same, plus network_fee |
+| Withdrawable `available` | revenue − withdrawals | always 0 | `claimable` |
+| Withdrawal | from treasury | rejected with a clear message | `withdrawWithSignature` |
+| Refund on origin failure | treasury pays back | **not supported**: logged as `[refund] NO SOPORTADO …` (the net is outside Peaje; the treasury would pay the merchant's share) | merchant's contract balance |
+
+`tempo-split` is a ledger rail, not a `NetworkId` (like the Circle Gateway rails): it is never funded, swept or withdrawn, so no agent/wallet code picks it up. No schema change: the balances view lists it from the payments table; `saldosPorRed` (gateway and dashboard) forces its `available` to 0, and the aggregate `available` is the sum of the corrected per-network values. The dashboard withdraw page shows these earnings as "already in your payout wallet" (es/en) instead of a withdraw button, and payment rows link to the Tempo explorer.
+
+### Measured end to end (Tempo testnet, local gateway, throwaway tenant, route GET at $0.01, stock `mppx/client` `tempo({ account })`)
+
+| Tx | Case | Gas | Agent paid gas | Merchant got | Peaje got |
+|---|---|---|---|---|---|
+| `0x71b2c2a1…083d` | first payment to a new merchant address (account creation) | 308,701 | $0.000186 | 0.0098 | 0.0002 |
+| `0x58b64885…08b0` | second payment | 59,401 | $0.000036 at floor ($0.00071 at cap) | 0.0098 | 0.0002 |
+
+Ledger row: `network tempo-split, amount 0.009800, platform_fee 0.000200, network_fee 0, method tempo`. Tenant balance after two payments: `revenue 0.0196, available 0`; `POST /withdraw` on `tempo-split` → 400 "already in your wallet"; on `tempo` → 400 "insufficient balance $0". With the payout wallet removed, the same route offered the custodial Tempo request (recipient = treasury, no splits). Tenant deleted afterwards.
+
+Compared with `settleWithPermit` (below): 59k vs 349k gas per payment, one agent transaction and no relayer, and every existing client pays it.
+
+### Not covered
+
+- Refunds for split payments (above). A future option: the merchant's Privy-custodied wallet sends the net back, as the contract rails do, but the merchant wallet must also hold pathUSD for gas.
+- The OpenAPI discovery (`/:slug/openapi.json`) builds offers without a charge context, so its Tempo offer shows the treasury as recipient; the real 402 carries the split.
+
+---
+
+# Groundwork: PeajeSettlement settlement by EIP-2612 permit
 
 **Date:** 2026-10-05 (work done 2026-09-29)
 **Contract:** PeajeSettlement v2.1 on Tempo testnet (Moderato, 42431) [`0x3e0f648349432A5195e498D8D3b7Fa7d759752cC`](https://explore.testnet.tempo.xyz/address/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC), block 37495736, deploy tx `0x9248a0d4…3fd2`, verified (`exact_match`) on Tempo's Sourcify verifier. Accepted token: pathUSD, max network fee $0.01.
-**Status:** contract live and exercised with real payments. **Not wired into the 402** (see "Why the gateway rail stops here").
+**Status:** contract live and exercised with real payments. **Not wired into the 402**: San chose native splits (option D) instead.
 
 ## Research
 
@@ -86,7 +129,7 @@ The client path works (custom mppx method above). What does not fit is Peaje's b
 | C. Stock `tempo.charge` paying the contract + relayer `creditTransfer` (v2.2) | Payer transfers pathUSD to the contract with the challenge memo; gateway credits the surplus to the merchant on-chain | Every MPP client, zero client changes | ~1 day incl. new contract function and a migration like Arc's | Two transactions per payment; the relayer attributes a transfer it verified off-chain (payer in the event is asserted, not proven). All of Tempo moves to the contract, one balance source. |
 | D. Stock `tempo.charge` with `splits` | One Tempo transaction: price×0.98 to the merchant's wallet, 2% (+ network) to Peaje | Every MPP client, zero client changes, no contract | ~0.5 day, gateway only | Split on-chain and non-custodial, but the merchant holds the funds: refunds and "balance" semantics change, and the merchant needs a Tempo payout wallet. |
 
-Recommendation: D if the goal is "2% split on-chain, non-custodial" for everybody; A if the goal is specifically to have Tempo payments inside PeajeSettlement. The contract here supports A and does not block C.
+Decision (San): D, shipped above. The contract here keeps A and C open.
 
 ## Not done
 

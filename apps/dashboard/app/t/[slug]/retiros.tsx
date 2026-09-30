@@ -1,7 +1,7 @@
 'use client'
 
 import type { Withdrawal } from '@peaje/db'
-import { explorerTxUrl, isGatewayRail, isNetworkId, NETWORKS, railLabel } from '@peaje/shared'
+import { explorerTxUrl, isDirectRail, isGatewayRail, isNetworkId, NETWORKS, railLabel } from '@peaje/shared'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { money, shortWallet, RAILS_LABEL } from '@/lib/config'
@@ -17,7 +17,7 @@ export function RetirosPanel({
 }: {
   slug: string
   disponible: string
-  porRed: { network: string; available: string }[]
+  porRed: { network: string; available: string; revenue?: string }[]
   wallet: string | null
   historial: Withdrawal[]
 }) {
@@ -29,6 +29,9 @@ export function RetirosPanel({
   const [error, setError] = useState<string | null>(null)
 
   const redesConSaldo = porRed.filter((b) => Number(b.available) > 0)
+  // ---- Tempo splits ----
+  // Cobros por split directo: ya están en la wallet del negocio, no se retiran.
+  const directos = porRed.filter((b) => isDirectRail(b.network) && Number(b.revenue ?? 0) > 0)
 
   async function copiarWallet() {
     if (!wallet) return
@@ -96,6 +99,19 @@ export function RetirosPanel({
           )}
         </div>
       </div>
+
+      {directos.map((b) => (
+        <div
+          key={b.network}
+          className="flex flex-col gap-2 border border-border bg-bg p-4 sm:flex-row sm:items-center sm:gap-3 sm:p-5"
+        >
+          <span className="font-mono text-sm font-bold">{money(b.revenue ?? '0')} pathUSD</span>
+          <span className="inline-flex w-fit items-center border border-border bg-panel-2 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em]">
+            {railLabel(b.network)}
+          </span>
+          <span className="text-xs text-muted">{d.dinero.yaEnTuWallet}</span>
+        </div>
+      ))}
 
       {/* Una fila de retiro por red con saldo */}
       {redesConSaldo.length > 0 ? (

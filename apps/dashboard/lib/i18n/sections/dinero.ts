@@ -31,6 +31,7 @@ export const dinero = {
     estadoPendiente: 'pendiente',
     estadoConfirmado: 'confirmado',
     estadoFallo: 'falló',
+    yaEnTuWallet: 'Ya está en tu wallet de cobro: llegó directo con cada pago por Tempo, no hay nada que retirar.',
 
     // Mi wallet
     miWallet: 'Mi wallet',
@@ -93,6 +94,7 @@ export const dinero = {
     estadoPendiente: 'pending',
     estadoConfirmado: 'confirmed',
     estadoFallo: 'failed',
+    yaEnTuWallet: 'Already in your payout wallet: it arrived directly with each Tempo payment, nothing to withdraw.',
 
     // Mi wallet
     miWallet: 'My wallet',

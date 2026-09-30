@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { GATEWAY_RAIL_IDS, isGatewayRail, isNetworkId, NETWORK_IDS, railExplorerTxUrl, type NetworkId } from '@peaje/shared'
+import { GATEWAY_RAIL_IDS, isDirectRail, isGatewayRail, isNetworkId, NETWORK_IDS, railExplorerTxUrl, type NetworkId } from '@peaje/shared'
 import { env } from './env.js'
 import { saldosPorRed } from './saldos.js'
 import { store } from './store.js'
@@ -24,12 +24,17 @@ withdrawals.get('/:slug/ledger', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
   const payments = await store.listPayments(tenant.id)
+  // ---- Tempo splits ----
+  // El disponible agregado sale de los saldos por red ya corregidos (contrato
+  // y split directo), no de la vista cruda del ledger.
+  const [balance, balanceByNetwork] = await Promise.all([store.balance(tenant.id), saldosPorRed(tenant)])
+  const available = balanceByNetwork.reduce((n, b) => n + Number(b.available), 0)
   return c.json({
-    balance: await store.balance(tenant.id),
-    balanceByNetwork: await saldosPorRed(tenant),
+    balance: { ...balance, available: available.toFixed(6) },
+    balanceByNetwork,
     payments: payments.map((p) => ({
       ...p,
-      explorer: isNetworkId(p.network) ? railExplorerTxUrl(p.network, p.receiptRef, env.testnet) : null,
+      explorer: railExplorerTxUrl(p.network, p.receiptRef, env.testnet),
     })),
   })
 })
@@ -45,6 +50,10 @@ withdrawals.post('/:slug/withdraw', async (c) => {
   }
 
   const network = body.network ?? 'tempo'
+  // ---- Tempo splits ----
+  if (isDirectRail(network)) {
+    return c.json({ error: 'Esos pagos ya llegaron directo a tu wallet de cobro: no hay nada que retirar.' }, 400)
+  }
   if (!isNetworkId(network) && !isGatewayRail(network)) {
     return c.json({ error: `Red inválida. Soportadas: ${[...NETWORK_IDS, ...GATEWAY_RAIL_IDS].join(', ')}` }, 400)
   }

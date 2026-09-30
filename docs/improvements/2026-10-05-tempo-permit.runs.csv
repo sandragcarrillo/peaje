@@ -4,3 +4,5 @@ tx,case,gas_used,effective_gas_price_attousd,cost_usd_measured,cost_usd_at_cap
 0xcbdfdae47c5ca96937cca0ce1535f8726bd13c018e83fe86fb173ccfadadbd79,setAcceptedToken,532738,600000001,,
 0xc46a490d3e9b762309ad91ec8aad8115d232a8553799ebbf1f541853ca51f72d,settleWithPermit first payment,1585964,600000001,0.000952,0.019032
 0x61a4e439c3251f2544f3cf52f3556a38625d540f23342582f279b64bb2ca4e0e,settleWithPermit same payer and merchant,349476,600000001,0.000210,0.004194
+0x71b2c2a10eba6d5aeeffe6afcbeccd93d344a435c6f628963636149ddf67083d,tempo split via gateway first payment (paid by agent),308701,600000001,0.000186,0.003704
+0x58b64885302d8697efd1ce0547de9d1d00ba7431ad1712a793a2a70d2b7e08b0,tempo split via gateway second payment (paid by agent),59401,600000001,0.000036,0.000713

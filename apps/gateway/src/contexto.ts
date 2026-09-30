@@ -18,6 +18,13 @@ export type ContextoCobro = {
   priceUsd: string | null
   /** Costo de red que pagó el agente encima del precio, en USD decimal. Lo anota el settlement. */
   networkFee: string | null
+  // ---- Tempo splits ----
+  /**
+   * Reparto que llevó la oferta de Tempo de este cobro (split nativo): neto a
+   * la wallet del negocio, fee a Peaje, en USD decimal. null = Tempo custodial.
+   * mppx exige que la credencial pague exactamente estos transfers.
+   */
+  tempoSplit: { neto: string; fee: string } | null
 }
 
 export const contextoCobro = new AsyncLocalStorage<ContextoCobro>()
@@ -30,5 +37,6 @@ export function nuevoContexto(merchant: string | null, priceUsd?: string | numbe
     payer: null,
     priceUsd: priceUsd == null ? null : String(priceUsd),
     networkFee: null,
+    tempoSplit: null,
   }
 }

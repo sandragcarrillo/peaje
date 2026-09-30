@@ -210,7 +210,7 @@ function buildServer(
         }
         if (receipt.reference) {
           const payment = await creditPayment(
-            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network, networkFee: cobro.networkFee },
+            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network, networkFee: cobro.networkFee, tempoSplit: cobro.tempoSplit /* ---- Tempo splits ---- */ },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
           if (originFallo) await refundOriginFailure(payment)
@@ -294,6 +294,7 @@ function buildServer(
               priceUsd: route.priceUsd,
               network: cobro.network,
               networkFee: cobro.networkFee,
+              tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
             },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )

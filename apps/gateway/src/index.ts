@@ -327,6 +327,7 @@ app.get('/:slug/r/:rslug', async (c) => {
     priceUsd: resource.priceUsd,
     network: cobro.network,
     networkFee: cobro.networkFee,
+    tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
     payer: cobro.payer,
   })
 
@@ -623,6 +624,7 @@ app.all('/:slug/*', async (c) => {
     priceUsd: match.route.priceUsd,
     network: cobro.network,
     networkFee: cobro.networkFee,
+    tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
     payer: cobro.payer,
   })
 

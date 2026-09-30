@@ -1,5 +1,5 @@
-import { railLabel } from '@peaje/shared'
-import { explorerTxUrl, isNetworkId, NETWORKS } from '@peaje/shared'
+import { isDirectRail, railExplorerTxUrl, railLabel } from '@peaje/shared'
+import { isNetworkId, NETWORKS } from '@peaje/shared'
 import { gatewayUrl, money, shortWallet, RAILS_LABEL } from '@/lib/config'
 import { TerminalBuffer } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
@@ -175,9 +175,9 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-3.5 text-right font-bold">
-                        {isNetworkId(p.network) ? (
+                        {isNetworkId(p.network) || isDirectRail(p.network) ? (
                           <a
-                            href={explorerTxUrl(p.network, p.receiptRef)}
+                            href={railExplorerTxUrl(p.network, p.receiptRef, true) ?? undefined}
                             target="_blank"
                             rel="noreferrer"
                             className="hover:text-accent"

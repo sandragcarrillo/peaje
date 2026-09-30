@@ -1,8 +1,10 @@
 import type { Payment } from '@peaje/db'
 import {
   isNetworkId,
+  isDirectRail,
   isSettlementNetwork,
   networkFromReceiptMethod,
+  TEMPO_SPLIT_RAIL,
   type NetworkId,
   type SettlementNetwork,
 } from '@peaje/shared'
@@ -24,6 +26,9 @@ export type ChargeContext = {
   payer?: string | null
   /** Costo de red pagado por el agente, si el settlement lo anotó. */
   networkFee?: string | null
+  // ---- Tempo splits ----
+  /** Reparto de la oferta de Tempo de este cobro (ver contexto.ts). null = custodial. */
+  tempoSplit?: { neto: string; fee: string } | null
 }
 
 export type ReceiptInfo = {
@@ -37,14 +42,19 @@ export type ReceiptInfo = {
  * La red sale del método del Receipt: `tempo` → tempo, `evm` → arc.
  */
 export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): Promise<Payment> {
-  const network: string = ctx.network ?? networkFromReceiptMethod(receipt.method)
+  // ---- Tempo splits ----
+  // Pago de Tempo con split nativo: el neto ya llegó a la wallet del negocio en
+  // la misma tx, así que va al riel directo (saldo retirable 0) con los montos
+  // exactos que se transfirieron on-chain.
+  const split = receipt.method === 'tempo' && (!ctx.network || ctx.network === 'tempo') ? (ctx.tempoSplit ?? null) : null
+  const network: string = split ? TEMPO_SPLIT_RAIL : (ctx.network ?? networkFromReceiptMethod(receipt.method))
 
   // El agente pagó el precio listado (bruto). El negocio recibe el neto; la
   // diferencia es el take rate de Peaje y se queda en la treasury, donde el
   // pago ya cayó on-chain. Un solo punto de cobro: acá.
   const bruto = Number(ctx.priceUsd)
-  const fee = bruto * env.feePct
-  const neto = Math.max(0, bruto - fee)
+  const fee = split ? Number(split.fee) : bruto * env.feePct
+  const neto = split ? Number(split.neto) : Math.max(0, bruto - fee)
 
   const payment = await store.recordPayment({
     tenantId: ctx.tenantId,
@@ -72,8 +82,9 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
 
   // La wallet del agente sale de la tx on-chain; no bloqueamos la respuesta por
   // eso. En los rieles Gateway ya vino en el payload y no hay tx que leer.
-  if (!ctx.payer && isNetworkId(network)) {
-    void resolvePayer(network, receipt.reference).then((wallet) => {
+  const redPagador = isDirectRail(network) ? 'tempo' : network
+  if (!ctx.payer && isNetworkId(redPagador)) {
+    void resolvePayer(redPagador, receipt.reference).then((wallet) => {
       if (wallet) void store.setPaymentWallet(payment.id, wallet).catch(() => {})
     })
   }
@@ -89,6 +100,19 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
  */
 export async function refundOriginFailure(payment: Payment): Promise<string | null> {
   if (payment.refundTx) return payment.refundTx // Receipt re-presentado: ya se devolvió.
+  // ---- Tempo splits ----
+  // El neto de un pago con split ya está en la wallet del negocio, fuera de
+  // Peaje: la treasury no puede devolverlo sin pagar de su bolsillo la parte
+  // del negocio. Queda sin reembolso automático y a la vista en el log.
+  if (isDirectRail(payment.network)) {
+    console.warn('[refund] NO SOPORTADO: pago de Tempo con split directo, el neto ya está en la wallet del negocio', {
+      payment: payment.id,
+      tenant: payment.tenantId,
+      amount: payment.amount,
+      receipt: payment.receiptRef,
+    })
+    return null
+  }
   if (!isNetworkId(payment.network)) return null
 
   const payer = await resolvePayer(payment.network, payment.receiptRef)
