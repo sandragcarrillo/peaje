@@ -3,7 +3,7 @@ import type { Host, Kit } from '@peaje/shared'
 
 export type { Host, Kit }
 
-export type Stack = 'next' | 'nuxt' | 'astro' | 'sveltekit' | 'remix' | 'react-router' | 'vite' | 'static' | 'unknown'
+export type Stack = 'next' | 'nuxt' | 'astro' | 'sveltekit' | 'remix' | 'react-router' | 'hono' | 'express' | 'vite' | 'static' | 'unknown'
 
 export type Gestor = 'pnpm' | 'yarn' | 'npm' | 'bun'
 
@@ -17,8 +17,17 @@ export type Deteccion = {
   /** Rutas relativas a `dir`. */
   nextConfig: string | null
   layout: string | null
-  /** Solo Next: el middleware que ya existe (`proxy.ts` en 16, `middleware.ts` antes), si hay. */
+  /**
+   * El middleware que ya existe, si hay. Next: `proxy.ts` (16) o `middleware.ts`.
+   * Vite en Vercel: la Routing Middleware de la raíz (`middleware.ts`/`.js`).
+   */
   middleware: string | null
+  /**
+   * Solo Express y Hono: el archivo de entrada del servidor cuando no hay duda
+   * (`main` o el script `start` apuntan a un único archivo con un solo
+   * `express()` / `new Hono()`). Null: la línea se agrega a mano.
+   */
+  servidor: string | null
   /** Solo Next: versión mayor declarada en package.json (null si no se pudo leer). */
   nextMajor: number | null
   gestor: Gestor

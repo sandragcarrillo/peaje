@@ -3,17 +3,22 @@ pragma solidity 0.8.28;
 
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {IERC3009} from "./interfaces/IERC3009.sol";
 
 /// @title PeajeSettlement
-/// @notice Settles EIP-3009 stablecoin payments from AI agents to merchants and splits the
-///         platform fee on-chain. Merchants and the fee recipient withdraw their balances.
+/// @notice Settles stablecoin payments from AI agents to merchants and splits the platform
+///         fee on-chain. Payments arrive as EIP-3009 authorizations (`settle`) or, for tokens
+///         that only implement EIP-2612 such as Tempo's TIP-20 pathUSD, as a permit
+///         (`settleWithPermit`). Merchants and the fee recipient withdraw their balances.
 /// @dev `settle` is relayer-only: an EIP-3009 authorization binds the payer, amount and nonce,
 ///      but not the merchant, so an open `settle` would let anyone redirect a signed payment.
 ///      Withdrawals can be relayed with an EIP-712 signature so merchants never need gas.
@@ -30,6 +35,8 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     uint16 private constant BPS_DENOMINATOR = 10_000;
     bytes32 public constant WITHDRAW_TYPEHASH =
         keccak256("Withdraw(address token,address account,uint256 amount,address to,uint256 nonce,uint256 deadline)");
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     struct Authorization {
         address from;
@@ -37,6 +44,18 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         uint256 validAfter;
         uint256 validBefore;
         bytes32 nonce;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
+    /// @notice EIP-2612 permit signed by the payer with `spender` = this contract. `nonce` is the
+    ///         token's permit nonce the signature was made with.
+    struct PermitPayment {
+        address owner;
+        uint256 value;
+        uint256 nonce;
+        uint256 deadline;
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -50,6 +69,8 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     mapping(address account => bool) public isRelayer;
     mapping(address token => mapping(address account => uint256)) public claimable;
     mapping(address token => uint256) public totalOwed;
+    /// @notice Permits already settled, keyed by `permitPaymentId(token, owner, nonce)`.
+    mapping(bytes32 paymentId => bool) public permitSettled;
 
     event PaymentSettled(
         bytes32 indexed nonce,
@@ -78,6 +99,8 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
     error RenounceDisabled();
     error SignatureExpired(uint256 deadline);
     error InvalidSignature();
+    error PermitAlreadySettled(bytes32 paymentId);
+    error PermitNotUsable(address owner, uint256 nonce);
 
     modifier onlyRelayer() {
         _checkRelayer();
@@ -102,20 +125,63 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         nonReentrant
         returns (uint256 net)
     {
+        net = _credit(token, merchant, auth.from, auth.value, networkFee, auth.nonce);
+        _pull(token, auth);
+    }
+
+    /// @notice Settles a payment authorized with an EIP-2612 permit (spender = this contract).
+    ///         Same split, caps and event as `settle`; the event's `nonce` is the payment id.
+    /// @dev Relayer-only for the same reason as `settle`: a permit binds owner, value, nonce and
+    ///      deadline, not the merchant. Each (token, owner, permit nonce) settles at most once,
+    ///      so a spent permit can never be replayed, not even towards another merchant. If
+    ///      someone submits the permit to the token first (it is public calldata), settlement
+    ///      still goes through as long as the signature is valid for this contract, its nonce
+    ///      is spent and the allowance covers the value.
+    /// @return net Amount credited to the merchant: the price minus the percentage fee.
+    function settleWithPermit(address token, address merchant, PermitPayment calldata permit, uint256 networkFee)
+        external
+        onlyRelayer
+        whenNotPaused
+        nonReentrant
+        returns (uint256 net)
+    {
+        // slither-disable-next-line timestamp
+        if (block.timestamp > permit.deadline) revert SignatureExpired(permit.deadline);
+
+        bytes32 paymentId = permitPaymentId(token, permit.owner, permit.nonce);
+        if (permitSettled[paymentId]) revert PermitAlreadySettled(paymentId);
+        permitSettled[paymentId] = true;
+
+        net = _credit(token, merchant, permit.owner, permit.value, networkFee, paymentId);
+        _pullWithPermit(token, permit);
+    }
+
+    /// @notice Id under which a permit payment is recorded and emitted.
+    function permitPaymentId(address token, address owner, uint256 nonce) public pure returns (bytes32) {
+        return keccak256(abi.encode(token, owner, nonce));
+    }
+
+    /// @dev Validates the payment, splits it and credits both sides. Effects only.
+    function _credit(
+        address token,
+        address merchant,
+        address payer,
+        uint256 value,
+        uint256 networkFee,
+        bytes32 paymentId
+    ) private returns (uint256 net) {
         if (!isAcceptedToken[token]) revert TokenNotAccepted(token);
         if (merchant == address(0)) revert ZeroAddress();
         if (networkFee > maxNetworkFee[token]) revert NetworkFeeTooHigh(networkFee, maxNetworkFee[token]);
-        if (auth.value <= networkFee) revert ZeroAmount();
+        if (value <= networkFee) revert ZeroAmount();
 
-        uint256 fee = ((auth.value - networkFee) * feeBps) / BPS_DENOMINATOR;
-        net = auth.value - networkFee - fee;
+        uint256 fee = ((value - networkFee) * feeBps) / BPS_DENOMINATOR;
+        net = value - networkFee - fee;
 
         claimable[token][merchant] += net;
         if (fee + networkFee != 0) claimable[token][feeRecipient] += fee + networkFee;
-        totalOwed[token] += auth.value;
-        emit PaymentSettled(auth.nonce, token, merchant, auth.from, auth.value, fee, networkFee);
-
-        _pull(token, auth);
+        totalOwed[token] += value;
+        emit PaymentSettled(paymentId, token, merchant, payer, value, fee, networkFee);
     }
 
     /// @dev Pulls the authorized amount and reverts unless the token delivered exactly that much.
@@ -135,6 +201,42 @@ contract PeajeSettlement is Ownable2Step, Pausable, ReentrancyGuard, EIP712, Non
         uint256 received = IERC20(token).balanceOf(address(this)) - balanceBefore;
         // slither-disable-next-line reentrancy-balance
         if (received != auth.value) revert UnexpectedAmountReceived(auth.value, received);
+    }
+
+    /// @dev Applies the permit and pulls exactly `permit.value` from the payer.
+    function _pullWithPermit(address token, PermitPayment calldata permit) private {
+        try IERC20Permit(token).permit(
+            permit.owner, address(this), permit.value, permit.deadline, permit.v, permit.r, permit.s
+        ) {} catch {
+            _checkSpentPermit(token, permit);
+        }
+
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        // `owner` signed a permit for exactly this spender and value: the token checked it above,
+        // or `_checkSpentPermit` did. The caller is a relayer and each permit settles once.
+        // slither-disable-next-line arbitrary-send-erc20-permit
+        IERC20(token).safeTransferFrom(permit.owner, address(this), permit.value);
+        uint256 received = IERC20(token).balanceOf(address(this)) - balanceBefore;
+        // slither-disable-next-line reentrancy-balance
+        if (received != permit.value) revert UnexpectedAmountReceived(permit.value, received);
+    }
+
+    /// @dev The permit call failed. Accept it only if it failed because the permit was already
+    ///      applied: the owner signed it for this contract, its nonce is spent and the
+    ///      allowance still covers the value. Anything else (bad signature, unspent nonce,
+    ///      allowance used up) reverts.
+    function _checkSpentPermit(address token, PermitPayment calldata permit) private view {
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, permit.owner, address(this), permit.value, permit.nonce, permit.deadline)
+        );
+        bytes32 digest = MessageHashUtils.toTypedDataHash(IERC20Permit(token).DOMAIN_SEPARATOR(), structHash);
+        // slither-disable-next-line unused-return
+        (address signer, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, permit.v, permit.r, permit.s);
+        if (
+            err != ECDSA.RecoverError.NoError || signer != permit.owner
+                || IERC20Permit(token).nonces(permit.owner) <= permit.nonce
+                || IERC20(token).allowance(permit.owner, address(this)) < permit.value
+        ) revert PermitNotUsable(permit.owner, permit.nonce);
     }
 
     /// @notice Withdraws the caller's balance. Available while paused and for delisted tokens.

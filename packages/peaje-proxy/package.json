@@ -1,0 +1,93 @@
+{
+  "name": "@peaje/proxy",
+  "version": "0.1.0",
+  "description": "Peaje for any server: answer HTTP 402 (MPP, x402) for your priced API routes on your own domain. Fetch handler plus Express, Hono and Vercel Routing Middleware adapters.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sandragcarrillo/peaje.git",
+    "directory": "packages/peaje-proxy"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./express": {
+      "import": {
+        "types": "./dist/express.d.ts",
+        "default": "./dist/express.js"
+      },
+      "require": {
+        "types": "./dist/express.d.cts",
+        "default": "./dist/express.cjs"
+      }
+    },
+    "./hono": {
+      "import": {
+        "types": "./dist/hono.d.ts",
+        "default": "./dist/hono.js"
+      },
+      "require": {
+        "types": "./dist/hono.d.cts",
+        "default": "./dist/hono.cjs"
+      }
+    },
+    "./vercel": {
+      "import": {
+        "types": "./dist/vercel.d.ts",
+        "default": "./dist/vercel.js"
+      },
+      "require": {
+        "types": "./dist/vercel.d.cts",
+        "default": "./dist/vercel.cjs"
+      }
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "keywords": [
+    "peaje",
+    "402",
+    "mpp",
+    "x402",
+    "express",
+    "hono",
+    "vercel",
+    "middleware",
+    "agents"
+  ],
+  "devDependencies": {
+    "@peaje/shared": "workspace:*",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20",
+    "express": "^5.2.1",
+    "hono": "^4.13.3",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,3 +1,4 @@
+import type { Tenant } from '@peaje/db'
 import { Hono } from 'hono'
 import { dominioVerificable } from '@peaje/shared'
 import { env } from '../env.js'
@@ -13,6 +14,8 @@ import { correrRonda } from '../citacion/medir.js'
 import { procesarSeguimientos } from '../ciclo/seguimiento.js'
 // ---- M7 ----
 import { correrComprador } from '../comprador/misterioso.js'
+// ---- M9 ----
+import { esActivo } from '../billing/acceso.js'
 
 /**
  * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
@@ -30,7 +33,8 @@ monitorRouter.use('*', async (c, next) => {
   await next()
 })
 
-const esPro = (t: { plan: string; email: string | null }) => t.plan === 'pro' && !!t.email
+// M9: Pro vigente (pago o prueba) y con correo. Alertas y semanal son Pro; la corrida diaria no.
+const esPro = (t: Tenant) => esActivo(t) && !!t.email
 
 async function corridaConAlerta(slug: string) {
   const tenant = await store.getTenantBySlug(slug)

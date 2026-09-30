@@ -4,6 +4,8 @@ import { store } from '../store.js'
 import { conversar } from '../tareas/agente.js'
 import { resolverAccion } from '../tareas/acciones.js'
 import { aHtml, nombreBot, partir, tg } from './api.js'
+// ---- M9 ----
+import { esActivo, mensajeSinPro } from '../billing/acceso.js'
 
 /**
  * El agente de Peaje en Telegram: el mismo de "Mi agente" (mismas
@@ -79,6 +81,8 @@ async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: 'es' | '
 }
 
 async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 'es' | 'en') {
+  // ---- M9: el agente en Telegram es Pro ----
+  if (!esActivo(tenant)) return void (await tg('sendMessage', { chat_id: chatId, text: mensajeSinPro(tenant, idioma) }))
   // "Escribiendo…" mientras el agente trabaja: Telegram lo muestra 5 s por llamada.
   await tg('sendChatAction', { chat_id: chatId, action: 'typing' })
   const latido = setInterval(() => void tg('sendChatAction', { chat_id: chatId, action: 'typing' }), 4_500)

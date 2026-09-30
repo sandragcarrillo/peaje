@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
@@ -141,18 +141,120 @@ test('fixture 3: pages router: config CJS envuelta, head manual, robots existent
   assert.ok(resultado.next.some((n) => n.startsWith('npm install @peaje/next')))
 })
 
-test('fixture 4: Vite + vercel.json: host vercel, todo bajo peaje/ y manual', async () => {
+test('fixture 4: Vite + vercel.json: middleware.js de Vercel con @peaje/proxy, sin fusionar vercel.json', async () => {
   const dir = copia('vite-vercel')
   const { resultado, codigo } = await init({ ...base, slug: 'demo', dir })
   assert.equal(codigo, 0)
   assert.equal(resultado.stack, 'vite')
   assert.equal(pedidos.at(-1)?.host, 'vercel')
-  assert.ok(existsSync(join(dir, 'peaje/vercel.txt')))
+  assert.ok(existsSync(join(dir, 'peaje/vercel.txt')), 'el snippet del host queda de referencia')
   assert.ok(existsSync(join(dir, 'peaje/head.html')))
   assert.ok(existsSync(join(dir, 'public/robots.txt')))
   assert.ok(resultado.manual.some((m) => m.includes('peaje/head.html')))
-  assert.ok(resultado.manual.some((m) => m.includes('Merge peaje/vercel.txt')))
+  // Sin tsconfig: middleware.js en la raíz, al lado de package.json.
+  const mw = readFileSync(join(dir, 'middleware.js'), 'utf8')
+  assert.ok(mw.startsWith(`import peaje from '@peaje/proxy/vercel'\n`))
+  assert.ok(mw.includes(`export default peaje({ slug: "demo" })`))
+  assert.ok(mw.includes(`matcher: ['/((?!assets/|favicon.ico).*)']`))
+  assert.ok(!resultado.manual.some((m) => m.includes('Merge peaje/vercel.txt')), 'el middleware ya cubre lo del vercel.json')
+  assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.0')
+  assert.equal(pkg.dependencies['@vercel/functions'], undefined, 'el middleware no necesita @vercel/functions')
+  assert.equal(pkg.devDependencies.vite, '^6.0.0', 'lo que había queda')
+  assert.ok(resultado.next[0]?.startsWith('bun add @peaje/proxy   #'))
   assert.ok(!resultado.next.some((n) => n.includes('@peaje/next')), 'sin Next no se instala @peaje/next')
+
+  // Idempotente, y un middleware propio no se pisa.
+  const otra = await init({ ...base, slug: 'demo', dir })
+  assert.ok(!otra.resultado.written.includes('middleware.js'))
+  assert.ok(!otra.resultado.written.includes('package.json'))
+  const propio = copia('vite-vercel')
+  writeFileSync(join(propio, 'middleware.ts'), 'export default function mw() {}\n')
+  const conPropio = await init({ ...base, slug: 'demo', dir: propio })
+  assert.equal(readFileSync(join(propio, 'middleware.ts'), 'utf8'), 'export default function mw() {}\n')
+  assert.ok(conPropio.resultado.manual.some((m) => m.startsWith('middleware.ts exists') && m.includes(`peaje({ slug: "demo" }, yourMiddleware)`)))
+})
+
+test('fixture 6: Express con entrada inequívoca: require + app.use justo después de express()', async () => {
+  const dir = copia('express-app')
+  const { resultado, codigo, det } = await init({ ...base, slug: 'demo', dir })
+  assert.equal(codigo, 0)
+  assert.equal(resultado.stack, 'express')
+  assert.equal(det.servidor, 'server.js')
+  const server = readFileSync(join(dir, 'server.js'), 'utf8')
+  assert.ok(server.startsWith(`'use strict'\nconst { peajeExpress } = require('@peaje/proxy/express')\nconst express = require('express')`))
+  assert.match(server, /const app = express\(\)\napp\.use\(peajeExpress\(\{ slug: "demo" \}\)\)\napp\.use\(express\.json\(\)\)/, 'antes del body parser')
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.0')
+  assert.ok(resultado.next[0]?.startsWith('npm install @peaje/proxy '))
+  assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
+  assert.ok(!resultado.manual.some((m) => m.startsWith('Pick the ONE proxy file')), 'sin host conocido igual no hay archivo que elegir')
+  assert.ok(!resultado.manual.some((m) => m.startsWith('Next.js:')))
+
+  const otra = await init({ ...base, slug: 'demo', dir })
+  assert.ok(!otra.resultado.written.includes('server.js'))
+  assert.equal((readFileSync(join(dir, 'server.js'), 'utf8').match(/peajeExpress\(/g) ?? []).length, 1)
+})
+
+test('Express ambiguo: sin entrada clara, instrucción exacta y nada tocado', async () => {
+  const dir = copia('express-app')
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'x', dependencies: { express: '^5.1.0' } }))
+  const { resultado } = await init({ ...base, slug: 'demo', dir })
+  assert.ok(!readFileSync(join(dir, 'server.js'), 'utf8').includes('peaje'))
+  const m = resultado.manual.find((x) => x.startsWith('Express:'))
+  assert.ok(m?.includes(`npm install @peaje/proxy`))
+  assert.ok(m?.includes(`import { peajeExpress } from '@peaje/proxy/express'`))
+  assert.ok(m?.includes(`app.use(peajeExpress({ slug: "demo" }))`))
+  assert.ok(!resultado.written.includes('package.json'))
+})
+
+test('Hono en TS: dev apunta a src/, start a dist/; import ESM y app.use tras new Hono<...>()', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'peaje-hono-'))
+  temporales.push(dir)
+  writeFileSync(
+    join(dir, 'package.json'),
+    JSON.stringify({ name: 'api', type: 'module', scripts: { dev: 'tsx watch src/index.ts', start: 'node dist/index.js' }, dependencies: { hono: '^4.9.0' } }, null, 2),
+  )
+  writeFileSync(join(dir, 'pnpm-lock.yaml'), '')
+  mkdirSync(join(dir, 'src'))
+  writeFileSync(
+    join(dir, 'src/index.ts'),
+    `import { serve } from '@hono/node-server'\nimport { Hono } from 'hono'\n\nconst app = new Hono<{ Bindings: { X: string } }>()\n\napp.get('/', (c) => c.text('hola'))\n\nserve(app)\n`,
+  )
+  const { resultado, det } = await init({ ...base, slug: 'demo', dir })
+  assert.equal(det.stack, 'hono')
+  assert.equal(det.servidor, 'src/index.ts')
+  const src = readFileSync(join(dir, 'src/index.ts'), 'utf8')
+  assert.ok(src.includes(`import { Hono } from 'hono'\nimport { peajeHono } from '@peaje/proxy/hono'\n`))
+  assert.ok(src.includes(`const app = new Hono<{ Bindings: { X: string } }>()\napp.use(peajeHono({ slug: "demo" }))\n`))
+  assert.ok(resultado.next[0]?.startsWith('pnpm add @peaje/proxy'))
+})
+
+test('Astro y SvelteKit: instrucción con peajeFetch y el hook de cada uno', async () => {
+  for (const [dep, archivo] of [
+    ['astro', 'src/middleware.ts'],
+    ['@sveltejs/kit', 'src/hooks.server.ts'],
+  ] as const) {
+    const dir = mkdtempSync(join(tmpdir(), 'peaje-ssr-'))
+    temporales.push(dir)
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'x', devDependencies: { [dep]: '*', vite: '*' } }))
+    const { resultado } = await init({ ...base, slug: 'demo', dir })
+    const m = resultado.manual.find((x) => x.includes(archivo))
+    assert.ok(m?.includes(`peajeFetch({ slug: "demo" })`), dep)
+    assert.ok(resultado.manual.some((x) => x.startsWith('Set PEAJE_ORIGIN_SECRET')))
+  }
+})
+
+test('detección: Express/Hono antes que Vite, .vercel/project.json cuenta como Vercel', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'peaje-det-'))
+  temporales.push(dir)
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { express: '*' }, devDependencies: { vite: '*' } }))
+  assert.equal(detectar(dir).stack, 'express')
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ devDependencies: { vite: '*' } }))
+  mkdirSync(join(dir, '.vercel'))
+  writeFileSync(join(dir, '.vercel/project.json'), '{}')
+  assert.equal(detectar(dir).host, 'vercel')
 })
 
 test('fixture 5: monorepo con dos apps aborta pidiendo --dir y lista candidatos', async () => {

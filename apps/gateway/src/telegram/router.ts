@@ -3,6 +3,8 @@ import { env } from '../env.js'
 import { store } from '../store.js'
 import { bandeja, modoPrueba, tg } from './api.js'
 import { enlaceParaConectar, procesarUpdate, type Update } from './bot.js'
+// ---- M9 ----
+import { sinPro } from '../billing/acceso.js'
 
 /**
  *   POST /telegram/webhook                  updates de Telegram (header secreto)
@@ -48,6 +50,8 @@ telegramRouter.get('/_internal/telegram/outbox', (c) => c.json({ testMode: modoP
 telegramRouter.post('/_internal/:slug/telegram/link', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  const bloqueo = sinPro(tenant) // M9: Telegram es Pro
+  if (bloqueo) return c.json(bloqueo, 403)
   return c.json(await enlaceParaConectar(tenant))
 })
 

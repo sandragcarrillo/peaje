@@ -41,6 +41,9 @@ import type { FollowupSnapshot, TaskFollowup } from './types'
 import { aggregateVisits } from './visits'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
+// ---- M9 ----
+import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
+import { DIAS_PRUEBA } from './planes'
 
 /**
  * Store en memoria. Corre el gateway y el dashboard sin Supabase, con la misma
@@ -82,6 +85,9 @@ export class MemoryStore implements Store {
       entityDescription: null,
       robotsBlockTraining: false,
       plan: 'free',
+      // ---- M9: 14 días de prueba de Pro desde la creación ----
+      planUntil: null,
+      trialUntil: new Date(Date.now() + DIAS_PRUEBA * 86_400_000).toISOString(),
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -719,4 +725,32 @@ export class MemoryStore implements Store {
     return this.#mystery.find((r) => r.tenantId === tenantId) ?? null
   }
   // ---- fin M7 ----
+
+  // ---- M9: cobro del agente Pro ----
+  #billing: BillingPayment[] = []
+
+  async recordBillingPayment(p: NewBillingPayment): Promise<BillingPayment> {
+    if (this.#billing.some((b) => b.method === p.method && b.reference === p.reference)) throw new Error('billing reference already recorded')
+    const fila: BillingPayment = { ...p, id: this.#id('bil'), createdAt: new Date().toISOString() }
+    this.#billing.unshift(fila)
+    return fila
+  }
+
+  async listBillingPayments(tenantId: string, limit = 20): Promise<BillingPayment[]> {
+    return this.#billing.filter((b) => b.tenantId === tenantId).slice(0, limit)
+  }
+
+  async findBillingPayment(method: BillingMethod, reference: string): Promise<BillingPayment | null> {
+    return this.#billing.find((b) => b.method === method && b.reference === reference) ?? null
+  }
+
+  async setTenantPlan(tenantId: string, plan: 'free' | 'founder' | 'pro', until: string | null): Promise<void> {
+    const t = this.#tenants.get(tenantId)
+    if (t) this.#tenants.set(tenantId, { ...t, plan, planUntil: until })
+  }
+
+  async countFounders(): Promise<number> {
+    return new Set(this.#billing.filter((b) => b.plan === 'founder').map((b) => b.tenantId)).size
+  }
+  // ---- fin M9 ----
 }

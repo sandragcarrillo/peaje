@@ -26,8 +26,14 @@ export type Tenant = {
   entityDescription: string | null
   /** Bloquear bots de entrenamiento en robots.txt. No afecta la citación. */
   robotsBlockTraining: boolean
-  /** 'free' | 'pro'. Pro recibe alertas y el reporte semanal por correo. */
+  /** 'free' | 'founder' | 'pro'. Lo que habilita sale de accesoPro (planes.ts), no de leer esto directo. */
   plan: string
+  // ---- M9 ----
+  /** Hasta cuándo vale el plan pago (founder o pro). Null si nunca pagó. */
+  planUntil: string | null
+  /** Fin de la prueba de 14 días de Pro. */
+  trialUntil: string | null
+  // ---- fin M9 ----
   createdAt: string
 }
 
@@ -648,4 +654,33 @@ export interface Store {
   recordMysteryRun(run: NewMysteryRun): Promise<MysteryRun>
   lastMysteryRun(tenantId: string): Promise<MysteryRun | null>
   // ---- fin M7 ----
+
+  // ---- M9: cobro del agente Pro ----
+  recordBillingPayment(p: NewBillingPayment): Promise<BillingPayment>
+  listBillingPayments(tenantId: string, limit?: number): Promise<BillingPayment[]>
+  /** Pago ya registrado con esta referencia (un receipt no extiende el plan dos veces). */
+  findBillingPayment(method: BillingMethod, reference: string): Promise<BillingPayment | null>
+  setTenantPlan(tenantId: string, plan: 'free' | 'founder' | 'pro', until: string | null): Promise<void>
+  /** Negocios distintos que pagaron founder alguna vez: el cupo es 50. */
+  countFounders(): Promise<number>
+  // ---- fin M9 ----
 }
+
+// ---- M9: cobro del agente Pro ----
+export type BillingMethod = 'x402' | 'balance'
+
+export type BillingPayment = {
+  id: string
+  tenantId: string
+  plan: 'founder' | 'pro'
+  amountUsd: string
+  method: BillingMethod
+  /** Referencia del receipt (x402/MPP) o id del débito al saldo. */
+  reference: string
+  periodStart: string
+  periodEnd: string
+  createdAt: string
+}
+
+export type NewBillingPayment = Omit<BillingPayment, 'id' | 'createdAt'>
+// ---- fin M9 ----

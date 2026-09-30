@@ -22,6 +22,8 @@ import { tareasRouter } from './tareas/router.js'
 import { registrarWebhook, telegramRouter } from './telegram/router.js'
 // ---- M7: comprador misterioso ----
 import { compradorRouter } from './comprador/router.js'
+// ---- M9: cobro del agente Pro ----
+import { billingRouter } from './billing/router.js'
 import { store } from './store.js'
 import {
   ACP_VERSION_HEADER,
@@ -150,6 +152,8 @@ app.route('/_internal', rutasRouter)
 app.route('/_internal', compradorRouter)
 app.route('/', tareasRouter)
 app.route('/', telegramRouter)
+// ---- M9: cobro del agente Pro (antes de /:slug/*, que si no se come /_billing) ----
+app.route('/', billingRouter)
 app.route('/internal/monitor', monitorRouter)
 
 /**

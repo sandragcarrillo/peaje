@@ -275,3 +275,24 @@ export function enlaceTelegram(slug: string) {
 export function desconectarTelegram(slug: string) {
   return internal<{ ok: boolean }>(`/${slug}/telegram`, { method: 'DELETE' })
 }
+
+// ---- M9: plan y cobro del agente Pro ----
+
+export type EstadoBilling = {
+  access: import('@peaje/db').AccesoPro
+  prices: Record<'founder' | 'pro', { usd: number; charged: string; limits: { preguntas: number; mensajes: number } }>
+  founder: { slotsLeft: number; total: number; available: boolean; alreadyFounder: boolean }
+  balanceAvailable: string
+  payments: import('@peaje/db').BillingPayment[]
+  checkout: { founder: string | null; pro: string }
+  upgradeUrl: string
+}
+
+export function leerBilling(slug: string) {
+  return internal<EstadoBilling>(`/${slug}/billing`)
+}
+
+export function pagarPlanConSaldo(slug: string, plan: 'founder' | 'pro') {
+  return internal<{ ok: true; plan: string; planUntil: string }>(`/${slug}/billing/pay-with-balance`, { method: 'POST', body: JSON.stringify({ plan }) })
+}
+// ---- fin M9 ----

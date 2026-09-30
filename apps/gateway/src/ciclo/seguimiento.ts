@@ -1,7 +1,7 @@
 import type { AgentTask, FollowupSnapshot, TaskFollowup, Tenant } from '@peaje/db'
 import type { Chequeo } from '@peaje/shared'
 import { store } from '../store.js'
-import { MAX_PROMPTS, esPropio, marcas, raizDe } from '../citacion/medir.js'
+import { maxPreguntas, esPropio, marcas, raizDe } from '../citacion/medir.js'
 import { MOTORES, motoresDisponibles } from '../citacion/motores.js'
 import { medirMetricas } from '../tareas/plan.js'
 import { verificarTarea } from '../tareas/verificar.js'
@@ -35,7 +35,7 @@ async function citacionPrevia(tenant: Tenant, pregunta: string): Promise<Followu
 async function asegurarPregunta(tenant: Tenant, pregunta: string): Promise<void> {
   const actuales = await store.listCitationPrompts(tenant.id)
   if (actuales.some((p) => normal(p.text) === normal(pregunta))) return
-  if (actuales.length >= MAX_PROMPTS) return
+  if (actuales.length >= maxPreguntas(tenant)) return
   await store.addCitationPrompts(tenant.id, [pregunta], 'agent')
 }
 

@@ -11,7 +11,9 @@ import { handleOwnerMcp } from './mcp.js'
 import { completarTarea } from './verificar.js'
 import { generarPlan, planConAvance } from './plan.js'
 import { conversar } from './agente.js'
-import { correrRonda, MAX_PROMPTS, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+import { correrRonda, maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+// ---- M9: lo Pro pregunta a un solo lugar ----
+import { accesoPro, sinPro } from '../billing/acceso.js'
 import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
 
 /**
@@ -138,7 +140,8 @@ export async function buscarTareas(tenant: Tenant) {
     return { error: 'too-soon' as const, retryInSeconds: Math.ceil((ESPERA_BUSQUEDA_MS - (Date.now() - antes)) / 1000) }
   }
   ultimaBusqueda.set(tenant.id, Date.now())
-  return { ...(await generarTareas(tenant, { conContenido: true })) }
+  // M9: las tareas de arreglo son gratis; las de contenido (Opus y borradores) son Pro.
+  return { ...(await generarTareas(tenant, { conContenido: accesoPro(tenant).activo })) }
 }
 
 tareasRouter.post('/_internal/:slug/tasks/generate', async (c) => {
@@ -164,6 +167,8 @@ tareasRouter.post('/_internal/:slug/tasks/plan', async (c) => {
   const capacity = Array.isArray(b.capacity) ? PLAN_CAPACITIES.filter((x) => (b.capacity as unknown[]).includes(x)) : []
   if (!goal) return c.json({ error: 'goal must be recommendations, agent-sales or both' }, 400)
   const tenant = c.get('tenant')
+  const bloqueo = sinPro(tenant, b.language === 'es' ? 'es' : 'en') // M9
+  if (bloqueo) return c.json(bloqueo, 403)
   await generarPlan(tenant, { goal, goalDetail: String(b.goalDetail ?? ''), capacity, cadence, language: b.language === 'es' ? 'es' : 'en' })
   return c.json({ plan: await planConAvance(tenant) })
 })
@@ -173,6 +178,8 @@ tareasRouter.post('/_internal/:slug/tasks/chat', async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as { text?: string; language?: string; channel?: string }
   const texto = String(b.text ?? '').trim()
   if (!texto) return c.json({ error: 'empty message' }, 400)
+  const bloqueo = sinPro(c.get('tenant'), b.language === 'es' ? 'es' : 'en') // M9
+  if (bloqueo) return c.json(bloqueo, 403)
   const mensaje = await conversar(c.get('tenant'), texto, { idioma: b.language === 'es' ? 'es' : 'en', canal: b.channel })
   return c.json({ message: mensaje })
 })
@@ -187,11 +194,13 @@ tareasRouter.get('/_internal/:slug/tasks/citations', async (c) => {
 
 tareasRouter.post('/_internal/:slug/tasks/citations/prompts', async (c) => {
   const tenant = c.get('tenant')
+  const bloqueo = sinPro(tenant) // M9
+  if (bloqueo) return c.json(bloqueo, 403)
   const b = (await c.req.json().catch(() => ({}))) as { texts?: unknown; suggest?: boolean }
   const textos = b.suggest ? await sugerirPrompts(tenant) : Array.isArray(b.texts) ? b.texts.map((t) => String(t).trim().slice(0, 200)).filter(Boolean) : []
   const actuales = await store.listCitationPrompts(tenant.id)
   const vistos = new Set(actuales.map((p) => p.text.toLowerCase()))
-  const nuevos = textos.filter((t) => !vistos.has(t.toLowerCase())).slice(0, Math.max(0, MAX_PROMPTS - actuales.length))
+  const nuevos = textos.filter((t) => !vistos.has(t.toLowerCase())).slice(0, Math.max(0, maxPreguntas(tenant) - actuales.length))
   return c.json({ added: await store.addCitationPrompts(tenant.id, nuevos, b.suggest ? 'agent' : 'owner') })
 })
 
@@ -201,6 +210,8 @@ tareasRouter.delete('/_internal/:slug/tasks/citations/prompts/:id', async (c) =>
 })
 
 tareasRouter.post('/_internal/:slug/tasks/citations/run', async (c) => {
+  const bloqueo = sinPro(c.get('tenant')) // M9
+  if (bloqueo) return c.json(bloqueo, 403)
   const r = await medirAhora(c.get('tenant'))
   return c.json(r, 'error' in r ? 429 : 200)
 })
@@ -212,7 +223,7 @@ export async function medirAhora(tenant: Tenant) {
   const espera = 6 * 3_600_000
   if (Date.now() - antes < espera) return { error: 'too-soon' as const, retryInSeconds: Math.ceil((espera - (Date.now() - antes)) / 1000) }
   ultimaRonda.set(tenant.id, Date.now())
-  if ((await store.listCitationPrompts(tenant.id)).length === 0) await store.addCitationPrompts(tenant.id, await sugerirPrompts(tenant), 'agent')
+  if ((await store.listCitationPrompts(tenant.id)).length === 0) await store.addCitationPrompts(tenant.id, (await sugerirPrompts(tenant)).slice(0, maxPreguntas(tenant)), 'agent')
   await correrRonda(tenant)
   return resumenCitacion(tenant)
 }
@@ -228,6 +239,8 @@ tareasRouter.post('/_internal/:slug/tasks/chat/stream', async (c) => {
   if (!texto) return c.json({ error: 'empty message' }, 400)
   const tenant = c.get('tenant')
   const idioma = b.language === 'es' ? 'es' : 'en'
+  const bloqueo = sinPro(tenant, idioma) // M9
+  if (bloqueo) return c.json(bloqueo, 403)
   return streamSSE(c, async (stream) => {
     try {
       await stream.writeSSE({ event: 'status', data: idioma === 'es' ? 'Leyendo tu mensaje…' : 'Reading your message…' })

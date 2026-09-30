@@ -12,6 +12,10 @@ import { leerCitacion, leerPlan, leerTelegram } from '@/lib/gateway'
 import { CitacionPanel } from './citacion'
 // ---- M7 ----
 import { CompradorPanel } from './comprador'
+// ---- M9: plan y cobro del agente Pro ----
+import { accesoPro } from '@peaje/db'
+import { leerBilling } from '@/lib/gateway'
+import { Bloqueado, Suscripcion } from './suscripcion'
 
 /**
  * Mi agente: el agente Pro de este negocio. Propone tareas; el coding agent
@@ -33,6 +37,10 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
   // ---- M7: última corrida del comprador misterioso ----
   const comprador = await store.lastMysteryRun(tenant.id).catch(() => null)
   const mcpUrl = `${gatewayUrl}/_owner/mcp`
+  // ---- M9: qué tiene Pro (se calcula acá; el gateway da precios, cupos y pagos) ----
+  const acceso = accesoPro(tenant)
+  const billing = await leerBilling(tenant.slug).catch(() => null)
+  const pro = acceso.activo
 
   const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress')
   const esperando = tareas.filter((x) => x.status === 'done')
@@ -42,25 +50,31 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
     <div className="space-y-8">
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
 
+      {/* ---- M9: plan ---- */}
+      <section className="space-y-3">
+        <SectionBar label={t.planSeccion} />
+        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} />
+      </section>
+
       <section className="space-y-3">
         <SectionBar label={t.chatTitulo} />
-        <Chat slug={tenant.slug} inicial={mensajes} />
+        {pro ? <Chat slug={tenant.slug} inicial={mensajes} /> : <Bloqueado />}
       </section>
 
       <section className="space-y-3">
         <SectionBar label={t.tgTitulo} />
-        <TelegramPanel slug={tenant.slug} estado={telegram} />
+        {pro ? <TelegramPanel slug={tenant.slug} estado={telegram} /> : <Bloqueado />}
       </section>
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />
-        <CitacionPanel slug={tenant.slug} datos={citacion} />
+        {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} /> : <Bloqueado />}
       </section>
 
       {/* ---- M7: comprador misterioso ---- */}
       <section className="space-y-3">
         <SectionBar label={t.compTitulo} />
-        <CompradorPanel slug={tenant.slug} run={comprador} />
+        {pro ? <CompradorPanel slug={tenant.slug} run={comprador} /> : <Bloqueado />}
       </section>
 
       <section className="space-y-3">

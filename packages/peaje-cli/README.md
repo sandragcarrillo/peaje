@@ -14,13 +14,14 @@ Requires Node 20 or newer. No runtime dependencies.
 
 ### `peaje init <slug>`
 
-1. Detects the stack (Next.js, Nuxt, Astro, SvelteKit, Remix, React Router, Vite, static) and the host (Next, Vercel, Cloudflare Workers, nginx, Caddy) by reading `package.json` and the config files in the directory. In a monorepo with several sites it stops and asks for `--dir`.
+1. Detects the stack (Next.js, Nuxt, Astro, SvelteKit, Remix, React Router, Hono, Express, Vite, static) and the host (Next, Vercel, Cloudflare Workers, nginx, Caddy) by reading `package.json` and the config files in the directory. In a monorepo with several sites it stops and asks for `--dir`.
 2. Downloads the kit for that host from the gateway.
 3. Writes it:
    - new files (`public/robots.txt`) only if they do not exist;
    - snippets to merge (`peaje/next.config.ts`, `peaje/head.html`, ...) always under `peaje/`, exactly as the gateway sent them.
 4. Next.js: wraps a plain `next.config.*` with `withPeaje()` from `@peaje/next`, writes `proxy.ts` (Next 16) or `middleware.ts` (older) with `peajeProxy()` so priced API routes answer 402 on your domain at runtime (if you already have one, you get the one-line wrap as an instruction), adds `@peaje/next` to `package.json` (you run the install; the command is printed) and renders `<PeajeHead slug="..." />` in the `<head>` of the app router root layout. Configs wrapped in `withSentryConfig(...)` or similar, and the pages router, are left for you with an exact instruction.
-5. Moves static copies that would shadow the proxy (`public/openapi.json`, `app/mcp/route.ts`, ...) to `.peaje-backup/<timestamp>/`. Nothing is ever deleted.
+5. Other stacks get the same runtime proxy from [`@peaje/proxy`](../peaje-proxy): see [Outside Next.js](#outside-nextjs).
+6. Moves static copies that would shadow the proxy (`public/openapi.json`, `app/mcp/route.ts`, ...) to `.peaje-backup/<timestamp>/`. Nothing is ever deleted.
 
 Without `--yes` it prints the plan and asks for confirmation on a TTY. Without a TTY and without `--yes` it exits with code 2 instead of hanging.
 
@@ -54,9 +55,21 @@ npx @peaje/cli@1 done <id> --url <live url>   # after deploying; Peaje verifies 
 
 `done` exits 0 when Peaje verified the task on the live site and 1 when it is marked done but not live yet (Peaje checks again every day). The same tasks are available over MCP at `https://peaje-gateway.up.railway.app/_owner/mcp` with `Authorization: Bearer <agent key>`; the dashboard shows the exact line for Claude Code and Cursor.
 
+## Outside Next.js
+
+The runtime proxy that answers 402 for your priced API routes, on your own domain, comes from `@peaje/proxy`:
+
+| Stack | What `init` does |
+|---|---|
+| Vite on Vercel (`vercel.json` or `.vercel/project.json`) | Writes `middleware.ts` (or `.js` without a `tsconfig.json`) at the root with `@peaje/proxy/vercel` (Vercel Routing Middleware) and adds `@peaje/proxy` to `package.json`. If you already have a `middleware.*`, you get the one-line wrap as an instruction. The `vercel.json` snippet is not needed. |
+| Express, Hono | When `main` and the `start`/`dev` scripts point at one source file that creates the app once (`const app = express()`, `const app = new Hono()`), adds the import and `app.use(peajeExpress({ slug }))` / `app.use(peajeHono({ slug }))` right after it, before body parsers and routes. Otherwise prints those two lines for you to add. |
+| Astro (SSR), SvelteKit | Prints the `src/middleware.ts` / `src/hooks.server.ts` lines with `peajeFetch` from `@peaje/proxy`. |
+
+All of them need `PEAJE_ORIGIN_SECRET` in the hosting environment (Kit page of the dashboard); `init` lists it as a manual step. Without it, discovery files and `/r/` links work and priced API routes are not charged on your domain.
+
 ## What it touches and what it does not
 
-Touches: `next.config.*` (only when it is a plain `export default X` or `module.exports = X`), the root `app/layout.*`, `package.json` dependencies, `public/robots.txt` (only if missing), files under `peaje/`, and moves shadowing copies to `.peaje-backup/`.
+Touches: `next.config.*` (only when it is a plain `export default X` or `module.exports = X`), the root `app/layout.*`, a new root `middleware.*` (Vite on Vercel), one `app.use(...)` line in an unambiguous Express or Hono entry file, `package.json` dependencies, `public/robots.txt` (only if missing), files under `peaje/`, and moves shadowing copies to `.peaje-backup/`.
 
 Does not touch: anything else. It never runs your package manager, never deletes files, never rewrites a config it cannot parse, never edits an existing `robots.txt` or `app/robots.ts` (it tells you what to change instead), and never edits your footer: add the visible `<a href="/developers">API for agents</a>` yourself.
 

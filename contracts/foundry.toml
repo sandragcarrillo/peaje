@@ -22,3 +22,4 @@ fail_on_revert = false
 [rpc_endpoints]
 arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 robinhood_testnet = "${ROBINHOOD_TESTNET_RPC_URL}"
+tempo_testnet = "${TEMPO_TESTNET_RPC_URL}"

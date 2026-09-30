@@ -7,7 +7,10 @@ import { validarRuta } from '../rutas.js'
 import { MODEL } from '../monitor/reporte.js'
 import { generarPlan, medirMetricas, planConAvance } from './plan.js'
 import { buscarTareas, medirAhora, tareaPublica } from './router.js'
-import { MAX_PROMPTS, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+import { maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+// ---- M9 ----
+import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
+import { LIMITES } from '@peaje/db'
 import { revisarAcceso } from '../acceso/revisar.js'
 // ---- M6 ----
 import { tareaConBorrador } from '../ciclo/borrador.js'
@@ -26,8 +29,7 @@ import { probarAhora, resultadoPublico } from '../comprador/misterioso.js'
 // El chat corre en Sonnet: responde casi igual y cuesta bastante menos por
 // mensaje. Opus queda para lo que se piensa una vez: plan, borradores, misiones.
 const AGENT_MODEL = process.env.AGENT_MODEL ?? 'claude-sonnet-5'
-/** Tope de mensajes del dueño por mes calendario (Pro a US$29). */
-const TOPE_MENSUAL = Number(process.env.AGENT_MONTHLY_MESSAGES ?? 150)
+// El tope de mensajes del dueño por mes calendario sale del plan (M9): 60 founder, 150 pro y prueba.
 const HISTORIAL = 20
 const MAX_VUELTAS = 8
 
@@ -62,7 +64,7 @@ const HERRAMIENTAS: Herramienta[] = [
       return {
         business: tenant.name,
         domain: dominioVerificable(tenant.originUrl),
-        plan: tenant.plan,
+        plan: accesoPro(tenant), // M9: plan vigente, hasta cuándo y límites
         checks: checks.map((c) => ({ id: c.id, ok: c.ok, reason: c.ok ? undefined : c.motivo })),
         checkedAt: v?.runAt ?? null,
         score: v?.score ?? null,
@@ -179,7 +181,7 @@ const HERRAMIENTAS: Herramienta[] = [
   },
   {
     name: 'manage_questions',
-    description: `Change the questions Peaje asks AI assistants for this business (max ${MAX_PROMPTS}). Peaje picks them itself when the plan is built; only use this when the owner asks to add or drop one, or to regenerate them. Questions must not include the business name.`,
+    description: `Change the questions Peaje asks AI assistants for this business (max ${LIMITES.pro.preguntas} on Pro, ${LIMITES.founder.preguntas} on Founder). Peaje picks them itself when the plan is built; only use this when the owner asks to add or drop one, or to regenerate them. Questions must not include the business name.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -193,7 +195,7 @@ const HERRAMIENTAS: Herramienta[] = [
       const actuales = await store.listCitationPrompts(tenant.id)
       const textos = i.suggest ? await sugerirPrompts(tenant) : Array.isArray(i.add) ? i.add.map((t) => String(t).trim().slice(0, 200)).filter(Boolean) : []
       const vistos = new Set(actuales.map((p) => p.text.toLowerCase()))
-      const nuevos = textos.filter((t) => !vistos.has(t.toLowerCase())).slice(0, Math.max(0, MAX_PROMPTS - actuales.length))
+      const nuevos = textos.filter((t) => !vistos.has(t.toLowerCase())).slice(0, Math.max(0, maxPreguntas(tenant) - actuales.length))
       await store.addCitationPrompts(tenant.id, nuevos, i.suggest ? 'agent' : 'owner')
       return { trackedQuestions: (await store.listCitationPrompts(tenant.id)).map((p) => p.text) }
     },
@@ -449,6 +451,10 @@ export async function conversar(
   opciones: { idioma: 'es' | 'en'; canal?: string; alEstado?: (estado: string) => void },
 ): Promise<AgentMessage> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
+  // ---- M9: el chat es Pro; el tope mensual sale del plan ----
+  const acceso = accesoPro(tenant)
+  if (!acceso.activo) throw new Error(mensajeSinPro(tenant, opciones.idioma))
+  const TOPE_MENSUAL = acceso.limites.mensajes
   if (!dentroDelLimite(tenant.id)) throw new Error(opciones.idioma === 'es' ? 'Muchos mensajes en esta hora. Prueba en un rato.' : 'Too many messages this hour. Try again later.')
   const inicioMes = new Date()
   inicioMes.setUTCDate(1)

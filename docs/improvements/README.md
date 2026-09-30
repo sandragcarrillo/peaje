@@ -7,6 +7,7 @@ One file per big change, with the numbers that justify it. The point is to be ab
 | 2026-09-22 | [Kit as a CLI (`@peaje/cli`)](./2026-09-22-kit-cli.md) | Install cost for the coding agent: $0.269 to $0.118 per session (-56%) |
 | 2026-09-27 | [Settlement v2: the agent pays the network cost](./2026-09-27-network-fee.md) | Peaje margin on a $0.02 payment: -$0.0076 to +$0.0004 |
 | 2026-09-27 | [Circle Nanopayments: gasless payments settled in batches](./2026-09-27-nanopayments.md) | Per-request network cost on Arbitrum: $0.0166 to $0; 250 ms per payment, zero buyer transactions |
+| 2026-10-05 | [Tempo on PeajeSettlement via EIP-2612 permit](./2026-10-05-tempo-permit.md) | `settleWithPermit` live on Tempo testnet: 349k gas ($0.0002 at floor, $0.0042 at cap) per payment; not wired into the 402 yet |
 
 ## How to add one
 

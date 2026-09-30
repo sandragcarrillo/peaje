@@ -8,6 +8,14 @@ import { basename, dirname, join, posix } from 'node:path'
 import { rutasABorrar } from '@peaje/shared'
 import { comandoInstalar } from './detectar'
 import { agregarDependencia, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead, nextConfigNuevo, proxyNuevo } from './next'
+import {
+  insertarMiddlewareServidor,
+  manualAstro,
+  manualServidor,
+  manualSvelteKit,
+  middlewareVercelNuevo,
+  VERSION_PEAJE_PROXY,
+} from './servidores'
 import type { Accion, Deteccion, Kit, Plan } from './tipos'
 
 export const VERSION_PEAJE_NEXT = '^0.2.0'
@@ -103,7 +111,10 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     manual.push(
       `Put the tags from peaje/head.html inside the <head> of your homepage template${stack === 'static' ? '' : ` (${stack})`}. Keep any JSON-LD you already have; add this block next to it.`,
     )
-    if (soloAeo) {
+    // El proxy en runtime (@peaje/proxy) cubre discovery, /r/ y las rutas de
+    // API: con él, el archivo de proxy del host ya no hace falta.
+    const cubre = !soloAeo && planificarProxyRuntime(det, slug, acciones, manual, next)
+    if (soloAeo || cubre) {
       // nada más: no hay proxy que fusionar
     } else if (kit.host === 'unknown') {
       manual.push('Pick the ONE proxy file under peaje/ that matches where the site is served (Vercel, Cloudflare, nginx, Caddy) and merge it into that config.')
@@ -122,7 +133,9 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     if (/^Deploy\./.test(m)) continue
     if (/^Pick the ONE proxy file/.test(m) && manual.some((x) => x.startsWith('Pick the ONE proxy file'))) continue
     // En Next el CLI ya escribió o pidió envolver el middleware, y ya avisó del secreto.
-    if (/^Next\.js: add `peajeProxy/.test(m) && det.stack === 'next') continue
+    if (/^Next\.js: add `peajeProxy/.test(m) && reconocido) continue
+    // Con @peaje/proxy no hay archivo de host que elegir ni Worker que configurar.
+    if (/^(Pick the ONE proxy file|Cloudflare Worker: add PEAJE_ORIGIN_SECRET)/.test(m) && proxyRuntimeCubre(det)) continue
     manual.push(m)
   }
 
@@ -131,6 +144,81 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
   if (kit.paidPath) next.push(`Then: curl -sIL https://${kit.originHost}${kit.paidPath} should return 402.`)
 
   return { acciones, manual, next }
+}
+
+const SECRETO_MANUAL =
+  'Set PEAJE_ORIGIN_SECRET in your hosting environment variables (copy it from the Kit page of your Peaje dashboard). Without it, priced API routes are not charged on your domain; discovery files and /r/ links work anyway.'
+
+/** Vite en Vercel, Express y Hono: @peaje/proxy reemplaza al archivo de proxy del host. */
+function proxyRuntimeCubre(det: Deteccion): boolean {
+  return det.stack === 'express' || det.stack === 'hono' || (det.stack === 'vite' && det.host === 'vercel')
+}
+
+/**
+ * `@peaje/proxy` fuera de Next. Vite en Vercel: `middleware.ts` en la raíz.
+ * Express y Hono: la línea `app.use(...)` en la entrada si es inequívoca, si
+ * no la instrucción exacta. Astro y SvelteKit: instrucción (el hook depende
+ * del modo de render). Devuelve true si el archivo de proxy del host sobra.
+ */
+function planificarProxyRuntime(det: Deteccion, slug: string, acciones: Accion[], manual: string[], next: string[]): boolean {
+  const { dir, stack } = det
+  const instalar = comandoInstalar(det.gestor, '@peaje/proxy')
+  const deps: [string, string][] = []
+
+  if (stack === 'vite' && det.host === 'vercel') {
+    if (det.middleware) {
+      if (/@peaje\/proxy/.test(leer(dir, det.middleware))) {
+        acciones.push({ tipo: 'skip', path: det.middleware, motivo: 'already uses @peaje/proxy' })
+      } else {
+        manual.push(
+          `${det.middleware} exists. Wrap it so Peaje runs first: \`import peaje from '@peaje/proxy/vercel'\` and \`export default peaje({ slug: ${JSON.stringify(slug)} }, yourMiddleware)\`. Without it, priced API routes only answer 402 at the gateway URL, not on your domain.`,
+        )
+        deps.push(['@peaje/proxy', VERSION_PEAJE_PROXY])
+      }
+    } else {
+      const nuevo = middlewareVercelNuevo(slug, existe(dir, 'tsconfig.json'))
+      acciones.push({ tipo: 'write', path: nuevo.path, content: nuevo.content, motivo: 'Vercel Routing Middleware: priced routes answer 402 on your domain' })
+      deps.push(['@peaje/proxy', VERSION_PEAJE_PROXY])
+    }
+  } else if (stack === 'express' || stack === 'hono') {
+    const r = det.servidor ? insertarMiddlewareServidor(leer(dir, det.servidor), stack, slug) : null
+    if (r?.ok && det.servidor) {
+      acciones.push({ tipo: 'edit', path: det.servidor, content: r.src, motivo: `added app.use(${stack === 'express' ? 'peajeExpress' : 'peajeHono'}(...)) right after the app is created` })
+      deps.push(['@peaje/proxy', VERSION_PEAJE_PROXY])
+    } else if (r && !r.ok && r.motivo === 'already' && det.servidor) {
+      acciones.push({ tipo: 'skip', path: det.servidor, motivo: 'already uses @peaje/proxy' })
+    } else {
+      manual.push(manualServidor(stack, slug, instalar))
+    }
+  } else if (stack === 'astro') {
+    manual.push(manualAstro(slug, instalar))
+  } else if (stack === 'sveltekit') {
+    manual.push(manualSvelteKit(slug, instalar))
+  } else {
+    return false
+  }
+
+  manual.push(
+    stack === 'hono' && det.host === 'cloudflare'
+      ? 'Set PEAJE_ORIGIN_SECRET as a Worker secret (`wrangler secret put PEAJE_ORIGIN_SECRET`, value from the Kit page of your Peaje dashboard); peajeHono reads it from c.env. Without it, priced API routes are not charged on your domain; discovery files and /r/ links work anyway.'
+      : SECRETO_MANUAL,
+  )
+
+  // package.json: la dependencia se anota, la instalación la corre el dueño.
+  if (deps.length > 0 && existe(dir, 'package.json')) {
+    let pkg = leer(dir, 'package.json')
+    const agregadas: string[] = []
+    for (const [nombre, version] of deps) {
+      const nuevo = agregarDependencia(pkg, nombre, version)
+      if (nuevo) {
+        pkg = nuevo
+        agregadas.push(nombre)
+      }
+    }
+    if (agregadas.length > 0) acciones.push({ tipo: 'edit', path: 'package.json', content: pkg, motivo: `added ${agregadas.join(' and ')} to dependencies` })
+    next.unshift(`${comandoInstalar(det.gestor, deps.map(([n]) => n).join(' '))}   # installs the dependencies added to package.json`)
+  }
+  return proxyRuntimeCubre(det)
 }
 
 function planificarRobots(det: Deteccion, path: string, content: string, manual: string[]): Accion[] {

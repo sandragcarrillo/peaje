@@ -3,6 +3,8 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import { env } from '../env.js'
 import { store } from '../store.js'
 import { probarAhora } from './misterioso.js'
+// ---- M9 ----
+import { sinPro } from '../billing/acceso.js'
 
 /**
  * Comprador misterioso, para el dashboard (secreto interno):
@@ -31,6 +33,8 @@ compradorRouter.use('/:slug/mystery/*', auth)
 compradorRouter.get('/:slug/mystery', async (c) => c.json({ run: await store.lastMysteryRun(c.get('tenant').id) }))
 
 compradorRouter.post('/:slug/mystery/run', async (c) => {
+  const bloqueo = sinPro(c.get('tenant')) // M9: el comprador misterioso es Pro
+  if (bloqueo) return c.json(bloqueo, 403)
   const r = await probarAhora(c.get('tenant'))
   if ('error' in r) return c.json(r, 429)
   return c.json({ run: r })

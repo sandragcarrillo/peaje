@@ -1,6 +1,6 @@
 {
   "name": "@peaje/cli",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Install Peaje on your site in one command: proxy rewrites, head block, robots.txt, and a verifier that measures your own domain.",
   "license": "MIT",
   "repository": {

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { randomUUID } from 'node:crypto'
-import type { CitationRun, NewCitationRun, Tenant } from '@peaje/db'
+import { accesoPro, type CitationRun, type NewCitationRun, type Tenant } from '@peaje/db'
 import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
@@ -17,8 +17,11 @@ import { MOTORES, motoresDisponibles } from './motores.js'
 
 const PARALELO = 3
 
-/** Tope de preguntas por negocio: 20 (Pro). Cada una cuesta una consulta por motor por ronda. */
-export const MAX_PROMPTS = 20
+/**
+ * Tope de preguntas por negocio según el plan (M9): 10 founder, 20 pro y
+ * prueba, 0 free. Cada una cuesta una consulta por motor por ronda.
+ */
+export const maxPreguntas = (tenant: Tenant): number => accesoPro(tenant).limites.preguntas
 
 /** El dominio propio sin subdominio de API: api.open-meteo.com cuenta como open-meteo.com. */
 export function raizDe(tenant: Tenant): string | null {
@@ -35,7 +38,8 @@ export function marcas(tenant: Tenant, raiz: string | null): string[] {
 }
 
 export async function correrRonda(tenant: Tenant): Promise<{ roundId: string; runs: number; engines: string[] }> {
-  const prompts = await store.listCitationPrompts(tenant.id)
+  // Si bajó de plan (pro → founder) se miden las primeras del nuevo tope; las otras quedan guardadas.
+  const prompts = (await store.listCitationPrompts(tenant.id)).slice(0, maxPreguntas(tenant))
   const motores = motoresDisponibles()
   if (prompts.length === 0) throw new Error('No prompts yet')
   if (motores.length === 0) throw new Error('No answer engine is configured on the gateway')

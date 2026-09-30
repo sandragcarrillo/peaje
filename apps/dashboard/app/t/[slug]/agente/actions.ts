@@ -124,3 +124,18 @@ export async function quitarTelegram(slug: string) {
   await desconectarTelegram(slug)
   revalidatePath(`/t/${slug}/agente`)
 }
+
+// ---- M9: pagar el plan con el saldo cobrado ----
+export async function pagarConSaldo(slug: string, plan: 'founder' | 'pro') {
+  await requireTenant(slug)
+  const { pagarPlanConSaldo } = await import('@/lib/gateway')
+  try {
+    const r = await pagarPlanConSaldo(slug, plan)
+    revalidatePath(`/t/${slug}/agente`)
+    return { planUntil: r.planUntil, error: null }
+  } catch (e) {
+    // Se devuelve el mensaje en vez de tirar: en producción Next oculta el texto de los errores de server actions.
+    return { planUntil: null, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+// ---- fin M9 ----

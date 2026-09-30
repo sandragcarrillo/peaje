@@ -8,6 +8,9 @@ import { ErrorCli, type Deteccion, type Gestor, type Host, type Stack } from './
 
 type PackageJson = {
   name?: string
+  main?: string
+  type?: string
+  scripts?: Record<string, string>
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
   workspaces?: string[] | { packages?: string[] }
@@ -36,6 +39,10 @@ export function stackDe(pkg: PackageJson | null): Stack {
   if (tieneDep(pkg, (n) => n === '@sveltejs/kit')) return 'sveltekit'
   if (tieneDep(pkg, (n) => n.startsWith('@remix-run/'))) return 'remix'
   if (tieneDep(pkg, (n) => n === 'react-router' || n === '@react-router/dev')) return 'react-router'
+  // Un servidor propio va antes que `vite`: en un Vite + Express, el que
+  // atiende las requests en producción es el servidor.
+  if (tieneDep(pkg, (n) => n === 'hono')) return 'hono'
+  if (tieneDep(pkg, (n) => n === 'express')) return 'express'
   if (tieneDep(pkg, (n) => n === 'vite')) return 'vite'
   return 'unknown'
 }
@@ -48,7 +55,8 @@ function existeAlguno(dir: string, nombres: string[]): string | null {
 export function hostDe(dir: string, stack: Stack): Host | null {
   // Next ignora vercel.json para rewrites: la config manda aunque el deploy sea Vercel.
   if (stack === 'next') return 'next'
-  if (existsSync(join(dir, 'vercel.json'))) return 'vercel'
+  // `.vercel/project.json` lo deja `vercel link`: muchos Vite en Vercel no tienen vercel.json.
+  if (existsSync(join(dir, 'vercel.json')) || existsSync(join(dir, '.vercel/project.json'))) return 'vercel'
   if (existeAlguno(dir, ['wrangler.toml', 'wrangler.jsonc', 'wrangler.json'])) return 'cloudflare'
   if (existeAlguno(dir, ['nginx.conf', 'nginx/nginx.conf', 'nginx/default.conf'])) return 'nginx'
   if (existeAlguno(dir, ['Caddyfile', 'caddy/Caddyfile'])) return 'caddy'
@@ -56,6 +64,8 @@ export function hostDe(dir: string, stack: Stack): Host | null {
 }
 
 const CONFIGS_NEXT = ['next.config.ts', 'next.config.mjs', 'next.config.js', 'next.config.cjs', 'next.config.mts']
+/** Routing Middleware de Vercel para proyectos que no son Next: solo en la raíz. */
+const MIDDLEWARES_VERCEL = ['middleware.ts', 'middleware.js', 'middleware.mjs']
 const MIDDLEWARES = ['proxy.ts', 'proxy.js', 'middleware.ts', 'middleware.js', 'src/proxy.ts', 'src/proxy.js', 'src/middleware.ts', 'src/middleware.js']
 
 /** `^15.3.0`, `~16.0.0`, `16.1.2`, `canary`: la mayor si se puede leer. */
@@ -144,7 +154,7 @@ export function detectar(dirEntrada: string): Deteccion {
   if (stack === 'unknown') {
     const candidatos = candidatosDe(dir, pkg)
     if (candidatos.length > 1) {
-      return { dir, stack, host: null, router: null, nextConfig: null, layout: null, middleware: null, nextMajor: null, gestor: gestorDe(dir), candidatos }
+      return { dir, stack, host: null, router: null, nextConfig: null, layout: null, middleware: null, servidor: null, nextMajor: null, gestor: gestorDe(dir), candidatos }
     }
     if (candidatos.length === 1) {
       // Un solo paquete con framework: lo tomamos y lo decimos.
@@ -160,6 +170,9 @@ export function detectar(dirEntrada: string): Deteccion {
   let layout: string | null = null
   let middleware: string | null = null
   let nextMajor: number | null = null
+  let servidor: string | null = null
+  if (stack === 'vite' && host === 'vercel') middleware = existeAlguno(dir, MIDDLEWARES_VERCEL)
+  if (stack === 'express' || stack === 'hono') servidor = servidorDe(dir, pkg, stack)
   if (stack === 'next') {
     nextConfig = existeAlguno(dir, CONFIGS_NEXT)
     layout = existeAlguno(dir, LAYOUTS)
@@ -170,7 +183,39 @@ export function detectar(dirEntrada: string): Deteccion {
     else if (existeAlguno(dir, ['app', 'src/app'])) router = 'app'
   }
 
-  return { dir, stack, host, router, nextConfig, layout, middleware, nextMajor, gestor: gestorDe(dir), candidatos: [] }
+  return { dir, stack, host, router, nextConfig, layout, middleware, servidor, nextMajor, gestor: gestorDe(dir), candidatos: [] }
+}
+
+const EXTENSIONES_SERVIDOR = /\.(?:[cm]?js|[cm]?ts)$/
+/** Salidas de build: editar ahí no sirve, el próximo build lo pisa. */
+const CARPETAS_BUILD = /^(?:\.\/)?(?:dist|build|out|\.output|node_modules)\//
+
+/** Crea la app: `const app = express()` o `const app = new Hono()` (con genérico opcional), sola en su línea. */
+export function creacionApp(stack: 'express' | 'hono'): RegExp {
+  const llamada = stack === 'express' ? String.raw`express\(\s*\)` : String.raw`new\s+Hono(?:<[^>\n]*>)?\(\s*\)`
+  return new RegExp(String.raw`^([ \t]*)(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*${llamada}[ \t]*;?[ \t]*$`, 'gm')
+}
+
+/**
+ * El archivo de entrada del servidor, solo si no hay duda: `main` y los
+ * scripts `start` y `dev` nombran, fuera de las carpetas de build, un único
+ * archivo fuente que existe y crea la app una sola vez. Cualquier otra cosa
+ * devuelve null y la línea queda como instrucción manual.
+ */
+export function servidorDe(dir: string, pkg: PackageJson | null, stack: 'express' | 'hono'): string | null {
+  const candidatos = new Set<string>()
+  const anotar = (ruta: string) => {
+    const limpia = ruta.replace(/^\.\//, '')
+    if (!CARPETAS_BUILD.test(limpia) && existsSync(join(dir, limpia))) candidatos.add(limpia)
+  }
+  if (pkg?.main) anotar(pkg.main)
+  for (const script of [pkg?.scripts?.start, pkg?.scripts?.dev]) {
+    if (script) for (const t of script.split(/\s+/)) if (EXTENSIONES_SERVIDOR.test(t)) anotar(t)
+  }
+  if (candidatos.size !== 1) return null
+  const [ruta] = [...candidatos] as [string]
+  const src = readFileSync(join(dir, ruta), 'utf8')
+  return [...src.matchAll(creacionApp(stack))].length === 1 ? ruta : null
 }
 
 /** Para mensajes: rutas relativas al cwd cuando caben, absolutas si no. */

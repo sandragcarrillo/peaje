@@ -44,6 +44,8 @@ import type { FollowupSnapshot, TaskFollowup } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
+// ---- M9 ----
+import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
 
 type Row = Record<string, any>
 
@@ -67,6 +69,9 @@ function tenantFrom(row: Row): Tenant {
     entityDescription: row.entity_description ?? null,
     robotsBlockTraining: row.robots_block_training ?? false,
     plan: row.plan ?? 'free',
+    // ---- M9 ----
+    planUntil: row.plan_until ?? null,
+    trialUntil: row.trial_until ?? null,
     email: row.email,
     privyUserId: row.privy_user_id,
     createdAt: row.created_at,
@@ -1223,6 +1228,54 @@ export class SupabaseStore implements Store {
     return data ? mysteryRunFrom(data as Row) : null
   }
   // ---- fin M7 ----
+
+  // ---- M9: cobro del agente Pro ----
+  async recordBillingPayment(p: NewBillingPayment): Promise<BillingPayment> {
+    const { data, error } = await this.#db
+      .from('billing_payments')
+      .insert({
+        tenant_id: p.tenantId,
+        plan: p.plan,
+        amount_usd: p.amountUsd,
+        method: p.method,
+        reference: p.reference,
+        period_start: p.periodStart,
+        period_end: p.periodEnd,
+      })
+      .select()
+      .single()
+    this.#fail('recordBillingPayment', error)
+    return billingFrom(data as Row)
+  }
+
+  async listBillingPayments(tenantId: string, limit = 20): Promise<BillingPayment[]> {
+    const { data, error } = await this.#db
+      .from('billing_payments')
+      .select()
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    this.#fail('listBillingPayments', error)
+    return ((data ?? []) as Row[]).map(billingFrom)
+  }
+
+  async findBillingPayment(method: BillingMethod, reference: string): Promise<BillingPayment | null> {
+    const { data, error } = await this.#db.from('billing_payments').select().eq('method', method).eq('reference', reference).maybeSingle()
+    this.#fail('findBillingPayment', error)
+    return data ? billingFrom(data as Row) : null
+  }
+
+  async setTenantPlan(tenantId: string, plan: 'free' | 'founder' | 'pro', until: string | null): Promise<void> {
+    const { error } = await this.#db.from('tenants').update({ plan, plan_until: until }).eq('id', tenantId)
+    this.#fail('setTenantPlan', error)
+  }
+
+  async countFounders(): Promise<number> {
+    const { data, error } = await this.#db.from('billing_payments').select('tenant_id').eq('plan', 'founder')
+    this.#fail('countFounders', error)
+    return new Set(((data ?? []) as Row[]).map((r) => r.tenant_id)).size
+  }
+  // ---- fin M9 ----
 }
 
 // ---- M7 ----
@@ -1235,5 +1288,20 @@ function mysteryRunFrom(row: Row): MysteryRun {
     probe: row.probe ?? null,
     issues: row.issues ?? [],
     summary: row.summary ?? null,
+  }
+}
+
+// ---- M9 ----
+function billingFrom(row: Row): BillingPayment {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    plan: row.plan,
+    amountUsd: String(row.amount_usd),
+    method: row.method,
+    reference: row.reference,
+    periodStart: String(row.period_start),
+    periodEnd: String(row.period_end),
+    createdAt: String(row.created_at),
   }
 }

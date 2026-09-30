@@ -1,6 +1,8 @@
 export * from './types'
 export { MemoryStore } from './memory'
 export { SupabaseStore } from './supabase'
+// ---- M9 ----
+export * from './planes'
 
 import { MemoryStore } from './memory'
 import { SupabaseStore } from './supabase'
