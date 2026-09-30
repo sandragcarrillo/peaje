@@ -1,3 +1,4 @@
+import { SaldoInsuficiente } from './types'
 import type {
   Agent,
   AgentRun,
@@ -74,6 +75,8 @@ export class MemoryStore implements Store {
       embedSecret: input.embedSecret,
       originUrl: input.originUrl,
       payoutWallet: input.payoutWallet ?? null,
+      custodialWallet: input.custodialWallet ?? null,
+      custodialWalletId: input.custodialWalletId ?? null,
       email: input.email ?? null,
       privyUserId: input.privyUserId ?? null,
       baselineScore: null,
@@ -126,6 +129,11 @@ export class MemoryStore implements Store {
 
   async listTenants() {
     return [...this.#tenants.values()]
+  }
+
+  async setCustodialWallet(tenantId: string, address: string, walletId: string) {
+    const tenant = this.#tenants.get(tenantId)
+    if (tenant) Object.assign(tenant, { custodialWallet: address, custodialWalletId: walletId })
   }
 
   async setPayoutWallet(tenantId: string, wallet: string) {
@@ -532,7 +540,17 @@ export class MemoryStore implements Store {
       .map(([date, b]) => ({ date, amount: b.amount.toFixed(6), count: b.count }))
   }
 
-  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }) {
+  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }, opts: { checkAvailable?: boolean } = {}) {
+    // Leer y escribir sin await entre medio: así es atómico en memoria.
+    if (opts.checkAvailable) {
+      const revenue = this.#payments
+        .filter((p) => p.tenantId === input.tenantId && p.network === input.network && !p.refundTx)
+        .reduce((acc, p) => acc + Number(p.amount), 0)
+      const withdrawn = this.#withdrawals
+        .filter((w) => w.tenantId === input.tenantId && w.network === input.network && w.status !== 'failed')
+        .reduce((acc, w) => acc + Number(w.amount), 0)
+      if (revenue - withdrawn + 1e-9 < Number(input.amount)) throw new SaldoInsuficiente()
+    }
     const row: Withdrawal = {
       id: this.#id('wdr'),
       tenantId: input.tenantId,

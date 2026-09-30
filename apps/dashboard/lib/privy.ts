@@ -45,11 +45,11 @@ export async function createMerchantWallet(
 }
 
 /**
- * Resuelve el wallet_id de Privy a partir de la address guardada en tenants
- * (el alta original solo persistió la address). null = esa address no es una
- * wallet custodiada por esta app de Privy (ej: el merchant puso una externa).
+ * El id de Privy si esa address es una wallet custodiada por esta app, o null.
+ * Solo sirve para rechazar direcciones ajenas: nunca para decidir con qué
+ * wallet firmar (eso sale de tenant.custodialWalletId).
  */
-export async function findMerchantWalletId(address: string): Promise<string | null> {
+export async function idSiEsCustodiada(address: string): Promise<string | null> {
   try {
     const wallet = await client().wallets().getWalletByAddress({ address })
     return wallet?.id ?? null

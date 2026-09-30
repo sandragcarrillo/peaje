@@ -1,4 +1,5 @@
 import type { Route } from '@peaje/db'
+import { segmentosCanonicos } from '@peaje/shared'
 
 type Match = { route: Route; params: Record<string, string> }
 
@@ -9,7 +10,8 @@ type Match = { route: Route; params: Record<string, string> }
  * Gana el patrón más específico: literal sobre param, param sobre comodín.
  */
 export function matchRoute(routes: Route[], method: string, path: string): Match | null {
-  const parts = split(path)
+  // Mismo path que ve el servidor del negocio (ver segmentosCanonicos).
+  const parts = segmentosCanonicos(path)
   let best: (Match & { score: number }) | null = null
 
   for (const route of routes) {
@@ -47,7 +49,7 @@ function matchPattern(
       score += 1
       continue
     }
-    if (segment !== value) return null
+    if (segment.toLowerCase() !== value.toLowerCase()) return null
     score += 2
   }
 

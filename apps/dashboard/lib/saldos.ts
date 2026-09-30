@@ -54,21 +54,21 @@ async function claimableOnchain(network: string, wallet: string | null): Promise
  * Saldo por red. En redes con contrato el disponible sale de `claimable`:
  * el ledger solo aporta el historial (ingresos, retiros, cantidad de pagos).
  */
-export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'payoutWallet'>): Promise<NetworkBalance[]> {
+export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'custodialWallet'>): Promise<NetworkBalance[]> {
   const ledger = await store.balanceByNetwork(tenant.id)
   return Promise.all(
     ledger.map(async (b) => {
       // ---- Tempo splits ----
       // Cobrado por split directo: ya está en la wallet del negocio, no se retira.
       if (isDirectRail(b.network)) return { ...b, available: '0' }
-      const onchain = await claimableOnchain(b.network, tenant.payoutWallet)
+      const onchain = await claimableOnchain(b.network, tenant.custodialWallet)
       return onchain === null ? b : { ...b, available: onchain }
     }),
   )
 }
 
 /** Saldo agregado con el disponible de cada red ya corregido por el contrato. */
-export async function saldoTotal(tenant: Pick<Tenant, 'id' | 'payoutWallet'>): Promise<Balance> {
+export async function saldoTotal(tenant: Pick<Tenant, 'id' | 'custodialWallet'>): Promise<Balance> {
   const [total, porRed] = await Promise.all([store.balance(tenant.id), saldosPorRed(tenant)])
   const disponible = porRed.reduce((n, b) => n + Number(b.available), 0)
   return { ...total, available: disponible.toFixed(6) }

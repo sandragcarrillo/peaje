@@ -13,7 +13,7 @@ import { withdrawFromSettlement } from './settlement.js'
 import { resolvePayer } from './chain.js'
 import { env } from './env.js'
 import { store } from './store.js'
-import { sendPayout } from './treasury.js'
+import { custodiaDe, sendPayout } from './treasury.js'
 
 export type ChargeContext = {
   tenantId: string
@@ -152,8 +152,9 @@ async function refundFromSettlement(
   payer: `0x${string}`,
 ): Promise<`0x${string}`> {
   const tenant = await store.getTenantById(payment.tenantId)
-  if (!tenant?.payoutWallet) throw new Error('El negocio no tiene wallet de cobro para reembolsar desde el contrato')
-  return withdrawFromSettlement(network, tenant.payoutWallet as `0x${string}`, payer, payment.amount)
+  const custodia = tenant ? custodiaDe(tenant) : null
+  if (!custodia) throw new Error('El negocio no tiene wallet custodiada para reembolsar desde el contrato')
+  return withdrawFromSettlement(network, custodia, payer, payment.amount)
 }
 
 /**

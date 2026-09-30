@@ -1,9 +1,10 @@
-import type { Agent, AgentDelivery } from '@peaje/db'
+import { SaldoInsuficiente, type Agent, type AgentDelivery } from '@peaje/db'
 import {
   AGENT_FREQUENCIES,
   explorerTxUrl,
   NETWORK_IDS,
   isNetworkId,
+  isSettlementNetwork,
   type NetworkId,
   nextRunAt,
   type AgentFrequencyId,
@@ -196,12 +197,17 @@ agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
     )
   }
 
-  const withdrawal = await store.createWithdrawal({
-    tenantId: pagador.id,
-    amount: monto.toFixed(6),
-    toWallet: agent.walletAddress,
-    network,
-  })
+  // Registro atómico en los rieles de treasury (ver withdrawals.ts).
+  let withdrawal
+  try {
+    withdrawal = await store.createWithdrawal(
+      { tenantId: pagador.id, amount: monto.toFixed(6), toWallet: agent.walletAddress, network },
+      { checkAvailable: !isSettlementNetwork(network) },
+    )
+  } catch (error) {
+    if (error instanceof SaldoInsuficiente) return c.json({ error: `Saldo insuficiente en ${network}`, code: 'fondos-negocio' }, 409)
+    throw error
+  }
 
   try {
     const hash = await payoutFromTenant(pagador, network, agent.walletAddress as `0x${string}`, monto.toFixed(6))

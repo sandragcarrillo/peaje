@@ -6,6 +6,13 @@ export type Tenant = {
   embedSecret: string
   originUrl: string
   payoutWallet: string | null
+  /**
+   * La wallet que Peaje custodia para el negocio (Privy), fijada al crearlo.
+   * Es la única con la que Peaje firma retiros y envíos en su nombre: la de
+   * cobro (`payoutWallet`) la edita el dueño y no sirve para decidir quién firma.
+   */
+  custodialWallet: string | null
+  custodialWalletId: string | null
   email: string | null
   privyUserId: string | null
   /** Score de agent-readiness con el que llegó, antes de aplicar Peaje. */
@@ -184,6 +191,8 @@ export type NewTenant = {
   apiKeyHash?: string
   apiKeyPrefix?: string
   payoutWallet?: string | null
+  custodialWallet?: string | null
+  custodialWalletId?: string | null
   email?: string | null
   privyUserId?: string | null
 }
@@ -509,6 +518,7 @@ export interface Store {
   listTenantsByPrivyUserId(privyUserId: string): Promise<Tenant[]>
   listTenants(): Promise<Tenant[]>
   setPayoutWallet(tenantId: string, wallet: string): Promise<void>
+  setCustodialWallet(tenantId: string, address: string, walletId: string): Promise<void>
   /** Datos de entidad del kit (JSON-LD Organization, toggle de robots). Solo pisa lo que viene definido. */
   updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void>
   /** La clave con la que el coding agent del dueño entra al MCP y al CLI. Solo el hash. */
@@ -589,7 +599,13 @@ export interface Store {
   dailyRevenue(tenantId: string, days: number): Promise<{ date: string; amount: string; count: number }[]>
 
   // retiros
-  createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }): Promise<Withdrawal>
+  /**
+   * Registra un retiro. Con `checkAvailable`, en la misma transacción bloquea
+   * al negocio, relee su disponible en esa red y solo inserta si alcanza: dos
+   * retiros simultáneos no pueden gastar el mismo saldo. Si no alcanza lanza
+   * SaldoInsuficiente.
+   */
+  createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }, opts?: { checkAvailable?: boolean }): Promise<Withdrawal>
   updateWithdrawal(id: string, patch: { txRef?: string; status?: WithdrawalStatus }): Promise<Withdrawal>
   listWithdrawals(tenantId: string, limit?: number): Promise<Withdrawal[]>
   /** Retiros pending con tx enviada, de todos los tenants: los reconcilia el gateway contra la chain. */
@@ -684,3 +700,11 @@ export type BillingPayment = {
 
 export type NewBillingPayment = Omit<BillingPayment, 'id' | 'createdAt'>
 // ---- fin M9 ----
+
+/** El disponible no alcanza para el retiro (ver Store.createWithdrawal). */
+export class SaldoInsuficiente extends Error {
+  constructor() {
+    super('saldo-insuficiente')
+    this.name = 'SaldoInsuficiente'
+  }
+}

@@ -19,6 +19,15 @@ test('coincidePatron: literal, :param y * de cola, con las reglas del gateway', 
   assert.ok(coincidePatron('/api/batch/*', '/api/batch'))
 })
 
+test('coincidePatron: las variantes que el servidor enruta igual también cobran', () => {
+  // Express enruta sin mayúsculas; Hono decodifica %xx antes de enrutar.
+  for (const p of ['/API/forecast', '/api/FORECAST', '/api/%66orecast', '//api//forecast/', '/api/./forecast', '/x/../api/forecast', '/api%2fforecast']) {
+    assert.ok(coincidePatron('/api/forecast', p), p)
+  }
+  assert.ok(coincidePatron('/api/history/:city', '/Api/History/bogota'))
+  assert.ok(!coincidePatron('/api/forecast', '/api/forecasts'))
+})
+
 test('patronReenviable deja fuera /* y /:x a la raíz', () => {
   assert.ok(!patronReenviable('/*'))
   assert.ok(!patronReenviable('/:id'))

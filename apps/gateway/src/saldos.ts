@@ -9,7 +9,7 @@ import { store } from './store.js'
  * le debe (`claimable`): el ledger solo aporta historial. Si la lectura
  * on-chain falla se cae al ledger, que en la práctica coincide.
  */
-export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'payoutWallet'>): Promise<NetworkBalance[]> {
+export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'custodialWallet'>): Promise<NetworkBalance[]> {
   const ledger = await store.balanceByNetwork(tenant.id)
   return Promise.all(
     ledger.map(async (b) => {
@@ -17,9 +17,13 @@ export async function saldosPorRed(tenant: Pick<Tenant, 'id' | 'payoutWallet'>):
       // Lo cobrado por split directo ya está en la wallet del negocio: es
       // ingreso (revenue), nunca saldo retirable de la treasury.
       if (isDirectRail(b.network)) return { ...b, available: '0' }
-      if (!isSettlementNetwork(b.network) || !env.settlementContracts[b.network] || !tenant.payoutWallet) return b
+      if (!isSettlementNetwork(b.network) || !env.settlementContracts[b.network]) return b
+      // Solo lo que Peaje puede retirar: lo acreditado a la wallet que custodia.
+      // Con la de cobro, cualquiera que pusiera la address de otro negocio
+      // veía (y retiraba) el saldo ajeno.
+      if (!tenant.custodialWallet) return { ...b, available: '0' }
       try {
-        return { ...b, available: await claimableEnContrato(b.network, tenant.payoutWallet as `0x${string}`) }
+        return { ...b, available: await claimableEnContrato(b.network, tenant.custodialWallet as `0x${string}`) }
       } catch {
         return b
       }

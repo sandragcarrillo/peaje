@@ -63,17 +63,46 @@ export type OpcionesProxyRuntime = {
  */
 export function coincidePatron(patron: string, pathname: string): boolean {
   const p = patron.split('/').filter(Boolean)
-  const parts = pathname.split('/').filter(Boolean)
+  const parts = segmentosCanonicos(pathname)
   for (let i = 0; i < p.length; i++) {
     const seg = p[i]!
     if (seg === '*') return true
     const v = parts[i]
     if (v === undefined) return false
     if (seg.startsWith(':')) continue
-    if (seg !== v) return false
+    if (seg.toLowerCase() !== v.toLowerCase()) return false
   }
   return p.length === parts.length
 }
+
+/**
+ * Los segmentos de un path como los ve el servidor del negocio: decodificados
+ * (%70 es p), sin barras repetidas ni `.`, con `..` resuelto. El cobro compara
+ * además sin mayúsculas: Express y otros enrutan /API/x igual que /api/x, y
+ * Hono decodifica antes de enrutar; si Peaje comparaba el texto crudo, esas
+ * variantes llegaban al handler sin pagar. Misma función en gateway y sitio.
+ */
+export function segmentosCanonicos(pathname: string): string[] {
+  const out: string[] = []
+  for (const crudo of pathname.split(/[\\/]+/)) {
+    if (!crudo) continue
+    let seg = crudo
+    try {
+      seg = decodeURIComponent(crudo)
+    } catch {
+      // Codificación inválida: queda el texto crudo.
+    }
+    for (const s of seg.split(/[\\/]+/)) {
+      if (!s || s === '.') continue
+      if (s === '..') out.pop()
+      else out.push(s)
+    }
+  }
+  return out
+}
+
+/** El path canónico, con `/` inicial: para comparar contra rutas fijas y prefijos. */
+export const pathCanonico = (pathname: string) => `/${segmentosCanonicos(pathname).join('/')}`
 
 /**
  * Patrones demasiado anchos para reenviar desde el sitio: `/*` o `/:x` a la
@@ -149,9 +178,10 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
       if (secreto && prueba && iguales(prueba, secreto)) return null
       const { rutas, prefijos, patrones } = await listas()
       const path = input.pathname
+      const canon = pathCanonico(path).toLowerCase()
       const esFetchDePeaje = input.headers.get(PEAJE_FETCH_HEADER) !== null
-      const fija = rutas.includes(path) && !(path === '/llms.txt' && esFetchDePeaje)
-      const prefijo = prefijos.some((p) => path.startsWith(p))
+      const fija = (rutas.includes(path) || rutas.some((r) => r.toLowerCase() === canon)) && !(canon === '/llms.txt' && esFetchDePeaje)
+      const prefijo = prefijos.some((p) => path.startsWith(p) || canon.startsWith(p.toLowerCase()))
       const method = input.method.toUpperCase()
       const patron =
         secreto !== null &&

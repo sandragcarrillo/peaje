@@ -58,6 +58,9 @@ export async function registrarNegocio(
     originUrl: origin.origin + origin.pathname.replace(/\/$/, ''),
     embedSecret: generateEmbedSecret(),
     payoutWallet: wallet.address,
+    // La que Peaje custodia queda fija: solo con esta firma en nombre del negocio.
+    custodialWallet: wallet.address,
+    custodialWalletId: wallet.id,
     email,
     privyUserId,
   })

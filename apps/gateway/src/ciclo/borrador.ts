@@ -96,6 +96,71 @@ export function cuerpoConBorrador(tenant: Tenant, dominio: string, pregunta: str
 
 export const tieneBorrador = (t: Pick<AgentTask, 'body'>) => t.body.includes(MARCA_BORRADOR)
 
+/** Los [TODO: ...] que quedan en un borrador. */
+export const pendientesDe = (markdown: string) => [...markdown.matchAll(/\[TODO:\s*([^\]]+)\]/g)].map((m) => m[1]!.trim())
+
+const CompletadoSchema = z.object({
+  markdown: z.string(),
+  /** Qué dato del dueño quedó en qué parte, en una línea cada uno. */
+  aplicados: z.array(z.string()),
+})
+
+/**
+ * El dueño contesta en el chat los datos que faltaban ("somos 4 en el equipo,
+ * fue el 12 de octubre") y el borrador se actualiza con eso: cada [TODO] que
+ * su mensaje cubre se reemplaza, los que dice no tener se quitan, el resto
+ * queda. Solo tareas abiertas: una que su herramienta ya tomó no se pisa.
+ */
+export async function completarBorrador(tenant: Tenant, taskId: string, datos: string): Promise<{ task: AgentTask; aplicados: string[]; faltan: string[] } | { error: string }> {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
+  const tarea = await store.getTask(tenant.id, taskId)
+  if (!tarea) return { error: 'task not found; call list_tasks' }
+  if (!tieneBorrador(tarea)) return { error: 'this task has no page draft' }
+  if (tarea.status !== 'open') return { error: `the task is already ${tarea.status}; the draft can only change while it is open` }
+  const dominio = dominioVerificable(tenant.originUrl)
+  if (!dominio) return { error: 'the business has no public domain' }
+  const borrador = tarea.body.split(MARCA_BORRADOR)[1] ?? ''
+  if (pendientesDe(borrador).length === 0) return { task: tarea, aplicados: [], faltan: [] }
+
+  anthropic ??= new Anthropic()
+  const res = await anthropic.messages.parse({
+    model: process.env.AGENT_MODEL ?? 'claude-sonnet-5',
+    max_tokens: 8_000,
+    system: [
+      'You update a markdown web page draft with facts the business owner just gave. The draft has placeholders like [TODO: team size].',
+      'Rules:',
+      '- Replace a placeholder only when the owner\'s message gives that fact. Write it naturally into the sentence, in the language of the page.',
+      '- When the owner says they do not have a fact, do not want it, or it does not apply, remove the sentence (or list item) that holds that placeholder and fix the text around it so it still reads well. If that leaves a section with no text, remove its heading too.',
+      '- Leave every other placeholder exactly as it is.',
+      '- Change nothing else: same headings, order, links and wording. Never invent facts beyond what the owner wrote.',
+      '- In "aplicados", one short line per placeholder you filled or removed, in the language of the page.',
+    ].join('\n'),
+    messages: [{ role: 'user', content: `Owner's message:\n${datos.slice(0, 3_000)}\n\nDraft:\n${borrador}` }],
+    output_config: { format: zodOutputFormat(CompletadoSchema) },
+  })
+  if (res.stop_reason === 'max_tokens') throw new Error('The updated draft came back cut off')
+  const salida = res.parsed_output
+  if (!salida?.markdown.trim()) throw new Error('The model did not return the draft')
+  // El H1 sigue siendo la pregunta literal.
+  const markdown = `# ${tarea.title}\n\n${salida.markdown.trim().replace(/^#\s+[^\n]*\n+/, '')}\n`
+  const faltan = pendientesDe(markdown)
+  const url = tarea.acceptance.find((a) => a.type === 'url')
+  const slug = (url && 'url' in url ? new URL(url.url).pathname.replace(/^\//, '') : '') || tarea.key.replace(/^content:/, '') || slugDePregunta(tarea.title)
+  // Se conserva lo que el dueño ya leyó como "por qué": va antes de la marca.
+  const porQue = tarea.body.split(MARCA_BORRADOR)[0]?.match(/\nWhy an AI assistant would cite it: (.*)\n?$/)?.[1]
+  const r = await store.upsertTask({
+    tenantId: tenant.id,
+    key: tarea.key,
+    kind: tarea.kind,
+    title: tarea.title,
+    summary: tarea.summary,
+    body: cuerpoConBorrador(tenant, dominio, tarea.title, slug, { markdown, todos: faltan }, porQue),
+    acceptance: tarea.acceptance,
+    source: tarea.source,
+  })
+  return { task: r.task, aplicados: salida.aplicados, faltan }
+}
+
 /**
  * Crea o actualiza la tarea de contenido con el borrador completo. La usa la
  * herramienta draft_page del chat. Misma `key` que las sugerencias del

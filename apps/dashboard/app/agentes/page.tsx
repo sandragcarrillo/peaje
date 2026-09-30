@@ -52,8 +52,8 @@ export default async function Agentes() {
     ? tenants.find((t) => t.slug === principal.negocio.slug)
     : null
   const walletSaldos: Record<string, string> = {}
-  if (tenantPrincipal?.payoutWallet) {
-    const saldos = await walletBalances(tenantPrincipal.payoutWallet as `0x${string}`).catch(() => [])
+  if (tenantPrincipal?.custodialWallet) {
+    const saldos = await walletBalances(tenantPrincipal.custodialWallet as `0x${string}`).catch(() => [])
     for (const s of saldos) walletSaldos[s.network] = s.amount
   }
 

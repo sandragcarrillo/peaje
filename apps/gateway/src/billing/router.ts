@@ -2,6 +2,7 @@ import {
   CUPOS_FOUNDER,
   LIMITES,
   PRECIOS_USD,
+  SaldoInsuficiente,
   accesoPro,
   esPlanPago,
   extenderPlan,
@@ -201,7 +202,16 @@ billingRouter.post('/_internal/:slug/billing/pay-with-balance', async (c) => {
       )
     }
 
-    const retiro = await store.createWithdrawal({ tenantId: tenant.id, amount: monto.toFixed(6), toWallet: env.treasuryAddress, network: red.network })
+    let retiro
+    try {
+      retiro = await store.createWithdrawal(
+        { tenantId: tenant.id, amount: monto.toFixed(6), toWallet: env.treasuryAddress, network: red.network },
+        { checkAvailable: !isSettlementNetwork(red.network) },
+      )
+    } catch (error) {
+      if (error instanceof SaldoInsuficiente) return c.json({ error: 'insufficient-balance', message: 'Your balance changed. Try again or use the checkout link.', checkout: urlCheckout(tenant.slug, plan) }, 409)
+      throw error
+    }
     if (isSettlementNetwork(red.network)) {
       try {
         const hash = await payoutFromTenant(tenant, red.network, env.treasuryAddress, monto.toFixed(6))

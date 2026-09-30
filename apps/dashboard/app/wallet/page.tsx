@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { getDict } from '@/lib/i18n'
-import { findMerchantWalletId } from '@/lib/privy'
 import { currentTenant } from '@/lib/session'
 import { walletBalances } from '@/lib/walletops'
 import { Eyebrow } from '@/components/chrome'
@@ -15,15 +14,14 @@ export default async function Wallet() {
   const [tenant, d] = await Promise.all([currentTenant(), getDict()])
   if (!tenant) redirect('/acceder')
 
-  const address = tenant.payoutWallet as `0x${string}` | null
+  // La wallet que Peaje custodia para el negocio; la de cobro puede ser externa.
+  const address = tenant.custodialWallet as `0x${string}` | null
   if (!address) {
     return <p className="text-sm text-muted">{d.dinero.sinWalletNegocio}</p>
   }
 
-  const [balances, walletId] = await Promise.all([
-    walletBalances(address),
-    findMerchantWalletId(address),
-  ])
+  const balances = await walletBalances(address)
+  const walletId = tenant.custodialWalletId
 
   return (
     <div className="space-y-8 py-2">

@@ -8,6 +8,10 @@ const STRIP = new Set([
   'content-length',
   // El credential MPP es entre el agente y el gateway: el origin no lo ve.
   'authorization',
+  // Igual el pago x402: una autorización sin usar en manos del origin se
+  // puede someter por fuera y el agente pierde la plata.
+  'payment-signature',
+  'x-payment',
 ])
 
 /**
@@ -21,12 +25,18 @@ export async function proxyToOrigin(
   context: { paymentRef?: string } = {},
 ): Promise<Response> {
   const incoming = new URL(request.url)
-  const target = new URL(path, ensureTrailingSlash(tenant.originUrl))
+  // El path se pega al origin como texto: con new URL(path, base), un path
+  // "//otro-host/x" cambiaba de host y el gateway le mandaba a ese host la
+  // prueba de origen del negocio (y servía para leer la red interna).
+  const origin = new URL(tenant.originUrl).origin
+  const target = new URL(`${origin}${path.startsWith('/') ? '' : '/'}${path}`)
+  if (target.origin !== origin) return new Response('Bad path', { status: 400 })
   target.search = incoming.search
 
   const headers = new Headers()
   request.headers.forEach((value, key) => {
-    if (!STRIP.has(key.toLowerCase())) headers.set(key, value)
+    const k = key.toLowerCase()
+    if (!STRIP.has(k) && !k.startsWith('payment-') && !k.startsWith('x-payment')) headers.set(key, value)
   })
   headers.set('x-peaje-tenant', tenant.slug)
   // Prueba ante el sitio de que esta request ya pagó (ver proxy-runtime.ts):
@@ -58,6 +68,3 @@ export async function proxyToOrigin(
   })
 }
 
-function ensureTrailingSlash(url: string): string {
-  return url.endsWith('/') ? url : `${url}/`
-}

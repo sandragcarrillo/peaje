@@ -12,7 +12,7 @@ import {
 } from 'viem'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
-import { findMerchantWalletId, merchantViemAccount } from './privy'
+import { merchantViemAccount } from './privy'
 
 /**
  * Operaciones sobre la wallet Peaje del merchant (custodiada por Privy):
@@ -68,20 +68,18 @@ export async function walletBalances(address: `0x${string}`): Promise<WalletBala
 }
 
 /**
- * Envía `amount` (decimal) del token de la red desde la wallet Peaje del
- * merchant a `to`. Devuelve el hash. Lanza si la address no es una wallet
- * custodiada por Privy de esta app.
+ * Envía `amount` (decimal) del token de la red desde la wallet que Peaje
+ * custodia para el negocio a `to`. Devuelve el hash. La wallet sale del id
+ * guardado al crear el negocio (tenant.custodialWalletId), nunca de buscar una
+ * address: la de cobro la edita el dueño.
  */
 export async function sendFromMerchantWallet(
-  walletAddress: `0x${string}`,
+  custodia: { address: `0x${string}`; walletId: string },
   network: NetworkId,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
-  const walletId = await findMerchantWalletId(walletAddress)
-  if (!walletId) {
-    throw new Error('Peaje does not custody that wallet: move the funds from your own wallet app.')
-  }
+  const { address: walletAddress, walletId } = custodia
   // El cast aplaca la inferencia de TS (la firma doble tempo+EVM del account de
   // Privy revienta el checker); en runtime firma ambos tipos de tx igual.
   const account = merchantViemAccount(walletId, walletAddress) as unknown as LocalAccount

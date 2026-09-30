@@ -13,7 +13,7 @@ import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
 import { LIMITES } from '@peaje/db'
 import { revisarAcceso } from '../acceso/revisar.js'
 // ---- M6 ----
-import { tareaConBorrador } from '../ciclo/borrador.js'
+import { completarBorrador, MARCA_BORRADOR, tareaConBorrador } from '../ciclo/borrador.js'
 import { resultados } from '../ciclo/seguimiento.js'
 // ---- M7 ----
 import { probarAhora, resultadoPublico } from '../comprador/misterioso.js'
@@ -34,7 +34,7 @@ const HISTORIAL = 20
 const MAX_VUELTAS = 8
 
 type Herramienta = Anthropic.Messages.Tool & { correr: (input: Record<string, unknown>, ctx: Ctx) => Promise<unknown> }
-type Ctx = { tenant: Tenant; idioma: 'es' | 'en'; acciones: AgentAction[]; opciones: string[] }
+type Ctx = { tenant: Tenant; idioma: 'es' | 'en'; acciones: AgentAction[]; opciones: string[]; anexos: string[] }
 
 const numero = (x: unknown) => (typeof x === 'number' ? x : Number(x))
 
@@ -334,6 +334,45 @@ HERRAMIENTAS.push(
 )
 // ---- fin M6 ----
 
+// ---- Datos que faltaban y el texto para su herramienta de IA ----
+HERRAMIENTAS.push(
+  {
+    name: 'complete_draft',
+    description:
+      "Update a page draft with facts the owner just told you in the chat (the ones marked [TODO: ...]). Pass their words as they wrote them. Facts they say they do not have are removed from the page. Only for open content tasks with a draft. Returns what was filled and what is still missing.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'From list_tasks or the draft_page result' },
+        facts: { type: 'string', description: "The owner's message with the facts, verbatim" },
+      },
+      required: ['task_id', 'facts'],
+    },
+    async correr(i, { tenant }) {
+      const r = await completarBorrador(tenant, String(i.task_id ?? ''), String(i.facts ?? ''))
+      if ('error' in r) return r
+      return { id: r.task.id, title: r.task.title, filled: r.aplicados, stillMissing: r.faltan, readyToPublish: r.faltan.length === 0 }
+    },
+  },
+  {
+    name: 'send_task_text',
+    description:
+      "Attach a task's text to your reply, word for word, so the owner can copy it. part \"prompt\": the full instructions plus the page, to paste into their AI coding tool (Lovable, Cursor, Claude Code, v0, Bolt). part \"page\": only the page text, to paste into their site editor themselves. Do not rewrite the text in your own message: it is attached after it.",
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, part: { type: 'string', enum: ['prompt', 'page'] } },
+      required: ['id', 'part'],
+    },
+    async correr(i, ctx) {
+      const t = await store.getTask(ctx.tenant.id, String(i.id ?? ''))
+      if (!t) return { error: 'task not found; call list_tasks' }
+      const texto = i.part === 'page' ? (t.body.split(MARCA_BORRADOR)[1] ?? t.body) : t.body
+      ctx.anexos.push(texto.trim())
+      return { attached: i.part, title: t.title, characters: texto.length }
+    },
+  },
+)
+
 // ---- M7: comprador misterioso ----
 HERRAMIENTAS.push(
   {
@@ -389,8 +428,9 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
         ].join('\n'),
     '',
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
-    'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ChatGPT, Claude or Perplexity cite it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, call get_task and send the page itself (the part after "## Draft"), not the instructions.',
+    'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ChatGPT, Claude or Perplexity cite it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, use send_task_text instead of copying it yourself.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
+    'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
     'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site and saves it as a task. Tell them what facts are missing, if any. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
@@ -429,6 +469,8 @@ Object.assign(ESTADOS, {
 Object.assign(ESTADOS, {
   run_mystery_shopper: { es: 'Probando si un agente comprador te encuentra y te elige (un minuto)…', en: 'Checking whether a buying agent finds you and picks you (about a minute)…' },
   get_mystery_results: { es: 'Revisando la última prueba del agente comprador…', en: 'Checking the last buying agent test…' },
+  complete_draft: { es: 'Poniendo tus datos en la página…', en: 'Putting your facts into the page…' },
+  send_task_text: { es: 'Preparando el texto para copiar…', en: 'Getting the text ready to copy…' },
 })
 // ---- fin M7 ----
 
@@ -474,7 +516,7 @@ export async function conversar(
     ...previos.map((m) => ({ role: m.role, content: m.text || '(empty)' }) as Anthropic.Messages.MessageParam),
     { role: 'user', content: texto.slice(0, 4_000) },
   ]
-  const ctx: Ctx = { tenant, idioma: opciones.idioma, acciones: [], opciones: [] }
+  const ctx: Ctx = { tenant, idioma: opciones.idioma, acciones: [], opciones: [], anexos: [] }
   const tienePlan = (await store.getPlan(tenant.id)) !== null
   anthropic ??= new Anthropic()
 
@@ -522,6 +564,8 @@ export async function conversar(
   // Estilo de la casa: sin rayas largas aunque el modelo las use.
   let respuesta = partes.join('\n\n')
   respuesta = respuesta.replace(/\s+—\s+/g, ': ').replace(/—/g, ', ')
+  // El texto de la tarea va tal cual, después de la respuesta: el modelo no lo reescribe.
+  if (ctx.anexos.length) respuesta = [respuesta, ...ctx.anexos].filter(Boolean).join('\n\n---\n\n')
   return store.addMessage({
     tenantId: tenant.id,
     role: 'assistant',

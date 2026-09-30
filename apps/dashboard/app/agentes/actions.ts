@@ -197,7 +197,7 @@ export async function fondearDesdeWallet(
 ): Promise<Resultado<{ tx: string }>> {
   const tenant = await requireTenant(slug)
   const d = await getDict()
-  if (!tenant.payoutWallet) return { ok: false, error: d.agentes.errorFondear }
+  if (!tenant.custodialWallet || !tenant.custodialWalletId) return { ok: false, error: d.agentes.errorFondear }
   if (!isNetworkId(red)) return { ok: false, error: d.agentes.errorFondear }
 
   const { agents } = await gateway.listAgents(slug)
@@ -206,7 +206,7 @@ export async function fondearDesdeWallet(
 
   try {
     const tx = await sendFromMerchantWallet(
-      tenant.payoutWallet as `0x${string}`,
+      { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId },
       red,
       agente.walletAddress as `0x${string}`,
       Number(amount.replace(',', '.')).toFixed(6),

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { GATEWAY_RAIL_IDS, isDirectRail, isGatewayRail, isNetworkId, NETWORK_IDS, railExplorerTxUrl, type NetworkId } from '@peaje/shared'
+import { SaldoInsuficiente } from '@peaje/db'
+import { GATEWAY_RAIL_IDS, isDirectRail, isGatewayRail, isNetworkId, isSettlementNetwork, NETWORK_IDS, railExplorerTxUrl, type NetworkId } from '@peaje/shared'
 import { env } from './env.js'
 import { saldosPorRed } from './saldos.js'
 import { store } from './store.js'
@@ -72,12 +73,19 @@ withdrawals.post('/:slug/withdraw', async (c) => {
 
   // El retiro se registra ANTES de mandar la tx: si el broadcast falla,
   // queda en pending y se marca failed, nunca se pierde plata del ledger.
-  const withdrawal = await store.createWithdrawal({
-    tenantId: tenant.id,
-    amount: amount.toFixed(6),
-    toWallet,
-    network,
-  })
+  // En los rieles con saldo en la treasury el registro relee el disponible en
+  // la misma transacción (dos retiros a la vez no gastan el mismo saldo); en
+  // los de contrato el límite lo pone el claimable on-chain.
+  let withdrawal
+  try {
+    withdrawal = await store.createWithdrawal(
+      { tenantId: tenant.id, amount: amount.toFixed(6), toWallet, network },
+      { checkAvailable: !isSettlementNetwork(network) },
+    )
+  } catch (error) {
+    if (error instanceof SaldoInsuficiente) return c.json({ error: `Saldo insuficiente en ${network}` }, 409)
+    throw error
+  }
 
   try {
     const hash = await payoutFromTenant(tenant, network, toWallet as `0x${string}`, amount.toFixed(6))

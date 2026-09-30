@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { SaldoInsuficiente } from './types'
 import type {
   Agent,
   AgentRun,
@@ -58,6 +59,8 @@ function tenantFrom(row: Row): Tenant {
     embedSecret: row.embed_secret,
     originUrl: row.origin_url,
     payoutWallet: row.payout_wallet,
+    custodialWallet: row.custodial_wallet ?? null,
+    custodialWalletId: row.custodial_wallet_id ?? null,
     baselineScore: row.baseline_score ?? null,
     baselineScoreAt: row.baseline_score_at ?? null,
     // `??` a propósito: hasta que corra la migración 20260922 estas columnas
@@ -290,6 +293,8 @@ export class SupabaseStore implements Store {
         api_key_prefix: input.apiKeyPrefix ?? null,
         embed_secret: input.embedSecret,
         payout_wallet: input.payoutWallet ?? null,
+        custodial_wallet: input.custodialWallet ?? null,
+        custodial_wallet_id: input.custodialWalletId ?? null,
         email: input.email ?? null,
         privy_user_id: input.privyUserId ?? null,
       })
@@ -329,6 +334,14 @@ export class SupabaseStore implements Store {
       .order('created_at', { ascending: false })
     this.#fail('listTenants', error)
     return (data ?? []).map(tenantFrom)
+  }
+
+  async setCustodialWallet(tenantId: string, address: string, walletId: string) {
+    const { error } = await this.#db
+      .from('tenants')
+      .update({ custodial_wallet: address, custodial_wallet_id: walletId })
+      .eq('id', tenantId)
+    this.#fail('setCustodialWallet', error)
   }
 
   async setPayoutWallet(tenantId: string, wallet: string) {
@@ -803,12 +816,22 @@ export class SupabaseStore implements Store {
           platform_fee: payment.platformFee ?? '0',
           network_fee: payment.networkFee ?? '0',
         },
-        { onConflict: 'network,receipt_ref' },
+        // Si el Receipt ya se acreditó no se toca: antes el upsert pisaba
+        // tenant y monto, y una credencial reusada movía el pago a otro negocio.
+        { onConflict: 'network,receipt_ref', ignoreDuplicates: true },
       )
       .select()
-      .single()
+      .maybeSingle()
     this.#fail('recordPayment', error)
-    return paymentFrom(data as Row)
+    if (data) return paymentFrom(data as Row)
+    const { data: previo, error: e2 } = await this.#db
+      .from('payments')
+      .select()
+      .eq('network', payment.network)
+      .eq('receipt_ref', payment.receiptRef)
+      .single()
+    this.#fail('recordPayment(previo)', e2)
+    return paymentFrom(previo as Row)
   }
 
   async setPaymentWallet(paymentId: string, wallet: string) {
@@ -891,7 +914,21 @@ export class SupabaseStore implements Store {
       .map(([date, b]) => ({ date, amount: b.amount.toFixed(6), count: b.count }))
   }
 
-  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }) {
+  async createWithdrawal(input: { tenantId: string; amount: string; toWallet: string; network: string }, opts: { checkAvailable?: boolean } = {}) {
+    if (opts.checkAvailable) {
+      // Chequeo e inserción en una sola transacción (migración 20261006000000).
+      const { data, error } = await this.#db.rpc('crear_retiro', {
+        p_tenant: input.tenantId,
+        p_amount: input.amount,
+        p_to: input.toWallet,
+        p_network: input.network,
+      })
+      if (error?.message?.includes('saldo-insuficiente')) throw new SaldoInsuficiente()
+      this.#fail('createWithdrawal(rpc)', error)
+      const fila = (Array.isArray(data) ? data[0] : data) as Row | undefined
+      if (!fila) throw new Error('createWithdrawal(rpc): sin fila')
+      return withdrawalFrom(fila)
+    }
     const { data, error } = await this.#db
       .from('withdrawals')
       .insert({

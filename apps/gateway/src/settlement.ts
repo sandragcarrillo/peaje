@@ -15,7 +15,7 @@ import {
   type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { privyAccountByAddress } from './agents/wallet.js'
+import { agentAccount } from './agents/wallet.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
 
@@ -156,20 +156,24 @@ export async function resolveSettlementPayer(network: SettlementNetwork, txHash:
   }
 }
 
+/** La wallet que Peaje custodia para un negocio (ver custodiaDe en treasury.ts). */
+export type Custodia = { address: `0x${string}`; walletId: string }
+
 /**
- * Retiro de lo que el contrato le debe a un comerciante. Su wallet (custodiada
- * por Privy) firma el retiro EIP-712 y el relayer lo somete pagando el gas.
+ * Retiro de lo que el contrato le debe a un comerciante. Firma su wallet
+ * custodiada (Privy), identificada por el id guardado al crear el negocio,
+ * nunca buscada por address: la address de cobro la edita el dueño.
  */
 export async function withdrawFromSettlement(
   network: SettlementNetwork,
-  merchant: `0x${string}`,
+  custodia: Custodia,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
   const { chain, publicClient, relayerClient, token, decimals } = riel(network)
   const contrato = settlementContract(network)
-  const firmante = await privyAccountByAddress(merchant)
-  if (!firmante) throw new Error('La wallet de cobro del negocio no es una wallet custodiada por Peaje')
+  const merchant = custodia.address
+  const firmante = agentAccount(custodia.walletId, merchant)
 
   const value = parseUnits(amount, decimals)
   const nonce = await publicClient.readContract({

@@ -34,19 +34,6 @@ export async function createAgentWallet(name: string): Promise<{ id: string; add
   return { id: wallet.id, address: wallet.address as `0x${string}` }
 }
 
-/**
- * Cuenta firmante de cualquier wallet que esta app de Privy custodia, a partir
- * de su address (así se guarda la wallet de cobro del negocio). null si no es nuestra.
- */
-export async function privyAccountByAddress(address: `0x${string}`): Promise<LocalAccount | null> {
-  try {
-    const wallet = await privy().wallets().getWalletByAddress({ address })
-    return wallet ? agentAccount(wallet.id, address) : null
-  } catch {
-    return null
-  }
-}
-
 /** El cast aplaca la inferencia de viem con la firma doble tempo+EVM de Privy. */
 export function agentAccount(walletId: string, address: `0x${string}`): LocalAccount {
   return createViemAccount(privy(), { walletId, address }) as unknown as LocalAccount

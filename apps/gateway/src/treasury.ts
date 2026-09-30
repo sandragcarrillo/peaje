@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPayoutConfirmed, arcTreasuryBalance, sendArcPayout } from './arc.js'
-import { sendTreasuryPayout, treasuryTokenBalance, txConfirmed, withdrawFromSettlement } from './settlement.js'
+import { sendTreasuryPayout, treasuryTokenBalance, txConfirmed, withdrawFromSettlement, type Custodia } from './settlement.js'
 import { retirarGateway, retiroGatewayConfirmado, saldoGatewayTreasury } from './circle.js'
 import { publicClient } from './chain.js'
 import { env } from './env.js'
@@ -112,12 +112,21 @@ export async function payoutConfirmed(
  * vive en PeajeSettlement a nombre de la wallet de cobro del negocio.
  */
 export async function payoutFromTenant(
-  tenant: { payoutWallet: string | null },
+  tenant: TenantCustodia,
   network: NetworkId | string,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
   if (!isSettlementNetwork(network)) return sendPayout(network, to, amount)
-  if (!tenant.payoutWallet) throw new Error(`El negocio no tiene wallet de cobro en ${railLabel(network)}`)
-  return withdrawFromSettlement(network, tenant.payoutWallet as `0x${string}`, to, amount)
+  const custodia = custodiaDe(tenant)
+  if (!custodia) throw new Error(`El negocio no tiene wallet custodiada por Peaje en ${railLabel(network)}`)
+  return withdrawFromSettlement(network, custodia, to, amount)
+}
+
+export type TenantCustodia = { custodialWallet: string | null; custodialWalletId: string | null }
+
+/** La wallet custodiada del negocio, o null si no tiene (negocio viejo sin migrar). */
+export function custodiaDe(tenant: TenantCustodia): Custodia | null {
+  if (!tenant.custodialWallet || !tenant.custodialWalletId) return null
+  return { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId }
 }

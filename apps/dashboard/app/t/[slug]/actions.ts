@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getWithdrawal, requestWithdrawal } from '@/lib/gateway'
 import { getDict } from '@/lib/i18n'
 import { avisarIndexNow } from '@/lib/indexnow'
+import { idSiEsCustodiada } from '@/lib/privy'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { sendFromMerchantWallet } from '@/lib/walletops'
@@ -61,6 +62,12 @@ export async function guardarWallet(slug: string, formData: FormData) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
     throw new Error((await getDict()).panel.errorWalletInvalida)
   }
+  // Una wallet que Peaje custodia solo puede ser la de este negocio: la de
+  // otro negocio o la de un agente no se puede reclamar como propia.
+  const id = await idSiEsCustodiada(wallet)
+  if (id && id !== tenant.custodialWalletId) {
+    throw new Error((await getDict()).panel.errorWalletAjena)
+  }
   await store.setPayoutWallet(tenant.id, wallet)
   revalidatePath(`/t/${slug}`)
 }
@@ -108,7 +115,10 @@ export type EnvioResultado =
 /** Envía fondos desde la wallet Peaje (Privy) del merchant a una address externa. */
 export async function enviarFondos(slug: string, formData: FormData): Promise<EnvioResultado> {
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
-  if (!tenant.payoutWallet) return { ok: false, error: d.panel.errorNegocioSinWallet }
+  // Se envía desde la wallet que Peaje custodia para este negocio, nunca desde
+  // la de cobro (el dueño puede poner ahí cualquier address).
+  if (!tenant.custodialWallet || !tenant.custodialWalletId) return { ok: false, error: d.panel.errorNegocioSinWallet }
+  const custodia = { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId }
 
   const to = String(formData.get('to') ?? '').trim()
   const network = String(formData.get('network') ?? '').trim()
@@ -117,13 +127,13 @@ export async function enviarFondos(slug: string, formData: FormData): Promise<En
   if (!/^0x[a-fA-F0-9]{40}$/.test(to)) return { ok: false, error: d.panel.errorDestinoInvalido }
   if (!isNetworkId(network)) return { ok: false, error: d.panel.errorRedInvalida }
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: d.panel.errorMontoInvalido }
-  if (to.toLowerCase() === tenant.payoutWallet.toLowerCase()) {
+  if (to.toLowerCase() === custodia.address.toLowerCase()) {
     return { ok: false, error: d.panel.errorMismoDestino }
   }
 
   try {
     const tx = await sendFromMerchantWallet(
-      tenant.payoutWallet as `0x${string}`,
+      custodia,
       network,
       to as `0x${string}`,
       amount.toFixed(6),
@@ -156,14 +166,14 @@ export type ResumenWallet = {
 /** Datos del popover de wallet del navbar: saldos live + últimos retiros. */
 export async function resumenWallet(slug: string): Promise<ResumenWallet | null> {
   const tenant = await requireTenant(slug)
-  if (!tenant.payoutWallet) return null
+  if (!tenant.custodialWallet) return null
   const { walletBalances } = await import('@/lib/walletops')
   const [balances, retiros] = await Promise.all([
-    walletBalances(tenant.payoutWallet as `0x${string}`),
+    walletBalances(tenant.custodialWallet as `0x${string}`),
     store.listWithdrawals(tenant.id, 5),
   ])
   return {
-    address: tenant.payoutWallet,
+    address: tenant.custodialWallet,
     balances,
     retiros: retiros.map((w) => ({
       id: w.id,
