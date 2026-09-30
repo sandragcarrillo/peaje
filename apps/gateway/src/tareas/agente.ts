@@ -138,7 +138,7 @@ const HERRAMIENTAS: Herramienta[] = [
       properties: {
         kind: { type: 'string', enum: ['content', 'route', 'fix'] },
         title: { type: 'string' },
-        summary: { type: 'string', description: 'One line: why it matters' },
+        summary: { type: 'string', description: "One plain sentence for the owner, in the chat's language, on why we suggest it, grounded in their data" },
         prompt: { type: 'string', description: 'Markdown instructions for the coding agent, with the draft when it is content' },
         acceptance_url: { type: 'string', description: 'Live URL Peaje should check once done, if any' },
       },
@@ -296,11 +296,18 @@ HERRAMIENTAS.push(
     name: 'draft_page',
     description:
       'Write the complete page (markdown) that answers one question customers ask AI assistants, from the facts on the site: the exact question as title, the direct answer first, a real number with its source, 3 to 5 follow-up sections, a visible updated date and sources. Missing facts come out as [TODO: ...]. Saves it as a content task for their developer or AI coding tool (creates it or updates an open one) and returns its id and title. Takes about a minute and costs money: only when the owner wants the page.',
-    input_schema: { type: 'object', properties: { question: { type: 'string', description: 'The exact question, in the language of the site' } }, required: ['question'] },
+    input_schema: {
+      type: 'object',
+      properties: {
+        question: { type: 'string', description: 'The exact question, in the language of the site' },
+        why: { type: 'string', description: "One plain sentence for the owner, in the chat's language, on why this page, grounded in their data (who asks this, what shows up instead of them today)" },
+      },
+      required: ['question', 'why'],
+    },
     async correr(i, { tenant }) {
       const pregunta = String(i.question ?? '').trim()
       if (pregunta.length < 8) return { error: 'question is too short' }
-      const r = await tareaConBorrador(tenant, pregunta)
+      const r = await tareaConBorrador(tenant, pregunta, typeof i.why === 'string' ? i.why : undefined)
       if (!r.created && !r.updated) return { id: r.task.id, title: r.task.title, status: r.task.status, note: 'A task for this question already exists and is past "open"; the draft was not changed.' }
       return { id: r.task.id, title: r.task.title, created: r.created, missingFacts: r.todos, excerpt: r.task.body.split('\n## Draft\n')[1]?.slice(0, 600) }
     },
@@ -363,6 +370,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     '- Numbers come after you know their goal, one at a time, each tied to what to do about it.',
     '- Before suggesting something, check list_tasks (including dismissed): never repeat a suggestion they already dismissed.',
     '- No hype, no filler, no em dashes, no bold headings in short answers.',
+    '- Never narrate your own checks or steps ("no repeated tasks", "I will now write", "checking your data"): the screen already shows what you are doing. Never write stage directions like "(waiting for your choice)". Write only what the owner should read.',
     '',
     primeraVez
       ? 'This is your first conversation with them. Open with two or three sentences: who you are in one line, one specific thing you noticed on their site (read it first with read_site_page), and your first question. Do not list what you can do.'
@@ -379,6 +387,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
         ].join('\n'),
     '',
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
+    'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ChatGPT, Claude or Perplexity cite it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, call get_task and send the page itself (the part after "## Draft"), not the instructions.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
@@ -483,7 +492,11 @@ export async function conversar(
       .map((b) => b.text)
       .join('\n')
       .trim()
-    if (texto) partes.push(texto)
+    // El texto de una vuelta que usa herramientas de trabajo es un anuncio
+    // ("armo la página ya"): la pantalla ya muestra el estado, no se guarda.
+    // Sí se guarda si la vuelta solo ofrece opciones (ahí va la pregunta).
+    const soloOpciones = usos.length > 0 && usos.every((u) => u.name === 'offer_choices')
+    if (texto && (usos.length === 0 || soloOpciones)) partes.push(texto)
     if (res.stop_reason !== 'tool_use' || usos.length === 0) break
     const resultados: Anthropic.Messages.ToolResultBlockParam[] = []
     for (const u of usos) {

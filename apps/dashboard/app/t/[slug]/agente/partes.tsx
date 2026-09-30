@@ -128,48 +128,60 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
       }
     })
 
+  // Tareas abiertas: por qué, qué esperamos y cómo, en palabras simples. Las cerradas, compactas.
+  const borrador = tarea.body.split('\n## Draft\n')[1]?.trim() ?? null
+  const copiar = () => {
+    void navigator.clipboard.writeText(tarea.body)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 1500)
+  }
+
+  if (cerrada) {
+    return (
+      <li className="px-4 py-3 text-sm">
+        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
+        <span className="font-medium">{tarea.title}</span>
+        <p className="mt-1 text-xs text-muted">{t.estados[tarea.status] ?? tarea.status}{tarea.note ? ` · ${tarea.note}` : ''}</p>
+        {tarea.status === 'verified' ? <Resultado seguimientos={seguimientos} /> : null}
+      </li>
+    )
+  }
+
   return (
-    <li className="px-4 py-3 text-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
-          <span className="font-medium">{tarea.title}</span>
-          <p className="mt-1 text-xs text-muted">
-            {t.estados[tarea.status] ?? tarea.status}
-            {tarea.summary ? ` · ${tarea.summary}` : ''}
-          </p>
-          {tarea.note ? <p className="mt-1 text-xs text-muted">{tarea.note}</p> : null}
-          {tarea.status === 'verified' ? <Resultado seguimientos={seguimientos} /> : null}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className={boton} onClick={() => setAbierto(!abierto)}>
-            {abierto ? t.ocultarPrompt : t.verPrompt}
-          </button>
-          <button
-            className={boton}
-            onClick={() => {
-              void navigator.clipboard.writeText(tarea.body)
-              setCopiado(true)
-              setTimeout(() => setCopiado(false), 1500)
-            }}
-          >
-            {copiado ? t.copiado : t.copiarPrompt}
-          </button>
-          {!cerrada ? (
-            <>
-              <button className={boton} onClick={() => setModo(modo === 'hecha' ? 'nada' : 'hecha')}>
-                {t.marcarHecha}
-              </button>
-              <button className={boton} onClick={() => setModo(modo === 'descartar' ? 'nada' : 'descartar')}>
-                {t.descartar}
-              </button>
-            </>
-          ) : null}
-        </div>
+    <li className="space-y-3 px-4 py-4 text-sm">
+      <div>
+        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
+        <span className="font-medium">{tarea.title}</span>
+        {tarea.status !== 'open' ? <span className="ml-2 text-xs text-muted">· {t.estados[tarea.status] ?? tarea.status}</span> : null}
       </div>
-      {abierto ? <pre className={`mt-3 ${pre}`}>{tarea.body}</pre> : null}
+      <dl className="grid gap-2 text-sm md:grid-cols-[10rem_1fr]">
+        <dt className="text-xs text-muted">{t.tarjetaPorQue}</dt>
+        <dd>{tarea.summary || t.porQueGenerico[tarea.kind]}</dd>
+        <dt className="text-xs text-muted">{t.tarjetaEsperamos}</dt>
+        <dd>{t.esperamos[tarea.kind]}</dd>
+        <dt className="text-xs text-muted">{t.tarjetaComo}</dt>
+        <dd>
+          {t.como[tarea.kind]} <span className="text-muted">{t.comoMcp}</span>
+        </dd>
+      </dl>
+      {tarea.note ? <p className="text-xs text-muted">{tarea.note}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button className="rounded-lg bg-text px-3 py-1.5 text-sm font-medium text-bg" onClick={copiar}>
+          {copiado ? t.copiado : t.copiarIA}
+        </button>
+        <button className={boton} onClick={() => setAbierto(!abierto)}>
+          {abierto ? t.ocultar : borrador ? t.verPagina : t.verInstrucciones}
+        </button>
+        <button className={boton} onClick={() => setModo(modo === 'hecha' ? 'nada' : 'hecha')}>
+          {t.yaEsta[tarea.kind] ?? t.marcarHecha}
+        </button>
+        <button className={boton} onClick={() => setModo(modo === 'descartar' ? 'nada' : 'descartar')}>
+          {t.noSirve}
+        </button>
+      </div>
+      {abierto ? <pre className={pre}>{borrador ?? tarea.body}</pre> : null}
       {modo !== 'nada' ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             value={valor}
             onChange={(e) => setValor(e.target.value)}
@@ -181,11 +193,11 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
             className="rounded-lg bg-text px-3 py-1.5 text-sm text-bg disabled:opacity-50"
             onClick={() => correr(() => (modo === 'hecha' ? tareaHecha(slug, tarea.id, valor) : descartarTarea(slug, tarea.id, valor)))}
           >
-            {modo === 'hecha' ? t.verificar : t.descartar}
+            {modo === 'hecha' ? t.verificar : t.noSirve}
           </button>
         </div>
       ) : null}
-      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </li>
   )
 }

@@ -101,7 +101,7 @@ export const tieneBorrador = (t: Pick<AgentTask, 'body'>) => t.body.includes(MAR
  * herramienta draft_page del chat. Misma `key` que las sugerencias del
  * monitor, así una pregunta no genera dos tareas.
  */
-export async function tareaConBorrador(tenant: Tenant, pregunta: string): Promise<{ task: AgentTask; created: boolean; updated: boolean; todos: string[] }> {
+export async function tareaConBorrador(tenant: Tenant, pregunta: string, porQue?: string): Promise<{ task: AgentTask; created: boolean; updated: boolean; todos: string[] }> {
   const dominio = dominioVerificable(tenant.originUrl)
   if (!dominio) throw new Error('The business has no public domain')
   const limpia = pregunta.trim().replace(/\s+/g, ' ').slice(0, 200)
@@ -116,7 +116,8 @@ export async function tareaConBorrador(tenant: Tenant, pregunta: string): Promis
     key,
     kind: 'content',
     title: limpia,
-    summary: previa?.summary || 'A full page drafted from your site, ready to publish.',
+    // El porqué con datos del negocio, para el dueño; sin él la tarjeta muestra uno genérico por tipo.
+    summary: (porQue?.trim() || previa?.summary || '').slice(0, 300),
     body: cuerpoConBorrador(tenant, dominio, limpia, slug, b),
     acceptance: [{ type: 'url', url: `https://${dominio}/${slug}` }],
     source: 'chat',
