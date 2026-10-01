@@ -103,6 +103,23 @@ function conUrlExterna(req: Request): Request {
   return externa === req.url ? req : new Request(externa, req)
 }
 
+const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`)
+
+/** Lo que ve una persona que abre el link de pago en el navegador. */
+function paginaDePago(tenant: Tenant, plan: PlanPago, precio: string, url: string): string {
+  const nombre = plan === 'founder' ? 'Founder' : 'Pro'
+  const panel = `${process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app'}/t/${tenant.slug}/agente#plan`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Peaje ${nombre}</title>
+<style>body{font-family:system-ui,sans-serif;background:#171613;color:#f3efe6;max-width:34rem;margin:12vh auto;padding:0 1.25rem;line-height:1.5}code{display:block;background:#23211d;padding:.75rem;overflow-x:auto;font-size:.85rem}a{color:#a9d8e0}p{color:#c9c4b8}h1{font-size:1.4rem}</style></head><body>
+<h1>Peaje ${nombre} for ${esc(tenant.name)}: US$${Number(precio).toFixed(2)} for 30 days</h1>
+<p>This link is paid by a wallet or an AI agent, not by a browser. Today it is paid in USDC.</p>
+<p><strong>Easiest:</strong> pay with your Peaje balance from your dashboard.<br><a href="${esc(panel)}">Open my plan in Peaje</a></p>
+<p><strong>From a terminal</strong>, with a wallet that speaks x402 or MPP:</p>
+<code>npx mppx ${esc(url)}</code>
+<p>Card payments are coming soon.</p>
+</body></html>`
+}
+
 billingRouter.get('/_billing/:slug/:plan', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Business not found' }, 404)
@@ -111,6 +128,11 @@ billingRouter.get('/_billing/:slug/:plan', async (c) => {
   if (plan === 'founder' && !(await founderDisponible(tenant)).ok) return c.json(sinCupoFounder(tenant), 409)
 
   const precio = precioCobro(plan)
+  // Una persona que abre el link en el navegador veía un 402 crudo: se le
+  // explica cómo se paga. Wallets y agentes no piden text/html ni llegan sin credencial.
+  const esNavegador =
+    (c.req.header('accept') ?? '').includes('text/html') && !c.req.header('authorization') && !c.req.header('payment-signature')
+  if (esNavegador) return c.html(paginaDePago(tenant, plan, precio, c.req.url))
   // merchant nulo: en los rieles con contrato el pago queda a nombre de Peaje, no del negocio.
   const cobro = nuevoContexto(null, precio)
   cobro.x402Header = c.req.header('payment-signature') ?? null

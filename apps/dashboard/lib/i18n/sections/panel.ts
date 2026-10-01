@@ -10,7 +10,7 @@ export const panel = {
     hace: (v: string) => `hace ${v}`,
     scoreEyebrow: 'CONSOLA // AGENT-READINESS',
     scoreAuditoria: 'AUDITORÍA',
-    scoreConKit: (n: number) => `~${n} con el kit completo`,
+    scoreConKit: (n: number) => `hasta ~${n} con el kit completo`,
     scoreCapacidad: (pts: number) => `Margen inmediato: +${pts} pts`,
     scoreDesde: (antes: number, ahora: number) => `De ${antes} a ${ahora} con Peaje`,
     scoreCol1: 'Lo que los agentes encuentran',
@@ -39,11 +39,11 @@ export const panel = {
     // layout
     necesitasEntrar: 'Necesitas entrar',
     soloEmailPre: 'El panel de ',
-    soloEmailPost: ' solo se abre con el email de ese negocio.',
+    soloEmailPost: ' solo se abre con el email de ese sitio.',
     entrarConEmail: 'Entrar con tu email',
 
     // sidebar
-    cambiarNegocio: 'cambiar de negocio →',
+    cambiarNegocio: 'cambiar de sitio →',
     navDashboard: 'Dashboard',
     navScore: 'Score',
     navRutas: 'Agregar rutas',
@@ -164,7 +164,7 @@ export const panel = {
     errorPrecioMayorCero: 'El precio tiene que ser mayor a 0',
     errorWalletInvalida: 'Esa no parece una wallet válida',
     errorWalletAjena: 'Esa wallet la maneja Peaje para otra cuenta. Usa la tuya o una wallet externa.',
-    errorNegocioSinWallet: 'Este negocio no tiene wallet.',
+    errorNegocioSinWallet: 'Este sitio no tiene wallet.',
     errorDestinoInvalido: 'La address de destino no es válida.',
     errorRedInvalida: 'Red inválida.',
     errorMontoInvalido: 'Monto inválido.',
@@ -221,7 +221,7 @@ export const panel = {
     hace: (v: string) => `${v} ago`,
     scoreEyebrow: 'CONSOLE // AGENT-READINESS',
     scoreAuditoria: 'AUDIT RUN',
-    scoreConKit: (n: number) => `~${n} with the full kit`,
+    scoreConKit: (n: number) => `up to ~${n} with the full kit`,
     scoreCapacidad: (pts: number) => `Immediate headroom: +${pts} pts`,
     scoreDesde: (antes: number, ahora: number) => `From ${antes} to ${ahora} with Peaje`,
     scoreCol1: 'What agents find',
@@ -250,11 +250,11 @@ export const panel = {
     // layout
     necesitasEntrar: 'You need to sign in',
     soloEmailPre: 'The panel for ',
-    soloEmailPost: ' only opens with that business email.',
+    soloEmailPost: ' only opens with that site email.',
     entrarConEmail: 'Sign in with your email',
 
     // sidebar
-    cambiarNegocio: 'switch business →',
+    cambiarNegocio: 'switch site →',
     navDashboard: 'Dashboard',
     navScore: 'Score',
     navRutas: 'Add routes',
@@ -375,7 +375,7 @@ export const panel = {
     errorPrecioMayorCero: 'The price has to be greater than 0',
     errorWalletInvalida: 'That does not look like a valid wallet',
     errorWalletAjena: 'Peaje manages that wallet for another account. Use yours or an external wallet.',
-    errorNegocioSinWallet: 'This business has no wallet.',
+    errorNegocioSinWallet: 'This site has no wallet.',
     errorDestinoInvalido: 'The destination address is not valid.',
     errorRedInvalida: 'Invalid network.',
     errorMontoInvalido: 'Invalid amount.',

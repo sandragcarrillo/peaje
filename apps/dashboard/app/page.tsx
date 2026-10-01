@@ -59,7 +59,7 @@ export default async function Landing() {
                 </Link>
               ) : (
                 <Link
-                  href="/nuevo"
+                  href="/radar"
                   className="rounded-full border border-tinta bg-tinta px-6 py-3 text-crema"
                 >
                   {L.ctaRegistrar}
@@ -136,6 +136,7 @@ export default async function Landing() {
           <Paso n="002" titulo={L.paso2Titulo} texto={L.paso2Texto} />
           <Paso n="003" titulo={L.paso3Titulo} texto={L.paso3Texto} />
           </div>
+          <p className="relative mt-10 max-w-2xl border-t border-border pt-5 text-sm text-muted">{L.precio}</p>
         </section>
       </Sangre>
 
@@ -215,7 +216,7 @@ function PanelComparativa({
     { path: '/llms.txt', monto: null },
     { path: '/openapi.json', monto: null },
     { path: '/mcp', monto: '$0.01', s: 2 },
-    { path: '/r/informe-2026', monto: '$0.05', s: 9 },
+    { path: '/r/report-2026', monto: '$0.05', s: 9 },
   ]
   return (
     <div
@@ -273,7 +274,7 @@ function Paso({ n, titulo, texto }: { n: string; titulo: string; texto: string }
 /** Ruido tipográfico (§6): texto real del dominio, apenas legible. */
 function RuidoTipografico() {
   const linea =
-    'GET /r/informe-2026 → 402 → PAGO CONFIRMADO 0x3715…e253 → 200 OK · AGENT: VERIFIED · '
+    'GET /r/report-2026 → 402 → PAID 0x3715…e253 → 200 OK · AGENT: VERIFIED · '
   return (
     <div aria-hidden className="ruido">
       {linea.repeat(40)}

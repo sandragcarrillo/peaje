@@ -2,7 +2,7 @@
 
 import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import Link from 'next/link'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { gatewayUrl } from '@/lib/config'
 import { Eyebrow } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
@@ -34,6 +34,12 @@ export default function NuevoNegocio() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [resultado, setResultado] = useState<AltaResultado | null>(null)
+
+  // El radar manda acá con el dominio ya medido: se precarga el campo.
+  useEffect(() => {
+    const url = new URLSearchParams(window.location.search).get('url')
+    if (url) setOriginUrl((actual) => actual || url)
+  }, [])
 
   const d = useDict()
   const { getAccessToken, authenticated, logout } = usePrivy()

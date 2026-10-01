@@ -1,6 +1,16 @@
 export const kit = {
   es: {
     monitorUltima: 'Última verificación',
+    unComandoTitulo: 'Instala Peaje con un comando',
+    unComandoIntro: 'Córrelo en la carpeta de tu proyecto. Detecta si usas Next.js, Vite, Express o Hono y deja listo lo que los agentes leen.',
+    unComandoPaso1: 'Corre esto en tu proyecto',
+    unComandoPaso2: 'Agrega esta variable en tu hosting (Vercel, Railway, Cloudflare)',
+    unComandoPaso2Nota: 'Sirve para cobrar rutas de API en tu dominio. No la subas al repositorio.',
+    unComandoPaso3: 'Publica tu sitio y vuelve aquí: abajo revisamos que todo quedó bien',
+    unComandoCopiar: 'Copiar',
+    unComandoCopiado: 'Copiado',
+    sinTerminal: '¿Usas Lovable, v0, Cursor u otra herramienta de IA? Copia las instrucciones de abajo y pégaselas.',
+    avanzado: 'Opciones avanzadas: datos de tu sitio, instalación a mano y archivos',
     secretoTitulo: 'Secreto del sitio',
     secretoIntro: 'Ponlo como variable de entorno en tu hosting (Vercel, Railway, Cloudflare). Con él, tus rutas de API con precio cobran en tu dominio: el gateway lo manda cuando el agente ya pagó y tu sitio sabe que puede responder.',
     secretoNota: 'No lo publiques en el repo. Si se filtra, cualquiera puede llamar tus rutas de API sin pagar.',
@@ -11,8 +21,8 @@ export const kit = {
     necesitasSesion: 'Necesitás iniciar sesión.',
     entrar: 'Entrar',
     titulo: 'Haz que los agentes puedan encontrarte',
-    subtituloInicio: 'Los bloques exactos para ',
-    subtituloFin: ', en el orden que más score suma. Aplícalos por partes, o todo de una con el prompt.',
+    subtituloInicio: 'Un comando deja ',
+    subtituloFin: ' legible para agentes. Cobrar es opcional: lo decides ruta por ruta.',
 
     yaActivoTitulo: 'Ya activo, sin que hagas nada',
     yaActivoNota: 'La capa Payments para Agentes (checks de MPP y x402) ya está cubierta.',
@@ -112,7 +122,7 @@ npx @ora-ai/ax@latest audit ${domain}
     capaTodo: 'Todo el kit',
     capaTodoDetalle: 'Proxy al gateway (MCP, OpenAPI y 402 en tu dominio), datos estructurados, robots y motores de respuesta.',
     capaAeo: 'Solo motores de respuesta',
-    capaAeoDetalle: 'robots.txt por bot y ficha de tu negocio (Organization) en el head. Sin proxy ni cobro. Para que ChatGPT, Perplexity y Google te lean; no para que los agentes te paguen.',
+    capaAeoDetalle: 'robots.txt por bot y ficha de tu sitio (Organization) en el head. Sin proxy ni cobro. Para que ChatGPT, Perplexity y Google te lean; no para que los agentes te paguen.',
     promptIntroAeo: (originHost: string) =>
       `Haz que los motores de respuesta puedan leer mi sitio (${originHost}). No conectes ningún proxy ni cobro: solo estos bloques en el repo del sitio:`,
     promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
@@ -184,7 +194,7 @@ npx @ora-ai/ax@latest audit ${domain}
     entidadTelefono: 'Teléfono',
     entidadDireccion: 'Dirección (una línea)',
     entidadDescripcion: 'Descripción corta',
-    entidadDescripcionAyuda: 'Máximo 300 caracteres. Qué es tu negocio, en una frase.',
+    entidadDescripcionAyuda: 'Máximo 300 caracteres. Qué es tu sitio, en una frase.',
     entidadSameAs: 'Perfiles (sameAs)',
     entidadSameAsAyuda: 'Una URL por línea: LinkedIn, Instagram, Google Business Profile, Wikidata.',
     entidadBloquearEntrenamiento: 'Bloquear bots de entrenamiento (no afecta las citas)',
@@ -239,6 +249,16 @@ npx @ora-ai/ax@latest audit ${domain}
   },
   en: {
     monitorUltima: 'Last check',
+    unComandoTitulo: 'Install Peaje with one command',
+    unComandoIntro: 'Run it in your project folder. It detects Next.js, Vite, Express or Hono and sets up what agents read.',
+    unComandoPaso1: 'Run this in your project',
+    unComandoPaso2: 'Add this variable in your hosting (Vercel, Railway, Cloudflare)',
+    unComandoPaso2Nota: 'It lets priced API routes charge on your domain. Do not commit it to the repo.',
+    unComandoPaso3: 'Deploy your site and come back: below we check everything is in place',
+    unComandoCopiar: 'Copy',
+    unComandoCopiado: 'Copied',
+    sinTerminal: 'Using Lovable, v0, Cursor or another AI tool? Copy the instructions below and paste them in.',
+    avanzado: 'Advanced options: your site details, manual install and files',
     secretoTitulo: 'Site secret',
     secretoIntro: 'Set it as an environment variable in your hosting (Vercel, Railway, Cloudflare). With it, your priced API routes charge on your domain: the gateway sends it once the agent paid, and your site knows it can answer.',
     secretoNota: 'Do not commit it to the repo. If it leaks, anyone can call your API routes without paying.',
@@ -249,9 +269,9 @@ npx @ora-ai/ax@latest audit ${domain}
     necesitasSesion: 'You need to sign in.',
     entrar: 'Sign in',
     titulo: 'Make your site findable by agents',
-    subtituloInicio: 'The exact blocks for ',
+    subtituloInicio: 'One command makes ',
     subtituloFin:
-      ', in the order that adds the most score. Apply them one by one, or all at once with the prompt.',
+      ' readable by agents. Charging is optional: you decide route by route.',
 
     yaActivoTitulo: 'Already live, nothing for you to do',
     yaActivoNota: 'The Payments for Agents layer (MPP and x402 checks) is already covered.',
@@ -349,7 +369,7 @@ npx @ora-ai/ax@latest audit ${domain}
     capaTodo: 'The whole kit',
     capaTodoDetalle: 'Proxy to the gateway (MCP, OpenAPI and 402 on your domain), structured data, robots and answer engines.',
     capaAeo: 'Answer engines only',
-    capaAeoDetalle: 'robots.txt by bot and your business card (Organization) in the head. No proxy, no charging. So ChatGPT, Perplexity and Google can read you; not so agents can pay you.',
+    capaAeoDetalle: 'robots.txt by bot and your site card (Organization) in the head. No proxy, no charging. So ChatGPT, Perplexity and Google can read you; not so agents can pay you.',
     promptIntroAeo: (originHost: string) =>
       `Make my site (${originHost}) readable by answer engines. Do not connect any proxy or charging: only these blocks in the site repo:`,
     promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
@@ -421,7 +441,7 @@ npx @ora-ai/ax@latest audit ${domain}
     entidadTelefono: 'Phone',
     entidadDireccion: 'Address (one line)',
     entidadDescripcion: 'Short description',
-    entidadDescripcionAyuda: 'Up to 300 characters. What your business is, in one sentence.',
+    entidadDescripcionAyuda: 'Up to 300 characters. What your site is, in one sentence.',
     entidadSameAs: 'Profiles (sameAs)',
     entidadSameAsAyuda: 'One URL per line: LinkedIn, Instagram, Google Business Profile, Wikidata.',
     entidadBloquearEntrenamiento: 'Block training bots (does not affect citations)',

@@ -77,6 +77,24 @@ export async function freshScan(domain: string): Promise<OraScore | null> {
 }
 
 
+/** Scan fresco que distingue "ese sitio no abre" de una falla pasajera de Ora. */
+export async function escanear(domain: string): Promise<{ score: OraScore } | { error: 'inalcanzable' | 'fallo' }> {
+  try {
+    const res = await fetch(`${BASE}/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: domain }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(90_000),
+    })
+    if (res.ok) return { score: (await res.json()) as OraScore }
+    const cuerpo = (await res.json().catch(() => ({}))) as { error?: string }
+    return { error: res.status === 400 && /not reachable/i.test(cuerpo.error ?? '') ? 'inalcanzable' : 'fallo' }
+  } catch {
+    return { error: 'fallo' }
+  }
+}
+
 /**
  * Checks de Ora que el kit de Peaje ataca, con el bloque que los arregla.
  * `viaGateway` = lo aporta el gateway solo, sin tocar la web del tenant.

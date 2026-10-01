@@ -35,7 +35,9 @@ export const dinero = {
 
     // Mi wallet
     miWallet: 'Mi wallet',
-    sinWalletNegocio: 'Este negocio no tiene wallet configurada.',
+    sinWalletNegocio: 'Este sitio no tiene wallet configurada.',
+    modoPruebaEtiqueta: 'MODO PRUEBA',
+    modoPrueba: 'Los agentes pagan con dinero de prueba. Sirve para comprobar que el cobro funciona; todavía no se puede cambiar por pesos ni dólares.',
     walletCustodiada: 'Tu cuenta Peaje. Acá llegan tus retiros; desde acá mandas fondos a donde quieras.',
     walletExterna: 'Tu wallet de retiro es externa: los fondos ya llegan a una cuenta que manejas tú.',
     copiada: 'Copiada',
@@ -52,7 +54,7 @@ export const dinero = {
     wallet: 'Wallet',
     cerrar: 'Cerrar',
     cargando: 'Cargando…',
-    sinWallet: 'Este negocio no tiene wallet.',
+    sinWallet: 'Este sitio no tiene wallet.',
     recibir: 'Recibir',
     notaRecibir: 'La misma address recibe en todas las redes: pathUSD en Tempo, USDC en Arc y Arbitrum, USDG en Arbitrum y Robinhood.',
     volver: 'Volver',
@@ -98,7 +100,9 @@ export const dinero = {
 
     // Mi wallet
     miWallet: 'My wallet',
-    sinWalletNegocio: 'This business has no wallet set up.',
+    sinWalletNegocio: 'This site has no wallet set up.',
+    modoPruebaEtiqueta: 'TEST MODE',
+    modoPrueba: 'Agents pay with test money. It proves charging works; it cannot be turned into dollars yet.',
     walletCustodiada: 'Your Peaje account. Withdrawals land here, and you send funds anywhere from here.',
     walletExterna: 'Your payout wallet is external: funds already land in an account you control.',
     copiada: 'Copied',
@@ -115,7 +119,7 @@ export const dinero = {
     wallet: 'Wallet',
     cerrar: 'Close',
     cargando: 'Loading…',
-    sinWallet: 'This business has no wallet.',
+    sinWallet: 'This site has no wallet.',
     recibir: 'Receive',
     notaRecibir: 'The same address receives on every network: pathUSD on Tempo, USDC on Arc and Arbitrum, USDG on Arbitrum and Robinhood.',
     volver: 'Back',

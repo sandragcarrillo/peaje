@@ -56,7 +56,13 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
           }}
           portalUrl={`${gatewayUrl}/${tenant.slug}/developers`}
         />
-        <main className="min-w-0 flex-1 space-y-8 p-6 lg:p-10">{children}</main>
+        <main className="min-w-0 flex-1 space-y-8 p-6 lg:p-10">
+          <p className="border border-border bg-panel px-4 py-2.5 text-xs text-muted">
+            <span className="mr-2 font-mono tracking-[0.1em] text-accent">{d.dinero.modoPruebaEtiqueta}</span>
+            {d.dinero.modoPrueba}
+          </p>
+          {children}
+        </main>
       </div>
     </div>
   )

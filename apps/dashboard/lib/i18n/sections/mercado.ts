@@ -34,7 +34,7 @@ export const mercado = {
 
     ctaTitulo: 'Estos agentes ya están comprando',
     ctaCuerpo:
-      'Cada vez más agentes tienen wallet, identidad y presupuesto. Peaje hace que tu web o tu API puedan cobrarles por request, sin API keys y sin tocar tu código.',
+      'Cada vez más agentes tienen wallet, identidad y presupuesto. Peaje hace que tu web o tu API puedan cobrarles por pedido, sin API keys, con un comando en tu proyecto.',
     ctaBoton: 'Ponle un peaje a tu web →',
 
     fuenteInicio: 'Fuente: Subgraphs de ',
@@ -96,7 +96,7 @@ export const mercado = {
 
     ctaTitulo: 'These agents are already buying',
     ctaCuerpo:
-      'More and more agents have a wallet, an identity and a budget. Peaje lets your site or your API charge them per request, with no API keys and no changes to your code.',
+      'More and more agents have a wallet, an identity and a budget. Peaje lets your site or your API charge them per request, with no API keys and one command in your project.',
     ctaBoton: 'Use Peaje on your site →',
 
     fuenteInicio: 'Source: Subgraphs from ',

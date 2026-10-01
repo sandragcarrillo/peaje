@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { gatewayUrl } from '@/lib/config'
 import { PageHeader } from '@/components/chrome'
-import { getDict, type Dict } from '@/lib/i18n'
+import { getDict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -9,17 +9,14 @@ import {
   construirBloques,
   primeraRutaPaga,
   rutasDelProxy,
-  type Bloque,
   type Oferta,
 } from './bloques'
 import { MotoresDeRespuesta } from './motores'
 import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
 import { BloqueProxy } from './proxy'
 import { UltimaVerificacion } from './ultima-verificacion'
-import { SecretoOrigen } from './secreto-origen'
-import { generarProxy, type Entidad } from '@peaje/shared'
-
-type Kit = Dict['kit']
+import { Copiable } from './comando'
+import { generarProxy, secretoOrigen, type Entidad } from '@peaje/shared'
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
@@ -98,8 +95,26 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           }
         />
 
+        <section className="space-y-4 border border-accent/40 bg-panel p-5">
+          <div>
+            <h2 className="font-medium">{d.unComandoTitulo}</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">{d.unComandoIntro}</p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm">1. {d.unComandoPaso1}</p>
+            <Copiable texto={`npx @peaje/cli@1 init ${tenant.slug}`} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm">2. {d.unComandoPaso2}</p>
+            <Copiable texto={`PEAJE_ORIGIN_SECRET=${await secretoOrigen(tenant.embedSecret)}`} />
+            <p className="text-xs text-muted">{d.unComandoPaso2Nota}</p>
+          </div>
+          <p className="text-sm">3. {d.unComandoPaso3}</p>
+        </section>
+
         <UltimaVerificacion tenantId={tenant.id} />
-        <SecretoOrigen embedSecret={tenant.embedSecret} />
+
+        <p className="text-sm text-muted">{d.sinTerminal}</p>
 
         <ImplementarPeaje
           piezas={[
@@ -133,6 +148,9 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           }}
         />
 
+        <details className="border border-border">
+          <summary className="cursor-pointer px-4 py-3 text-sm text-muted hover:text-text">{d.avanzado}</summary>
+          <div className="space-y-8 border-t border-border p-4">
         <MotoresDeRespuesta
           slug={tenant.slug}
           nombre={tenant.name}
@@ -147,14 +165,6 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           <p className="text-sm text-muted">{d.proxyManualDetalle}</p>
         </div>
 
-        <PromptTodoDeUna
-          d={d}
-          bloques={bloques}
-          base={base}
-          originHost={originHost}
-          domain={domain}
-          rutaPaga={primeraRutaPaga(ofertas, tenant.slug)}
-        />
 
         <div className="space-y-3">
           {bloques.map((b) => (
@@ -195,6 +205,9 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           </ul>
         </section>
 
+          </div>
+        </details>
+
         <div className="rounded-lg border border-accent/40 bg-panel p-4 text-sm">
           <p>
             {d.verificaInicio}
@@ -207,65 +220,5 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         </div>
       </div>
     </VerificacionProvider>
-  )
-}
-
-function PromptTodoDeUna({
-  d,
-  bloques,
-  base,
-  originHost,
-  domain,
-  rutaPaga,
-}: {
-  d: Kit
-  bloques: Bloque[]
-  base: string
-  originHost: string
-  domain: string | null
-  rutaPaga: string | null
-}) {
-  // El prompt sigue el idioma de la UI: sus secciones son los títulos y
-  // detalles traducidos de los bloques, así que dejar el marco en otro idioma
-  // lo dejaría a medias.
-  const proxy = generarProxy('next', base, {
-    titulo: d.proxyComentarioTitulo,
-    sub: d.proxyComentarioSub,
-    rutaPaga: d.proxyComentarioRutaPaga,
-  })
-
-  const prompt = `${d.promptIntro(originHost, base)}
-
-## ${d.promptProxyTitulo}
-${d.promptProxyDetalle}
-
-\`\`\`ts
-${proxy}
-\`\`\`
-
-${d.promptProxyNota}
-
-## ${d.promptNoCrearTitulo}
-${d.promptNoCrearDetalle}
-
-${rutasDelProxy()
-  .map((r) => `- ${r}`)
-  .join('\n')}
-
-${d.promptNoCrearCierre}
-
-${bloques.map((b) => `## ${b.titulo}\n${b.detalle}\n\n\`\`\`\n${b.contenido}\n\`\`\``).join('\n\n')}
-
-${d.promptVerifica(originHost, rutaPaga)}
-${domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio}
-
-${d.promptReferencia}`
-
-  return (
-    <ToggleBlock
-      titulo={d.promptTitulo}
-      detalle={d.promptDetalle}
-      contenido={prompt}
-    />
   )
 }
