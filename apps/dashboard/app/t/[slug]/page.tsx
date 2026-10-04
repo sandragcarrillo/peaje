@@ -16,17 +16,23 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   const tenant = await requireTenant(slug)
 
   const domain = scannableDomain(tenant.originUrl)
-  const [balance, payments, porDia, resources, score, d] = await Promise.all([
+  const [balance, payments, porDia, resources, score, verificacion, d] = await Promise.all([
     saldoTotal(tenant),
     store.listPayments(tenant.id, 10),
     store.dailyRevenue(tenant.id, 7),
     store.listResources(tenant.id).catch(() => []),
     domain ? cachedScore(domain) : Promise.resolve(null),
+    store.lastVerification(tenant.id).catch(() => null),
     getDict(),
   ])
 
   const base = `${gatewayUrl}/${tenant.slug}`
-  const kitAplicado = score !== null && prevision(score).arreglables.length === 0
+  // El kit está puesto cuando Peaje lo vio en el dominio: la última verificación
+  // (del Kit o del monitor) con todo lo propio en verde. `bots` es el firewall
+  // del hosting, no parte del kit, igual que en la página del Kit.
+  const propios = ((verificacion?.checks ?? []) as { id: string; ok: boolean }[]).filter((c) => c.id !== 'bots')
+  const kitVerificado = propios.length > 0 && propios.every((c) => c.ok)
+  const kitAplicado = kitVerificado || (score !== null && prevision(score).arreglables.length === 0)
   const pasos = [
     {
       n: 1,

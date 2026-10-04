@@ -41,6 +41,23 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
   const { kit: d } = await getDict()
   const tenant = await requireTenant(slug)
   const chequeos = await verificar(tenant.originUrl)
+  // Queda guardada igual que la del monitor diario: así el panel y la lista
+  // de pasos saben que el kit ya está en el dominio sin esperar a mañana.
+  if (chequeos[0]?.id !== 'dominio') {
+    await store
+      .recordVerification({
+        tenantId: tenant.id,
+        checks: chequeos,
+        ok: chequeos.every((c) => c.ok),
+        score: null,
+        robotsHash: null,
+        llmsHash: null,
+        alerted: [],
+        pending: [],
+      })
+      .catch(() => {})
+    revalidatePath(`/t/${slug}`)
+  }
   return chequeos.map((c) => conTexto(c, d))
 }
 
