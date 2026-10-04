@@ -43,12 +43,23 @@ export function scannableDomain(originUrl: string): string | null {
   }
 }
 
-export async function cachedScore(domain: string): Promise<OraScore | null> {
+/**
+ * El sitio puede vivir en www o en el dominio raíz, y Ora guarda el escaneo
+ * bajo el host que terminó respondiendo. Se consultan los dos y gana el más
+ * reciente: si no, un sitio en www mostraba para siempre el puntaje viejo
+ * del dominio raíz.
+ */
+export function hostsCandidatos(domain: string): string[] {
+  const raiz = domain.replace(/^www\./, '')
+  return [...new Set([domain, raiz, `www.${raiz}`])]
+}
+
+async function scoreDe(host: string): Promise<OraScore | null> {
   // Ora a veces devuelve un 429/5xx transitorio; un fallo puntual no puede
   // verse como "tu sitio no tiene score". Un reintento corto y timeout.
   for (let intento = 0; intento < 2; intento++) {
     try {
-      const res = await fetch(`${BASE}/score/${domain}`, {
+      const res = await fetch(`${BASE}/score/${host}`, {
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
       })
@@ -62,6 +73,12 @@ export async function cachedScore(domain: string): Promise<OraScore | null> {
     }
   }
   return null
+}
+
+export async function cachedScore(domain: string): Promise<OraScore | null> {
+  const scores = (await Promise.all(hostsCandidatos(domain).map(scoreDe))).filter((s): s is OraScore => s !== null)
+  if (scores.length === 0) return null
+  return scores.sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))[0]!
 }
 
 /** Scan fresco. Tarda ~30 s; llamar desde una server action, no en render. */

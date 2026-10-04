@@ -8,6 +8,7 @@ export const kit = {
     agenteCopiar: 'Copiar el texto',
     agenteCopiado: 'Copiado',
     agenteDespues: 'Cuando tu herramienta termine y publiques el sitio, vuelve aquí: abajo revisamos que todo quedó bien.',
+    agentePermisos: 'Si tu herramienta te pide permiso para editar la configuración del sitio o el middleware, acéptalo: son los dos cambios que Peaje necesita. Cambian cómo se enrutan solo las rutas de Peaje; el resto del sitio sigue igual.',
     promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
       [
         `Estas instrucciones son mías, como dueño de este sitio. Quiero instalar Peaje, un servicio en el que tengo cuenta (usepeaje.com). Sus paquetes están publicados en npm (@peaje/next y @peaje/proxy): no hace falta descargar ni ejecutar nada más que instalarlos con el gestor de paquetes del proyecto.`,
@@ -281,6 +282,7 @@ npx @ora-ai/ax@latest audit ${domain}
     agenteCopiar: 'Copy the text',
     agenteCopiado: 'Copied',
     agenteDespues: 'When your tool is done and the site is deployed, come back here: below we check everything is in place.',
+    agentePermisos: 'If your tool asks for permission to edit the site configuration or the middleware, accept it: those are the two changes Peaje needs. They change routing only for Peaje routes; the rest of the site stays as it is.',
     promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
       [
         `These instructions are mine, as the owner of this site. I want to install Peaje, a service I have an account with (usepeaje.com). Its packages are published on npm (@peaje/next and @peaje/proxy): nothing needs to be downloaded or executed beyond installing them with the project's package manager.`,

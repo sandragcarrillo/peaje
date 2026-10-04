@@ -105,6 +105,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
                 <p className="mt-1 max-w-2xl text-sm text-muted">{d.agenteIntro}</p>
               </div>
               <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, secreto, `${dashboardUrl}/t/${tenant.slug}/kit`)} />
+              <p className="text-sm text-muted">{d.agentePermisos}</p>
               <p className="text-sm text-muted">{d.agenteDespues}</p>
             </section>
           }
