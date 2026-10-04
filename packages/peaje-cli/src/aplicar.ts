@@ -18,7 +18,7 @@ import {
 } from './servidores'
 import type { Accion, Deteccion, Kit, Plan } from './tipos'
 
-export const VERSION_PEAJE_NEXT = '^0.2.0'
+export const VERSION_PEAJE_NEXT = '^0.2.1'
 export const CARPETA_BACKUP = '.peaje-backup'
 
 const BLOQUEA_TODO = /^Disallow:\s*\/\s*$/m

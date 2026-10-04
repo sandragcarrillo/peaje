@@ -88,7 +88,7 @@ test('fixture 1: Next app router con rewrites() array y <head>', async () => {
   assert.match(layout, /<head>\n\s+<PeajeHead slug="demo" \/>\n\s+<meta name="theme-color"/)
 
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/next'], '^0.2.0')
+  assert.equal(pkg.dependencies['@peaje/next'], '^0.2.1')
   assert.ok(resultado.next.some((n) => n.startsWith('pnpm add @peaje/next')))
 
   // robots nuevo, snippets bajo peaje/, copia estática movida al backup
@@ -159,7 +159,7 @@ test('fixture 4: Vite + vercel.json: middleware.js de Vercel con @peaje/proxy, s
   assert.ok(!resultado.manual.some((m) => m.includes('Merge peaje/vercel.txt')), 'el middleware ya cubre lo del vercel.json')
   assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.0')
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.1')
   assert.equal(pkg.dependencies['@vercel/functions'], undefined, 'el middleware no necesita @vercel/functions')
   assert.equal(pkg.devDependencies.vite, '^6.0.0', 'lo que había queda')
   assert.ok(resultado.next[0]?.startsWith('bun add @peaje/proxy   #'))
@@ -186,7 +186,7 @@ test('fixture 6: Express con entrada inequívoca: require + app.use justo despu�
   assert.ok(server.startsWith(`'use strict'\nconst { peajeExpress } = require('@peaje/proxy/express')\nconst express = require('express')`))
   assert.match(server, /const app = express\(\)\napp\.use\(peajeExpress\(\{ slug: "demo" \}\)\)\napp\.use\(express\.json\(\)\)/, 'antes del body parser')
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.0')
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.1')
   assert.ok(resultado.next[0]?.startsWith('npm install @peaje/proxy '))
   assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
   assert.ok(!resultado.manual.some((m) => m.startsWith('Pick the ONE proxy file')), 'sin host conocido igual no hay archivo que elegir')
@@ -400,9 +400,9 @@ test('fusionarRobots conserva lo del sitio, omite el grupo * y el Sitemap duplic
 
 test('agregarDependencia inserta una sola línea sin reordenar el resto', () => {
   const src = '{\n  "name": "x",\n  "dependencies": {\n    "next": "15.3.0",\n    "react": "19.1.0"\n  }\n}\n'
-  const out = agregarDependencia(src, '@peaje/next', '^0.2.0')!
+  const out = agregarDependencia(src, '@peaje/next', '^0.2.1')!
   assert.equal(out.split('\n').length, src.split('\n').length + 1)
-  assert.ok(out.includes('    "@peaje/next": "^0.2.0",\n    "next": "15.3.0"'))
-  assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.2.0')
-  assert.equal(agregarDependencia(out, '@peaje/next', '^0.2.0'), null)
+  assert.ok(out.includes('    "@peaje/next": "^0.2.1",\n    "next": "15.3.0"'))
+  assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.2.1')
+  assert.equal(agregarDependencia(out, '@peaje/next', '^0.2.1'), null)
 })

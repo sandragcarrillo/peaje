@@ -23,7 +23,7 @@ export const landing = {
     status: [
       ['MPP', 'ACTIVO'],
       ['REDES', `${RAILS_LABEL} · DE PRUEBA`],
-      ['PROTOCOLOS', '402 · X402 · MCP'],
+      ['PROTOCOLOS', 'MPP · X402 · MCP · ACP · UCP · AP2'],
       ['COBRO', 'OPCIONAL'],
     ] as [string, string][],
 
@@ -75,7 +75,7 @@ export const landing = {
     status: [
       ['MPP', 'ACTIVE'],
       ['NETWORKS', `${RAILS_LABEL} · TEST`],
-      ['PROTOCOLS', '402 · X402 · MCP'],
+      ['PROTOCOLS', 'MPP · X402 · MCP · ACP · UCP · AP2'],
       ['CHARGING', 'OPTIONAL'],
     ] as [string, string][],
 

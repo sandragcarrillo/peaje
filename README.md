@@ -12,12 +12,12 @@ Built by:
 - Carla Martínez ([@carlaupgrade](https://github.com/carlaupgrade))
 - Angela Ocando ([@ocandocrypto](https://github.com/ocandocrypto))
 
-**Demo:** [peaje-dashboard.vercel.app](https://peaje-dashboard.vercel.app) · Gateway: `peaje-gateway.up.railway.app`
+**Demo:** [usepeaje.com](https://usepeaje.com) · Gateway: `api.usepeaje.com`
 
 Try the live payment cycle right now (a real priced route, weather data proxied from Open-Meteo):
 
 ```bash
-curl -i "https://peaje-gateway.up.railway.app/clima-andino/v1/forecast?latitude=4.71&longitude=-74.07&daily=temperature_2m_max&forecast_days=5"
+curl -i "https://api.usepeaje.com/clima-andino/v1/forecast?latitude=4.71&longitude=-74.07&daily=temperature_2m_max&forecast_days=5"
 ```
 
 It answers `402 Payment Required` with one offer per rail in the challenge (Tempo pathUSD, Arc USDC, Arbitrum Sepolia USDC and USDG, Robinhood Chain USDG); an MPP/x402-capable agent picks one, pays and gets the data.

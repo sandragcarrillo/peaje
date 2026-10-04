@@ -100,7 +100,7 @@ The forwarded request keeps method, body and query, and carries `x-forwarded-hos
 |---|---|
 | `slug` | required, the business slug from your dashboard |
 | `secret` | `process.env.PEAJE_ORIGIN_SECRET` |
-| `gateway` | `process.env.PEAJE_GATEWAY_URL` or `https://peaje-gateway.up.railway.app` |
+| `gateway` | `process.env.PEAJE_GATEWAY_URL` or `https://api.usepeaje.com` |
 
 ## License
 

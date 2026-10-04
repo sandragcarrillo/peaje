@@ -43,7 +43,7 @@ export type Reporte = {
 
 const DIAS = 7
 export const MODEL = process.env.MONITOR_MODEL ?? 'claude-opus-5'
-export const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app').replace(/\/$/, '')
+export const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com').replace(/\/$/, '')
 
 const SugerenciasSchema = z.object({
   paginas: z.array(

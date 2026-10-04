@@ -108,7 +108,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};
 /** Lo que ve una persona que abre el link de pago en el navegador. */
 function paginaDePago(tenant: Tenant, plan: PlanPago, precio: string, url: string): string {
   const nombre = plan === 'founder' ? 'Founder' : 'Pro'
-  const panel = `${process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app'}/t/${tenant.slug}/agente#plan`
+  const panel = `${process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com'}/t/${tenant.slug}/agente#plan`
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Peaje ${nombre}</title>
 <style>body{font-family:system-ui,sans-serif;background:#171613;color:#f3efe6;max-width:34rem;margin:12vh auto;padding:0 1.25rem;line-height:1.5}code{display:block;background:#23211d;padding:.75rem;overflow-x:auto;font-size:.85rem}a{color:#a9d8e0}p{color:#c9c4b8}h1{font-size:1.4rem}</style></head><body>
 <h1>Peaje ${nombre} for ${esc(tenant.name)}: US$${Number(precio).toFixed(2)} for 30 days</h1>

@@ -31,7 +31,7 @@ export default withPeaje(nextConfig, { slug: 'cafe-andino' })
 
 `withPeaje` prepends the Peaje rules to `rewrites().beforeFiles` and keeps what you had: an array becomes `afterFiles`, an object keeps its `beforeFiles`, `afterFiles` and `fallback`. It accepts sync or async `rewrites()` and a config written as a function `(phase, { defaultConfig }) => config`. Wrapping twice does not duplicate rules.
 
-Options: `slug` (required, the one from your Peaje dashboard) and `gateway` (defaults to `https://peaje-gateway.up.railway.app`, overridable with the `PEAJE_GATEWAY_URL` environment variable).
+Options: `slug` (required, the one from your Peaje dashboard) and `gateway` (defaults to `https://api.usepeaje.com`, overridable with the `PEAJE_GATEWAY_URL` environment variable).
 
 ## 1b. Runtime proxy (priced API routes on your domain)
 

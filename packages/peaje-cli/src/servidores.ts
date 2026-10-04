@@ -7,7 +7,7 @@
 import { creacionApp } from './detectar'
 import { agregarImport, type Edicion } from './next'
 
-export const VERSION_PEAJE_PROXY = '^0.1.0'
+export const VERSION_PEAJE_PROXY = '^0.1.1'
 
 const COMENTARIO = `// Peaje: answers 402 on your own domain for the priced routes in your dashboard.
 // Reads the route list from your gateway at runtime (cached 60 s): a route you

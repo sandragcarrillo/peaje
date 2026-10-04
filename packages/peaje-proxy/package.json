@@ -1,6 +1,6 @@
 {
   "name": "@peaje/proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Peaje for any server: answer HTTP 402 (MPP, x402) for your priced API routes on your own domain. Fetch handler plus Express, Hono and Vercel Routing Middleware adapters.",
   "license": "MIT",
   "repository": {

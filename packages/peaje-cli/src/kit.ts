@@ -4,7 +4,7 @@
  */
 import { ErrorCli, type Host, type Kit } from './tipos'
 
-export const GATEWAY_POR_DEFECTO = 'https://peaje-gateway.up.railway.app'
+export const GATEWAY_POR_DEFECTO = 'https://api.usepeaje.com'
 
 export type Fetch = typeof fetch
 

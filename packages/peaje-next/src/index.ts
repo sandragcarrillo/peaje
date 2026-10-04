@@ -6,7 +6,7 @@
  */
 import { reglasNext } from '@peaje/shared'
 
-export const GATEWAY_POR_DEFECTO = 'https://peaje-gateway.up.railway.app'
+export const GATEWAY_POR_DEFECTO = 'https://api.usepeaje.com'
 
 export type OpcionesPeaje = {
   /** El slug del negocio en Peaje (el mismo del dashboard). */

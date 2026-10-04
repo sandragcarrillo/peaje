@@ -12,7 +12,7 @@ export { accesoPro, type AccesoPro }
 export const esActivo = (tenant: Tenant) => accesoPro(tenant).activo
 
 // Igual que monitor/reporte.ts; copiado para no importar ese módulo (y su ciclo) desde acá.
-const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://peaje-dashboard.vercel.app').replace(/\/$/, '')
+const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com').replace(/\/$/, '')
 
 /** Dónde se suscribe el dueño: la sección Plan de "Mi agente". */
 export const urlPlan = (slug: string) => `${DASHBOARD}/t/${slug}/agente#plan`

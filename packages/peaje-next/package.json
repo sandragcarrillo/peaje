@@ -1,6 +1,6 @@
 {
   "name": "@peaje/next",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Peaje for Next.js: runtime proxy, rewrites and the head block that make your site answer 402 (MPP, x402), MCP and OpenAPI on your own domain.",
   "license": "MIT",
   "type": "module",

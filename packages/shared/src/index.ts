@@ -44,32 +44,6 @@ export type NetworkDef = {
 }
 
 export const NETWORKS: Record<NetworkId, NetworkDef> = {
-  tempo: {
-    id: 'tempo',
-    label: 'Tempo',
-    token: TOKENS.pathUsd,
-    tokenSymbol: 'pathUSD',
-    decimals: 6,
-    mainnet: TEMPO.mainnet,
-    testnet: TEMPO.testnet,
-  },
-  arc: {
-    id: 'arc',
-    label: 'Arc',
-    // Interfaz ERC-20 del USDC nativo de Arc; el gas de la red se paga en ese mismo USDC.
-    token: '0x3600000000000000000000000000000000000000',
-    tokenSymbol: 'USDC',
-    decimals: 6,
-    // Leído on-chain del contrato: name() = "USDC", version() = "2".
-    eip3009: { name: 'USDC', version: '2' },
-    // Arc no publica direcciones de mainnet todavía (sept 2026).
-    mainnet: null,
-    testnet: {
-      chainId: 5042002,
-      rpcUrl: 'https://rpc.testnet.arc.io',
-      explorerUrl: 'https://testnet.arcscan.app',
-    },
-  },
   arbitrum: {
     id: 'arbitrum',
     label: 'Arbitrum',
@@ -119,12 +93,39 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
       explorerUrl: 'https://explorer.testnet.chain.robinhood.com',
     },
   },
+  tempo: {
+    id: 'tempo',
+    label: 'Tempo',
+    token: TOKENS.pathUsd,
+    tokenSymbol: 'pathUSD',
+    decimals: 6,
+    mainnet: TEMPO.mainnet,
+    testnet: TEMPO.testnet,
+  },
+  arc: {
+    id: 'arc',
+    label: 'Arc',
+    // Interfaz ERC-20 del USDC nativo de Arc; el gas de la red se paga en ese mismo USDC.
+    token: '0x3600000000000000000000000000000000000000',
+    tokenSymbol: 'USDC',
+    decimals: 6,
+    // Leído on-chain del contrato: name() = "USDC", version() = "2".
+    eip3009: { name: 'USDC', version: '2' },
+    // Arc no publica direcciones de mainnet todavía (sept 2026).
+    mainnet: null,
+    testnet: {
+      chainId: 5042002,
+      rpcUrl: 'https://rpc.testnet.arc.io',
+      explorerUrl: 'https://testnet.arcscan.app',
+    },
+  },
 }
 
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
 
 /**
- * Cadenas con riel de cobro, una vez cada una y en el orden de NETWORK_IDS.
+ * Cadenas con riel de cobro, una vez cada una y en el orden de NETWORK_IDS
+ * (Arbitrum y Robinhood primero: es el orden en que se muestran).
  * Arbitrum tiene dos rieles (USDC y USDG) pero es una sola cadena: las
  * etiquetas para personas cuentan cadenas, no tokens.
  */

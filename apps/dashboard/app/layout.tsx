@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
         </Providers>
         </LocaleProvider>
         <footer className="border-t border-border px-6 py-8">
-          <p className="mx-auto max-w-5xl font-mono text-xs tracking-[0.08em] text-muted">
+          <p className="mx-auto max-w-5xl text-center font-mono text-xs tracking-[0.08em] text-muted">
             PEAJE · 2026
           </p>
         </footer>

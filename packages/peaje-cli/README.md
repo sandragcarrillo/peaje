@@ -1,6 +1,6 @@
 # @peaje/cli
 
-Install [Peaje](https://peaje-gateway.up.railway.app) on your site in one command. Peaje charges AI agents per request (MPP, HTTP 402) and publishes your catalog, MCP server and OpenAPI spec; this CLI makes all of that answer on your own domain.
+Install [Peaje](https://api.usepeaje.com) on your site in one command. Peaje charges AI agents per request (MPP, HTTP 402) and publishes your catalog, MCP server and OpenAPI spec; this CLI makes all of that answer on your own domain.
 
 ```sh
 npx @peaje/cli@1 init <slug> --yes
@@ -53,7 +53,7 @@ npx @peaje/cli@1 task <id>              # the full prompt, to implement in this 
 npx @peaje/cli@1 done <id> --url <live url>   # after deploying; Peaje verifies it on the live site
 ```
 
-`done` exits 0 when Peaje verified the task on the live site and 1 when it is marked done but not live yet (Peaje checks again every day). The same tasks are available over MCP at `https://peaje-gateway.up.railway.app/_owner/mcp` with `Authorization: Bearer <agent key>`; the dashboard shows the exact line for Claude Code and Cursor.
+`done` exits 0 when Peaje verified the task on the live site and 1 when it is marked done but not live yet (Peaje checks again every day). The same tasks are available over MCP at `https://api.usepeaje.com/_owner/mcp` with `Authorization: Bearer <agent key>`; the dashboard shows the exact line for Claude Code and Cursor.
 
 ## Outside Next.js
 
