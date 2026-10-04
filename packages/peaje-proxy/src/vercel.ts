@@ -15,6 +15,7 @@
  * request no pasa por la función, Vercel la reescribe al gateway (método,
  * body y query intactos). Con un middleware propio: `peaje({ slug }, tuyo)`.
  */
+import { PEAJE_HOST_HEADER } from '@peaje/shared'
 import { crearPeaje, type OpcionesPeaje } from './index'
 
 export type { OpcionesPeaje } from './index'
@@ -47,6 +48,8 @@ export function peajeVercel(opciones: OpcionesPeaje, siguiente?: MiddlewareVerce
       // challenge nombra al gateway y los clientes x402 estrictos abortan.
       const headers = new Headers(request.headers)
       headers.set('x-forwarded-host', url.host)
+      // Railway (donde corre el gateway) pisa X-Forwarded-Host: el host del negocio va también acá.
+      headers.set(PEAJE_HOST_HEADER, url.host)
       headers.set('x-forwarded-proto', url.protocol.replace(':', ''))
       return respuestaMiddleware({ 'x-middleware-rewrite': destino }, headers)
     }

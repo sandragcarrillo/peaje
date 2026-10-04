@@ -32,6 +32,7 @@ export type Eco = {
   body: string
   forwardedHost: string | null
   forwardedProto: string | null
+  peajeHost: string | null
   origin: string | null
 }
 
@@ -55,6 +56,7 @@ export async function levantarGateway(): Promise<{ url: string; cerrar: () => Pr
         body: Buffer.concat(partes).toString('utf8'),
         forwardedHost: (req.headers['x-forwarded-host'] as string | undefined) ?? null,
         forwardedProto: (req.headers['x-forwarded-proto'] as string | undefined) ?? null,
+        peajeHost: (req.headers['x-peaje-forwarded-host'] as string | undefined) ?? null,
         origin: (req.headers['x-peaje-origin'] as string | undefined) ?? null,
       }
       const json = Buffer.from(JSON.stringify(eco))

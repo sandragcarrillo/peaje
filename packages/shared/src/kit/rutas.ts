@@ -58,6 +58,15 @@ export const RUTAS_DINAMICAS = [
 export const PEAJE_FETCH_HEADER = 'x-peaje-fetch'
 
 /**
+ * Host público del negocio, para que el gateway arme la URL del challenge 402.
+ * Va además de `X-Forwarded-Host` porque el borde de Railway (donde corre el
+ * gateway) pisa ese header con su propio host: sin este, el 402 que sale en
+ * el dominio del negocio nombra la URL del gateway y los clientes x402
+ * estrictos abortan ("resource does not match response URL").
+ */
+export const PEAJE_HOST_HEADER = 'x-peaje-forwarded-host'
+
+/**
  * Una ruta de API con precio del negocio (tabla `routes`), tal como la publica
  * el manifiesto: método y patrón (`/api/x`, `/api/x/:id`, `/api/x/*`). El proxy
  * la reenvía al gateway para que el 402 salga en el dominio del negocio.
@@ -303,6 +312,7 @@ export default {
     // The gateway rebuilds the 402 challenge URL from these: without them the
     // challenge names the gateway host and strict x402 clients abort.
     headers.set('x-forwarded-host', url.host)
+    headers.set('${PEAJE_HOST_HEADER}', url.host)
     headers.set('x-forwarded-proto', url.protocol.replace(':', ''))
     return fetch(new Request(destino, { method: request.method, headers, body: request.body, redirect: 'manual' }))
   },
@@ -313,6 +323,7 @@ function nginx(base: string, c: Comentarios): string {
   const comunes = `        proxy_ssl_server_name on;
         proxy_set_header Host ${new URL(base).host};
         proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Peaje-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;`
   // Sin guarda condicional para /llms.txt: en nginx un `if` dentro de
   // `location` con proxy_pass es terreno minado. El gateway corta el bucle
@@ -363,10 +374,12 @@ yoursite.com {
     reverse_proxy @peaje https://${upstream} {
         header_up Host {upstream_hostport}
         header_up X-Forwarded-Host {host}
+        header_up X-Peaje-Forwarded-Host {host}
     }
     reverse_proxy @peajeLlms https://${upstream} {
         header_up Host {upstream_hostport}
         header_up X-Forwarded-Host {host}
+        header_up X-Peaje-Forwarded-Host {host}
     }
 }`
 }

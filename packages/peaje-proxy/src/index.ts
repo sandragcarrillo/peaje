@@ -13,7 +13,7 @@
  * separa decidir de reenviar: en Express el body no se lee hasta saber que la
  * request es de Peaje, así los body parsers de la app no pierden nada.
  */
-import { crearProxyRuntime, RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
+import { crearProxyRuntime, PEAJE_HOST_HEADER, RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
 
 export const GATEWAY_POR_DEFECTO = 'https://api.usepeaje.com'
 
@@ -101,7 +101,10 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
       // Detrás de otro proxy (Railway, Render, un load balancer) el host de la
       // URL es el interno: manda el que ya venía reenviado, si venía.
       const primero = (h: string) => headers.get(h)?.split(',')[0]?.trim() || null
-      salida.set('x-forwarded-host', primero('x-forwarded-host') ?? url.host)
+      const host = primero('x-forwarded-host') ?? url.host
+      salida.set('x-forwarded-host', host)
+      // Railway (donde corre el gateway) pisa X-Forwarded-Host: el host del negocio va también acá.
+      salida.set(PEAJE_HOST_HEADER, host)
       salida.set('x-forwarded-proto', primero('x-forwarded-proto') ?? url.protocol.replace(':', ''))
       const sinBody = method === 'GET' || method === 'HEAD'
       const res = await fetchImpl(destino, { method, headers: salida, body: sinBody ? null : body, redirect: 'manual' })

@@ -20,7 +20,7 @@
  * request pagada de un agente que se hace pasar por él. Sin él, solo se
  * reenvían los archivos de discovery y los links `/r/`, y se avisa en consola.
  */
-import { crearProxyRuntime, RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
+import { crearProxyRuntime, PEAJE_HOST_HEADER, RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
 import { baseDe, type OpcionesPeaje } from './index'
 
@@ -74,8 +74,10 @@ export function peajeProxy(opciones: OpcionesProxy, siguiente?: Middleware): Mid
     if (decision) {
       // El gateway arma la URL del 402 con estos headers: sin ellos el
       // challenge nombra al gateway y los clientes x402 estrictos abortan.
+      // El host va también en PEAJE_HOST_HEADER porque Railway pisa X-Forwarded-Host.
       const headers = new Headers(req.headers)
       headers.set('x-forwarded-host', req.nextUrl.host)
+      headers.set(PEAJE_HOST_HEADER, req.nextUrl.host)
       headers.set('x-forwarded-proto', req.nextUrl.protocol.replace(':', ''))
       return NextResponse.rewrite(new URL(decision.destino), { request: { headers } })
     }

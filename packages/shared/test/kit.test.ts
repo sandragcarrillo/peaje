@@ -55,6 +55,10 @@ test('nginx reenvía host original y habilita SNI; Caddy y Worker reenvían X-Fo
   assert.ok(n.includes('X-Forwarded-Host $host'))
   assert.ok(generarProxy('caddy', base).includes('X-Forwarded-Host {host}'))
   assert.ok(generarProxy('cloudflare', base).includes(`'x-forwarded-host'`))
+  // El borde de Railway pisa X-Forwarded-Host: el host del negocio viaja también en el header propio.
+  assert.ok(n.includes('X-Peaje-Forwarded-Host $host'))
+  assert.ok(generarProxy('caddy', base).includes('X-Peaje-Forwarded-Host {host}'))
+  assert.ok(generarProxy('cloudflare', base).includes(`'x-peaje-forwarded-host'`))
 })
 
 test('reglasNext es la misma lista que la config de texto', () => {

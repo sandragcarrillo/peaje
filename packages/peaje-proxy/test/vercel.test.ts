@@ -17,6 +17,7 @@ test('vercel: ruta con precio → x-middleware-rewrite al gateway con x-forwarde
   assert.equal(res.headers.get('x-middleware-rewrite'), `${gw.url}/${SLUG}/api/forecast?city=lima`)
   assert.equal(res.headers.get('x-middleware-request-x-forwarded-host'), 'cafe-andino.test')
   assert.equal(res.headers.get('x-middleware-request-x-forwarded-proto'), 'https')
+  assert.equal(res.headers.get('x-middleware-request-x-peaje-forwarded-host'), 'cafe-andino.test')
   assert.match(res.headers.get('x-middleware-override-headers') ?? '', /x-forwarded-host/)
   assert.equal(gw.pedidos.filter((p) => p.includes('/api/forecast')).length, 0, 'Vercel reescribe: el middleware no hace el fetch')
 })

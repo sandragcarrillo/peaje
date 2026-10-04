@@ -67,6 +67,7 @@ test('POST: método y body llegan intactos; x-forwarded-* que ya venían se resp
   assert.equal(eco.search, '?v=1')
   assert.equal(eco.body, '{"hola":"mundo"}')
   assert.equal(eco.forwardedHost, 'www.cafe-andino.com')
+  assert.equal(eco.peajeHost, 'www.cafe-andino.com', 'Railway pisa X-Forwarded-Host: el host viaja también en el header propio')
 })
 
 test('/llms.txt con x-peaje-fetch es el gateway leyendo el del sitio: pasa a la app', async () => {

@@ -1,7 +1,7 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import type { Tenant } from '@peaje/db'
-import { CHAIN_LABELS, NETWORK_IDS, PEAJE_FETCH_HEADER } from '@peaje/shared'
+import { CHAIN_LABELS, NETWORK_IDS, PEAJE_FETCH_HEADER, PEAJE_HOST_HEADER } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
 import { agentCard } from './agents/erc8004.js'
@@ -54,7 +54,14 @@ import { withdrawals } from './withdrawals.js'
  */
 function conUrlExterna(req: Request, tenant?: Tenant): Request {
   const proto = req.headers.get('x-forwarded-proto')
-  const host = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? req.headers.get('host')
+  // El borde de Railway pisa X-Forwarded-Host con el host del gateway, así que
+  // el proxy del negocio manda el suyo también en PEAJE_HOST_HEADER. Solo vale
+  // si es el dominio del tenant: nadie puede hacer que el 402 nombre otro host.
+  const propio = req.headers.get(PEAJE_HOST_HEADER)?.split(',')[0]?.trim()
+  const host =
+    (tenant && propio && esHostDelTenant(propio, tenant) ? propio : null) ??
+    req.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ??
+    req.headers.get('host')
   if (!proto && !host) return req
   const url = new URL(req.url)
   // Cuando la petición entra por el proxy del negocio (rewrite en su host), el
