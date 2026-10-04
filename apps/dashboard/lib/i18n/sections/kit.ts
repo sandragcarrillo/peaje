@@ -1,6 +1,21 @@
 export const kit = {
   es: {
     monitorUltima: 'Última verificación',
+    pestanaAgente: 'Usa tu herramienta de IA',
+    pestanaManual: 'Hazlo tú',
+    agenteTitulo: 'Pégale este texto a tu herramienta de IA',
+    agenteIntro: 'Sirve con Claude Code, Cursor, Lovable, v0 o Bolt, abiertos en el proyecto de tu sitio. Instala Peaje y al final te dice, paso por paso, qué poner en tu hosting.',
+    agenteCopiar: 'Copiar el texto',
+    agenteCopiado: 'Copiado',
+    agenteDespues: 'Cuando tu herramienta termine y publiques el sitio, vuelve aquí: abajo revisamos que todo quedó bien.',
+    promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
+      [
+        `Instala Peaje en este sitio (${originHost}). Peaje deja el sitio legible para agentes de IA y permite cobrarles por ruta, de forma opcional.`,
+        `1. Si puedes correr comandos, corre \`npx @peaje/cli@1 init ${slug} --yes\` en la raíz del proyecto y aplica lo que reporte como paso manual. Si no puedes correr comandos, sigue al pie de la letra ${base}/kit/INSTALL.md; los archivos ya generados están en ${base}/kit.json.`,
+        `2. Guarda esta variable en el archivo de entorno local que git ignora (por ejemplo .env.local): PEAJE_ORIGIN_SECRET=${secreto}. Nunca la escribas en un archivo que se suba al repositorio.`,
+        `3. Al terminar, explícame en palabras simples, paso por paso y con los nombres exactos de los menús, cómo agrego esa misma variable PEAJE_ORIGIN_SECRET en mi hosting (Vercel, Railway, Cloudflare o el que uses) y cómo vuelvo a publicar el sitio. No des por hecho que sé programar.`,
+        `4. Cierra diciéndome que, después de publicar, abra ${panel} para comprobar que todo quedó bien.`,
+      ].join('\n'),
     unComandoTitulo: 'Instala Peaje con un comando',
     unComandoIntro: 'Córrelo en la carpeta de tu proyecto. Detecta si usas Next.js, Vite, Express o Hono y deja listo lo que los agentes leen.',
     unComandoPaso1: 'Corre esto en tu proyecto',
@@ -249,6 +264,21 @@ npx @ora-ai/ax@latest audit ${domain}
   },
   en: {
     monitorUltima: 'Last check',
+    pestanaAgente: 'Use your AI coding tool',
+    pestanaManual: 'Do it yourself',
+    agenteTitulo: 'Paste this into your AI coding tool',
+    agenteIntro: 'Works with Claude Code, Cursor, Lovable, v0 or Bolt, open in your site project. It installs Peaje and ends by telling you, step by step, what to set in your hosting.',
+    agenteCopiar: 'Copy the text',
+    agenteCopiado: 'Copied',
+    agenteDespues: 'When your tool is done and the site is deployed, come back here: below we check everything is in place.',
+    promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
+      [
+        `Install Peaje on this site (${originHost}). Peaje makes the site readable by AI agents and lets it charge them per route, optionally.`,
+        `1. If you can run commands, run \`npx @peaje/cli@1 init ${slug} --yes\` at the project root and apply whatever it reports as a manual step. If you cannot run commands, follow ${base}/kit/INSTALL.md to the letter; the generated files are at ${base}/kit.json.`,
+        `2. Save this variable in the local env file that git ignores (for example .env.local): PEAJE_ORIGIN_SECRET=${secreto}. Never write it into a file that gets committed.`,
+        `3. When you are done, explain to me in plain words, step by step and with the exact menu names, how to add that same PEAJE_ORIGIN_SECRET variable in my hosting (Vercel, Railway, Cloudflare or whichever I use) and how to redeploy the site. Do not assume I can code.`,
+        `4. Finish by telling me to open ${panel} after deploying, to confirm everything is in place.`,
+      ].join('\n'),
     unComandoTitulo: 'Install Peaje with one command',
     unComandoIntro: 'Run it in your project folder. It detects Next.js, Vite, Express or Hono and sets up what agents read.',
     unComandoPaso1: 'Run this in your project',

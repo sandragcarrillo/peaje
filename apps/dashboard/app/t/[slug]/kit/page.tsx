@@ -15,7 +15,7 @@ import { MotoresDeRespuesta } from './motores'
 import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
 import { BloqueProxy } from './proxy'
 import { UltimaVerificacion } from './ultima-verificacion'
-import { Copiable } from './comando'
+import { Copiable, Pestanas, PromptAgente } from './comando'
 import { generarProxy, secretoOrigen, type Entidad } from '@peaje/shared'
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
@@ -34,6 +34,8 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   }
 
   const base = `${gatewayUrl}/${tenant.slug}`
+  const secreto = await secretoOrigen(tenant.embedSecret)
+  const dashboardUrl = process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com'
   const domain = scannableDomain(tenant.originUrl)
   // El kit se aplica en el WEBSITE del negocio (dominio raíz), no en el host de la API.
   const originHost = domain ?? new URL(tenant.originUrl).hostname
@@ -95,26 +97,38 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           }
         />
 
-        <section className="space-y-4 border border-accent/40 bg-panel p-5">
-          <div>
-            <h2 className="font-medium">{d.unComandoTitulo}</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted">{d.unComandoIntro}</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm">1. {d.unComandoPaso1}</p>
-            <Copiable texto={`npx @peaje/cli@1 init ${tenant.slug}`} />
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm">2. {d.unComandoPaso2}</p>
-            <Copiable texto={`PEAJE_ORIGIN_SECRET=${await secretoOrigen(tenant.embedSecret)}`} />
-            <p className="text-xs text-muted">{d.unComandoPaso2Nota}</p>
-          </div>
-          <p className="text-sm">3. {d.unComandoPaso3}</p>
-        </section>
+        <Pestanas
+          agente={
+            <section className="space-y-4 border border-accent/40 bg-panel p-5">
+              <div>
+                <h2 className="font-medium">{d.agenteTitulo}</h2>
+                <p className="mt-1 max-w-2xl text-sm text-muted">{d.agenteIntro}</p>
+              </div>
+              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, secreto, `${dashboardUrl}/t/${tenant.slug}/kit`)} />
+              <p className="text-sm text-muted">{d.agenteDespues}</p>
+            </section>
+          }
+          manual={
+            <section className="space-y-4 border border-accent/40 bg-panel p-5">
+              <div>
+                <h2 className="font-medium">{d.unComandoTitulo}</h2>
+                <p className="mt-1 max-w-2xl text-sm text-muted">{d.unComandoIntro}</p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm">1. {d.unComandoPaso1}</p>
+                <Copiable texto={`npx @peaje/cli@1 init ${tenant.slug}`} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm">2. {d.unComandoPaso2}</p>
+                <Copiable texto={`PEAJE_ORIGIN_SECRET=${secreto}`} />
+                <p className="text-xs text-muted">{d.unComandoPaso2Nota}</p>
+              </div>
+              <p className="text-sm">3. {d.unComandoPaso3}</p>
+            </section>
+          }
+        />
 
         <UltimaVerificacion tenantId={tenant.id} />
-
-        <p className="text-sm text-muted">{d.sinTerminal}</p>
 
         <ImplementarPeaje
           piezas={[
