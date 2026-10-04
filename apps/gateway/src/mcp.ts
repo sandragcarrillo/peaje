@@ -106,7 +106,16 @@ function buildServer(
       title: `${tenant.name} · paid tools`,
       description: `Tools from ${tenant.name}, paid per call via MPP. No API keys: each tool charges the price it advertises and returns a receipt.`,
     },
-    { capabilities: { tools: {}, resources: {} } },
+    {
+      capabilities: { tools: {}, resources: {} },
+      // Las instrucciones viajan en el saludo inicial: un agente sabe qué es
+      // este servidor y cómo pagar sin leer nada más.
+      instructions: [
+        `${tenant.name} sells content and data to AI agents through this server.`,
+        'Call get_pricing first: it is free and lists every tool with its price. Each paid tool returns an HTTP 402 payment challenge (MPP) on the first call; pay it with a wallet that supports MPP or x402 and call again. There are no API keys and no accounts: the receipt comes back in the tool result.',
+        'Free resources: pricing.md and llms.txt.',
+      ].join(' '),
+    },
   )
 
   // Recursos informativos (mcp-resource-listing): precios y guía, gratis.
@@ -142,7 +151,9 @@ function buildServer(
     'get_pricing',
     {
       description: `List everything ${tenant.name} sells to agents and what each item costs. Free to call: use it before paying for anything else.`,
-      inputSchema: {},
+      inputSchema: {
+        detail: z.enum(['summary', 'full']).optional().describe('summary: one line per item with its price (default). full: the complete pricing document with descriptions and how to pay.'),
+      },
       annotations: {
         title: `${tenant.name} pricing`,
         readOnlyHint: true,
@@ -150,8 +161,16 @@ function buildServer(
         openWorldHint: false,
       },
     },
-    async () => ({
-      content: [{ type: 'text' as const, text: pricingMd({ tenant, routes: catalogo, base }) }],
+    async (args: { detail?: 'summary' | 'full' }) => ({
+      content: [
+        {
+          type: 'text' as const,
+          text:
+            args.detail === 'full'
+              ? pricingMd({ tenant, routes: catalogo, base })
+              : catalogo.map((r) => `${r.method} ${r.pathPattern}: $${Number(r.priceUsd)}`).join('\n') || `${tenant.name} has nothing priced yet.`,
+        },
+      ],
     }),
   )
 
@@ -168,7 +187,9 @@ function buildServer(
           precio > 0
             ? `Fetch "${titulo}" from ${tenant.name}. Costs $${precio} per call (MPP; pay in pathUSD on Tempo or USDC on Arc). No API key needed.`
             : `Fetch "${titulo}" from ${tenant.name}. Free.`,
-        inputSchema: {},
+        inputSchema: {
+          max_chars: z.number().int().positive().optional().describe('Return at most this many characters of the content, from the start. Omit for the whole thing.'),
+        },
         annotations: {
           title: titulo,
           readOnlyHint: true,
@@ -176,10 +197,11 @@ function buildServer(
           openWorldHint: true,
         },
       },
-      async (_args: Record<string, unknown>, extra) => {
+      async (args: { max_chars?: number }, extra) => {
+        const recortar = (texto: string) => (args.max_chars ? texto.slice(0, args.max_chars) : texto)
         if (precio <= 0) {
           const libre = await fetch(resource.url, { redirect: 'follow' })
-          return { content: [{ type: 'text' as const, text: await libre.text() }] }
+          return { content: [{ type: 'text' as const, text: recortar(await libre.text()) }] }
         }
 
         const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
@@ -202,7 +224,7 @@ function buildServer(
           })
         }
 
-        const sealed = result.withReceipt({ content: [{ type: 'text' as const, text: body }] })
+        const sealed = result.withReceipt({ content: [{ type: 'text' as const, text: originFallo ? body : recortar(body) }] })
 
         const receipt = (sealed._meta?.['org.paymentauth/receipt'] ?? {}) as {
           reference?: string

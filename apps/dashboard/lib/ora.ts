@@ -160,12 +160,21 @@ export type Prevision = {
  */
 export function prevision(score: OraScore): Prevision {
   const arreglables: Prevision['arreglables'] = []
+  const vistos = new Set<string>()
   let ganancia = 0
   for (const layer of score.layers) {
     for (const check of layer.checks) {
       if (check.status === 'pass') continue
+      // "No aplica" no es una falla: Ora lo marca cuando otro protocolo ya
+      // cubre lo mismo (MPP y x402 salen N/A si detecta ACP). No hay nada que
+      // desbloquear ahí, y sumarlo inflaba la previsión.
+      if (check.status === 'na' || check.status === 'not_applicable') continue
       const fix = PEAJE_FIXABLE[check.id]
       if (!fix) continue
+      // Ora corre el mismo chequeo sobre su "MCP de producto" y su "MCP de
+      // docs" y los lista dos veces; para el dueño es una sola cosa.
+      if (vistos.has(check.id)) continue
+      vistos.add(check.id)
       arreglables.push({ check, bloque: fix.bloque, viaGateway: fix.viaGateway ?? false })
       ganancia += check.estScoreGain ?? check.maxScore ?? 0
     }
