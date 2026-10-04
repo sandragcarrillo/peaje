@@ -10,6 +10,7 @@ import { currentTenant } from '@/lib/session'
 import { Logo } from './components/logo'
 import './globals.css'
 import { Providers } from './providers'
+import { salir } from './salir/actions'
 
 // Grotesca para titulares y body, mono para todo el chrome técnico.
 // Ver design/direccion-visual.md §3.
@@ -51,13 +52,14 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                   <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} />
                   <ThemeToggle />
                   <LanguageToggle locale={locale} />
-                  <Link
-                    href="/salir"
-                    prefetch={false}
-                    className="rounded-full border border-border px-4 py-1.5 text-xs text-muted hover:border-muted hover:text-text"
-                  >
-                    {d.nav.salir}
-                  </Link>
+                  <form action={salir}>
+                    <button
+                      type="submit"
+                      className="rounded-full border border-border px-4 py-1.5 text-xs text-muted hover:border-muted hover:text-text"
+                    >
+                      {d.nav.salir}
+                    </button>
+                  </form>
                 </nav>
               ) : (
                 <nav className="flex items-center gap-3 text-sm">
