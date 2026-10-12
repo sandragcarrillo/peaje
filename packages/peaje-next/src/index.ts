@@ -39,10 +39,12 @@ export type ResultadoRewrites = ReglaRewrite[] | RewritesObjeto
 
 export type ConfigConRewrites = {
   rewrites?: () => ResultadoRewrites | Promise<ResultadoRewrites>
-  [clave: string]: unknown
 }
 
-export type ConfigOFuncion<C extends ConfigConRewrites = ConfigConRewrites> =
+// `object` y no ConfigConRewrites: con una firma de índice, el `NextConfig`
+// tipado (una interface) no era asignable y `withPeaje(nextConfig)` no compilaba
+// en un proyecto Next con TypeScript, que es el caso por defecto.
+export type ConfigOFuncion<C extends object = ConfigConRewrites> =
   | C
   | ((phase: string, contexto: { defaultConfig: unknown }) => C | Promise<C>)
 
@@ -67,22 +69,22 @@ export function fusionarRewrites(previo: ResultadoRewrites | undefined, reglas: 
   return { ...objeto, beforeFiles: [...nuevas, ...antes] }
 }
 
-function envolverConfig<C extends ConfigConRewrites>(config: C, reglas: ReglaRewrite[]): C {
-  const original = config.rewrites
+function envolverConfig<C extends object>(config: C, reglas: ReglaRewrite[]): C {
+  const original = (config as ConfigConRewrites).rewrites
   return {
     ...config,
     async rewrites() {
       const previo = original ? await original.call(config) : undefined
       return fusionarRewrites(previo, reglas)
     },
-  }
+  } as C
 }
 
 /**
  * Acepta la config como objeto o como función `(phase, { defaultConfig })`,
  * y un `rewrites()` sync o async que devuelva array u objeto.
  */
-export function withPeaje<C extends ConfigConRewrites>(nextConfig: ConfigOFuncion<C>, opciones: OpcionesPeaje): ConfigOFuncion<C> {
+export function withPeaje<C extends object>(nextConfig: ConfigOFuncion<C>, opciones: OpcionesPeaje): ConfigOFuncion<C> {
   if (!opciones?.slug) throw new Error('withPeaje: `slug` is required (the business slug from your Peaje dashboard).')
   const reglas = reglasNext(baseDe(opciones)) as ReglaRewrite[]
   if (typeof nextConfig === 'function') {

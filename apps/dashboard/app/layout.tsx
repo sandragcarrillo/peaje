@@ -10,6 +10,7 @@ import { currentTenant } from '@/lib/session'
 import { Logo } from './components/logo'
 import './globals.css'
 import { Providers } from './providers'
+import { PeajeHead } from '@peaje/next/head'
 import { salir } from './salir/actions'
 
 // Grotesca para titulares y body, mono para todo el chrome técnico.
@@ -34,6 +35,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             __html: `try{var t=localStorage.getItem('peaje_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,
           }}
         />
+        <PeajeHead slug="peaje" originHost="usepeaje.com" />
       </head>
       <body className={`${sans.variable} ${mono.variable} antialiased`}>
         <LocaleProvider locale={locale}>

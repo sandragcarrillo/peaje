@@ -1,3 +1,4 @@
+import type { NextConfig } from 'next'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
@@ -64,7 +65,7 @@ test('nextConfig como función (phase, { defaultConfig })', async () => {
   assert.equal(faseVista, 'phase-production-build')
   assert.equal(r.beforeFiles?.length, TOTAL)
   assert.equal(r.afterFiles?.length, 1)
-  const c = await (envuelta as (p: string, x: { defaultConfig: unknown }) => Promise<ConfigConRewrites>)('phase-production-build', { defaultConfig: {} })
+  const c = await (envuelta as (p: string, x: { defaultConfig: unknown }) => Promise<Record<string, unknown>>)('phase-production-build', { defaultConfig: {} })
   assert.deepEqual(c.images, { domains: ['x'] })
 })
 
@@ -85,7 +86,7 @@ test('idempotente: envolver dos veces o tener reglas al gateway no duplica', asy
 })
 
 test('conserva el resto de la config y exige slug', async () => {
-  const c = withPeaje({ reactStrictMode: true, images: { formats: ['image/avif'] } }, { slug, gateway }) as ConfigConRewrites
+  const c = withPeaje({ reactStrictMode: true, images: { formats: ['image/avif'] } }, { slug, gateway }) as Record<string, unknown>
   assert.equal(c.reactStrictMode, true)
   assert.deepEqual(c.images, { formats: ['image/avif'] })
   assert.throws(() => withPeaje({}, { slug: '' }), /slug/)
@@ -100,4 +101,11 @@ test('gateway por defecto y override por env', () => {
   assert.equal(baseDe({ slug, gateway }), base)
   if (previo === undefined) delete process.env.PEAJE_GATEWAY_URL
   else process.env.PEAJE_GATEWAY_URL = previo
+})
+
+test('acepta el NextConfig tipado (interface) que trae un proyecto Next con TypeScript', async () => {
+  const nextConfig: NextConfig = { reactStrictMode: true }
+  const envuelta = withPeaje(nextConfig, { slug, gateway })
+  const r = await rewritesDe(envuelta)
+  assert.equal(r.beforeFiles?.length, TOTAL)
 })
