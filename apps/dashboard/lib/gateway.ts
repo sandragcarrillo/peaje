@@ -296,3 +296,8 @@ export function pagarPlanConSaldo(slug: string, plan: 'founder' | 'pro') {
   return internal<{ ok: true; plan: string; planUntil: string }>(`/${slug}/billing/pay-with-balance`, { method: 'POST', body: JSON.stringify({ plan }) })
 }
 // ---- fin M9 ----
+
+/** Pide al gateway que escriba la descripción del sitio para agentes, leyéndolo. No bloquea a quien llama. */
+export function describirSitio(slug: string): void {
+  void internal<{ description: string | null }>(`/${slug}/describe`, { method: 'POST' }).catch(() => {})
+}

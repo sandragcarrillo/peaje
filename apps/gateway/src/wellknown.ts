@@ -14,6 +14,9 @@ import { env } from './env.js'
 
 type Ctx = { tenant: Tenant; routes: Route[]; base: string }
 
+/** Qué es el negocio, en sus palabras o leído de su sitio (ver describir.ts). */
+const queEs = (tenant: Tenant) => tenant.entityDescription?.trim() || null
+
 /** "pathUSD on Tempo, USDC on Arc, ... or USDG on Robinhood": para prosa de discovery. */
 const RAILS = (() => {
   const rieles = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)}`)
@@ -105,7 +108,9 @@ export function llmsTxt({ tenant, routes, base }: Ctx): string {
   return [
     `# ${tenant.name}`,
     '',
-    `> Pay-per-request API for agents (MPP over HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource. Use it when you need ${tenant.name} programmatically and only want to pay for what you consume.`,
+    queEs(tenant)
+      ? `> ${queEs(tenant)} Priced routes are paid per request over HTTP 402 (MPP or x402) in stablecoin (${RAILS}), with no API key and no signup.`
+      : `> Pay-per-request API for agents (MPP over HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource. Use it when you need ${tenant.name} programmatically and only want to pay for what you consume.`,
     '',
     '## Resources',
     '',
@@ -239,7 +244,8 @@ export function agentsMd({ tenant, routes, base }: Ctx): string {
     '',
     '## What this is',
     '',
-    `${tenant.name} exposes data through a pay-per-request API. You pay per call in stablecoin (${RAILS}) via MPP/HTTP 402, with no prior signup.`,
+    ...(queEs(tenant) ? [queEs(tenant)!, ''] : []),
+    `${queEs(tenant) ? 'Priced routes are' : `${tenant.name} exposes data through a pay-per-request API.`} paid per call in stablecoin (${RAILS}) via MPP/HTTP 402, with no prior signup.`,
     '',
     '## When to use it',
     '',
@@ -304,7 +310,7 @@ export function aiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown
         displayName: `${tenant.name} API`,
         type: 'application/vnd.oai.openapi+json;version=3.1',
         url: `${base}/openapi.json`,
-        description: `Pay-per-request API from ${tenant.name} (MPP over HTTP 402). No API keys.`,
+        description: queEs(tenant) ?? `Pay-per-request API from ${tenant.name} (MPP over HTTP 402). No API keys.`,
         tags: ['api', 'openapi', 'pay-per-request', 'x402', 'mpp'],
         representativeQueries: [
           `buy data from ${tenant.name} without an API key`,
@@ -397,7 +403,7 @@ function slugSeguro(texto: string): string {
 export function agentCard({ tenant, routes, base }: Ctx): Record<string, unknown> {
   return {
     name: tenant.name,
-    description: `Pay-per-request API (MPP/HTTP 402). ${routes.map((r) => r.description).filter(Boolean).join(' · ')}`,
+    description: queEs(tenant) ?? `Pay-per-request API (MPP/HTTP 402). ${routes.map((r) => r.description).filter(Boolean).join(' · ')}`,
     url: base,
     version: '1.0.0',
     capabilities: { streaming: false, pushNotifications: false },
@@ -537,7 +543,7 @@ export function bazaarResources(
 export function mcpServerCard({ tenant, routes, base }: Ctx): Record<string, unknown> {
   return {
     name: `${tenant.slug}-peaje`,
-    description: `Paid tools from ${tenant.name}: pay per call via MPP, no API keys`,
+    description: queEs(tenant) ?? `Paid tools from ${tenant.name}: pay per call via MPP, no API keys`,
     url: `${base}/mcp`,
     transport: { type: 'streamable-http' },
     version: '1.0.0',

@@ -43,6 +43,7 @@ export function enriquecer(doc: Doc, tenant: Tenant, base: string): Doc {
     ...doc.info,
     version: '1.0.0',
     description: [
+      ...(tenant.entityDescription?.trim() ? [tenant.entityDescription.trim(), ''] : []),
       `Pay-per-request API from ${tenant.name}. No API keys and no signup: call an endpoint, get HTTP 402 with the terms, settle in stablecoin, get the resource.`,
       '',
       `Auth walkthrough: ${base}/auth.md · Priced catalog: ${base}/discovery/resources · MCP: ${base}/mcp`,

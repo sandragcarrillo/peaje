@@ -2,6 +2,7 @@ import type { Route } from '@peaje/db'
 import { Hono } from 'hono'
 import { env } from './env.js'
 import { avisarIndexNow } from './indexnow.js'
+import { asegurarDescripcion } from './describir.js'
 import { store } from './store.js'
 
 /**
@@ -56,6 +57,16 @@ export function validarRuta(input: { method?: unknown; pathPattern?: unknown; pr
 function publica(r: Route) {
   return { id: r.id, method: r.method, pathPattern: r.pathPattern, priceUsd: r.priceUsd, description: r.description }
 }
+
+// La descripción que leen los agentes, escrita a partir del sitio (ver describir.ts).
+// La llama el dashboard al registrar un sitio; nunca pisa la que escribió el dueño.
+rutasRouter.post('/:slug/describe', async (c) => {
+  if (c.req.header('authorization') !== `Bearer ${env.internalSecret}`) return c.json({ error: 'No autorizado' }, 401)
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  const description = await asegurarDescripcion(tenant)
+  return c.json({ description })
+})
 
 rutasRouter.get('/:slug/routes', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))

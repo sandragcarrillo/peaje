@@ -104,14 +104,14 @@ function buildServer(
       name: `${tenant.slug}-peaje`,
       version: '1.0.0',
       title: `${tenant.name} · paid tools`,
-      description: `Tools from ${tenant.name}, paid per call via MPP. No API keys: each tool charges the price it advertises and returns a receipt.`,
+      description: tenant.entityDescription?.trim() || `Tools from ${tenant.name}, paid per call via MPP. No API keys: each tool charges the price it advertises and returns a receipt.`,
     },
     {
       capabilities: { tools: {}, resources: {} },
       // Las instrucciones viajan en el saludo inicial: un agente sabe qué es
       // este servidor y cómo pagar sin leer nada más.
       instructions: [
-        `${tenant.name} sells content and data to AI agents through this server.`,
+        tenant.entityDescription?.trim() || `${tenant.name} sells content and data to AI agents through this server.`,
         'Call get_pricing first: it is free and lists every tool with its price. Each paid tool returns an HTTP 402 payment challenge (MPP) on the first call; pay it with a wallet that supports MPP or x402 and call again. There are no API keys and no accounts: the receipt comes back in the tool result.',
         'Free resources: pricing.md and llms.txt.',
       ].join(' '),

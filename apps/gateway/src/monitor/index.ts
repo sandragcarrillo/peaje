@@ -1,4 +1,5 @@
 import type { Tenant } from '@peaje/db'
+import { asegurarDescripcion } from '../describir.js'
 import { Hono } from 'hono'
 import { dominioVerificable } from '@peaje/shared'
 import { env } from '../env.js'
@@ -74,6 +75,8 @@ monitorRouter.post('/run', async (c) => {
   // medición si algo falló; en paralelo sería fácil parecer un ataque.
   for (const t of tenants) {
     try {
+      // Sitios sin descripción: se escribe una leyendo el sitio (una vez; la del dueño nunca se pisa).
+      if (!t.entityDescription?.trim()) await asegurarDescripcion(t).catch((e) => console.warn('[monitor] descripción', t.slug, e instanceof Error ? e.message : e))
       resultados.push(await corridaConAlerta(t.slug))
     } catch (error) {
       resultados.push({ slug: t.slug, error: error instanceof Error ? error.message : String(error) })

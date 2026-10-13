@@ -4,6 +4,7 @@ import { generateEmbedSecret, slugify } from '@peaje/shared'
 import { getDict } from '@/lib/i18n'
 import { createMerchantWallet, getPrivyUserEmail, verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
+import { describirSitio } from '@/lib/gateway'
 import { store } from '@/lib/store'
 
 export type AltaResultado =
@@ -67,6 +68,8 @@ export async function registrarNegocio(
 
   await store.addAllowedOrigin(tenant.id, origin.origin)
   await setSession(privyUserId)
+  // Que llms.txt, openapi y el MCP describan el sitio desde el primer día, sin plantilla.
+  describirSitio(tenant.slug)
 
   return { ok: true, slug: tenant.slug, payoutWallet: wallet.address }
 }
