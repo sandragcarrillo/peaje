@@ -19,6 +19,7 @@ import type {
   Store,
   Tenant,
   TenantEntityUpdate,
+  TenantWalletPatch,
   Verificacion,
   VisitStats,
   Withdrawal,
@@ -46,7 +47,7 @@ import { aggregateVisits, type VisitRow } from './visits'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
-import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
+import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatch } from './types'
 // ---- radar ----
 import type { NewRadarLead, RadarLead } from './types'
 // ---- trabajos y voz ----
@@ -83,11 +84,22 @@ function tenantFrom(row: Row): Tenant {
     // ---- M9 ----
     planUntil: row.plan_until ?? null,
     trialUntil: row.trial_until ?? null,
+    // ---- Paddle: `??` hasta que corra la migración 20261024600000 ----
+    paddleCustomerId: row.paddle_customer_id ?? null,
+    paddleSubscriptionId: row.paddle_subscription_id ?? null,
+    paddleStatus: row.paddle_status ?? null,
+    paddleCancelAt: row.paddle_cancel_at ?? null,
     // ---- voz: `??` hasta que corra la migración 20261024420000 ----
     voiceProfile: (row.voice_profile ?? null) as VoiceProfile | null,
     voiceProfileAt: row.voice_profile_at ?? null,
     email: row.email,
     privyUserId: row.privy_user_id,
+    // ---- app de Privy propia: `??` hasta que corra la migración 20261025000000 ----
+    privyUserIdLegacy: row.privy_user_id_legacy ?? null,
+    ownerWallet: row.owner_wallet ?? null,
+    ownerWalletId: row.owner_wallet_id ?? null,
+    custodialWalletLegacy: row.custodial_wallet_legacy ?? null,
+    custodialWalletIdLegacy: row.custodial_wallet_id_legacy ?? null,
     createdAt: row.created_at,
   }
 }
@@ -277,6 +289,9 @@ function agentFrom(row: Row): Agent {
     mission: row.mission,
     walletAddress: row.wallet_address,
     privyWalletId: row.privy_wallet_id,
+    // `??`: hasta que corra la migración 20261025000000 la columna no existe.
+    walletAddressLegacy: row.wallet_address_legacy ?? null,
+    privyWalletIdLegacy: row.privy_wallet_id_legacy ?? null,
     network: row.network,
     maxPerRun: String(row.max_per_run),
     deliveryKind: row.delivery_kind ?? 'dashboard',
@@ -340,6 +355,9 @@ export class SupabaseStore implements Store {
         custodial_wallet_id: input.custodialWalletId ?? null,
         email: input.email ?? null,
         privy_user_id: input.privyUserId ?? null,
+        // Solo si viene: sin la migración 20261025000000 la columna no existe.
+        ...(input.ownerWallet !== undefined ? { owner_wallet: input.ownerWallet } : {}),
+        ...(input.ownerWalletId !== undefined ? { owner_wallet_id: input.ownerWalletId } : {}),
       })
       .select()
       .single()
@@ -394,6 +412,67 @@ export class SupabaseStore implements Store {
       .eq('id', tenantId)
     this.#fail('setPayoutWallet', error)
   }
+
+  // ---- app de Privy propia ----
+
+  async listTenantsByEmail(email: string): Promise<Tenant[]> {
+    const buscado = email.trim()
+    if (!buscado) return []
+    // ilike sin comodines = igualdad sin distinguir mayúsculas: se escapan % _ \.
+    const { data, error } = await this.#db
+      .from('tenants')
+      .select()
+      .ilike('email', buscado.replace(/[\\%_]/g, '\\$&'))
+      .order('created_at', { ascending: false })
+    this.#fail('listTenantsByEmail', error)
+    return (data ?? []).map(tenantFrom)
+  }
+
+  async rebindTenantOwner(tenantId: string, privyUserId: string, legacyPrivyUserId: string | null): Promise<boolean> {
+    // El filtro por legacy null hace el cambio una sola vez aunque entren dos logins a la par.
+    const { data, error } = await this.#db
+      .from('tenants')
+      .update({ privy_user_id: privyUserId, privy_user_id_legacy: legacyPrivyUserId })
+      .eq('id', tenantId)
+      .is('privy_user_id_legacy', null)
+      .select('id')
+    this.#fail('rebindTenantOwner', error)
+    return (data ?? []).length > 0
+  }
+
+  async setTenantWallets(tenantId: string, patch: TenantWalletPatch) {
+    const columnas: Record<keyof TenantWalletPatch, string> = {
+      payoutWallet: 'payout_wallet',
+      ownerWallet: 'owner_wallet',
+      ownerWalletId: 'owner_wallet_id',
+      custodialWallet: 'custodial_wallet',
+      custodialWalletId: 'custodial_wallet_id',
+      custodialWalletLegacy: 'custodial_wallet_legacy',
+      custodialWalletIdLegacy: 'custodial_wallet_id_legacy',
+    }
+    const update: Row = {}
+    for (const [k, v] of Object.entries(patch) as [keyof TenantWalletPatch, string | null | undefined][]) {
+      if (v !== undefined) update[columnas[k]] = v
+    }
+    if (Object.keys(update).length === 0) return
+    const { error } = await this.#db.from('tenants').update(update).eq('id', tenantId)
+    this.#fail('setTenantWallets', error)
+  }
+
+  async getAgentByWalletAddress(address: string): Promise<Agent | null> {
+    const a = address.trim()
+    if (!/^0x[0-9a-fA-F]{40}$/.test(a)) return null
+    const { data, error } = await this.#db
+      .from('agents')
+      .select()
+      .or(`wallet_address.ilike.${a},wallet_address_legacy.ilike.${a}`)
+      .limit(1)
+    this.#fail('getAgentByWalletAddress', error)
+    const row = (data ?? [])[0]
+    return row ? agentFrom(row as Row) : null
+  }
+
+  // ---- fin app de Privy propia ----
 
   async updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void> {
     const fila: Row = {}
@@ -1383,6 +1462,9 @@ export class SupabaseStore implements Store {
     if (patch.runsCount !== undefined) update.runs_count = patch.runsCount
     if (patch.runsMax !== undefined) update.runs_max = patch.runsMax
     if (patch.privyWalletId !== undefined) update.privy_wallet_id = patch.privyWalletId
+    if (patch.walletAddress !== undefined) update.wallet_address = patch.walletAddress
+    if (patch.walletAddressLegacy !== undefined) update.wallet_address_legacy = patch.walletAddressLegacy
+    if (patch.privyWalletIdLegacy !== undefined) update.privy_wallet_id_legacy = patch.privyWalletIdLegacy
     if (patch.erc8004AgentId !== undefined) update.erc8004_agent_id = patch.erc8004AgentId
     if (patch.erc8004ChainId !== undefined) update.erc8004_chain_id = patch.erc8004ChainId
     if (patch.erc8004Tx !== undefined) update.erc8004_tx = patch.erc8004Tx
@@ -1619,6 +1701,8 @@ export class SupabaseStore implements Store {
         reference: p.reference,
         period_start: p.periodStart,
         period_end: p.periodEnd,
+        // Solo Paddle la trae: x402 y saldo siguen andando aunque no haya corrido la migración 20261024600000.
+        ...(p.subscriptionRef ? { subscription_ref: p.subscriptionRef } : {}),
       })
       .select()
       .single()
@@ -1654,6 +1738,41 @@ export class SupabaseStore implements Store {
     return new Set(((data ?? []) as Row[]).map((r) => r.tenant_id)).size
   }
   // ---- fin M9 ----
+
+  // ---- Paddle ----
+  async setTenantPaddle(tenantId: string, patch: TenantPaddlePatch): Promise<void> {
+    const columnas: Record<string, string | null> = {}
+    if (patch.paddleCustomerId !== undefined) columnas.paddle_customer_id = patch.paddleCustomerId
+    if (patch.paddleSubscriptionId !== undefined) columnas.paddle_subscription_id = patch.paddleSubscriptionId
+    if (patch.paddleStatus !== undefined) columnas.paddle_status = patch.paddleStatus
+    if (patch.paddleCancelAt !== undefined) columnas.paddle_cancel_at = patch.paddleCancelAt
+    if (!Object.keys(columnas).length) return
+    const { error } = await this.#db.from('tenants').update(columnas).eq('id', tenantId)
+    this.#fail('setTenantPaddle', error)
+  }
+
+  async getTenantByPaddleSubscription(subscriptionId: string): Promise<Tenant | null> {
+    return this.#tenantWhere('paddle_subscription_id', subscriptionId)
+  }
+
+  async paddleEventSeen(eventId: string): Promise<boolean> {
+    const { data, error } = await this.#db.from('paddle_events').select('event_id').eq('event_id', eventId).maybeSingle()
+    this.#fail('paddleEventSeen', error)
+    return !!data
+  }
+
+  async recordPaddleEvent(e: { eventId: string; eventType: string; occurredAt: string | null }): Promise<void> {
+    const { error } = await this.#db
+      .from('paddle_events')
+      .upsert({ event_id: e.eventId, event_type: e.eventType, occurred_at: e.occurredAt }, { onConflict: 'event_id', ignoreDuplicates: true })
+    this.#fail('recordPaddleEvent', error)
+  }
+
+  async markBillingPaymentRefunded(id: string, at: string): Promise<void> {
+    const { error } = await this.#db.from('billing_payments').update({ refunded_at: at }).eq('id', id).is('refunded_at', null)
+    this.#fail('markBillingPaymentRefunded', error)
+  }
+  // ---- fin Paddle ----
 
   // ---- radar público: leads ----
   async upsertRadarLead(input: NewRadarLead): Promise<RadarLead> {
@@ -1737,6 +1856,8 @@ function billingFrom(row: Row): BillingPayment {
     reference: row.reference,
     periodStart: String(row.period_start),
     periodEnd: String(row.period_end),
+    subscriptionRef: row.subscription_ref ?? null,
+    refundedAt: row.refunded_at ? String(row.refunded_at) : null,
     createdAt: String(row.created_at),
   }
 }

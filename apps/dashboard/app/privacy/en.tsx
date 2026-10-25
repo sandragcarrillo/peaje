@@ -121,8 +121,9 @@ export function PrivacidadEn() {
 
         <H3>3.8 Subscription</H3>
         <p>
-          {/* TODO(San): once Paddle is integrated, list the Paddle IDs stored (customer, subscription). */}
-          We keep your plan status and its end date. We do <T>not</T> receive or store card numbers, security codes or
+          We keep your plan status and its end date, plus the identifiers Paddle assigns to your customer record, your
+          subscription and each charge, so we can link payments to your business and open the Paddle portal from Manage
+          subscription. We do <T>not</T> receive or store card numbers, security codes or
           bank details: the Pro subscription payment is processed by Paddle (section 7).
         </p>
 

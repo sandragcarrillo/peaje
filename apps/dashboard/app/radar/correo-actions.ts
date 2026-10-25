@@ -83,19 +83,22 @@ export async function registrarLead(input: {
 
 /**
  * Manda el reporte del dominio al email de la cookie, si hay email y puntaje.
- * Llamarla después de una medición. Nunca lanza; el gateway no repite el mismo
- * reporte antes de 10 minutos.
+ * Llamarla después de una medición o desde "Mándame el informe". Nunca lanza;
+ * el gateway no repite el mismo reporte antes de 10 minutos. Devuelve si quedó
+ * en cola (false: sin correo en la cookie, dominio inválido o tope por IP).
  */
-export async function enviarReporte(dominio: string): Promise<void> {
+export async function enviarReporte(dominio: string): Promise<boolean> {
   try {
     const email = emailValido((await cookies()).get(COOKIE)?.value)
     const limpio = dominioDeRadar(dominio)
-    if (!email || !limpio) return
-    if (!dentroDelLimite('reporte', await ipDe(), TOPE_REPORTE)) return
+    if (!email || !limpio) return false
+    if (!dentroDelLimite('reporte', await ipDe(), TOPE_REPORTE)) return false
     const locale = await getLocale()
     after(() => reportar(email, limpio, locale))
+    return true
   } catch (err) {
     console.error('[radar] enviarReporte falló', err)
+    return false
   }
 }
 

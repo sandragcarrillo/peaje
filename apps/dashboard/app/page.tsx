@@ -1,283 +1,174 @@
 import Link from 'next/link'
-import { getDict } from '@/lib/i18n'
+import { CUPOS_FOUNDER, PRECIOS_USD } from '@peaje/db'
+import { getDict, type Dict } from '@/lib/i18n'
 import { currentTenant } from '@/lib/session'
+import { ChatEjemplo } from './components/chat-ejemplo'
 
 /**
- * Landing según design/direccion-visual.md §10: hero split crema/tinta con
- * status bar de datos reales, ticker, comparativa antes/después, pasos
- * numerados y CTA final a dos tonos. Un solo momento animado (el ticker).
+ * Landing pública (copy final de San, 24 oct 2026). Crema y tinta, etiquetas
+ * mono, bordes de 6px y el punto verde. Dos CTAs en todo el sitio público:
+ * "Usar agente" (alta) y "Revisar mi sitio gratis" (radar).
  */
+
+const COMISION_PCT = 2
+
+type L = Dict['landing']
 
 /** Sección a sangre completa: se escapa del max-w-5xl del layout. */
 function Sangre({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-[calc(50%-50vw)] w-screen ${className}`}>{children}</div>
 }
 
-async function TickerRow() {
-  const d = await getDict()
-  const items = [d.landing.tickerMpp, d.landing.tickerPagos, d.landing.tickerSinApiKey]
-  return (
-    <div className="flex shrink-0 items-center">
-      {items.map((item) => (
-        <span key={item} className="mx-4 flex items-center gap-4">
-          {item}
-          <span aria-hidden className="text-border">·</span>
-        </span>
-      ))}
-    </div>
-  )
-}
-
 export default async function Landing() {
   const [tenant, d] = await Promise.all([currentTenant(), getDict()])
-  const L = d.landing
+  const t = d.landing
+  const agenteHref = tenant ? `/t/${tenant.slug}/agente` : '/nuevo'
+  const agenteTexto = tenant ? t.ctaDashboard : t.ctaAgente
 
   return (
     <div className="pb-4">
-      {/* ── Hero split crema/tinta ─────────────────────────────── */}
-      <Sangre>
-        <div className="grid lg:grid-cols-[1.1fr_1fr]">
-          <div className="bg-crema px-6 py-16 text-tinta sm:px-10 lg:py-24 lg:pl-[max(2.5rem,calc(50vw-40rem))]">
-            <p className="font-mono text-[11px] tracking-[0.14em] text-tinta/60">{L.eyebrow}</p>
-            <h1 className="mt-6 max-w-xl text-4xl leading-[1.05] font-semibold sm:text-5xl">
-              {L.hero1}
-              <br />
-              {L.hero2}
-              <br />
-              <span className="text-tinta/45">{L.hero3}</span>
-            </h1>
-            <p className="mt-6 max-w-lg text-base text-tinta/70">{L.heroTexto}</p>
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <Sangre className="isla-crema bg-bg text-text">
+        <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-16 lg:grid-cols-[1.15fr_1fr] lg:py-24">
+          <div>
+            <h1 className="max-w-xl text-4xl leading-[1.05] font-semibold sm:text-5xl">{t.h1}</h1>
+            <p className="mt-6 max-w-lg text-base text-muted">{t.sub}</p>
 
-            {/* El hero es crema fijo en ambos temas: el botón se ancla a tinta sobre crema. */}
-            <div className="mt-9 inline-flex">
-              {tenant ? (
-                <Link
-                  href={`/t/${tenant.slug}`}
-                  className="btn btn-primario [--bg:var(--crema)] [--text:var(--tinta)]"
-                >
-                  {L.ctaDashboard}
-                </Link>
-              ) : (
-                <Link
-                  href="/radar"
-                  className="btn btn-primario [--bg:var(--crema)] [--text:var(--tinta)]"
-                >
-                  {L.ctaRegistrar}
-                </Link>
-              )}
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link href={agenteHref} className="btn btn-primario">
+                {agenteTexto}
+              </Link>
+              <Link href="/radar" className="btn btn-secundario">
+                {t.ctaRadar}
+              </Link>
             </div>
           </div>
 
-          {/* Tinta: arte concéntrico sobre retícula con coordenadas (§6) */}
-          <div className="isla-tinta relative hidden overflow-hidden bg-bg lg:block">
-            <div className="dot-grid absolute inset-0 text-border opacity-50" />
-            <span className="absolute top-3 left-4 font-mono text-[10px] text-muted/60">0.0</span>
-            <span className="absolute right-4 bottom-3 font-mono text-[10px] text-muted/60">
-              402.2026
-            </span>
-            <ArteConcentrico frase={L.arte} />
-          </div>
+          <ChatEjemplo
+            mensajes={t.chat}
+            ejemplo={t.chatEjemplo}
+            negocio={t.chatNegocio}
+            bot={t.chatBot}
+            subtitulo={t.chatSubtitulo}
+            tu={t.chatTu}
+            escribiendo={t.chatEscribiendo}
+          />
         </div>
       </Sangre>
 
-      {/* Status bar (§5.1): el sitio reportando su propio estado */}
-      <Sangre className="isla-tinta border-y border-border bg-bg">
-        <div className="mx-auto flex max-w-5xl flex-wrap gap-x-10 gap-y-2 px-6 py-3 font-mono text-[11px] tracking-[0.1em]">
-          {L.status.map(([k, v]) => (
-            <span key={k} className="flex items-center gap-2">
-              <span className="text-muted">{k}:</span>
-              <span className="text-text">{v}</span>
-              {k === 'MPP' || k === 'MPP ' ? (
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-              ) : null}
-            </span>
-          ))}
-        </div>
-      </Sangre>
-
-      {/* Ticker: el único elemento en movimiento de la página */}
-      <div className="overflow-hidden border-b border-border py-2.5">
-        <div className="flex animate-marquee font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
-          <TickerRow />
-          <div aria-hidden>
-            <TickerRow />
+      {/* ── Lo que necesitan los agentes ─────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <section id="producto" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
+          <h2 className="text-2xl font-semibold sm:text-3xl">{t.necesitanTitulo}</h2>
+          <div className="mt-10 grid gap-8 sm:grid-cols-3">
+            {t.necesitan.map((n) => (
+              <div key={n.titulo} className="border-t border-border pt-5">
+                <p className="flex items-center gap-2 font-mono text-xs font-bold text-accent">
+                  <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+                  {n.titulo}
+                </p>
+                <p className="mt-3 text-base">{n.texto}</p>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
-
-      {/* ── Comparativa antes/después (§5.5) ───────────────────── */}
-      <Sangre className="bg-crema">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <h2 className="text-2xl font-semibold text-tinta sm:text-3xl">{L.compTitulo}</h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <PanelComparativa
-              badge={L.compSinBadge}
-              nota={L.compSinNota}
-              activo={false}
-              estadoSin={L.compSinEstado}
-            />
-            <PanelComparativa
-              badge={L.compConBadge}
-              nota={L.compConNota}
-              activo
-              hace={L.compConHace}
-            />
-          </div>
-        </div>
-      </Sangre>
-
-      {/* ── Pasos numerados sobre tinta con ruido (§5.3, §6) ───── */}
-      <Sangre className="isla-tinta bg-bg">
-        <section className="relative mx-auto max-w-5xl px-6 py-20">
-          <RuidoTipografico />
-        <h2 className="relative text-2xl font-semibold sm:text-3xl">{L.featuresTitulo}</h2>
-        <div className="relative mt-10 grid gap-10 sm:grid-cols-3">
-          <Paso n="001" titulo={L.paso1Titulo} texto={L.paso1Texto} />
-          <Paso n="002" titulo={L.paso2Titulo} texto={L.paso2Texto} />
-          <Paso n="003" titulo={L.paso3Titulo} texto={L.paso3Texto} />
-          </div>
-          <p className="relative mt-10 max-w-2xl border-t border-border pt-5 text-sm text-muted">{L.precio}</p>
+          <p className="mt-12 max-w-2xl text-lg font-semibold leading-snug">{t.necesitanCierre}</p>
         </section>
       </Sangre>
 
+      {/* ── Cómo funciona ────────────────────────────────────── */}
+      <Sangre className="isla-tinta bg-bg text-text">
+        <section id="como-funciona" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
+          <h2 className="text-2xl font-semibold sm:text-3xl">{t.comoTitulo}</h2>
+          <ol className="mt-10 grid gap-10 sm:grid-cols-3">
+            {t.pasos.map((p, i) => (
+              <li key={p.titulo} className="border-t border-border pt-5">
+                <p className="font-mono text-xs font-bold text-accent">{String(i + 1).padStart(2, '0')}</p>
+                <h3 className="mt-3 text-lg font-semibold leading-snug">{p.titulo}</h3>
+                <p className="mt-2 text-sm text-muted">{p.texto}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </Sangre>
+
+      {/* ── Precio ───────────────────────────────────────────── */}
+      <Sangre className="isla-crema bg-bg text-text">
+        <section id="precio" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
+          <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
+          <div className="mt-8 grid gap-8 border border-border bg-panel p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-end">
+            <div className="space-y-3">
+              <p className="flex items-center gap-2 font-mono text-xs font-bold text-accent">
+                <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+                {t.precioEtiqueta}
+              </p>
+              <p className="text-4xl font-bold tracking-tight sm:text-5xl">{t.precioMonto(PRECIOS_USD.founder)}</p>
+              <p className="text-base">{t.precioCupos(CUPOS_FOUNDER)}</p>
+              <p className="text-sm text-muted">
+                {t.precioNormal(PRECIOS_USD.pro)} {t.precioCancelar}
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <Link href={agenteHref} className="btn btn-primario">
+                {agenteTexto}
+              </Link>
+              <Link href="/precios" className="text-sm text-muted underline underline-offset-4 hover:text-text">
+                {t.verPrecios}
+              </Link>
+            </div>
+          </div>
+          <p className="mt-5 max-w-3xl text-xs text-muted">{t.letraChica(COMISION_PCT)}</p>
+        </section>
+      </Sangre>
+
+      {/* ── Preguntas ────────────────────────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <section className="mx-auto max-w-5xl px-6 py-20">
+          <h2 className="text-2xl font-semibold sm:text-3xl">{t.faqTitulo}</h2>
+          <div className="mt-8 divide-y divide-border border-y border-border">
+            {t.faq(COMISION_PCT).map((f) => (
+              <details key={f.p} className="group rounded-none py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+                  {f.p}
+                  <span aria-hidden className="font-mono text-sm text-muted group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 max-w-2xl text-sm text-muted">{f.r}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      </Sangre>
+
+      {/* ── Cierre ───────────────────────────────────────────── */}
+      <Sangre className="isla-tinta bg-bg text-text">
+        <section className="mx-auto max-w-5xl px-6 py-20">
+          <h2 className="max-w-2xl text-3xl font-semibold sm:text-4xl">{t.cierreTitulo}</h2>
+          <p className="mt-4 max-w-xl text-base text-muted">{t.cierreTexto}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={agenteHref} className="btn btn-primario">
+              {agenteTexto}
+            </Link>
+            <Link href="/radar" className="btn btn-secundario">
+              {t.ctaRadar}
+            </Link>
+          </div>
+        </section>
+      </Sangre>
+
+      {/* ── Para devs ────────────────────────────────────────── */}
+      <Sangre className="isla-tinta border-t border-border bg-bg text-text">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-sm">
+          <span className="font-mono text-xs font-bold text-accent">{t.devsEtiqueta}</span>
+          <span className="text-muted">
+            {t.devsTexto} <code className="font-mono text-text">npx @peaje/cli@1 init &lt;slug&gt;</code>
+          </span>
+          <a href="/developers" className="text-muted underline underline-offset-4 hover:text-text">
+            {t.devsPortal} →
+          </a>
+        </div>
+      </Sangre>
     </div>
   )
 }
 
-/**
- * La gota: un pulso desde el centro y los anillos de texto apareciendo hacia
- * afuera. La frase se repite las veces que caben en cada circunferencia y se
- * estira con `textLength`, así nunca se corta a mitad de palabra.
- */
-function ArteConcentrico({ frase }: { frase: string }) {
-  const texto = `${frase} · `
-  // Ancho aproximado por carácter: mono 11px + letter-spacing 3.
-  const charW = 11 * 0.6 + 3
-  const anillos = [
-    { r: 70, op: 0.55 },
-    { r: 110, op: 0.38 },
-    { r: 150, op: 0.24 },
-    { r: 190, op: 0.14 },
-  ]
-  return (
-    <svg
-      viewBox="0 0 440 440"
-      className="absolute top-1/2 left-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2"
-      aria-hidden
-    >
-      <title>Peaje</title>
-      {/* la onda: dos círculos que se expanden una vez al cargar */}
-      <circle className="gota-onda" cx="220" cy="220" fill="none" stroke="var(--accent)" strokeWidth="1" />
-      <circle className="gota-onda gota-onda-2" cx="220" cy="220" fill="none" stroke="var(--accent)" strokeWidth="1" />
-
-      {anillos.map((a, i) => {
-        const c = 2 * Math.PI * a.r
-        const reps = Math.max(1, Math.floor(c / (texto.length * charW)))
-        return (
-          <g key={a.r} className="gota-anillo" style={{ animationDelay: `${0.25 + i * 0.3}s` }}>
-            <path
-              id={`anillo-${a.r}`}
-              fill="none"
-              d={`M 220,220 m -${a.r},0 a ${a.r},${a.r} 0 1,1 ${a.r * 2},0 a ${a.r},${a.r} 0 1,1 -${a.r * 2},0`}
-            />
-            <text
-              fontSize="11"
-              letterSpacing="3"
-              fill="var(--crema)"
-              opacity={a.op}
-              style={{ fontFamily: 'var(--font-chrome), monospace' }}
-            >
-              <textPath href={`#anillo-${a.r}`} textLength={c} lengthAdjust="spacing">
-                {Array.from({ length: reps }, () => texto).join('')}
-              </textPath>
-            </text>
-          </g>
-        )
-      })}
-      <circle className="gota-centro" cx="220" cy="220" r="5" fill="var(--accent)" />
-    </svg>
-  )
-}
-
-function PanelComparativa({
-  badge,
-  nota,
-  activo,
-  estadoSin,
-  hace,
-}: {
-  badge: string
-  nota: string
-  activo: boolean
-  estadoSin?: string
-  hace?: (s: number) => string
-}) {
-  const rutas = [
-    { path: '/llms.txt', monto: null },
-    { path: '/openapi.json', monto: null },
-    { path: '/mcp', monto: '$0.01', s: 2 },
-    { path: '/r/report-2026', monto: '$0.05', s: 9 },
-  ]
-  return (
-    <div
-      className={
-        activo
-          ? 'isla-tinta rounded-lg border border-tinta bg-bg p-6'
-          : 'rounded-lg border border-linea-clara p-6'
-      }
-    >
-      <p
-        className={`flex items-center gap-2 font-mono text-[11px] tracking-[0.12em] ${
-          activo ? 'text-crema' : 'text-tinta/50'
-        }`}
-      >
-        {activo ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
-        {badge}
-      </p>
-      <ul className="mt-5 space-y-2.5">
-        {rutas.map((r) => (
-          <li
-            key={r.path}
-            className={`flex items-center justify-between rounded-md border px-3.5 py-2.5 font-mono text-xs ${
-              activo ? 'border-border bg-tinta-suave text-crema' : 'border-linea-clara text-tinta/45'
-            }`}
-          >
-            <span>{r.path}</span>
-            {activo ? (
-              <span className="flex items-center gap-3">
-                {r.monto ? <span className="text-accent">+{r.monto}</span> : null}
-                <span className="text-muted">{r.s !== undefined && hace ? hace(r.s) : 'OK'}</span>
-              </span>
-            ) : (
-              <span>{estadoSin}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-      <p className={`mt-5 text-sm ${activo ? 'text-muted' : 'text-tinta/60'}`}>{nota}</p>
-    </div>
-  )
-}
-
-function Paso({ n, titulo, texto }: { n: string; titulo: string; texto: string }) {
-  return (
-    <div className="border-t border-border pt-5">
-      <p className="font-mono text-[11px] tracking-[0.14em] text-muted">
-        {n} <span className="mx-1 text-border">/</span>{' '}
-        <span className="text-accent">{titulo.toUpperCase()}</span>
-      </p>
-      <p className="mt-3 text-sm text-muted">{texto}</p>
-    </div>
-  )
-}
-
-/** Ruido tipográfico (§6): texto real del dominio, apenas legible. */
-function RuidoTipografico() {
-  const linea =
-    'GET /r/report-2026 → 402 → PAID 0x3715…e253 → 200 OK · AGENT: VERIFIED · '
-  return (
-    <div aria-hidden className="ruido">
-      {linea.repeat(40)}
-    </div>
-  )
-}

@@ -68,6 +68,19 @@
   --accent-text: var(--tinta);
 }
 
+/* Isla crema: las secciones claras de la landing, iguales en los dos temas. */
+.isla-crema {
+  --bg: var(--crema);
+  --panel: var(--crema-2);
+  --panel-2: var(--crema-3);
+  --border: var(--linea-clara);
+  --text: #1c1c16;
+  --muted: var(--gris-texto);
+  --faint: var(--gris-tenue);
+  --accent: var(--verde-profundo);
+  --accent-text: #fff;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-panel: var(--panel);
@@ -296,4 +309,31 @@ h1, h2 {
   .gota-anillo { animation: none; opacity: 1; }
   .gota-onda { animation: none; }
   .gota-centro { animation: none; }
+}
+
+/* Conversación de ejemplo del hero (app/components/chat-ejemplo.tsx): aparece mensaje a mensaje, una vez. */
+.chat-msg {
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+.chat-msg[data-oculto='true'],
+.chat-msg[data-oculto='espera'] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.chat-punto {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--muted);
+  animation: chat-punto 900ms ease-in-out infinite;
+}
+@keyframes chat-punto {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg { transition: none; }
+  .chat-msg[data-oculto='true'],
+  .chat-msg[data-oculto='espera'] { opacity: 1; transform: none; }
+  .chat-escribiendo { display: none; }
 }

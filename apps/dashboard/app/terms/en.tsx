@@ -228,7 +228,6 @@ export function TerminosEn() {
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} a month</T>, only for the first {CUPOS_FOUNDER} businesses
             that subscribe. It includes {LIMITES.founder.preguntas} questions tracked in AI assistants and{' '}
             {LIMITES.founder.mensajes} messages to the agent a month. Founders keep that price while their subscription stays active; if they cancel and come back, they pay the Pro price.
-            {/* TODO(San): decide whether the founder price is kept if someone cancels and subscribes again. */}
           </li>
           <li>
             <T>Pro</T>: <T>US${PRECIOS_USD.pro} a month</T> once the founder spots are taken. It includes{' '}
@@ -265,9 +264,9 @@ export function TerminosEn() {
             cancel. Paddle emails you a receipt for each charge.
           </li>
           <li>
-            {/* TODO(San): once the dashboard has a "Manage subscription" button, name it here. */}
-            You can cancel at any time from the link in your Paddle receipt or at <X href={PADDLE_PORTAL}>paddle.net</X>,
-            where you can also change your payment method and download invoices. You can also write to us and we cancel
+            You can cancel at any time with the <T>Manage subscription</T> button in the Plan section of My agent, which
+            opens the Paddle customer portal; there you can also change your payment method and download invoices. You
+            can also do it from the link in your Paddle receipt or at <X href={PADDLE_PORTAL}>paddle.net</X>. You can also write to us and we cancel
             it for you. When you cancel you keep Pro until the end of the period already paid, and then the site moves
             to the free plan.
           </li>

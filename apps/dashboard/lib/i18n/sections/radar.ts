@@ -84,17 +84,16 @@ export const radar = {
     // 05
     s05: 'Déjanos arreglarlo',
     queIncluye:
-      'Gratis ves el diagnóstico. Con Peaje tienes tu propio agente en Telegram: te explica qué falta, te entrega los arreglos listos, te muestra cómo vas mejorando y cada semana te cuenta cuántos agentes de IA visitaron tu sitio.',
+      'Gratis ves el diagnóstico. Con Peaje tienes tu propio agente en Telegram: te dice qué falta, te pasa los arreglos listos, te muestra cómo vas mejorando y te cuenta cuántos agentes te visitaron, cada día, cada semana o cada mes, como prefieras.',
     cierreTitulo: 'Ese es el diagnóstico. Ahora tu agente lo arregla contigo.',
     cierreTexto:
-      'Agrega el agente de Peaje a tu Telegram. Te dice qué falla, te pregunta lo que necesita y te entrega los cambios listos para tu sitio, incluido el kit de Peaje para que los agentes también puedan pagarte. Precio de fundador: US$30 al mes (después será US$69).',
-    cta: 'Empezar por US$30 al mes',
-    ctaNota: 'Creas tu cuenta con tu correo y activas el agente desde tu panel.',
-    hazloTu: 'Prefiero hacerlo yo: copiar las instrucciones',
-    promptCompleto: (dominio: string, signupUrl: string, faltan: string[]) =>
-      `Instala Peaje en el repo de mi sitio (${dominio}) para que los agentes de IA lo entiendan y puedan pagarme. Primero creo la cuenta gratis en ${signupUrl} y te paso el identificador del negocio (slug). Con ese slug, si es Next.js corre \`npx @peaje/cli@1 init <slug> --yes\`; si es otro stack, corre \`npx @peaje/cli@1 plan <slug>\` y sigue lo que indica.${
-        faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
-      } No reescribas los archivos que baja el kit. Cuando esté publicado, corre \`npx @peaje/cli@1 verify <slug>\` y arregla solo lo que salga en falso.`,
+      'Agrega el agente de Peaje a tu Telegram. Te dice qué falla, te pregunta lo que necesita y te entrega los cambios listos para tu sitio, incluido el kit de Peaje para que los agentes también puedan pagarte. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.',
+    cta: (usd: number) => `Tu agente lo arregla contigo: US$${usd}`,
+    ctaNota: 'Creas tu cuenta con tu correo y pagas en el paso siguiente. Cancelas cuando quieras desde tu panel, sin llamadas.',
+    informe: 'Mándame el informe',
+    informeEnviar: 'Mandar',
+    informeListo: 'Listo. Te mandamos el informe a tu correo en unos minutos.',
+    informeFallo: 'No pudimos mandar el informe ahora. Prueba de nuevo en un rato.',
 
     // Metadata
     metaTitulo: (dominio: string) => `Cómo ven los agentes de IA a ${dominio} · Peaje`,
@@ -177,17 +176,16 @@ export const radar = {
 
     s05: 'Let us fix it',
     queIncluye:
-      'The diagnosis is free. With Peaje you get your own agent on Telegram: it explains what is missing, hands you the fixes ready to go, shows you how you are improving and tells you every week how many AI agents visited your site.',
+      'The diagnosis is free. With Peaje you get your own agent on Telegram: it tells you what is missing, hands you the fixes ready to go, shows you how you are improving and tells you how many agents visited you, daily, weekly or monthly, as you prefer.',
     cierreTitulo: 'That is the diagnosis. Now your agent fixes it with you.',
     cierreTexto:
-      'Add the Peaje agent to your Telegram. It tells you what fails, asks for what it needs and hands you the changes ready for your site, including the Peaje kit so agents can also pay you. Founder price: US$30 a month (later it will be US$69).',
-    cta: 'Start for US$30 a month',
-    ctaNota: 'You create your account with your email and turn on the agent from your dashboard.',
-    hazloTu: 'I would rather do it myself: copy the instructions',
-    promptCompleto: (dominio: string, signupUrl: string, faltan: string[]) =>
-      `Install Peaje in my site's repo (${dominio}) so AI agents understand it and can pay me. First I create the free account at ${signupUrl} and give you the business id (slug). With that slug, on Next.js run \`npx @peaje/cli@1 init <slug> --yes\`; on another stack run \`npx @peaje/cli@1 plan <slug>\` and follow what it says.${
-        faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
-      } Do not rewrite the files the kit downloads. Once it is live, run \`npx @peaje/cli@1 verify <slug>\` and fix only what comes back false.`,
+      'Add the Peaje agent to your Telegram. It tells you what fails, asks for what it needs and hands you the changes ready for your site, including the Peaje kit so agents can also pay you. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.',
+    cta: (usd: number) => `Your agent fixes it with you: US$${usd}`,
+    ctaNota: 'You create your account with your email and pay in the next step. Cancel anytime from your dashboard, no calls.',
+    informe: 'Email me the report',
+    informeEnviar: 'Send',
+    informeListo: 'Done. The report is on its way to your email in a few minutes.',
+    informeFallo: 'We could not send the report right now. Try again in a while.',
 
     metaTitulo: (dominio: string) => `How AI agents see ${dominio} · Peaje`,
     metaDescripcion: (dominio: string, linea: string) => `${linea} See what an AI agent finds on ${dominio}.`,

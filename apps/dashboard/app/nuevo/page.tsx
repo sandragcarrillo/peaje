@@ -2,6 +2,7 @@
 
 import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { gatewayUrl } from '@/lib/config'
 import { Eyebrow } from '@/components/chrome'
@@ -34,12 +35,22 @@ export default function NuevoNegocio() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [resultado, setResultado] = useState<AltaResultado | null>(null)
+  const [irAPlan, setIrAPlan] = useState(false)
+  const router = useRouter()
 
-  // El radar manda acá con el dominio ya medido: se precarga el campo.
+  // El radar manda acá con el dominio ya medido: se precarga el campo. Con
+  // `plan=1` (botón "Tu agente lo arregla contigo"), al terminar el alta se
+  // sigue directo a la sección del plan, donde está el checkout de Paddle.
   useEffect(() => {
-    const url = new URLSearchParams(window.location.search).get('url')
+    const params = new URLSearchParams(window.location.search)
+    const url = params.get('url')
     if (url) setOriginUrl((actual) => actual || url)
+    if (params.get('plan') === '1') setIrAPlan(true)
   }, [])
+
+  useEffect(() => {
+    if (resultado?.ok && irAPlan) router.replace(`/t/${resultado.slug}/agente#plan`)
+  }, [resultado, irAPlan, router])
 
   const d = useDict()
   const { getAccessToken, authenticated, logout } = usePrivy()
@@ -116,7 +127,16 @@ export default function NuevoNegocio() {
     }
   }
 
-  if (resultado?.ok) return <Listo slug={resultado.slug} payoutWallet={resultado.payoutWallet} />
+  if (resultado?.ok) {
+    if (irAPlan) {
+      return (
+        <div className="flex min-h-[65vh] items-center justify-center">
+          <p className="text-sm text-muted">{d.acceso.irAlPlan}</p>
+        </div>
+      )
+    }
+    return <Listo slug={resultado.slug} payoutWallet={resultado.payoutWallet} />
+  }
 
   if (step === 'code') {
     return (

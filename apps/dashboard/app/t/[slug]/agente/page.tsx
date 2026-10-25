@@ -19,6 +19,7 @@ import { CompradorPanel } from './comprador'
 import { accesoPro } from '@peaje/db'
 import { leerBilling } from '@/lib/gateway'
 import { Bloqueado, Suscripcion } from './suscripcion'
+import { paddleDelNegocio } from '@/lib/paddle'
 
 /**
  * Mi agente: el agente Pro de este negocio. Propone tareas; el coding agent
@@ -62,7 +63,7 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
       {/* ---- M9: plan ---- */}
       <section className="space-y-3">
         <SectionBar label={t.planSeccion} />
-        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} />
+        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} paddle={paddleDelNegocio(tenant)} />
       </section>
 
       <section className="space-y-3">
@@ -75,11 +76,13 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
         {pro ? <TelegramPanel slug={tenant.slug} estado={telegram} reportes={reportes} /> : <Bloqueado />}
       </section>
 
-      {/* ---- Slack ---- */}
-      <section className="space-y-3">
-        <SectionBar label={t.slTitulo} />
-        {pro ? <SlackPanel slug={tenant.slug} estado={slack} /> : <Bloqueado />}
-      </section>
+      {/* ---- Slack ---- (solo cuando el gateway tiene la app de Slack configurada) */}
+      {slack?.configured ? (
+        <section className="space-y-3">
+          <SectionBar label={t.slTitulo} />
+          {pro ? <SlackPanel slug={tenant.slug} estado={slack} /> : <Bloqueado />}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />

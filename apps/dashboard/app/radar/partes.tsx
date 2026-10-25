@@ -180,3 +180,93 @@ export function Medir({ dominio, auto = false, conCorreo }: { dominio: string; a
     </div>
   )
 }
+
+/**
+ * "Mándame el informe": con correo en la cookie llama a enviarReporte; sin
+ * correo (llegó por un enlace compartido) pide el correo, lo guarda como lead
+ * y el reporte sale solo desde registrarLead. Confirma en la misma línea.
+ */
+export function MandarInforme({ dominio, conCorreo }: { dominio: string; conCorreo: boolean }) {
+  const { radar: d } = useDict()
+  const locale = useLocale()
+  const [estado, setEstado] = useState<'idle' | 'pidiendo' | 'enviando' | 'listo'>('idle')
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  async function mandar(e?: FormEvent) {
+    e?.preventDefault()
+    setError(null)
+    if (!conCorreo && estado !== 'pidiendo') {
+      setEstado('pidiendo')
+      return
+    }
+    setEstado('enviando')
+    try {
+      if (conCorreo) {
+        const ok = await enviarReporte(dominio)
+        if (!ok) throw new Error('no enviado')
+      } else {
+        if (!email.trim()) {
+          setError(d.faltaCorreo)
+          setEstado('pidiendo')
+          return
+        }
+        const r = await registrarLead({ email: email.trim(), dominio, consiente: false, locale })
+        if (!r.ok) {
+          setError(r.error)
+          setEstado('pidiendo')
+          return
+        }
+      }
+      setEstado('listo')
+    } catch {
+      setError(d.informeFallo)
+      setEstado(conCorreo ? 'idle' : 'pidiendo')
+    }
+  }
+
+  if (estado === 'listo') {
+    return (
+      <p role="status" className="flex items-center gap-2 text-sm">
+        <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+        {d.informeListo}
+      </p>
+    )
+  }
+
+  if (estado === 'pidiendo' || (estado === 'enviando' && !conCorreo)) {
+    return (
+      <form onSubmit={mandar} className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[22rem]">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="sr-only" htmlFor="informe-correo">
+            {d.correo}
+          </label>
+          <input
+            id="informe-correo"
+            type="email"
+            value={email}
+            onChange={(ev) => setEmail(ev.target.value)}
+            placeholder={d.correoPlaceholder}
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            className="w-full min-w-0 border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+          />
+          <button type="submit" disabled={estado === 'enviando'} className="btn btn-secundario shrink-0">
+            {estado === 'enviando' ? d.enviando : d.informeEnviar}
+          </button>
+        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </form>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button type="button" onClick={() => void mandar()} disabled={estado === 'enviando'} className="btn btn-secundario">
+        {estado === 'enviando' ? d.enviando : d.informe}
+      </button>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    </div>
+  )
+}

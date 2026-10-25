@@ -15,6 +15,19 @@ export type Tenant = {
   custodialWalletId: string | null
   email: string | null
   privyUserId: string | null
+  // ---- app de Privy propia (20261025000000) ----
+  /** DID del dueño en la app de Privy vieja. Null = el negocio todavía no migró. */
+  privyUserIdLegacy: string | null
+  /**
+   * Wallet de Privy cuyo dueño es el usuario (no custodial): Peaje no firma con
+   * ella. Es la de cobro por defecto; el dueño puede poner otra address propia.
+   */
+  ownerWallet: string | null
+  ownerWalletId: string | null
+  /** La que custodiaba la app vieja, solo para barrer fondos y volver atrás. */
+  custodialWalletLegacy: string | null
+  custodialWalletIdLegacy: string | null
+  // ---- fin app de Privy propia ----
   /** Score de agent-readiness con el que llegó, antes de aplicar Peaje. */
   baselineScore: number | null
   baselineScoreAt: string | null
@@ -41,6 +54,16 @@ export type Tenant = {
   /** Fin de la prueba de 14 días de Pro. */
   trialUntil: string | null
   // ---- fin M9 ----
+  // ---- Paddle: suscripción Pro con tarjeta ----
+  /** Cliente de Paddle (ctm_...). Lo deja el webhook tras el primer checkout; abre el portal de Paddle. */
+  paddleCustomerId: string | null
+  /** Suscripción de Paddle (sub_...) de este negocio. */
+  paddleSubscriptionId: string | null
+  /** Estado de esa suscripción en Paddle: active, past_due, paused, canceled, trialing. Null si nunca se suscribió con tarjeta. */
+  paddleStatus: string | null
+  /** El dueño canceló: conserva Pro hasta esta fecha y la suscripción no se renueva. */
+  paddleCancelAt: string | null
+  // ---- fin Paddle ----
   // ---- voz de marca ----
   /** Cómo escribe el negocio, leído de su sitio (o editado por el dueño). Lo usan los borradores. */
   voiceProfile: VoiceProfile | null
@@ -154,6 +177,9 @@ export type Agent = {
   walletAddress: string
   /** Id de la wallet en Privy: sin esto no se puede firmar. */
   privyWalletId: string | null
+  /** Wallet del agente en la app de Privy vieja, para barrerla tras la migración. */
+  walletAddressLegacy: string | null
+  privyWalletIdLegacy: string | null
   network: string
   /** Tope blando por corrida; el techo duro es el saldo de la wallet. */
   maxPerRun: string
@@ -212,6 +238,19 @@ export type AgentRun = {
 
 export type NewAgentRun = Omit<AgentRun, 'id' | 'createdAt' | 'deliveredAt' | 'deliveryError'>
 
+export type TenantWalletPatch = Partial<
+  Pick<
+    Tenant,
+    | 'payoutWallet'
+    | 'ownerWallet'
+    | 'ownerWalletId'
+    | 'custodialWallet'
+    | 'custodialWalletId'
+    | 'custodialWalletLegacy'
+    | 'custodialWalletIdLegacy'
+  >
+>
+
 export type NewTenant = {
   slug: string
   name: string
@@ -224,6 +263,8 @@ export type NewTenant = {
   custodialWalletId?: string | null
   email?: string | null
   privyUserId?: string | null
+  ownerWallet?: string | null
+  ownerWalletId?: string | null
 }
 
 export type Resource = {
@@ -675,6 +716,20 @@ export interface Store {
   listTenants(): Promise<Tenant[]>
   setPayoutWallet(tenantId: string, wallet: string): Promise<void>
   setCustodialWallet(tenantId: string, address: string, walletId: string): Promise<void>
+  // ---- app de Privy propia ----
+  /** Negocios cuyo email de dueño coincide, sin distinguir mayúsculas. */
+  listTenantsByEmail(email: string): Promise<Tenant[]>
+  /**
+   * Pasa el negocio al DID de la app nueva y guarda el viejo en
+   * privyUserIdLegacy. Solo si todavía no migró (legacy null): devuelve false
+   * si ya estaba migrado y no tocó nada.
+   */
+  rebindTenantOwner(tenantId: string, privyUserId: string, legacyPrivyUserId: string | null): Promise<boolean>
+  /** Pisa solo los campos de wallet que vienen definidos. */
+  setTenantWallets(tenantId: string, patch: TenantWalletPatch): Promise<void>
+  /** El agente cuya wallet (actual o legacy) es esa address, sin distinguir mayúsculas. */
+  getAgentByWalletAddress(address: string): Promise<Agent | null>
+  // ---- fin app de Privy propia ----
   /** Datos de entidad del kit (JSON-LD Organization, toggle de robots). Solo pisa lo que viene definido. */
   updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void>
   /** La clave con la que el coding agent del dueño entra al MCP y al CLI. Solo el hash. */
@@ -843,6 +898,9 @@ export interface Store {
         | 'runsCount'
         | 'runsMax'
         | 'privyWalletId'
+        | 'walletAddress'
+        | 'walletAddressLegacy'
+        | 'privyWalletIdLegacy'
         | 'erc8004AgentId'
         | 'erc8004ChainId'
         | 'erc8004Tx'
@@ -894,6 +952,17 @@ export interface Store {
   countFounders(): Promise<number>
   // ---- fin M9 ----
 
+  // ---- Paddle ----
+  /** Guarda ids y estado de la suscripción de Paddle en el negocio (solo los campos que vienen). */
+  setTenantPaddle(tenantId: string, patch: TenantPaddlePatch): Promise<void>
+  getTenantByPaddleSubscription(subscriptionId: string): Promise<Tenant | null>
+  /** Evento de webhook ya procesado (idempotencia por event_id). */
+  paddleEventSeen(eventId: string): Promise<boolean>
+  /** Marca el evento como procesado. Repetirlo no falla. */
+  recordPaddleEvent(e: { eventId: string; eventType: string; occurredAt: string | null }): Promise<void>
+  markBillingPaymentRefunded(id: string, at: string): Promise<void>
+  // ---- fin Paddle ----
+
   // ---- radar público: leads ----
   /** Crea o actualiza el lead (email, dominio): pisa locale y consentimiento, conserva created_at. */
   upsertRadarLead(input: NewRadarLead): Promise<RadarLead>
@@ -908,7 +977,8 @@ export interface Store {
 }
 
 // ---- M9: cobro del agente Pro ----
-export type BillingMethod = 'x402' | 'balance'
+/** 'paddle': tarjeta, con Paddle como Merchant of Record. 'x402' y 'balance': USDC, detrás de BILLING_CRYPTO_ENABLED. */
+export type BillingMethod = 'x402' | 'balance' | 'paddle'
 
 export type BillingPayment = {
   id: string
@@ -916,14 +986,20 @@ export type BillingPayment = {
   plan: 'founder' | 'pro'
   amountUsd: string
   method: BillingMethod
-  /** Referencia del receipt (x402/MPP) o id del débito al saldo. */
+  /** Referencia del receipt (x402/MPP), id del débito al saldo o transacción de Paddle (txn_...). */
   reference: string
   periodStart: string
   periodEnd: string
+  /** Suscripción de Paddle (sub_...) a la que pertenece el cobro. Null en x402 y saldo. */
+  subscriptionRef: string | null
+  /** Cuándo Paddle aprobó el reembolso completo de este cobro. */
+  refundedAt: string | null
   createdAt: string
 }
 
-export type NewBillingPayment = Omit<BillingPayment, 'id' | 'createdAt'>
+export type NewBillingPayment = Omit<BillingPayment, 'id' | 'createdAt' | 'subscriptionRef' | 'refundedAt'> & { subscriptionRef?: string | null }
+
+export type TenantPaddlePatch = Partial<Pick<Tenant, 'paddleCustomerId' | 'paddleSubscriptionId' | 'paddleStatus' | 'paddleCancelAt'>>
 // ---- fin M9 ----
 
 /** El disponible no alcanza para el retiro (ver Store.createWithdrawal). */

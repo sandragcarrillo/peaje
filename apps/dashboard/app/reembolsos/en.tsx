@@ -31,9 +31,12 @@ export function ReembolsosEn() {
       <Seccion id="cancel" titulo="2. How to cancel">
         <Lista>
           <li>
-            {/* TODO(San): once the dashboard has a "Manage subscription" button, name it here. */}
-            Open the link in the receipt Paddle emailed you, or go to <X href={PADDLE_PORTAL}>paddle.net</X> with the
-            email you paid with. There you can cancel, change your payment method or download invoices.
+            In My agent, Plan section, tap <T>Manage subscription</T>: it opens the Paddle customer portal, where you can
+            cancel, change your payment method or download invoices.
+          </li>
+          <li>
+            You can also open the link in the receipt Paddle emailed you, or go to <X href={PADDLE_PORTAL}>paddle.net</X>{' '}
+            with the email you paid with.
           </li>
           <li>
             If something gets in the way, write to <Correo email={CONTACTO} /> and we cancel it for you.

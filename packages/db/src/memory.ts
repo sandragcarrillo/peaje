@@ -18,6 +18,7 @@ import type {
   Store,
   Tenant,
   TenantEntityUpdate,
+  TenantWalletPatch,
   Verificacion,
   VisitStats,
   Withdrawal,
@@ -43,7 +44,7 @@ import { aggregateVisits } from './visits'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
-import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
+import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatch } from './types'
 import { DIAS_PRUEBA } from './planes'
 // ---- radar ----
 import type { NewRadarLead, RadarLead } from './types'
@@ -87,6 +88,11 @@ export class MemoryStore implements Store {
       custodialWalletId: input.custodialWalletId ?? null,
       email: input.email ?? null,
       privyUserId: input.privyUserId ?? null,
+      privyUserIdLegacy: null,
+      ownerWallet: input.ownerWallet ?? null,
+      ownerWalletId: input.ownerWalletId ?? null,
+      custodialWalletLegacy: null,
+      custodialWalletIdLegacy: null,
       baselineScore: null,
       baselineScoreAt: null,
       entityLogoUrl: null,
@@ -99,6 +105,10 @@ export class MemoryStore implements Store {
       // ---- M9: 14 días de prueba de Pro desde la creación ----
       planUntil: null,
       trialUntil: DIAS_PRUEBA > 0 ? new Date(Date.now() + DIAS_PRUEBA * 86_400_000).toISOString() : null,
+      paddleCustomerId: null,
+      paddleSubscriptionId: null,
+      paddleStatus: null,
+      paddleCancelAt: null,
       voiceProfile: null,
       voiceProfileAt: null,
       createdAt: new Date().toISOString(),
@@ -150,6 +160,43 @@ export class MemoryStore implements Store {
     const tenant = this.#tenants.get(tenantId)
     if (tenant) tenant.payoutWallet = wallet
   }
+
+  // ---- app de Privy propia ----
+
+  async listTenantsByEmail(email: string) {
+    const buscado = email.trim().toLowerCase()
+    if (!buscado) return []
+    return [...this.#tenants.values()]
+      .filter((t) => t.email?.toLowerCase() === buscado)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
+  async rebindTenantOwner(tenantId: string, privyUserId: string, legacyPrivyUserId: string | null) {
+    const tenant = this.#tenants.get(tenantId)
+    if (!tenant || tenant.privyUserIdLegacy !== null) return false
+    tenant.privyUserIdLegacy = legacyPrivyUserId
+    tenant.privyUserId = privyUserId
+    return true
+  }
+
+  async setTenantWallets(tenantId: string, patch: TenantWalletPatch) {
+    const tenant = this.#tenants.get(tenantId)
+    if (!tenant) return
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) Object.assign(tenant, { [k]: v })
+    }
+  }
+
+  async getAgentByWalletAddress(address: string) {
+    const buscada = address.toLowerCase()
+    return (
+      this.#agents.find(
+        (a) => a.walletAddress.toLowerCase() === buscada || a.walletAddressLegacy?.toLowerCase() === buscada,
+      ) ?? null
+    )
+  }
+
+  // ---- fin app de Privy propia ----
 
   async updateTenantEntity(tenantId: string, patch: TenantEntityUpdate) {
     const tenant = this.#tenants.get(tenantId)
@@ -834,6 +881,8 @@ export class MemoryStore implements Store {
       mission: input.mission,
       walletAddress: input.walletAddress,
       privyWalletId: input.privyWalletId ?? null,
+      walletAddressLegacy: null,
+      privyWalletIdLegacy: null,
       network: input.network,
       maxPerRun: input.maxPerRun,
       deliveryKind: input.deliveryKind ?? 'dashboard',
@@ -982,7 +1031,7 @@ export class MemoryStore implements Store {
 
   async recordBillingPayment(p: NewBillingPayment): Promise<BillingPayment> {
     if (this.#billing.some((b) => b.method === p.method && b.reference === p.reference)) throw new Error('billing reference already recorded')
-    const fila: BillingPayment = { ...p, id: this.#id('bil'), createdAt: new Date().toISOString() }
+    const fila: BillingPayment = { ...p, subscriptionRef: p.subscriptionRef ?? null, refundedAt: null, id: this.#id('bil'), createdAt: new Date().toISOString() }
     this.#billing.unshift(fila)
     return fila
   }
@@ -1004,6 +1053,34 @@ export class MemoryStore implements Store {
     return new Set(this.#billing.filter((b) => b.plan === 'founder').map((b) => b.tenantId)).size
   }
   // ---- fin M9 ----
+
+  // ---- Paddle ----
+  #paddleEvents = new Set<string>()
+
+  async setTenantPaddle(tenantId: string, patch: TenantPaddlePatch): Promise<void> {
+    const t = this.#tenants.get(tenantId)
+    if (!t) return
+    const limpio = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as TenantPaddlePatch
+    this.#tenants.set(tenantId, { ...t, ...limpio })
+  }
+
+  async getTenantByPaddleSubscription(subscriptionId: string): Promise<Tenant | null> {
+    return [...this.#tenants.values()].find((t) => t.paddleSubscriptionId === subscriptionId) ?? null
+  }
+
+  async paddleEventSeen(eventId: string): Promise<boolean> {
+    return this.#paddleEvents.has(eventId)
+  }
+
+  async recordPaddleEvent(e: { eventId: string; eventType: string; occurredAt: string | null }): Promise<void> {
+    this.#paddleEvents.add(e.eventId)
+  }
+
+  async markBillingPaymentRefunded(id: string, at: string): Promise<void> {
+    const b = this.#billing.find((x) => x.id === id)
+    if (b && !b.refundedAt) b.refundedAt = at
+  }
+  // ---- fin Paddle ----
 
   // ---- radar público: leads ----
   #radarLeads = new Map<string, RadarLead>()

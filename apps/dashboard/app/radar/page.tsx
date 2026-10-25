@@ -3,11 +3,12 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { cache } from 'react'
 import { getDict, getLocale, type Dict, type Locale } from '@/lib/i18n'
+import { PRECIOS_USD } from '@peaje/db'
 import { cachedScore, gradeDe } from '@/lib/ora'
 import { Copiar } from './compartir'
 import { leer, primero, type Fila, type Lectura } from './datos'
 import { dominioDeRadar } from './dominio'
-import { Formulario, Medir } from './partes'
+import { Formulario, MandarInforme, Medir } from './partes'
 import { enFrase, textoDe, textoOk } from './textos'
 
 /**
@@ -243,7 +244,6 @@ function Resultado({
       ? t.promptArregloGateway(dominio, topTexto.titulo, signup)
       : t.promptArreglo(dominio, topTexto.titulo, archivoDe(t, top) ?? '', que, enlace)
     : ''
-  const faltan = [...new Set(l.arreglables.filter((a) => !a.viaGateway).map((a) => a.bloque ?? ''))].filter(Boolean)
 
   return (
     <div className="space-y-6 py-6">
@@ -374,14 +374,12 @@ function Resultado({
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>
         </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <Link
-            href={`/nuevo?url=${encodeURIComponent(dominio)}`}
-            className="btn btn-primario"
-          >
-            {t.cta} →
+        <div className="flex flex-wrap items-start gap-3">
+          {/* plan=1: después del alta, /nuevo lleva directo a la sección del plan con el checkout de Paddle. */}
+          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}&plan=1`} className="btn btn-primario">
+            {t.cta(PRECIOS_USD.founder)}
           </Link>
-          <Copiar texto={t.promptCompleto(dominio, signup, faltan)} etiqueta={t.hazloTu} copiado={t.instruccionesCopiadas} variante="enlace" />
+          <MandarInforme dominio={dominio} conCorreo={conCorreo} />
         </div>
         <p className="text-xs text-muted">{t.ctaNota}</p>
       </Seccion>

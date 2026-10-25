@@ -20,11 +20,17 @@ import { saldosPorRed } from '../saldos.js'
 import { store } from '../store.js'
 import { payoutFromTenant } from '../treasury.js'
 import { urlCheckout, urlPlan } from './acceso.js'
+import { cryptoActivo, founderDisponible } from './founder.js'
+import { crearSesionPortal, webhookPaddle } from './paddle.js'
 
 /**
- * Cobro del agente Pro con el propio 402 de Peaje (M9):
- *   GET  /_billing/:slug/:plan                     402 por el mes (founder|pro); pagado, extiende 30 días
- *   GET  /_internal/:slug/billing                  plan vigente, precios, cupos founder, historial, URLs
+ * Cobro del agente Pro (M9):
+ *   POST /paddle/webhook                           eventos de Paddle Billing (tarjeta; ver paddle.ts)
+ *   GET  /_internal/:slug/billing                  plan vigente, precios, cupos founder, historial
+ *   POST /_internal/:slug/billing/portal           link al portal de clientes de Paddle
+ *
+ * Detrás de BILLING_CRYPTO_ENABLED (apagado por defecto desde el 24 oct 2026):
+ *   GET  /_billing/:slug/:plan                     402 en USDC por el mes (founder|pro); pagado, extiende 30 días
  *   POST /_internal/:slug/billing/pay-with-balance {plan}  paga con el saldo cobrado del negocio
  *
  * El pago de la suscripción es de Peaje, no del negocio: va a la treasury con
@@ -48,23 +54,17 @@ export function precioCobro(plan: PlanPago): string {
   return String(PRECIOS_USD[plan])
 }
 
-/**
- * Founder renueva a su precio solo mientras el plan founder siga vigente. Si
- * lo deja vencer (cancela) y vuelve, paga Pro aunque queden cupos (decisión de
- * San, 24 oct 2026). Un negocio que nunca fue founder entra si quedan cupos.
- */
-async function founderDisponible(tenant: Tenant): Promise<{ ok: boolean; cupos: number; yaFounder: boolean }> {
-  const [usados, pagos] = await Promise.all([store.countFounders(), store.listBillingPayments(tenant.id, 100)])
-  const yaFounder = tenant.plan === 'founder' && !!tenant.planUntil && new Date(tenant.planUntil).getTime() > Date.now()
-  const loFue = pagos.some((p) => p.plan === 'founder')
-  const cupos = Math.max(0, CUPOS_FOUNDER - usados)
-  return { ok: yaFounder || (!loFue && cupos > 0), cupos, yaFounder }
-}
-
 const sinCupoFounder = (tenant: Tenant) => ({
   error: 'founder-full',
   message: `The ${CUPOS_FOUNDER} founder spots are taken. Subscribe to Pro instead.`,
   checkout: urlCheckout(tenant.slug, 'pro'),
+})
+
+/** Con el cobro en USDC apagado, el 402 de la suscripción y el pago con saldo no existen. */
+const cryptoApagado = (slug: string) => ({
+  error: 'card-only',
+  message: 'Peaje Pro is paid by card. Subscribe from your dashboard.',
+  upgradeUrl: urlPlan(slug),
 })
 
 /** Registra el pago y extiende el plan 30 días desde max(hoy, vencimiento actual). */
@@ -125,7 +125,11 @@ function paginaDePago(tenant: Tenant, plan: PlanPago, precio: string, url: strin
 </body></html>`
 }
 
+// Paddle firma cada evento; no lleva el secreto interno.
+billingRouter.post('/paddle/webhook', webhookPaddle)
+
 billingRouter.get('/_billing/:slug/:plan', async (c) => {
+  if (!cryptoActivo()) return c.json(cryptoApagado(c.req.param('slug')), 404)
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Business not found' }, 404)
   const plan = c.req.param('plan')
@@ -171,10 +175,11 @@ billingRouter.use('/_internal/:slug/billing/*', async (c, next) => {
 billingRouter.get('/_internal/:slug/billing', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  const crypto = cryptoActivo()
   const [founder, pagos, saldos] = await Promise.all([
     founderDisponible(tenant),
     store.listBillingPayments(tenant.id, 20),
-    saldosPorRed(tenant).catch(() => []),
+    crypto ? saldosPorRed(tenant).catch(() => []) : Promise.resolve([]),
   ])
   return c.json({
     access: accesoPro(tenant),
@@ -185,9 +190,31 @@ billingRouter.get('/_internal/:slug/billing', async (c) => {
     founder: { slotsLeft: founder.cupos, total: CUPOS_FOUNDER, available: founder.ok, alreadyFounder: founder.yaFounder },
     balanceAvailable: saldos.reduce((s, b) => s + Number(b.available), 0).toFixed(6),
     payments: pagos,
-    checkout: { founder: founder.ok ? urlCheckout(tenant.slug, 'founder') : null, pro: urlCheckout(tenant.slug, 'pro') },
+    // Links del 402 en USDC: solo con BILLING_CRYPTO_ENABLED.
+    crypto,
+    checkout: crypto
+      ? { founder: founder.ok ? urlCheckout(tenant.slug, 'founder') : null, pro: urlCheckout(tenant.slug, 'pro') }
+      : { founder: null, pro: null },
     upgradeUrl: urlPlan(tenant.slug),
   })
+})
+
+/**
+ * El botón "Gestionar suscripción": una sesión nueva del portal de Paddle en
+ * cada clic. El cliente sale del negocio (lo dejó el webhook), nunca de lo
+ * que mande el navegador.
+ */
+billingRouter.post('/_internal/:slug/billing/portal', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
+  if (!tenant.paddleCustomerId) return c.json({ error: 'no-paddle-customer', message: 'This business has no card subscription yet.' }, 404)
+  const subs = tenant.paddleSubscriptionId && tenant.paddleStatus !== 'canceled' ? [tenant.paddleSubscriptionId] : []
+  try {
+    return c.json({ url: await crearSesionPortal(tenant.paddleCustomerId, subs) })
+  } catch (error) {
+    console.error('[billing] no se pudo abrir el portal de Paddle', error)
+    return c.json({ error: 'We could not open the Paddle portal. Try again in a minute.' }, 502)
+  }
 })
 
 /** Un pago con saldo a la vez por negocio: un doble clic no cobra dos meses. */
@@ -201,6 +228,7 @@ const enCurso = new Set<string>()
  * negocio: ahí sí sale una tx del contrato a la treasury.
  */
 billingRouter.post('/_internal/:slug/billing/pay-with-balance', async (c) => {
+  if (!cryptoActivo()) return c.json(cryptoApagado(c.req.param('slug')), 404)
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
   const { plan } = (await c.req.json().catch(() => ({}))) as { plan?: string }

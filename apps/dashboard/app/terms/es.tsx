@@ -234,7 +234,6 @@ export function TerminosEs() {
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} al mes</T>, solo para los primeros {CUPOS_FOUNDER}{' '}
             negocios que se suscriben. Incluye {LIMITES.founder.preguntas} preguntas medidas en asistentes de IA y{' '}
             {LIMITES.founder.mensajes} mensajes al agente por mes. Quien entra como founder mantiene ese precio mientras su suscripción siga activa; si la cancela y vuelve, paga el precio Pro.
-            {/* TODO(San): definir si el precio founder se mantiene si la persona cancela y vuelve a suscribirse. */}
           </li>
           <li>
             <T>Pro</T>: <T>US${PRECIOS_USD.pro} al mes</T> cuando se toman los cupos founder. Incluye{' '}
@@ -272,9 +271,9 @@ export function TerminosEs() {
             que la canceles. Paddle te envía el recibo de cada cobro al correo de la compra.
           </li>
           <li>
-            {/* TODO(San): cuando exista el botón "Gestionar suscripción" en el dashboard, nombrarlo acá. */}
-            Cancelas cuando quieras desde el enlace del recibo de Paddle o en{' '}
-            <X href={PADDLE_PORTAL}>paddle.net</X>, donde también cambias el medio de pago y descargas tus facturas.
+            Cancelas cuando quieras con el botón <T>Gestionar suscripción</T> de la sección Plan en Mi agente, que
+            abre el portal de clientes de Paddle; ahí también cambias el medio de pago y descargas tus facturas. También
+            puedes hacerlo desde el enlace del recibo de Paddle o en <X href={PADDLE_PORTAL}>paddle.net</X>.
             También puedes escribirnos y la cancelamos por ti. Al cancelar conservas Pro hasta el final del período ya
             pagado y después el sitio pasa al plan gratis.
           </li>

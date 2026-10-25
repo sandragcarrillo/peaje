@@ -367,12 +367,20 @@ export type EstadoBilling = {
   founder: { slotsLeft: number; total: number; available: boolean; alreadyFounder: boolean }
   balanceAvailable: string
   payments: import('@peaje/db').BillingPayment[]
-  checkout: { founder: string | null; pro: string }
+  /** El cobro en USDC (402 y saldo) está prendido en el gateway (BILLING_CRYPTO_ENABLED). Por defecto no. */
+  crypto?: boolean
+  /** Links del 402 en USDC. Null con el cobro en USDC apagado. */
+  checkout: { founder: string | null; pro: string | null }
   upgradeUrl: string
 }
 
 export function leerBilling(slug: string) {
   return internal<EstadoBilling>(`/${slug}/billing`)
+}
+
+/** Sesión nueva del portal de clientes de Paddle (un solo uso; no se guarda). */
+export function abrirPortalPaddle(slug: string) {
+  return internal<{ url: string }>(`/${slug}/billing/portal`, { method: 'POST' })
 }
 
 export function pagarPlanConSaldo(slug: string, plan: 'founder' | 'pro') {

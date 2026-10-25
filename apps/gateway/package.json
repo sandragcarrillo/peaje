@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "monitor:daily": "tsx src/monitor/cli.ts daily",
     "monitor:weekly": "tsx src/monitor/cli.ts weekly",
-    "monitor:schedules": "tsx src/monitor/cli.ts schedules"
+    "monitor:schedules": "tsx src/monitor/cli.ts schedules",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

@@ -15,8 +15,26 @@ export function textoDe(check: OraCheck, locale: Locale): { titulo: string; deta
   )
 }
 
+/**
+ * Ora da por buenos los chequeos de permisos de robots.txt cuando el sitio no
+ * tiene robots.txt (sin archivo, todo está permitido). Es correcto, pero el
+ * texto "pueden leer tu sitio (robots.txt)" hacía creer que el archivo existe.
+ */
+const SIN_ROBOTS: Record<string, Record<Locale, string>> = {
+  'robots-ai-policy-quality': {
+    es: 'Los buscadores con IA pueden leer tu sitio: no tienes robots.txt, y sin ese archivo nada los bloquea',
+    en: 'AI search engines can read your site: you have no robots.txt, and without that file nothing blocks them',
+  },
+  'robots-agent-user-policy': {
+    es: 'Los agentes que actúan por tus clientes pueden entrar: no tienes robots.txt, y sin ese archivo nada los bloquea',
+    en: 'Agents acting for your customers can get in: you have no robots.txt, and without that file nothing blocks them',
+  },
+}
+
 /** La versión "esto ya lo haces" de un check que pasa. */
-export function textoOk(check: OraCheck, locale: Locale): string {
+export function textoOk(check: OraCheck & { details?: string }, locale: Locale): string {
+  const sinRobots = SIN_ROBOTS[check.id]
+  if (sinRobots && /no robots\.txt (\(http|found)|robots\.txt not found/i.test(check.details ?? '')) return sinRobots[locale]
   return textoDeChequeoOk(check.id, locale) ?? check.name
 }
 

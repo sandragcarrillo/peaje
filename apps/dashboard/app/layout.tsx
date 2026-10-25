@@ -45,8 +45,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             aria-hidden
             className="pointer-events-none fixed inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-bg via-bg/90 to-transparent"
           />
-          <header className="isla-tinta sticky top-4 z-40 mx-auto max-w-5xl px-6">
-            <div className="flex items-center justify-between rounded-full border border-border bg-panel px-5 py-2.5 shadow-lg shadow-black/30">
+          <header className="isla-tinta sticky top-4 z-40 mx-auto max-w-5xl px-3 sm:px-6">
+            <div className="flex items-center justify-between gap-2 rounded-full border border-border bg-panel px-3 py-2.5 shadow-lg sm:px-5 shadow-black/30">
               <Link href="/" className="flex items-center">
                 <Logo />
               </Link>
@@ -65,22 +65,30 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                   </form>
                 </nav>
               ) : (
-                <nav className="flex items-center gap-3 text-sm">
-                  <Link
-                    href="/nuevo"
-                    className="btn btn-primario btn-chico"
-                  >
-                    {d.nav.registrar}
-                  </Link>
-                  <Link
-                    href="/acceder"
-                    className="btn btn-secundario btn-chico"
-                  >
-                    {d.nav.entrar}
-                  </Link>
-                  <ThemeToggle />
-                  <LanguageToggle locale={locale} />
-                </nav>
+                <>
+                  {/* Enlaces al centro, como en boringmarketing.com; el Radar gratis destacado. */}
+                  <nav aria-label={d.nav.linkProducto} className="hidden items-center gap-6 font-mono text-xs md:flex">
+                    <Link href="/#producto" className="text-muted hover:text-text">{d.nav.linkProducto}</Link>
+                    <Link href="/#como-funciona" className="text-muted hover:text-text">{d.nav.linkComo}</Link>
+                    <Link href="/precios" className="text-muted hover:text-text">{d.nav.linkPrecios}</Link>
+                    <Link href="/radar" className="font-bold text-accent hover:text-text">{d.nav.linkRadar}</Link>
+                  </nav>
+                  <div className="flex items-center gap-2 text-sm sm:gap-3">
+                    <Link href="/radar" className="font-mono text-xs font-bold text-accent md:hidden">
+                      {d.nav.linkRadar}
+                    </Link>
+                    <Link href="/acceder" className="hidden px-1 font-mono text-xs text-muted hover:text-text sm:inline">
+                      {d.nav.entrar}
+                    </Link>
+                    <span className="hidden lg:contents">
+                      <ThemeToggle />
+                    </span>
+                    <LanguageToggle locale={locale} />
+                    <Link href="/nuevo" className="btn btn-primario btn-chico">
+                      {d.nav.usarAgente}
+                    </Link>
+                  </div>
+                </>
               )}
             </div>
           </header>

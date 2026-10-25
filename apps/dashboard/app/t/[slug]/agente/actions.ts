@@ -157,7 +157,21 @@ export async function quitarReporte(slug: string, filtro: { id: string } | { cha
 }
 // ---- fin reportes programados ----
 
-// ---- M9: pagar el plan con el saldo cobrado ----
+// ---- Paddle: botón "Gestionar suscripción" ----
+/** El cliente de Paddle sale del negocio del dueño con sesión (requireTenant), nunca del navegador. */
+export async function abrirPortal(slug: string) {
+  await requireTenant(slug)
+  const { abrirPortalPaddle } = await import('@/lib/gateway')
+  try {
+    const r = await abrirPortalPaddle(slug)
+    return { url: r.url, error: null }
+  } catch (e) {
+    return { url: null, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+// ---- fin Paddle ----
+
+// ---- M9: pagar el plan con el saldo cobrado (solo con BILLING_CRYPTO_ENABLED en el gateway) ----
 export async function pagarConSaldo(slug: string, plan: 'founder' | 'pro') {
   await requireTenant(slug)
   const { pagarPlanConSaldo } = await import('@/lib/gateway')

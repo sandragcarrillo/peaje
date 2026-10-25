@@ -36,9 +36,12 @@ export function ReembolsosEs() {
       <Seccion id="cancelar" titulo="2. Cómo cancelar">
         <Lista>
           <li>
-            {/* TODO(San): cuando exista el botón "Gestionar suscripción" en el dashboard, nombrarlo acá. */}
-            Abre el enlace del recibo que Paddle te mandó por correo, o entra a <X href={PADDLE_PORTAL}>paddle.net</X>{' '}
-            con el correo de la compra. Ahí cancelas, cambias el medio de pago o descargas tus facturas.
+            En Mi agente, sección Plan, toca <T>Gestionar suscripción</T>: abre el portal de clientes de Paddle, donde
+            cancelas, cambias el medio de pago o descargas tus facturas.
+          </li>
+          <li>
+            También puedes abrir el enlace del recibo que Paddle te mandó por correo, o entrar a{' '}
+            <X href={PADDLE_PORTAL}>paddle.net</X> con el correo de la compra.
           </li>
           <li>
             Si algo no te deja, escríbenos a <Correo email={CONTACTO} /> y la cancelamos nosotros.

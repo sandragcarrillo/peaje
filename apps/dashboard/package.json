@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@paddle/paddle-js": "^1.6.5",
     "@peaje/db": "workspace:*",
     "@peaje/next": "^0.2.2",
     "@peaje/shared": "workspace:*",

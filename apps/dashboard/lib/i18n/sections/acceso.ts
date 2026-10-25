@@ -69,6 +69,7 @@ export const acceso = {
 
     // --- /nuevo, pantalla final ---
     listoTitulo: 'Listo. Tu sitio está registrado.',
+    irAlPlan: 'Listo. Te llevamos a tu plan para activar tu agente…',
     tuSaldo: 'Tu saldo',
     etiquetaCuenta: 'Cuenta',
     copiado: 'Copiado',
@@ -155,6 +156,7 @@ export const acceso = {
 
     // --- /nuevo, pantalla final ---
     listoTitulo: 'Done. Your site is registered.',
+    irAlPlan: 'Done. Taking you to your plan to turn on your agent…',
     tuSaldo: 'Your balance',
     etiquetaCuenta: 'Account',
     copiado: 'Copied',

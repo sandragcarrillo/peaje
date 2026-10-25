@@ -127,8 +127,9 @@ export function PrivacidadEs() {
 
         <H3>3.8 Suscripción</H3>
         <p>
-          {/* TODO(San): cuando se integre Paddle, listar los identificadores de Paddle que se guardan (cliente, suscripción). */}
-          Guardamos el estado de tu plan y su fecha de vencimiento. <T>No</T> recibimos ni almacenamos números de
+          Guardamos el estado de tu plan y su fecha de vencimiento, y los identificadores que Paddle asigna a tu cliente,
+          a tu suscripción y a cada cobro, para ligar los pagos a tu negocio y abrir el portal de Paddle desde
+          Gestionar suscripción. <T>No</T> recibimos ni almacenamos números de
           tarjeta, códigos de seguridad ni datos bancarios: el pago de la suscripción Pro lo procesa Paddle (sección 7).
         </p>
 

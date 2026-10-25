@@ -1,5 +1,6 @@
 import { accesoPro, type AccesoPro, type PlanPago, type Tenant } from '@peaje/db'
 import { env } from '../env.js'
+import { cryptoActivo } from './founder.js'
 
 /**
  * El único lugar del gateway que decide si un negocio tiene Pro (M9). Todo lo
@@ -17,7 +18,7 @@ const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com').r
 /** Dónde se suscribe el dueño: la sección Plan de "Mi agente". */
 export const urlPlan = (slug: string) => `${DASHBOARD}/t/${slug}/agente#plan`
 
-/** El 402 de la suscripción: cualquier cliente x402 o MPP lo paga. */
+/** El 402 de la suscripción en USDC: cualquier cliente x402 o MPP lo paga. Solo con BILLING_CRYPTO_ENABLED. */
 export const urlCheckout = (slug: string, plan: PlanPago) => `${env.publicUrl.replace(/\/$/, '')}/_billing/${slug}/${plan}`
 
 export function mensajeSinPro(tenant: Tenant, idioma: 'es' | 'en'): string {
@@ -35,6 +36,7 @@ export function sinPro(tenant: Tenant, idioma: 'es' | 'en' = 'en') {
     message: mensajeSinPro(tenant, idioma),
     plan: acceso.plan,
     upgradeUrl: urlPlan(tenant.slug),
-    checkout: { founder: urlCheckout(tenant.slug, 'founder'), pro: urlCheckout(tenant.slug, 'pro') },
+    // Pro se paga con tarjeta desde el dashboard (Paddle). El 402 en USDC solo se anuncia si está prendido.
+    ...(cryptoActivo() ? { checkout: { founder: urlCheckout(tenant.slug, 'founder'), pro: urlCheckout(tenant.slug, 'pro') } } : {}),
   }
 }

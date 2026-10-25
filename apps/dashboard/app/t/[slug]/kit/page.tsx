@@ -104,7 +104,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
                 <h2 className="font-medium">{d.agenteTitulo}</h2>
                 <p className="mt-1 max-w-2xl text-sm text-muted">{d.agenteIntro}</p>
               </div>
-              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, secreto, `${dashboardUrl}/t/${tenant.slug}/kit`)} />
+              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, secreto, `${dashboardUrl}/t/${tenant.slug}/kit`)} secreto={secreto} />
               <p className="text-sm text-muted">{d.agentePermisos}</p>
               <p className="text-sm text-muted">{d.agenteDespues}</p>
             </section>
@@ -121,7 +121,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
               </div>
               <div className="space-y-2">
                 <p className="text-sm">2. {d.unComandoPaso2}</p>
-                <Copiable texto={`PEAJE_ORIGIN_SECRET=${secreto}`} />
+                <Copiable texto={`PEAJE_ORIGIN_SECRET=${secreto}`} secreto={secreto} />
                 <p className="text-xs text-muted">{d.unComandoPaso2Nota}</p>
               </div>
               <p className="text-sm">3. {d.unComandoPaso3}</p>

@@ -1,0 +1,48 @@
+/**
+ * /checkout: el link de pago por defecto de Paddle. Paddle manda acá a quien
+ * tiene que actualizar la tarjeta o reintentar un cobro que falló (?_ptxn=).
+ */
+export const pago = {
+  es: {
+    meta: 'Pago de Peaje Pro',
+    eyebrow: 'Peaje Pro',
+    abriendo: 'Abriendo tu pago',
+    abriendoNota: 'Un momento, Paddle está cargando el checkout.',
+    abierto: 'Tu pago está abierto',
+    abiertoNota: 'Completa los datos en la ventana de Paddle.',
+    listo: 'Listo, gracias',
+    listoNota: 'Tu pago quedó registrado. Paddle te manda el recibo por correo.',
+    cerrado: 'Cerraste el pago',
+    cerradoNota: 'Nada cambió. Puedes volver a abrirlo cuando quieras.',
+    reabrir: 'Volver a abrir el pago',
+    error: 'No pudimos abrir el pago',
+    errorNota: 'Puede que el link haya vencido o que el pago ya esté hecho. Vuelve a intentar desde el correo de Paddle.',
+    sinTxn: 'Este link abre un pago de Peaje Pro',
+    sinTxnNota: 'Funciona cuando llegas desde un correo de Paddle, por ejemplo para actualizar tu tarjeta. Para suscribirte, entra a tu negocio y abre Mi agente.',
+    sinConfig: 'El pago no se puede abrir ahora',
+    sinConfigNota: (correo: string) => `Estamos terminando de configurar los pagos. Escríbenos a ${correo} y lo resolvemos contigo.`,
+    irAlPanel: 'Ir a mis negocios',
+    pie: (correo: string) => `Los pagos de Peaje Pro los procesa Paddle. ¿Dudas? Escríbenos a ${correo}.`,
+  },
+  en: {
+    meta: 'Peaje Pro payment',
+    eyebrow: 'Peaje Pro',
+    abriendo: 'Opening your payment',
+    abriendoNota: 'One moment, Paddle is loading the checkout.',
+    abierto: 'Your payment is open',
+    abiertoNota: 'Fill in your details in the Paddle window.',
+    listo: 'Done, thank you',
+    listoNota: 'Your payment is recorded. Paddle emails you the receipt.',
+    cerrado: 'You closed the payment',
+    cerradoNota: 'Nothing changed. You can open it again any time.',
+    reabrir: 'Open the payment again',
+    error: 'We could not open the payment',
+    errorNota: 'The link may have expired or the payment may already be done. Try again from the Paddle email.',
+    sinTxn: 'This link opens a Peaje Pro payment',
+    sinTxnNota: 'It works when you arrive from a Paddle email, for example to update your card. To subscribe, open your business and go to My agent.',
+    sinConfig: 'The payment cannot open right now',
+    sinConfigNota: (correo: string) => `We are finishing the payment setup. Write to ${correo} and we will sort it out with you.`,
+    irAlPanel: 'Go to my businesses',
+    pie: (correo: string) => `Peaje Pro payments are processed by Paddle. Questions? Write to ${correo}.`,
+  },
+}
