@@ -1,6 +1,6 @@
 import { Correo, H3, L, Lista, Seccion, T, X } from '../components/legal'
 import { CIUDAD_ES, CONTACTO, PADDLE_PORTAL, PADDLE_TERMINOS, TITULAR } from '@/lib/legal'
-import { CUPOS_FOUNDER, DIAS_PRUEBA, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { CUPOS_FOUNDER, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 // Términos de servicio, versión en español (la que rige). Modelados sobre los
 // de Puente, que Paddle ya aprobó. Describen el producto como funciona hoy:
@@ -233,7 +233,7 @@ export function TerminosEs() {
           <li>
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} al mes</T>, solo para los primeros {CUPOS_FOUNDER}{' '}
             negocios que se suscriben. Incluye {LIMITES.founder.preguntas} preguntas medidas en asistentes de IA y{' '}
-            {LIMITES.founder.mensajes} mensajes al agente por mes. Quien entra como founder renueva a ese precio.
+            {LIMITES.founder.mensajes} mensajes al agente por mes. Quien entra como founder mantiene ese precio mientras su suscripción siga activa; si la cancela y vuelve, paga el precio Pro.
             {/* TODO(San): definir si el precio founder se mantiene si la persona cancela y vuelve a suscribirse. */}
           </li>
           <li>
@@ -291,7 +291,7 @@ export function TerminosEs() {
         </p>
         <Lista>
           <li>
-            Si es el <T>primer pago</T> de tu suscripción y lo pides dentro de los <T>catorce (14) días</T> siguientes
+            Si es el <T>primer pago</T> de tu suscripción y lo pides dentro de los <T>siete (7) días</T> siguientes
             al cobro, te devolvemos el importe completo, sin preguntas.
           </li>
           <li>Las renovaciones no se reembolsan, salvo error de cobro, que corregimos siempre.</li>

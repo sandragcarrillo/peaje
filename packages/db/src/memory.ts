@@ -98,7 +98,7 @@ export class MemoryStore implements Store {
       plan: 'free',
       // ---- M9: 14 días de prueba de Pro desde la creación ----
       planUntil: null,
-      trialUntil: new Date(Date.now() + DIAS_PRUEBA * 86_400_000).toISOString(),
+      trialUntil: DIAS_PRUEBA > 0 ? new Date(Date.now() + DIAS_PRUEBA * 86_400_000).toISOString() : null,
       voiceProfile: null,
       voiceProfileAt: null,
       createdAt: new Date().toISOString(),

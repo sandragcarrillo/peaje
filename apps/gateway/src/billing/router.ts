@@ -48,12 +48,17 @@ export function precioCobro(plan: PlanPago): string {
   return String(PRECIOS_USD[plan])
 }
 
-/** Founder solo si quedan cupos, o si este negocio ya es founder (renueva a su precio). */
+/**
+ * Founder renueva a su precio solo mientras el plan founder siga vigente. Si
+ * lo deja vencer (cancela) y vuelve, paga Pro aunque queden cupos (decisión de
+ * San, 24 oct 2026). Un negocio que nunca fue founder entra si quedan cupos.
+ */
 async function founderDisponible(tenant: Tenant): Promise<{ ok: boolean; cupos: number; yaFounder: boolean }> {
   const [usados, pagos] = await Promise.all([store.countFounders(), store.listBillingPayments(tenant.id, 100)])
-  const yaFounder = pagos.some((p) => p.plan === 'founder')
+  const yaFounder = tenant.plan === 'founder' && !!tenant.planUntil && new Date(tenant.planUntil).getTime() > Date.now()
+  const loFue = pagos.some((p) => p.plan === 'founder')
   const cupos = Math.max(0, CUPOS_FOUNDER - usados)
-  return { ok: yaFounder || cupos > 0, cupos, yaFounder }
+  return { ok: yaFounder || (!loFue && cupos > 0), cupos, yaFounder }
 }
 
 const sinCupoFounder = (tenant: Tenant) => ({

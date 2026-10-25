@@ -29,7 +29,10 @@ export const LIMITES: Record<PlanVigente, Limites> = {
 export const CUPOS_FOUNDER = 50
 /** Cada pago extiende el plan 30 días. */
 export const DIAS_PERIODO = 30
-export const DIAS_PRUEBA = 14
+/** Sin prueba gratis desde el 24 oct 2026: los sitios nuevos arrancan en free. Las pruebas ya dadas siguen hasta su fecha. */
+export const DIAS_PRUEBA = 0
+/** Ventana para pedir el reembolso completo del primer pago. */
+export const DIAS_REEMBOLSO = 7
 
 export const esPlanPago = (x: unknown): x is PlanPago => x === 'founder' || x === 'pro'
 

@@ -1,6 +1,6 @@
 import { Correo, H3, L, Lista, Seccion, T, X } from '../components/legal'
 import { CIUDAD_EN, CONTACTO, PADDLE_PORTAL, PADDLE_TERMINOS, TITULAR } from '@/lib/legal'
-import { CUPOS_FOUNDER, DIAS_PRUEBA, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { CUPOS_FOUNDER, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 // Terms of service, English version. Translation of es.tsx, which governs.
 // Keep both in sync and update the date in lib/legal.ts.
@@ -227,7 +227,7 @@ export function TerminosEn() {
           <li>
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} a month</T>, only for the first {CUPOS_FOUNDER} businesses
             that subscribe. It includes {LIMITES.founder.preguntas} questions tracked in AI assistants and{' '}
-            {LIMITES.founder.mensajes} messages to the agent a month. Founders renew at that price.
+            {LIMITES.founder.mensajes} messages to the agent a month. Founders keep that price while their subscription stays active; if they cancel and come back, they pay the Pro price.
             {/* TODO(San): decide whether the founder price is kept if someone cancels and subscribes again. */}
           </li>
           <li>
@@ -284,7 +284,7 @@ export function TerminosEn() {
         </p>
         <Lista>
           <li>
-            If it is the <T>first payment</T> of your subscription and you ask within <T>fourteen (14) days</T> of the
+            If it is the <T>first payment</T> of your subscription and you ask within <T>seven (7) days</T> of the
             charge, we refund the full amount, no questions asked.
           </li>
           <li>Renewals are not refunded, except for billing errors, which we always fix.</li>

@@ -120,8 +120,8 @@ const TEXTO = {
     instalar: 'Instalar Peaje en tu sitio',
     instalarTexto: 'Te registras con tu email y un comando en tu proyecto instala lo que falta.',
     nota: 'El puntaje lo calcula Ora (ora.ai), un medidor independiente. El número con Peaje estima lo que el kit arregla.',
-    responde: 'Si respondes este correo, te lee Sandra.',
-    firma: 'Sandra, de Peaje',
+    responde: 'Si respondes este correo, te contesta el equipo de Peaje.',
+    firma: 'El equipo de Peaje',
   },
   en: {
     subject: (d: string, n: number) => `${d} on the Peaje radar: ${n} out of 100`,
@@ -135,8 +135,8 @@ const TEXTO = {
     instalar: 'Install Peaje on your site',
     instalarTexto: 'Sign up with your email and one command in your project installs what is missing.',
     nota: 'The score comes from Ora (ora.ai), an independent scanner. The number with Peaje estimates what the kit fixes.',
-    responde: 'If you reply to this email, Sandra reads it.',
-    firma: 'Sandra, from Peaje',
+    responde: 'If you reply to this email, the Peaje team answers.',
+    firma: 'The Peaje team',
   },
 }
 

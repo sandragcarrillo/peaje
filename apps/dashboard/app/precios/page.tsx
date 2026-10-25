@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ENLACE } from '../components/legal'
 import { getDict } from '@/lib/i18n'
-import { CUPOS_FOUNDER, DIAS_PRUEBA, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 /**
  * Precios. Montos, cupos, prueba y límites salen de packages/db/src/planes.ts;
@@ -97,8 +97,8 @@ export default async function Precios() {
 
       <div className="mt-12 grid gap-4 sm:grid-cols-2">
         <section className="rounded-lg border border-border p-5">
-          <h2 className="text-base font-semibold">{P.pruebaTitulo(DIAS_PRUEBA)}</h2>
-          <p className="mt-2 text-sm text-muted">{P.pruebaTexto(DIAS_PRUEBA)}</p>
+          <h2 className="text-base font-semibold">{P.pruebaTitulo(DIAS_REEMBOLSO)}</h2>
+          <p className="mt-2 text-sm text-muted">{P.pruebaTexto(DIAS_REEMBOLSO)}</p>
         </section>
         <section className="rounded-lg border border-border p-5">
           <h2 className="text-base font-semibold">{P.cobroTitulo}</h2>

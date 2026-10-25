@@ -40,7 +40,7 @@ const MAX_CUSTOM = 5
 // El chat corre en Sonnet: responde casi igual y cuesta bastante menos por
 // mensaje. Opus queda para lo que se piensa una vez: plan, borradores, misiones.
 const AGENT_MODEL = process.env.AGENT_MODEL ?? 'claude-sonnet-5'
-// El tope de mensajes del dueño por mes calendario sale del plan (M9): 60 founder, 150 pro y prueba.
+// El tope de mensajes del dueño por mes calendario sale del plan (M9): 150 en founder y en pro.
 const HISTORIAL = 20
 const MAX_VUELTAS = 8
 

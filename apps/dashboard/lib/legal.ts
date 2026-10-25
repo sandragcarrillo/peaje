@@ -7,10 +7,8 @@
  */
 
 /**
- * Titular del servicio, igual que en Puente.
- * TODO(San): el README nombra a Carla Martínez y Angela Ocando como
- * coautoras de Peaje. Confirma que el titular legal es solo Sandra Carrillo
- * (persona natural) o cambia esto por la entidad que corresponda.
+ * Titular del servicio, igual que en Puente. Confirmado por San el 24 oct 2026:
+ * Sandra Carrillo, persona natural.
  */
 export const TITULAR = 'Sandra Carrillo'
 export const CIUDAD_ES = 'Bogotá, Colombia'

@@ -21,7 +21,7 @@ export const legal = {
       'Qué datos recoge Peaje, para qué los usa, con qué proveedores los comparte y cómo ejercer tus derechos.',
     reembolsosTitulo: 'Política de reembolso y cancelación',
     reembolsosMeta:
-      'Cómo cancelar la suscripción Pro de Peaje, la prueba de 14 días y cuándo hay reembolso. Paddle procesa los pedidos.',
+      'Cómo cancelar la suscripción Pro de Peaje y cuándo hay reembolso. Paddle procesa los pedidos.',
   },
   en: {
     pieNav: 'Legal pages and pricing',
@@ -40,6 +40,6 @@ export const legal = {
       'What data Peaje collects, what it uses it for, which providers it shares it with and how to exercise your rights.',
     reembolsosTitulo: 'Refund and cancellation policy',
     reembolsosMeta:
-      'How to cancel the Peaje Pro subscription, the 14-day trial and when you get a refund. Paddle processes the orders.',
+      'How to cancel the Peaje Pro subscription and when you get a refund. Paddle processes the orders.',
   },
 }

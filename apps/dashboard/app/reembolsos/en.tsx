@@ -1,6 +1,5 @@
 import { Correo, L, Lista, Seccion, T, X } from '../components/legal'
 import { CIUDAD_EN, CONTACTO, PADDLE_PORTAL, PADDLE_TERMINOS, TITULAR } from '@/lib/legal'
-import { DIAS_PRUEBA } from '@peaje/db'
 
 // Refund and cancellation policy, English version. Translation of es.tsx,
 // which governs. Keep both in sync and update the date in lib/legal.ts.
@@ -23,7 +22,7 @@ export function ReembolsosEn() {
             Peaje Pro <T>has no free trial</T>. The radar and the kit are always free, with no subscription.
           </li>
           <li>
-            If you subscribe and Pro is not for you, your <T>first payment is fully refunded</T> if you ask within 14
+            If you subscribe and Pro is not for you, your <T>first payment is fully refunded</T> if you ask within 7
             days (section 3).
           </li>
         </Lista>
@@ -56,8 +55,8 @@ export function ReembolsosEn() {
         </p>
         <Lista>
           <li>
-            <T>First payment, 14 days, no questions asked.</T> If it is the first charge of your subscription and you
-            ask for a refund within <T>fourteen (14) days</T> of that charge, we refund the full amount. You do not need
+            <T>First payment, 7 days, no questions asked.</T> If it is the first charge of your subscription and you
+            ask for a refund within <T>seven (7) days</T> of that charge, we refund the full amount. You do not need
             to explain why.
           </li>
           <li>

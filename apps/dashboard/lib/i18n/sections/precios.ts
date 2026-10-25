@@ -6,7 +6,7 @@ export const precios = {
   es: {
     metaTitulo: 'Precios',
     metaDescripcion:
-      'Radar gratis, kit gratis y el agente de AEO en la suscripción Pro: precio de fundador de US$30 al mes para los primeros 50 negocios, luego US$69 al mes. 14 días de prueba.',
+      'Radar gratis, kit gratis y el agente de AEO en la suscripción Pro: precio de fundador de US$30 al mes para los primeros 50 negocios, luego US$69 al mes.',
     kicker: 'Precios',
     titulo: 'Empieza gratis. Paga solo por el agente.',
     intro:
@@ -34,7 +34,7 @@ export const precios = {
 
     founderNombre: 'Pro founder',
     founderTexto: (cupos: number) =>
-      `Lo mismo que Pro, con descuento de fundador para los primeros ${cupos} negocios que se suscriben. Si entras como founder, renuevas a este precio.`,
+      `Lo mismo que Pro, con descuento de fundador para los primeros ${cupos} negocios que se suscriben. Mantienes este precio mientras tu suscripción siga activa. Si la cancelas y vuelves, pagas el precio Pro.`,
     proNombre: 'Pro',
     proTexto: (cupos: number) => `El precio de Pro cuando se toman los ${cupos} cupos de fundador.`,
     limites: (preguntas: number, mensajes: number) =>
@@ -51,9 +51,9 @@ export const precios = {
       'Reporte semanal por correo',
     ],
 
-    pruebaTitulo: (dias: number) => `${dias} días de prueba`,
+    pruebaTitulo: (dias: number) => `Reembolso del primer pago en ${dias} días`,
     pruebaTexto: (dias: number) =>
-      `Cada sitio nuevo tiene ${dias} días de Pro con los límites de Pro, sin tarjeta. Cuando termina la prueba, si no te suscribes, sigues en el plan gratis con el radar y el kit.`,
+      `No hay prueba gratis. Si te suscribes y Pro no es para ti, te devolvemos el primer pago completo si lo pides dentro de ${dias} días. El radar y el kit siguen gratis siempre.`,
 
     cobroTitulo: 'Cómo se cobra',
     cobroTexto:
@@ -68,7 +68,7 @@ export const precios = {
   en: {
     metaTitulo: 'Pricing',
     metaDescripcion:
-      'Free radar, free kit and the AEO agent in the Pro subscription: founder price of US$30 a month for the first 50 businesses, then US$69 a month. 14-day trial.',
+      'Free radar, free kit and the AEO agent in the Pro subscription: founder price of US$30 a month for the first 50 businesses, then US$69 a month.',
     kicker: 'Pricing',
     titulo: 'Start free. Pay only for the agent.',
     intro:
@@ -96,7 +96,7 @@ export const precios = {
 
     founderNombre: 'Pro founder',
     founderTexto: (cupos: number) =>
-      `Everything in Pro, at a founder discount for the first ${cupos} businesses that subscribe. If you join as a founder, you renew at this price.`,
+      `Everything in Pro, at a founder discount for the first ${cupos} businesses that subscribe. You keep this price while your subscription stays active. If you cancel and come back, you pay the Pro price.`,
     proNombre: 'Pro',
     proTexto: (cupos: number) => `The Pro price once the ${cupos} founder spots are taken.`,
     limites: (preguntas: number, mensajes: number) =>
@@ -113,9 +113,9 @@ export const precios = {
       'A weekly report by email',
     ],
 
-    pruebaTitulo: (dias: number) => `${dias}-day trial`,
+    pruebaTitulo: (dias: number) => `First payment refunded within ${dias} days`,
     pruebaTexto: (dias: number) =>
-      `Every new site gets ${dias} days of Pro with Pro limits, no card needed. When the trial ends, if you do not subscribe, you stay on the free plan with the radar and the kit.`,
+      `There is no free trial. If you subscribe and Pro is not for you, we refund your first payment in full if you ask within ${dias} days. The radar and the kit stay free.`,
 
     cobroTitulo: 'How billing works',
     cobroTexto:

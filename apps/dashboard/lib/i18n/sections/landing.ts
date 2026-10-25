@@ -46,7 +46,7 @@ export const landing = {
       'Un comando en tu proyecto. Tu sitio queda legible para agentes y cada ruta puede tener precio, incluido cero. Cobrar es opcional.',
     paso3Titulo: 'Activa tu agente de AEO',
     paso3Texto:
-      'Te dice qué publicar para que ChatGPT, Claude y Perplexity te recomienden, lo escribe, se lo pasa a tu herramienta de IA y mide si funcionó. Precio de fundador: US$30 al mes (después será US$69), con 14 días de prueba.',
+      'Te dice qué publicar para que ChatGPT, Claude y Perplexity te recomienden, lo escribe, se lo pasa a tu herramienta de IA y mide si funcionó. Precio de fundador: US$30 al mes (después será US$69).',
 
     precio:
       'Registrarte e instalar es gratis. Si cobras a agentes, Peaje se queda con el 2% de cada pago. Hoy los pagos corren en redes de prueba: sirven para comprobar que todo funciona y todavía no son dinero real.',
@@ -97,7 +97,7 @@ export const landing = {
       'One command in your project. Your site becomes readable by agents and every route can have a price, including zero. Charging is optional.',
     paso3Titulo: 'Turn on your AEO agent',
     paso3Texto:
-      'It tells you what to publish so ChatGPT, Claude and Perplexity recommend you, writes it, hands it to your AI coding tool and measures whether it worked. Founder price: US$30 a month (US$69 later), with a 14-day trial.',
+      'It tells you what to publish so ChatGPT, Claude and Perplexity recommend you, writes it, hands it to your AI coding tool and measures whether it worked. Founder price: US$30 a month (US$69 later).',
 
     precio:
       'Signing up and installing are free. If you charge agents, Peaje keeps 2% of each payment. Payments run on test networks today: they prove everything works and are not real money yet.',

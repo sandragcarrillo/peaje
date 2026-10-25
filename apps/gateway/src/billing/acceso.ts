@@ -22,8 +22,8 @@ export const urlCheckout = (slug: string, plan: PlanPago) => `${env.publicUrl.re
 
 export function mensajeSinPro(tenant: Tenant, idioma: 'es' | 'en'): string {
   return idioma === 'es'
-    ? `Esto es parte del agente Pro y tu prueba terminó. Las tareas de arreglo y el monitor diario siguen gratis. Para seguir con el chat, la citación y el resto, suscríbete en ${urlPlan(tenant.slug)}`
-    : `This is part of the Pro agent and your trial ended. Fix tasks and the daily monitor stay free. To keep the chat, citation tracking and the rest, subscribe at ${urlPlan(tenant.slug)}`
+    ? `Esto es parte del agente Pro. Las tareas de arreglo y el monitor diario siguen gratis. Para seguir con el chat, la citación y el resto, suscríbete en ${urlPlan(tenant.slug)}`
+    : `This is part of the Pro agent. Fix tasks and the daily monitor stay free. To keep the chat, citation tracking and the rest, subscribe at ${urlPlan(tenant.slug)}`
 }
 
 /** Null si tiene Pro; si no, el cuerpo del 403 que devuelven las rutas Pro. */

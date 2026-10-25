@@ -1,6 +1,5 @@
 import { Correo, L, Lista, Seccion, T, X } from '../components/legal'
 import { CIUDAD_ES, CONTACTO, PADDLE_PORTAL, PADDLE_TERMINOS, TITULAR } from '@/lib/legal'
-import { DIAS_PRUEBA } from '@peaje/db'
 
 // Política de reembolso y cancelación, versión en español (la que rige). Es la
 // fuente de verdad: los términos (sección 10.3) la resumen y enlazan acá.
@@ -8,7 +7,7 @@ import { DIAS_PRUEBA } from '@peaje/db'
 // layout). Reglas copiadas de la política web de Puente.
 //
 // Sin prueba gratis desde el 24 oct 2026 (decisión de San): el reembolso
-// completo del primer pago dentro de 14 días, igual que Puente, hace de prueba.
+// completo del primer pago dentro de 7 días hace de prueba (San, 24 oct 2026).
 
 export function ReembolsosEs() {
   return (
@@ -29,7 +28,7 @@ export function ReembolsosEs() {
           </li>
           <li>
             Si te suscribes y Pro no es para ti, el <T>primer pago tiene reembolso completo</T> si lo pides dentro de
-            los 14 días (sección 3).
+            los 7 días (sección 3).
           </li>
         </Lista>
       </Seccion>
@@ -61,8 +60,8 @@ export function ReembolsosEs() {
         </p>
         <Lista>
           <li>
-            <T>Primer pago, 14 días, sin preguntas.</T> Si es el primer cobro de tu suscripción y pides el reembolso
-            dentro de los <T>catorce (14) días</T> siguientes a ese cobro, te devolvemos el importe completo. No hace
+            <T>Primer pago, 7 días, sin preguntas.</T> Si es el primer cobro de tu suscripción y pides el reembolso
+            dentro de los <T>siete (7) días</T> siguientes a ese cobro, te devolvemos el importe completo. No hace
             falta que expliques por qué.
           </li>
           <li>
