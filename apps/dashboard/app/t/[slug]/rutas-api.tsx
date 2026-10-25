@@ -8,7 +8,7 @@ import { useDict } from '@/lib/i18n/client'
 import { borrarRuta, crearRuta, editarRuta } from './actions'
 
 const METODOS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
-const input = 'mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text'
+const input = 'mt-1 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text'
 
 /**
  * Rutas de API con precio: las que ya existen en el servidor del negocio y
@@ -69,10 +69,10 @@ export function RutasApiPanel({ slug, routes, dominio }: { slug: string; routes:
                         <span className="text-xs text-muted">{d.rutasApiPrecio}</span>
                         <input name="priceUsd" type="number" step="0.001" min="0.001" required defaultValue={Number(r.priceUsd)} className={input} />
                       </label>
-                      <button disabled={pending} className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50">
+                      <button disabled={pending} className="btn btn-primario">
                         {d.rutasApiGuardar}
                       </button>
-                      <button type="button" onClick={() => setEditando(null)} className="font-mono text-[11px] uppercase text-muted hover:text-text">
+                      <button type="button" onClick={() => setEditando(null)} className="btn btn-secundario">
                         {d.rutasApiCancelar}
                       </button>
                     </form>
@@ -88,14 +88,14 @@ export function RutasApiPanel({ slug, routes, dominio }: { slug: string; routes:
                   </td>
                   <td className="max-w-64 truncate py-2.5 pr-4 text-xs text-muted">{r.description ?? ''}</td>
                   <td className="py-2.5 text-right font-mono text-sm text-accent">+{money(r.priceUsd)}</td>
-                  <td className="w-32 py-2.5 text-right">
-                    <button onClick={() => setEditando(r.id)} className="mr-3 font-mono text-[11px] uppercase text-muted hover:text-text">
+                  <td className="w-44 py-2.5 text-right whitespace-nowrap">
+                    <button onClick={() => setEditando(r.id)} className="btn btn-secundario btn-chico mr-2">
                       {d.rutasApiEditar}
                     </button>
                     <button
                       disabled={pending}
                       onClick={() => correr(() => borrarRuta(slug, r.id))}
-                      className="font-mono text-[11px] uppercase text-muted hover:text-red-600 disabled:opacity-50"
+                      className="btn btn-secundario btn-chico hover:text-red-600"
                     >
                       {d.rutasApiQuitar}
                     </button>
@@ -130,7 +130,7 @@ export function RutasApiPanel({ slug, routes, dominio }: { slug: string; routes:
           <span className="text-xs text-muted">{d.rutasApiPrecio}</span>
           <input name="priceUsd" type="number" step="0.001" min="0.001" required placeholder="0.01" className={input} />
         </label>
-        <button disabled={pending} className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50">
+        <button disabled={pending} className="btn btn-primario">
           {d.rutasApiAgregar}
         </button>
       </form>

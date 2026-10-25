@@ -49,7 +49,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="flex max-w-56 items-center gap-1.5 truncate text-sm text-muted hover:text-text"
+        className="btn btn-secundario btn-chico max-w-56 gap-1.5"
       >
         <span className="truncate">{email}</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
@@ -81,14 +81,14 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                   <button
                     type="button"
                     onClick={copiar}
-                    className="flex-1 rounded-lg bg-text px-3 py-2 text-sm font-medium text-bg"
+                    className="btn btn-primario btn-chico flex-1"
                   >
                     {copiado ? d.dinero.copiada : d.dinero.copiarAddress}
                   </button>
                   <button
                     type="button"
                     onClick={() => setModo('resumen')}
-                    className="rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-text"
+                    className="btn btn-secundario btn-chico"
                   >
                     {d.dinero.volver}
                   </button>
@@ -108,7 +108,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
 
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted">{shortWallet(data.address)}</span>
-                  <button type="button" onClick={copiar} className="text-xs text-accent hover:underline">
+                  <button type="button" onClick={copiar} className="btn btn-secundario btn-chico">
                     {copiado ? d.dinero.copiada : d.dinero.copiar}
                   </button>
                 </div>
@@ -126,14 +126,14 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                   <Link
                     href="/wallet"
                     onClick={() => setOpen(false)}
-                    className="rounded-lg bg-text px-3 py-2.5 text-center text-sm font-medium text-bg"
+                    className="btn btn-primario btn-chico"
                   >
                     {d.dinero.enviar}
                   </Link>
                   <button
                     type="button"
                     onClick={() => setModo('recibir')}
-                    className="rounded-lg border border-border px-3 py-2.5 text-sm text-text hover:border-accent"
+                    className="btn btn-secundario btn-chico"
                   >
                     {d.dinero.recibir}
                   </button>
@@ -184,7 +184,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                 <Link
                   href="/wallet"
                   onClick={() => setOpen(false)}
-                  className="block rounded-lg border border-border px-3 py-2 text-center text-sm text-muted hover:border-accent hover:text-text"
+                  className="btn btn-secundario btn-chico btn-ancho"
                 >
                   {d.dinero.verWalletCompleta}
                 </Link>

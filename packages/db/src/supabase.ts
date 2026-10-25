@@ -47,6 +47,14 @@ import { aggregateVisits, type VisitRow } from './visits'
 import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
 import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
+// ---- radar ----
+import type { NewRadarLead, RadarLead } from './types'
+// ---- trabajos y voz ----
+import type { AgentJob, AgentMessageLink, NewAgentJob, VoiceProfile } from './types'
+// ---- Slack ----
+import type { SlackCode, SlackInstall, SlackLink } from './types'
+// ---- reportes programados ----
+import type { ReportKind, ReportSchedule, ReportScheduleInput } from './types'
 
 type Row = Record<string, any>
 
@@ -75,6 +83,9 @@ function tenantFrom(row: Row): Tenant {
     // ---- M9 ----
     planUntil: row.plan_until ?? null,
     trialUntil: row.trial_until ?? null,
+    // ---- voz: `??` hasta que corra la migración 20261024420000 ----
+    voiceProfile: (row.voice_profile ?? null) as VoiceProfile | null,
+    voiceProfileAt: row.voice_profile_at ?? null,
     email: row.email,
     privyUserId: row.privy_user_id,
     createdAt: row.created_at,
@@ -130,6 +141,7 @@ function runFrom(row: Row): CitationRun {
     cited: Boolean(row.cited),
     mentioned: Boolean(row.mentioned),
     domains: row.domains ?? [],
+    pages: Array.isArray(row.pages) ? row.pages : [],
     answerExcerpt: row.answer_excerpt ?? null,
     error: row.error ?? null,
   }
@@ -143,14 +155,45 @@ function messageFrom(row: Row): AgentMessage {
     text: row.text,
     actions: (row.actions ?? []) as AgentAction[],
     options: row.options ?? [],
+    links: (Array.isArray(row.links) ? row.links : []) as AgentMessageLink[],
     channel: row.channel ?? 'dashboard',
     createdAt: String(row.created_at),
+  }
+}
+
+function scheduleFrom(row: Row): ReportSchedule {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    channel: row.channel,
+    target: String(row.target),
+    kind: row.kind,
+    prompt: row.prompt ?? null,
+    frequency: row.frequency,
+    hour: Number(row.hour),
+    weekday: row.weekday === null || row.weekday === undefined ? null : Number(row.weekday),
+    dayOfMonth: row.day_of_month === null || row.day_of_month === undefined ? null : Number(row.day_of_month),
+    timezone: row.timezone ?? 'America/Bogota',
+    active: row.active !== false,
+    nextRunAt: new Date(String(row.next_run_at)).toISOString(),
+    lastRunAt: row.last_run_at ? new Date(String(row.last_run_at)).toISOString() : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
   }
 }
 
 function telegramFrom(row: Row): TelegramLink {
   return { chatId: Number(row.chat_id), tenantId: row.tenant_id, username: row.username ?? null, language: row.language ?? 'en', linkedAt: String(row.linked_at), active: row.active !== false }
 }
+
+// ---- Slack ----
+function slackLinkFrom(row: Row): SlackLink {
+  return { teamId: row.team_id, channelId: row.channel_id, tenantId: row.tenant_id, language: row.language ?? 'en', linkedBy: row.linked_by ?? null, linkedAt: String(row.linked_at), active: row.active !== false }
+}
+function slackCodeFrom(row: Row): SlackCode {
+  return { code: row.code, tenantId: row.tenant_id, language: row.language ?? 'en', teamId: row.team_id ?? null, userId: row.user_id ?? null, expiresAt: String(row.expires_at) }
+}
+// ---- fin Slack ----
 
 function planFrom(row: Row): AgentPlan {
   return {
@@ -440,7 +483,8 @@ export class SupabaseStore implements Store {
   async addMessage(m: NewAgentMessage): Promise<AgentMessage> {
     const { data, error } = await this.#db
       .from('agent_messages')
-      .insert({ tenant_id: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], channel: m.channel ?? 'dashboard' })
+      // `links` solo si hay: así sigue andando antes de la migración 20261024400000.
+      .insert({ tenant_id: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], channel: m.channel ?? 'dashboard', ...(m.links?.length ? { links: m.links } : {}) })
       .select()
       .single()
     this.#fail('addMessage', error)
@@ -491,6 +535,7 @@ export class SupabaseStore implements Store {
         cited: r.cited,
         mentioned: r.mentioned,
         domains: r.domains,
+        pages: r.pages ?? [],
         answer_excerpt: r.answerExcerpt,
         error: r.error,
       })),
@@ -575,6 +620,87 @@ export class SupabaseStore implements Store {
     this.#fail('clearMessages', error)
   }
 
+  // ---- trabajos largos del agente ----
+  async createJob(input: NewAgentJob): Promise<AgentJob> {
+    const { data, error } = await this.#db
+      .from('agent_jobs')
+      .insert({ tenant_id: input.tenantId, kind: input.kind, input: input.input, destino: input.destino ?? null })
+      .select()
+      .single()
+    this.#fail('createJob', error)
+    return jobFrom(data as Row)
+  }
+
+  async getJob(id: string): Promise<AgentJob | null> {
+    const { data, error } = await this.#db.from('agent_jobs').select().eq('id', id).maybeSingle()
+    this.#fail('getJob', error)
+    return data ? jobFrom(data as Row) : null
+  }
+
+  async listJobs(tenantId: string, limit: number): Promise<AgentJob[]> {
+    const { data, error } = await this.#db.from('agent_jobs').select().eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(limit)
+    this.#fail('listJobs', error)
+    return ((data ?? []) as Row[]).map(jobFrom)
+  }
+
+  async claimNextJob(kinds: string[]): Promise<AgentJob | null> {
+    if (kinds.length === 0) return null
+    // Candidatos más viejos primero; el UPDATE condicional (status = 'queued')
+    // hace de candado: si otro proceso lo tomó entre medio, no devuelve fila
+    // y se prueba el siguiente.
+    const { data, error } = await this.#db
+      .from('agent_jobs')
+      .select('id, attempts')
+      .eq('status', 'queued')
+      .in('kind', kinds)
+      .order('created_at', { ascending: true })
+      .limit(5)
+    this.#fail('claimNextJob(list)', error)
+    for (const c of (data ?? []) as Row[]) {
+      const { data: tomado, error: e2 } = await this.#db
+        .from('agent_jobs')
+        .update({ status: 'running', started_at: new Date().toISOString(), attempts: Number(c.attempts ?? 0) + 1 })
+        .eq('id', c.id)
+        .eq('status', 'queued')
+        .select()
+        .maybeSingle()
+      this.#fail('claimNextJob', e2)
+      if (tomado) return jobFrom(tomado as Row)
+    }
+    return null
+  }
+
+  async finishJob(id: string, patch: { status: 'done' | 'failed'; result?: Record<string, unknown> | null; error?: string | null }): Promise<AgentJob> {
+    const { data, error } = await this.#db
+      .from('agent_jobs')
+      .update({ status: patch.status, result: patch.result ?? null, error: patch.error ?? null, finished_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    this.#fail('finishJob', error)
+    return jobFrom(data as Row)
+  }
+
+  async listStaleJobs(before: string): Promise<AgentJob[]> {
+    const { data, error } = await this.#db.from('agent_jobs').select().eq('status', 'running').lt('started_at', before).limit(20)
+    this.#fail('listStaleJobs', error)
+    return ((data ?? []) as Row[]).map(jobFrom)
+  }
+
+  async requeueJob(id: string): Promise<void> {
+    const { error } = await this.#db.from('agent_jobs').update({ status: 'queued', started_at: null }).eq('id', id).eq('status', 'running')
+    this.#fail('requeueJob', error)
+  }
+
+  // ---- voz de marca ----
+  async setTenantVoiceProfile(tenantId: string, profile: VoiceProfile | null): Promise<void> {
+    const { error } = await this.#db
+      .from('tenants')
+      .update({ voice_profile: profile, voice_profile_at: profile ? new Date().toISOString() : null })
+      .eq('id', tenantId)
+    this.#fail('setTenantVoiceProfile', error)
+  }
+
   // ---- Telegram ----
 
   async createTelegramCode(tenantId: string, code: string, expiresAt: string): Promise<void> {
@@ -628,6 +754,221 @@ export class SupabaseStore implements Store {
     const { error } = await q
     this.#fail('unlinkTelegram', error)
   }
+
+  // ---- Slack ----
+  async createSlackCode(tenantId: string, code: string, expiresAt: string, language: string): Promise<void> {
+    const { error } = await this.#db.from('slack_codes').insert({ code, tenant_id: tenantId, expires_at: expiresAt, language })
+    this.#fail('createSlackCode', error)
+  }
+
+  async getSlackCode(code: string): Promise<SlackCode | null> {
+    const { data, error } = await this.#db.from('slack_codes').select().eq('code', code).gt('expires_at', new Date().toISOString()).maybeSingle()
+    this.#fail('getSlackCode', error)
+    return data ? slackCodeFrom(data as Row) : null
+  }
+
+  async bindSlackCode(code: string, teamId: string, userId: string, expiresAt: string): Promise<void> {
+    const { error } = await this.#db.from('slack_codes').update({ team_id: teamId, user_id: userId, expires_at: expiresAt }).eq('code', code)
+    this.#fail('bindSlackCode', error)
+  }
+
+  async consumeSlackCode(teamId: string, userId: string): Promise<SlackCode | null> {
+    const { data, error } = await this.#db
+      .from('slack_codes')
+      .select()
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    this.#fail('consumeSlackCode', error)
+    if (!data) return null
+    // El DELETE con select es el candado: si dos menciones llegan juntas, solo una recibe la fila.
+    const { data: borrado, error: e2 } = await this.#db.from('slack_codes').delete().eq('code', (data as Row).code).select().maybeSingle()
+    this.#fail('consumeSlackCode', e2)
+    return borrado ? slackCodeFrom(borrado as Row) : null
+  }
+
+  async saveSlackInstall(install: Omit<SlackInstall, 'installedAt'>): Promise<void> {
+    const { error } = await this.#db.from('slack_installs').upsert(
+      {
+        team_id: install.teamId,
+        team_name: install.teamName,
+        enterprise_id: install.enterpriseId,
+        bot_token_enc: install.botTokenEnc,
+        bot_user_id: install.botUserId,
+        installer_user_id: install.installerUserId,
+        installed_at: new Date().toISOString(),
+      },
+      { onConflict: 'team_id' },
+    )
+    this.#fail('saveSlackInstall', error)
+  }
+
+  async getSlackInstall(teamId: string): Promise<SlackInstall | null> {
+    const { data, error } = await this.#db.from('slack_installs').select().eq('team_id', teamId).maybeSingle()
+    this.#fail('getSlackInstall', error)
+    if (!data) return null
+    const r = data as Row
+    return {
+      teamId: r.team_id,
+      teamName: r.team_name ?? null,
+      enterpriseId: r.enterprise_id ?? null,
+      botTokenEnc: r.bot_token_enc,
+      botUserId: r.bot_user_id,
+      installerUserId: r.installer_user_id,
+      installedAt: String(r.installed_at),
+    }
+  }
+
+  async deleteSlackInstall(teamId: string): Promise<void> {
+    // slack_links cae en cascada.
+    const { error } = await this.#db.from('slack_installs').delete().eq('team_id', teamId)
+    this.#fail('deleteSlackInstall', error)
+  }
+
+  async linkSlack(link: Omit<SlackLink, 'linkedAt' | 'active'>): Promise<void> {
+    const { error } = await this.#db.from('slack_links').upsert(
+      { team_id: link.teamId, channel_id: link.channelId, tenant_id: link.tenantId, language: link.language, linked_by: link.linkedBy, linked_at: new Date().toISOString(), active: true },
+      { onConflict: 'team_id,channel_id,tenant_id' },
+    )
+    this.#fail('linkSlack', error)
+    await this.setActiveSlack(link.teamId, link.channelId, link.tenantId)
+  }
+
+  async getSlackLink(teamId: string, channelId: string): Promise<SlackLink | null> {
+    const todos = await this.listSlackChannel(teamId, channelId)
+    return todos.find((l) => l.active) ?? todos[0] ?? null
+  }
+
+  async listSlackChannel(teamId: string, channelId: string): Promise<SlackLink[]> {
+    const { data, error } = await this.#db.from('slack_links').select().eq('team_id', teamId).eq('channel_id', channelId).order('linked_at')
+    this.#fail('listSlackChannel', error)
+    return ((data ?? []) as Row[]).map(slackLinkFrom)
+  }
+
+  async setActiveSlack(teamId: string, channelId: string, tenantId: string): Promise<void> {
+    const { error: e1 } = await this.#db.from('slack_links').update({ active: false }).eq('team_id', teamId).eq('channel_id', channelId).neq('tenant_id', tenantId)
+    this.#fail('setActiveSlack', e1)
+    const { error: e2 } = await this.#db.from('slack_links').update({ active: true }).eq('team_id', teamId).eq('channel_id', channelId).eq('tenant_id', tenantId)
+    this.#fail('setActiveSlack', e2)
+  }
+
+  async listSlackLinks(tenantId: string): Promise<SlackLink[]> {
+    const { data, error } = await this.#db.from('slack_links').select().eq('tenant_id', tenantId).order('linked_at')
+    this.#fail('listSlackLinks', error)
+    return ((data ?? []) as Row[]).map(slackLinkFrom)
+  }
+
+  async unlinkSlack(filter: { tenantId?: string; teamId?: string; channelId?: string }): Promise<void> {
+    // Sin filtro no se borra nada: un DELETE sin WHERE se llevaría todos los canales.
+    if (filter.tenantId === undefined && filter.teamId === undefined && filter.channelId === undefined) return
+    let q = this.#db.from('slack_links').delete()
+    if (filter.tenantId !== undefined) q = q.eq('tenant_id', filter.tenantId)
+    if (filter.teamId !== undefined) q = q.eq('team_id', filter.teamId)
+    if (filter.channelId !== undefined) q = q.eq('channel_id', filter.channelId)
+    const { error } = await q
+    this.#fail('unlinkSlack', error)
+  }
+
+  async claimSlackEvent(eventId: string): Promise<boolean> {
+    const { data, error } = await this.#db.from('slack_events').upsert({ event_id: eventId }, { onConflict: 'event_id', ignoreDuplicates: true }).select()
+    this.#fail('claimSlackEvent', error)
+    // De vez en cuando se limpian los de más de un día (el builder corre al hacerle then).
+    if (Math.random() < 0.01) {
+      this.#db
+        .from('slack_events')
+        .delete()
+        .lt('created_at', new Date(Date.now() - 86_400_000).toISOString())
+        .then(
+          () => undefined,
+          () => undefined,
+        )
+    }
+    return (data ?? []).length > 0
+  }
+  // ---- fin Slack ----
+
+  // ---- reportes programados ----
+
+  async listReportSchedules(tenantId: string): Promise<ReportSchedule[]> {
+    const { data, error } = await this.#db.from('report_schedules').select().eq('tenant_id', tenantId).order('created_at')
+    this.#fail('listReportSchedules', error)
+    return (data ?? []).map(scheduleFrom)
+  }
+
+  async upsertReportSchedule(input: ReportScheduleInput): Promise<ReportSchedule> {
+    const fila = {
+      tenant_id: input.tenantId,
+      channel: input.channel,
+      target: input.target,
+      kind: input.kind,
+      prompt: input.kind === 'custom' ? (input.prompt ?? null) : null,
+      frequency: input.frequency,
+      hour: input.hour,
+      weekday: input.frequency === 'weekly' ? input.weekday : null,
+      day_of_month: input.frequency === 'monthly' ? input.dayOfMonth : null,
+      timezone: input.timezone,
+      active: input.active ?? true,
+      next_run_at: input.nextRunAt,
+      updated_at: new Date().toISOString(),
+    }
+    // Sin ON CONFLICT: el único es parcial (solo agent_visits) y PostgREST no lo infiere.
+    let id = input.id
+    if (!id && input.kind === 'agent_visits') {
+      const { data, error } = await this.#db
+        .from('report_schedules')
+        .select('id')
+        .eq('tenant_id', input.tenantId)
+        .eq('channel', input.channel)
+        .eq('target', input.target)
+        .eq('kind', 'agent_visits')
+        .maybeSingle()
+      this.#fail('upsertReportSchedule', error)
+      id = (data as Row | null)?.id
+    }
+    if (id) {
+      const { data, error } = await this.#db.from('report_schedules').update(fila).eq('id', id).eq('tenant_id', input.tenantId).select().maybeSingle()
+      this.#fail('upsertReportSchedule', error)
+      if (!data) throw new Error('report schedule not found')
+      return scheduleFrom(data as Row)
+    }
+    const { data, error } = await this.#db.from('report_schedules').insert(fila).select().single()
+    this.#fail('upsertReportSchedule', error)
+    return scheduleFrom(data as Row)
+  }
+
+  async deleteReportSchedules(tenantId: string, filter: { id?: string; channel?: string; target?: string; kind?: ReportKind }): Promise<number> {
+    let q = this.#db.from('report_schedules').delete().eq('tenant_id', tenantId)
+    if (filter.id !== undefined) q = q.eq('id', filter.id)
+    if (filter.channel !== undefined) q = q.eq('channel', filter.channel)
+    if (filter.target !== undefined) q = q.eq('target', filter.target)
+    if (filter.kind !== undefined) q = q.eq('kind', filter.kind)
+    const { data, error } = await q.select('id')
+    this.#fail('deleteReportSchedules', error)
+    return (data ?? []).length
+  }
+
+  async listDueReportSchedules(now: string, limit = 200): Promise<ReportSchedule[]> {
+    const { data, error } = await this.#db.from('report_schedules').select().eq('active', true).lte('next_run_at', now).order('next_run_at').limit(limit)
+    this.#fail('listDueReportSchedules', error)
+    return (data ?? []).map(scheduleFrom)
+  }
+
+  async markReportScheduleSent(id: string, run: { previousNextRunAt: string; sentAt: string; nextRunAt: string }): Promise<boolean> {
+    // Condicional sobre next_run_at: si otra corrida ya la tomó, no actualiza nada.
+    const { data, error } = await this.#db
+      .from('report_schedules')
+      .update({ last_run_at: run.sentAt, next_run_at: run.nextRunAt, updated_at: run.sentAt })
+      .eq('id', id)
+      .eq('active', true)
+      .eq('next_run_at', run.previousNextRunAt)
+      .select('id')
+    this.#fail('markReportScheduleSent', error)
+    return (data ?? []).length === 1
+  }
+  // ---- fin reportes programados ----
 
   async getPlan(tenantId: string): Promise<AgentPlan | null> {
     const { data, error } = await this.#db.from('agent_plans').select().eq('tenant_id', tenantId).maybeSingle()
@@ -1204,16 +1545,16 @@ export class SupabaseStore implements Store {
     this.#fail('recordVisits', error)
   }
 
-  async visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats> {
-    const since = new Date(Date.now() - opts.days * 86_400_000).toISOString()
+  async visitStats(tenantId: string, opts: { days: number; from?: string; to?: string }): Promise<VisitStats> {
+    const since = opts.from ?? new Date(Date.now() - opts.days * 86_400_000).toISOString()
     // La wallet del agente vive en el ledger: se trae por la FK payment_id.
-    const { data, error } = await this.#db
+    let q = this.#db
       .from('agent_visits')
       .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, route_id, price_usd, attempted, payments(agent_wallet)')
       .eq('tenant_id', tenantId)
       .gte('at', since)
-      .order('at', { ascending: false })
-      .limit(20_000)
+    if (opts.to) q = q.lt('at', opts.to)
+    const { data, error } = await q.order('at', { ascending: false }).limit(20_000)
     this.#fail('visitStats', error)
     const rows: VisitRow[] = ((data ?? []) as Row[]).map((r) => ({
       tenantId,
@@ -1232,7 +1573,7 @@ export class SupabaseStore implements Store {
       attempted: Boolean(r.attempted),
       agentWallet: r.payments?.agent_wallet ?? null,
     }))
-    return aggregateVisits(rows, opts.days)
+    return aggregateVisits(rows, opts.days, opts.from ? { from: opts.from, to: opts.to } : undefined)
   }
 
   async findPaymentByReceiptRef(receiptRef: string): Promise<Payment | null> {
@@ -1313,6 +1654,63 @@ export class SupabaseStore implements Store {
     return new Set(((data ?? []) as Row[]).map((r) => r.tenant_id)).size
   }
   // ---- fin M9 ----
+
+  // ---- radar público: leads ----
+  async upsertRadarLead(input: NewRadarLead): Promise<RadarLead> {
+    const { data, error } = await this.#db
+      .from('radar_leads')
+      .upsert(
+        {
+          email: input.email,
+          domain: input.domain,
+          source: input.source ?? 'radar',
+          locale: input.locale,
+          marketing_consent: input.marketingConsent,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'email,domain' },
+      )
+      .select()
+      .single()
+    this.#fail('upsertRadarLead', error)
+    return radarLeadFrom(data as Row)
+  }
+
+  async getRadarLead(email: string, domain: string): Promise<RadarLead | null> {
+    const { data, error } = await this.#db.from('radar_leads').select().eq('email', email).eq('domain', domain).maybeSingle()
+    this.#fail('getRadarLead', error)
+    return data ? radarLeadFrom(data as Row) : null
+  }
+
+  async claimRadarReport(email: string, domain: string, notSince: string): Promise<RadarLead | null> {
+    // Un solo UPDATE condicional: si dos pedidos llegan juntos, solo uno ve la fila.
+    const { data, error } = await this.#db
+      .from('radar_leads')
+      .update({ last_report_at: new Date().toISOString() })
+      .eq('email', email)
+      .eq('domain', domain)
+      .or(`last_report_at.is.null,last_report_at.lt."${notSince}"`)
+      .select()
+      .maybeSingle()
+    this.#fail('claimRadarReport', error)
+    return data ? radarLeadFrom(data as Row) : null
+  }
+  // ---- fin radar ----
+}
+
+// ---- radar ----
+function radarLeadFrom(row: Row): RadarLead {
+  return {
+    id: row.id,
+    email: row.email,
+    domain: row.domain,
+    source: row.source,
+    locale: row.locale,
+    marketingConsent: Boolean(row.marketing_consent),
+    lastReportAt: row.last_report_at ? String(row.last_report_at) : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  }
 }
 
 // ---- M7 ----
@@ -1340,5 +1738,23 @@ function billingFrom(row: Row): BillingPayment {
     periodStart: String(row.period_start),
     periodEnd: String(row.period_end),
     createdAt: String(row.created_at),
+  }
+}
+
+// ---- trabajos largos del agente ----
+function jobFrom(row: Row): AgentJob {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    kind: row.kind,
+    status: row.status,
+    input: (row.input ?? {}) as Record<string, unknown>,
+    result: (row.result ?? null) as Record<string, unknown> | null,
+    error: row.error ?? null,
+    destino: row.destino ?? null,
+    attempts: Number(row.attempts ?? 0),
+    createdAt: String(row.created_at),
+    startedAt: row.started_at ? String(row.started_at) : null,
+    finishedAt: row.finished_at ? String(row.finished_at) : null,
   }
 }

@@ -78,7 +78,7 @@ export function ToggleBlock({
               setCopiado(true)
               setTimeout(() => setCopiado(false), 1500)
             }}
-            className="shrink-0 text-xs text-accent hover:underline"
+            className="btn btn-secundario btn-chico shrink-0"
           >
             {copiado ? d.copiado : d.copiar}
           </button>
@@ -111,7 +111,7 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
             setEstado('idle')
           }
         }}
-        className="shrink-0 rounded-lg bg-text px-3 py-2 text-xs font-medium text-bg disabled:opacity-50"
+        className="btn btn-primario btn-chico shrink-0"
       >
         {estado === 'corriendo' ? d.escaneando : label}
       </button>
@@ -218,9 +218,8 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
       key={valor}
       type="button"
       onClick={() => setCapa(valor)}
-      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-        capa === valor ? 'border-accent bg-text text-bg' : 'border-border text-muted hover:border-muted hover:text-text'
-      }`}
+      aria-pressed={capa === valor}
+      className={`btn btn-secundario btn-chico ${capa === valor ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
     >
       {label}
     </button>
@@ -237,7 +236,7 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
           type="button"
           disabled={corriendo}
           onClick={verificar}
-          className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-text disabled:opacity-50"
+          className="btn btn-secundario btn-chico shrink-0"
         >
           {corriendo ? d.verificando : d.verificarDeNuevo}
         </button>
@@ -293,7 +292,7 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
                     setCopiado(true)
                     setTimeout(() => setCopiado(false), 1500)
                   }}
-                  className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg"
+                  className="btn btn-primario"
                 >
                   {copiado ? d.implementaCopiado : d.implementaCopiar}
                 </button>
@@ -314,7 +313,7 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
                     <button
                       type="button"
                       onClick={() => void navigator.clipboard.writeText(promptLargo)}
-                      className="text-xs text-accent hover:underline"
+                      className="btn btn-secundario btn-chico"
                     >
                       {d.copiar}
                     </button>

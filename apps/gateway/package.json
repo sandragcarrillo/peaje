@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "monitor:daily": "tsx src/monitor/cli.ts daily",
-    "monitor:weekly": "tsx src/monitor/cli.ts weekly"
+    "monitor:weekly": "tsx src/monitor/cli.ts weekly",
+    "monitor:schedules": "tsx src/monitor/cli.ts schedules"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

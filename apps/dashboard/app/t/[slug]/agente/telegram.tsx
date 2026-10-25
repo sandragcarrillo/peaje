@@ -2,11 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
-import type { EstadoTelegram } from '@/lib/gateway'
+import type { EstadoReportes, EstadoTelegram } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
 import { conectarTelegram, quitarTelegram } from './actions'
+import { ReportesChats } from './programados'
 
-export function TelegramPanel({ slug, estado }: { slug: string; estado: EstadoTelegram | null }) {
+export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado: EstadoTelegram | null; reportes?: EstadoReportes | null }) {
   const { miAgente: t } = useDict()
   const [enlace, setEnlace] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -59,21 +60,22 @@ export function TelegramPanel({ slug, estado }: { slug: string; estado: EstadoTe
       ))}
       <div className="flex flex-wrap items-center gap-3">
         {enlace ? (
-          <a href={enlace} target="_blank" rel="noreferrer" className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg">
+          <a href={enlace} target="_blank" rel="noreferrer" className="btn btn-primario">
             {t.tgAbrir}
           </a>
         ) : (
-          <button disabled={pending} onClick={conectar} className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50">
+          <button disabled={pending} onClick={conectar} className="btn btn-primario">
             {estado.links.length ? t.tgOtro : t.tgConectar}
           </button>
         )}
         {estado.links.length ? (
-          <button disabled={pending} onClick={() => correr(() => quitarTelegram(slug))} className="text-xs text-muted underline hover:text-text">
+          <button disabled={pending} onClick={() => correr(() => quitarTelegram(slug))} className="btn btn-secundario btn-chico hover:text-red-600">
             {t.tgDesconectar}
           </button>
         ) : null}
       </div>
       <p className="text-xs text-muted">{t.tgNota}</p>
+      <ReportesChats slug={slug} datos={reportes ?? null} />
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   )

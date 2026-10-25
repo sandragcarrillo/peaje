@@ -34,7 +34,7 @@ Peaje keeps 2% of each payment. On Tempo the split is native: 98% lands in the b
 
 ## How Peaje has been improving
 
-Four hackathons, one product, each round building on the last.
+Three hackathons, one product, each round building on the last.
 
 ### Platanus Hack 26, Bogotá (August 2026): the selling side
 
@@ -50,7 +50,7 @@ Four hackathons, one product, each round building on the last.
 - **The buyer agent**: ask, plan, approve. It discovers across the Peaje directory, the x402 Bazaar and the ERC-8004 registry, vetoes bad matches before spending, pays via MPP or x402 (real USDC on Base mainnet), and turns what it bought into a readable answer with the receipt behind it.
 - A per-tenant developer portal, a paid-tools MCP server per business, and the platform fee (2% by default).
 
-### Arbitrum Open House Buildathon and Colosseum (October): found first, then paid
+### Colosseum (October): found first, then paid
 
 - **Repositioned around being found.** Public radar on any domain, landing in three steps, charging presented as optional. The reasoning is in [docs/revision-producto-2026-10-01.md](./docs/revision-producto-2026-10-01.md).
 - **Install on any framework.** `@peaje/proxy` brings the 402-on-your-domain proxy to Express, Hono and Vite on Vercel; `@peaje/next` covers Next.js; `@peaje/cli` detects the framework and writes the code. The kit offers two paths: a self-contained text for AI coding tools, or the command and the hosting variable for people who use a terminal.
@@ -58,8 +58,22 @@ Four hackathons, one product, each round building on the last.
 - **PeajeSettlement v2.1** ([contracts](./contracts)): `settleWithPermit` for EIP-2612 tokens, 70 Foundry tests with invariants, Slither clean, deployed on Arbitrum Sepolia, Robinhood Chain, Arc and Tempo testnets. On Tempo the split is native: 98% straight to the business wallet, 2% to Peaje, in the agent's own transaction ([write-up](./docs/improvements/2026-10-05-tempo-permit.md)).
 - **Security review and fixes** ([details](./docs/improvements/2026-09-30-security-review.md)): Peaje signs only with the wallet created for each site; priced routes still charge when the path changes case or encoding; the gateway cannot be redirected to another host; simultaneous withdrawals cannot spend the same balance twice.
 - **Pro billing through Peaje's own 402**, payable by any x402 or MPP wallet or from the Peaje balance. Own domain: `usepeaje.com` and `api.usepeaje.com`.
+- **Peaje runs on Peaje.** usepeaje.com installs `@peaje/next` from npm like any customer, and sells its radar to agents as a paid API (`GET /api/radar/:domain`). The description agents read in `llms.txt`, `openapi.json` and the MCP server is written by Peaje from each site's own pages.
 
-Two audiences test this round at the same time. On Colosseum the project will be published as looking for testers, so crypto-native builders put the payment side through its paces. In parallel, our own team and a group of content creators who have never touched crypto are using the MVP: the radar, the install and the AEO agent, with the wallet created for them and the charging left off. What both groups find decides what ships next.
+Our own team and a group of content creators who have never touched crypto are using the MVP: the radar, the install and the AEO agent, with the wallet created for them. What they find decides what ships next.
+
+## Contracts
+
+PeajeSettlement, verified on each network ([source and tests](./contracts)):
+
+| Network | Address | Settles |
+|---|---|---|
+| Arbitrum Sepolia (421614) | [`0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231`](https://sepolia.arbiscan.io/address/0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231) | USDC, USDG |
+| Robinhood Chain Testnet (46630) | [`0xcfe4837a55fcf45c697f61b4577ddb894aa46eb7`](https://explorer.testnet.chain.robinhood.com/address/0xcfe4837a55fcf45c697f61b4577ddb894aa46eb7) | USDG |
+| Arc Testnet (5042002) | [`0xc0a98a8091a987bbb86f149f61253094e663d0ed`](https://testnet.arcscan.app/address/0xc0a98a8091a987bbb86f149f61253094e663d0ed) | USDC |
+| Tempo Testnet (42431) | [`0x3e0f648349432A5195e498D8D3b7Fa7d759752cC`](https://explore.testnet.tempo.xyz/address/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC) | pathUSD via `settleWithPermit` |
+
+On Tempo the contract is deployed and tested with real payments, but the gateway charges through Tempo's native split instead: 98% goes straight to the business wallet and 2% to Peaje in the agent's own transaction, so Peaje holds nothing.
 
 ## Install cost for the coding agent, measured
 

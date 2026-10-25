@@ -8,8 +8,10 @@ export type VisitRow = NewVisit & { agentWallet?: string | null }
  * dos traen las filas de la ventana y las resumen acá, así el panel ve lo
  * mismo con o sin Supabase. Volúmenes de miles de filas por mes: alcanza.
  */
-export function aggregateVisits(rows: VisitRow[], days: number): VisitStats {
-  const since = Date.now() - days * 86_400_000
+export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: string; to?: string }): VisitStats {
+  // Con `range`, la ventana exacta [from, to): la usan los reportes programados.
+  const since = range ? new Date(range.from).getTime() : Date.now() - days * 86_400_000
+  const until = range?.to ? new Date(range.to).getTime() : Infinity
   const byKind = new Map<AgentKind, { visits: number; paid: number }>()
   const byPath = new Map<string, { visits: number; served402: number; attempted: number; paid: number; revenue: number; priceUsd: string | null; agentes: Set<string> }>()
   const byDay = new Map<string, { visits: number; paid: number }>()
@@ -22,7 +24,8 @@ export function aggregateVisits(rows: VisitRow[], days: number): VisitStats {
   let attempted = 0
 
   for (const r of rows) {
-    if (new Date(r.at).getTime() < since) continue
+    const t = new Date(r.at).getTime()
+    if (t < since || t >= until) continue
     visits += 1
     const monto = r.paid && r.amount ? Number(r.amount) : 0
     if (r.paid) paid += 1

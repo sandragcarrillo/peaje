@@ -27,7 +27,7 @@ export const panel = {
     setupListo: '[✓] Listo',
     setupPendiente: '[ ] Te falta esto',
     pasoLabel: (n: number) => `Paso 0${n}`,
-    sidebarNuevaRuta: 'NUEVA RUTA',
+    sidebarNuevaRuta: 'Nueva ruta',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje está conectado: tu sitio pasó de ${antes} a ${ahora} para agentes.`,
     scoreMejoraNota: (delta: number) =>
@@ -238,7 +238,7 @@ export const panel = {
     setupListo: '[✓] Done',
     setupPendiente: '[ ] Action needed',
     pasoLabel: (n: number) => `Step 0${n}`,
-    sidebarNuevaRuta: 'NEW ROUTE',
+    sidebarNuevaRuta: 'New route',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje is connected: your site went from ${antes} to ${ahora} for agents.`,
     scoreMejoraNota: (delta: number) =>

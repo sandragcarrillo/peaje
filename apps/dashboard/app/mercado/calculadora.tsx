@@ -138,9 +138,8 @@ export function Calculadora({
           </div>
           <Link
             href="/nuevo"
-            className="flex w-full items-center justify-center gap-2 border border-text bg-negro py-3 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
+            className="btn btn-primario btn-ancho"
           >
-            <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
             {d.calcBoton}
           </Link>
         </div>

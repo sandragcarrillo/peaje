@@ -83,7 +83,7 @@ export function MotoresDeRespuesta({
             <li key={dir.nombre} className="flex items-center gap-2.5">
               <span className="text-muted">[ ]</span>
               <span>{dir.nombre}</span>
-              <a href={dir.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <a href={dir.url} target="_blank" rel="noreferrer" className="btn btn-secundario btn-chico">
                 {d.fueraAbrir} ↗
               </a>
             </li>
@@ -176,7 +176,7 @@ function FormularioEntidad({
         <button
           type="submit"
           disabled={pendiente}
-          className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+          className="btn btn-primario"
         >
           {pendiente ? d.entidadGuardando : d.entidadGuardar}
         </button>
@@ -203,7 +203,7 @@ function Copiable({ etiqueta, valor, vacio }: { etiqueta: string; valor: string 
               setCopiado(true)
               setTimeout(() => setCopiado(false), 1500)
             }}
-            className="text-xs text-accent hover:underline"
+            className="btn btn-secundario btn-chico"
           >
             {copiado ? d.copiado : d.copiar}
           </button>

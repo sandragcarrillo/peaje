@@ -48,19 +48,19 @@ export default async function Landing() {
             </h1>
             <p className="mt-6 max-w-lg text-base text-tinta/70">{L.heroTexto}</p>
 
-            {/* Botones pastilla conectados (§5.4) */}
-            <div className="mt-9 inline-flex font-mono text-xs tracking-[0.08em]">
+            {/* El hero es crema fijo en ambos temas: el botón se ancla a tinta sobre crema. */}
+            <div className="mt-9 inline-flex">
               {tenant ? (
                 <Link
                   href={`/t/${tenant.slug}`}
-                  className="rounded-full border border-tinta bg-tinta px-6 py-3 text-crema"
+                  className="btn btn-primario [--bg:var(--crema)] [--text:var(--tinta)]"
                 >
                   {L.ctaDashboard}
                 </Link>
               ) : (
                 <Link
                   href="/radar"
-                  className="rounded-full border border-tinta bg-tinta px-6 py-3 text-crema"
+                  className="btn btn-primario [--bg:var(--crema)] [--text:var(--tinta)]"
                 >
                   {L.ctaRegistrar}
                 </Link>

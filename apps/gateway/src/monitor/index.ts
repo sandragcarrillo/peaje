@@ -17,6 +17,11 @@ import { procesarSeguimientos } from '../ciclo/seguimiento.js'
 import { correrComprador } from '../comprador/misterioso.js'
 // ---- M9 ----
 import { esActivo } from '../billing/acceso.js'
+// ---- reportes programados ----
+import { correrVencidos } from '../reportes/entregar.js'
+// Los canales se registran al importarse (Telegram; Slack desde su módulo).
+import '../telegram/reportes.js'
+import '../slack/reportes.js'
 
 /**
  * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
@@ -24,6 +29,7 @@ import { esActivo } from '../billing/acceso.js'
  *   POST /internal/monitor/run/:slug     uno solo
  *   POST /internal/monitor/weekly        reporte semanal a los Pro
  *   GET  /internal/monitor/preview/:slug el reporte como HTML, para mirarlo
+ *   POST /internal/monitor/schedules     reportes programados vencidos (cron horario)
  *
  * Las filas se guardan para todos; los correos salen solo a los Pro con email.
  */
@@ -129,4 +135,13 @@ monitorRouter.get('/preview/:slug', async (c) => {
   const reporte = await armarReporte(tenant, actual, { conContenido })
   const { subject, html } = htmlSemanal(tenant, reporte)
   return c.html(`<!doctype html><title>${subject}</title><p style="color:#666;font:13px sans-serif">Subject: ${subject}</p>${html}`)
+})
+
+// ---- reportes programados: el cron horario manda los vencidos ----
+// Seguro de correr dos veces: cada agenda se toma con un update condicional
+// antes de mandarse. `?now=ISO` solo para probar en local.
+monitorRouter.post('/schedules', async (c) => {
+  const now = c.req.query('now')
+  const ahora = now && !Number.isNaN(Date.parse(now)) ? new Date(now) : new Date()
+  return c.json(await correrVencidos(ahora))
 })

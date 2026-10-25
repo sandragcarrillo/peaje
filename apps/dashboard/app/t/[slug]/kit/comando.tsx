@@ -17,7 +17,7 @@ export function Copiable({ texto }: { texto: string }) {
           setCopiado(true)
           setTimeout(() => setCopiado(false), 1500)
         }}
-        className="shrink-0 border border-border px-3 text-xs text-muted hover:text-text"
+        className="btn btn-secundario btn-chico shrink-0"
       >
         {copiado ? d.unComandoCopiado : d.unComandoCopiar}
       </button>
@@ -64,7 +64,7 @@ export function PromptAgente({ texto }: { texto: string }) {
           setCopiado(true)
           setTimeout(() => setCopiado(false), 1500)
         }}
-        className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg"
+        className="btn btn-primario"
       >
         {copiado ? d.agenteCopiado : d.agenteCopiar}
       </button>

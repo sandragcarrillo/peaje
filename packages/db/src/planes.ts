@@ -5,22 +5,23 @@ import type { Tenant } from './types'
  * quién tiene Pro, hasta cuándo y con qué límites.
  *
  * - free: kit, rutas con precio y 402, visitas, monitor diario y sus tareas de arreglo.
- * - founder: US$19/mes, solo los primeros 50 negocios que se suscriben.
- * - pro: US$29/mes.
+ * - founder: US$30/mes, solo los primeros 50 negocios que se suscriben (precio desde el 24 oct 2026).
+ * - pro: US$69/mes.
  * - trial: 14 días de Pro para todo negocio nuevo (y los que ya existían al migrar).
  */
 
 export type PlanPago = 'founder' | 'pro'
 export type PlanVigente = 'free' | 'trial' | PlanPago
 
-export const PRECIOS_USD: Record<PlanPago, number> = { founder: 19, pro: 29 }
+export const PRECIOS_USD: Record<PlanPago, number> = { founder: 30, pro: 69 }
 
 export type Limites = { preguntas: number; mensajes: number }
 
 export const LIMITES: Record<PlanVigente, Limites> = {
   free: { preguntas: 0, mensajes: 0 },
   trial: { preguntas: 20, mensajes: 150 },
-  founder: { preguntas: 10, mensajes: 60 },
+  // Founder es Pro con descuento: mismos límites, otro precio (decisión del 24 oct 2026).
+  founder: { preguntas: 20, mensajes: 150 },
   pro: { preguntas: 20, mensajes: 150 },
 }
 

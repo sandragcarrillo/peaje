@@ -28,7 +28,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
         </p>
         <Link
           href="/acceder"
-          className="mt-6 inline-block rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg"
+          className="btn btn-primario mt-6"
         >
           {d.panel.entrarConEmail}
         </Link>

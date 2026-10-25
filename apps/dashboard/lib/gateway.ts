@@ -220,8 +220,20 @@ export type Citacion = {
     byEngine: { engine: string; cited: number; mentioned: number; total: number }[]
     byPrompt: { prompt: string; engines: Record<string, { cited: boolean; mentioned: boolean; error: boolean }> }[]
     competitors: { domain: string; count: number }[]
+    /** Qué tipo de página cita la IA para estas preguntas (últimas tres rondas). Falta en gateways viejos. */
+    formats?: FormatosCitados
   }
 }
+
+export type FormatoCitado = {
+  format: string
+  citations: number
+  sources: number
+  examples: { url: string; title: string | null; domain: string; citations: number }[]
+  prompts: string[]
+}
+
+export type FormatosCitados = { answers: number; rounds: number; formats: FormatoCitado[] }
 
 export function leerCitacion(slug: string) {
   return internal<Citacion>(`/${slug}/tasks/citations`)
@@ -276,6 +288,77 @@ export function desconectarTelegram(slug: string) {
   return internal<{ ok: boolean }>(`/${slug}/telegram`, { method: 'DELETE' })
 }
 
+// ---- Slack ----
+
+export type EstadoSlack = {
+  configured: boolean
+  links: { teamId: string; teamName: string | null; channelId: string; direct: boolean; url: string; language: string; linkedAt: string }[]
+}
+
+export function leerSlack(slug: string) {
+  return internal<EstadoSlack>(`/${slug}/slack`)
+}
+
+export function enlaceSlack(slug: string, language: 'es' | 'en') {
+  return internal<{ url: string; expiresAt: string }>(`/${slug}/slack/link`, { method: 'POST', body: JSON.stringify({ language }) })
+}
+
+export function desconectarSlack(slug: string, canal?: { teamId: string; channelId: string }) {
+  const q = canal ? `?team=${encodeURIComponent(canal.teamId)}&channel=${encodeURIComponent(canal.channelId)}` : ''
+  return internal<{ ok: boolean }>(`/${slug}/slack${q}`, { method: 'DELETE' })
+}
+// ---- fin Slack ----
+
+// ---- reportes programados (Telegram hoy, Slack después) ----
+
+export type ReporteProgramado = {
+  id: string
+  channel: string
+  target: string
+  kind: 'agent_visits' | 'custom'
+  prompt: string | null
+  frequency: 'daily' | 'weekly' | 'monthly'
+  hour: number
+  weekday: number | null
+  dayOfMonth: number | null
+  timezone: string
+  nextRunAt: string
+  lastRunAt: string | null
+}
+
+export type EstadoReportes = {
+  pro: boolean
+  defaultTimezone: string
+  destinations: { channel: string; target: string; name: string; language: 'es' | 'en' }[]
+  schedules: ReporteProgramado[]
+}
+
+export type CambioReporte = {
+  channel: string
+  target: string
+  kind?: 'agent_visits' | 'custom'
+  prompt?: string
+  id?: string
+  frequency: 'daily' | 'weekly' | 'monthly'
+  hour: number
+  weekday?: number | null
+  dayOfMonth?: number | null
+  timezone: string
+}
+
+export function leerReportes(slug: string) {
+  return internal<EstadoReportes>(`/${slug}/schedules`)
+}
+
+export function guardarReporte(slug: string, cambio: CambioReporte) {
+  return internal<{ schedule: ReporteProgramado }>(`/${slug}/schedules`, { method: 'PUT', body: JSON.stringify(cambio) })
+}
+
+export function borrarReporte(slug: string, filtro: { id: string } | { channel: string; target: string; kind?: 'agent_visits' | 'custom' }) {
+  return internal<{ deleted: number }>(`/${slug}/schedules?${new URLSearchParams(filtro as Record<string, string>)}`, { method: 'DELETE' })
+}
+// ---- fin reportes programados ----
+
 // ---- M9: plan y cobro del agente Pro ----
 
 export type EstadoBilling = {
@@ -301,3 +384,29 @@ export function pagarPlanConSaldo(slug: string, plan: 'founder' | 'pro') {
 export function describirSitio(slug: string): void {
   void internal<{ description: string | null }>(`/${slug}/describe`, { method: 'POST' }).catch(() => {})
 }
+
+// ---- radar público: leads y reporte por correo ----
+
+export function guardarLeadRadar(body: { email: string; domain: string; locale: 'es' | 'en'; marketingConsent: boolean }) {
+  return internal<{ lead: import('@peaje/db').RadarLead }>(`/radar/leads`, {
+    method: 'POST',
+    body: JSON.stringify({ ...body, source: 'radar' }),
+  })
+}
+
+export type ReporteRadar = {
+  email: string
+  domain: string
+  locale: 'es' | 'en'
+  score: number
+  grade: string
+  projected: number
+  projectedGrade: string
+  fixes: { name: string; recommendation: string | null; points: number | null }[]
+}
+
+/** `sent: false` con motivo (correo sin configurar, mandado hace poco) no es error. */
+export function mandarReporteRadar(body: ReporteRadar) {
+  return internal<{ sent: boolean; reason?: string }>(`/radar/report`, { method: 'POST', body: JSON.stringify(body) })
+}
+// ---- fin radar ----

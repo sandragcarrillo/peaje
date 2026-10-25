@@ -133,9 +133,8 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
         <p className="mt-2 max-w-xl text-sm text-muted">{d.ctaCuerpo}</p>
         <Link
           href="/nuevo"
-          className="mt-4 inline-flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
+          className="btn btn-primario mt-4"
         >
-          <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
           {d.ctaBoton}
         </Link>
       </section>
@@ -189,13 +188,9 @@ function Chip({ href, activo, label }: { href: string; activo: boolean; label: s
   return (
     <Link
       href={href}
-      className={`flex items-center gap-1.5 border px-3 py-1.5 font-mono text-xs transition-colors ${
-        activo
-          ? 'border-text bg-negro font-bold text-white'
-          : 'border-border bg-bg text-muted hover:border-text hover:text-text'
-      }`}
+      aria-current={activo ? 'page' : undefined}
+      className={`btn btn-secundario btn-chico ${activo ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
     >
-      {activo ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
       {label}
     </Link>
   )

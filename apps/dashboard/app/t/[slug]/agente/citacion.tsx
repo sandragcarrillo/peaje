@@ -2,11 +2,82 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
-import type { Citacion } from '@/lib/gateway'
+import type { Citacion, FormatosCitados } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
 import { agregarPregunta, borrarPregunta, medirAhora } from './actions'
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
+
+/** Por debajo de esto, el panel avisa que los conteos son una pista. */
+const POCAS_RESPUESTAS = 12
+
+/** Qué tipo de página cita la IA para las preguntas del negocio, con ejemplos y cómo armarla. */
+export function FormatosPanel({ datos }: { datos: FormatosCitados }) {
+  const { miAgente: t } = useDict()
+  return (
+    <div className="border border-border p-4">
+      <p className="font-semibold">{t.fmtTitulo}</p>
+      <p className="mt-1 text-sm text-muted">{t.fmtIntro}</p>
+      {datos.formats.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">{t.fmtSinDatos}</p>
+      ) : (
+        <>
+          <p className="mt-2 font-mono text-xs text-muted">
+            {t.fmtBase(datos.answers, datos.rounds)} {datos.answers < POCAS_RESPUESTAS ? t.fmtPoco : null}
+          </p>
+          <div className="mt-3 divide-y divide-border border border-border">
+            {datos.formats.map((f, i) => (
+              <details key={f.format} open={i === 0} className="group px-4 py-3">
+                <summary className="flex cursor-pointer list-none items-baseline justify-between gap-3">
+                  <span className="font-medium">
+                    <span className="mr-2 inline-block text-muted transition-transform group-open:rotate-90">›</span>
+                    {t.fmtNombres[f.format] ?? f.format}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs text-muted">{t.fmtConteo(f.citations, f.sources)}</span>
+                </summary>
+                <div className="mt-3 space-y-3 text-sm">
+                  <p>{t.fmtPara[f.format]}</p>
+                  <div>
+                    <p className="text-xs text-muted">{t.fmtComoArmar}</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                      {(t.fmtRasgos[f.format] ?? []).map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  {f.examples.length ? (
+                    <div>
+                      <p className="text-xs text-muted">{t.fmtEjemplos}</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {f.examples.map((e) => (
+                          <li key={e.url} className="truncate">
+                            <a href={e.url} target="_blank" rel="noopener noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-text">
+                              {e.domain}
+                              {e.title ? ` · ${e.title}` : ''}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {f.prompts.length ? (
+                    <p className="text-xs text-muted">
+                      {t.fmtPreguntas}: {f.prompts.join(' · ')}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="font-medium">{t.fmtPrimerPaso}: </span>
+                    {t.fmtPaso[f.format]}
+                  </p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion | null }) {
   const { miAgente: t } = useDict()
@@ -88,7 +159,11 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
           </table>
           <p className="mt-2 text-xs text-muted">✓ {t.citCitado} · ~ {t.citMencion} · ✗ {t.citNo}</p>
         </div>
-      ) : esperando ? (
+      ) : null}
+
+      {s.measuredAt && s.formats ? <FormatosPanel datos={s.formats} /> : null}
+
+      {s.measuredAt ? null : esperando ? (
         <p className="text-sm">{t.citMidiendoFondo}</p>
       ) : (
         <p className="text-sm text-muted">{t.citSinMedir}</p>
@@ -103,7 +178,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
             {datos.prompts.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
                 <span>{p.text}</span>
-                <button disabled={pending} onClick={() => correr(() => borrarPregunta(slug, p.id))} className="font-mono text-[11px] uppercase text-muted hover:text-red-600">
+                <button disabled={pending} onClick={() => correr(() => borrarPregunta(slug, p.id))} className="btn btn-secundario btn-chico hover:text-red-600">
                   {t.quitar}
                 </button>
               </li>
@@ -114,9 +189,9 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder={t.citPlaceholder}
-              className="min-w-64 flex-1 rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+              className="min-w-64 flex-1 border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
-            <button disabled={pending || !texto.trim()} onClick={() => correr(async () => { await agregarPregunta(slug, texto); setTexto('') })} className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50">
+            <button disabled={pending || !texto.trim()} onClick={() => correr(async () => { await agregarPregunta(slug, texto); setTexto('') })} className="btn btn-secundario">
               {t.citAgregar}
             </button>
           </div>
@@ -137,7 +212,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               }
             })
           }}
-          className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+          className="btn btn-primario"
         >
           {pending && midiendo ? t.citMidiendo : t.citMedir}
         </button>

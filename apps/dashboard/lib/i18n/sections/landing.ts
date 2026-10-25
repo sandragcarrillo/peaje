@@ -13,8 +13,8 @@ export const landing = {
     hero3: 'Peaje lo arregla.',
     heroTexto:
       'Peaje deja tu sitio o tu API listo para agentes de IA: que te encuentren, te lean y, si quieres, te paguen por cada pedido. Empieza gratis mirando cómo te ven hoy.',
-    ctaDashboard: 'IR A MI DASHBOARD',
-    ctaRegistrar: 'REVISAR MI SITIO GRATIS',
+    ctaDashboard: 'Ir a mi dashboard',
+    ctaRegistrar: 'Revisar mi sitio gratis',
     ctaMercado: 'VER EL MERCADO',
 
     arte: 'ABRE TU MUNDO A AGENTES',
@@ -46,7 +46,7 @@ export const landing = {
       'Un comando en tu proyecto. Tu sitio queda legible para agentes y cada ruta puede tener precio, incluido cero. Cobrar es opcional.',
     paso3Titulo: 'Activa tu agente de AEO',
     paso3Texto:
-      'Te dice qué publicar para que ChatGPT, Claude y Perplexity te recomienden, lo escribe, se lo pasa a tu herramienta de IA y mide si funcionó. US$29 al mes, con 14 días de prueba.',
+      'Te dice qué publicar para que ChatGPT, Claude y Perplexity te recomienden, lo escribe, se lo pasa a tu herramienta de IA y mide si funcionó. Precio de fundador: US$30 al mes (después será US$69), con 14 días de prueba.',
 
     precio:
       'Registrarte e instalar es gratis. Si cobras a agentes, Peaje se queda con el 2% de cada pago. Hoy los pagos corren en redes de prueba: sirven para comprobar que todo funciona y todavía no son dinero real.',
@@ -66,8 +66,8 @@ export const landing = {
     hero3: 'Peaje fixes that.',
     heroTexto:
       'Peaje gets your site or API ready for AI agents: they find you, read you and, if you want, pay you per request. Start free by seeing how they see you today.',
-    ctaDashboard: 'GO TO MY DASHBOARD',
-    ctaRegistrar: 'CHECK MY SITE FREE',
+    ctaDashboard: 'Go to my dashboard',
+    ctaRegistrar: 'Check my site free',
     ctaMercado: 'SEE THE MARKET',
 
     arte: 'OPEN YOUR WORLD TO AGENTS',
@@ -97,7 +97,7 @@ export const landing = {
       'One command in your project. Your site becomes readable by agents and every route can have a price, including zero. Charging is optional.',
     paso3Titulo: 'Turn on your AEO agent',
     paso3Texto:
-      'It tells you what to publish so ChatGPT, Claude and Perplexity recommend you, writes it, hands it to your AI coding tool and measures whether it worked. US$29 a month, with a 14-day trial.',
+      'It tells you what to publish so ChatGPT, Claude and Perplexity recommend you, writes it, hands it to your AI coding tool and measures whether it worked. Founder price: US$30 a month (US$69 later), with a 14-day trial.',
 
     precio:
       'Signing up and installing are free. If you charge agents, Peaje keeps 2% of each payment. Payments run on test networks today: they prove everything works and are not real money yet.',

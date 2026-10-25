@@ -7,6 +7,7 @@ import { AccountMenu } from '@/components/account-menu'
 import { getDict, getLocale } from '@/lib/i18n'
 import { LocaleProvider } from '@/lib/i18n/client'
 import { currentTenant } from '@/lib/session'
+import { CONTACTO } from '@/lib/legal'
 import { Logo } from './components/logo'
 import './globals.css'
 import { Providers } from './providers'
@@ -57,7 +58,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                   <form action={salir}>
                     <button
                       type="submit"
-                      className="rounded-full border border-border px-4 py-1.5 text-xs text-muted hover:border-muted hover:text-text"
+                      className="btn btn-secundario btn-chico"
                     >
                       {d.nav.salir}
                     </button>
@@ -67,13 +68,13 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                 <nav className="flex items-center gap-3 text-sm">
                   <Link
                     href="/nuevo"
-                    className="rounded-full bg-text px-4 py-1.5 font-medium text-bg"
+                    className="btn btn-primario btn-chico"
                   >
                     {d.nav.registrar}
                   </Link>
                   <Link
                     href="/acceder"
-                    className="rounded-full border border-border px-4 py-1.5 text-muted hover:border-muted hover:text-text"
+                    className="btn btn-secundario btn-chico"
                   >
                     {d.nav.entrar}
                   </Link>
@@ -87,9 +88,18 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
         </Providers>
         </LocaleProvider>
         <footer className="border-t border-border px-6 py-8">
-          <p className="mx-auto max-w-5xl text-center font-mono text-xs tracking-[0.08em] text-muted">
-            PEAJE · 2026
-          </p>
+          {/* Paddle exige términos, privacidad, reembolsos y precios enlazados desde todo el sitio. */}
+          <nav
+            aria-label={d.legal.pieNav}
+            className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 font-mono text-xs text-muted"
+          >
+            <Link href="/precios" className="hover:text-text">{d.legal.piePrecios}</Link>
+            <Link href="/terms" className="hover:text-text">{d.legal.pieTerminos}</Link>
+            <Link href="/privacy" className="hover:text-text">{d.legal.piePrivacidad}</Link>
+            <Link href="/reembolsos" className="hover:text-text">{d.legal.pieReembolsos}</Link>
+            <a href={`mailto:${CONTACTO}`} className="hover:text-text">{d.legal.pieContacto}</a>
+          </nav>
+          <p className="mx-auto mt-4 max-w-5xl text-center font-mono text-xs text-muted">Peaje · 2026</p>
         </footer>
       </body>
     </html>

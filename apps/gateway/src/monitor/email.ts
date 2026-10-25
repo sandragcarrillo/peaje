@@ -14,14 +14,14 @@ function esc(t: string): string {
 const estilo = 'font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#111'
 const mono = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:#f4f4f4;padding:10px 12px;border-radius:4px;white-space:pre-wrap'
 
-export async function enviarCorreo(to: string, subject: string, html: string): Promise<void> {
+export async function enviarCorreo(to: string, subject: string, html: string, opts?: { replyTo?: string }): Promise<void> {
   const key = process.env.RESEND_API_KEY
   const from = process.env.AGENTS_FROM_EMAIL
   if (!key || !from) throw new Error('Falta RESEND_API_KEY o AGENTS_FROM_EMAIL en el gateway')
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to, subject, html }),
+    body: JSON.stringify({ from, to, subject, html, ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}) }),
     signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) throw new Error(`Resend respondió ${res.status}: ${await res.text()}`)

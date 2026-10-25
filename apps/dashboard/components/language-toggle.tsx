@@ -20,7 +20,7 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
 
   return (
     <div
-      className={`flex items-center rounded-full border border-border ${pending ? 'opacity-50' : ''}`}
+      className={`flex items-center gap-1 ${pending ? 'opacity-50' : ''}`}
     >
       {LOCALES.map((l) => (
         <button
@@ -28,8 +28,8 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
           type="button"
           onClick={() => elegir(l)}
           aria-pressed={l === locale}
-          className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-            l === locale ? 'bg-text text-bg' : 'text-muted hover:text-text'
+          className={`btn btn-secundario btn-chico btn-icono ${
+            l === locale ? 'border-text bg-panel' : 'text-muted hover:text-text'
           }`}
         >
           {LOCALE_LABELS[l]}

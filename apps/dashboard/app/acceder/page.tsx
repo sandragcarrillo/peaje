@@ -152,7 +152,7 @@ export default function Acceder() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
+              className="btn btn-primario"
             >
               {pending ? d.acceso.verificando : d.acceso.botonEntrar}
             </button>
@@ -183,7 +183,7 @@ export default function Acceder() {
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <button
             disabled={pending}
-            className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
+            className="btn btn-primario"
           >
             {pending ? d.acceso.enviando : d.acceso.enviarCodigo}
           </button>

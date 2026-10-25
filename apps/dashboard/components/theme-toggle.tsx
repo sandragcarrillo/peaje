@@ -29,7 +29,7 @@ export function ThemeToggle() {
       type="button"
       onClick={alternar}
       aria-label={oscuro ? 'Light mode' : 'Dark mode'}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted hover:border-accent hover:text-text"
+      className="btn btn-secundario btn-chico btn-icono"
     >
       {oscuro ? <Sol /> : <Luna />}
     </button>

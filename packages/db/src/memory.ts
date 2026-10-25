@@ -45,6 +45,14 @@ import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
 import type { BillingMethod, BillingPayment, NewBillingPayment } from './types'
 import { DIAS_PRUEBA } from './planes'
+// ---- radar ----
+import type { NewRadarLead, RadarLead } from './types'
+// ---- trabajos y voz ----
+import type { AgentJob, NewAgentJob, VoiceProfile } from './types'
+// ---- Slack ----
+import type { SlackCode, SlackInstall, SlackLink } from './types'
+// ---- reportes programados ----
+import type { ReportKind, ReportSchedule, ReportScheduleInput } from './types'
 
 /**
  * Store en memoria. Corre el gateway y el dashboard sin Supabase, con la misma
@@ -91,6 +99,8 @@ export class MemoryStore implements Store {
       // ---- M9: 14 días de prueba de Pro desde la creación ----
       planUntil: null,
       trialUntil: new Date(Date.now() + DIAS_PRUEBA * 86_400_000).toISOString(),
+      voiceProfile: null,
+      voiceProfileAt: null,
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -235,7 +245,7 @@ export class MemoryStore implements Store {
   }
 
   async addMessage(m: NewAgentMessage): Promise<AgentMessage> {
-    const nuevo: AgentMessage = { id: this.#id('msg'), tenantId: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], channel: m.channel ?? 'dashboard', createdAt: new Date().toISOString() }
+    const nuevo: AgentMessage = { id: this.#id('msg'), tenantId: m.tenantId, role: m.role, text: m.text, actions: m.actions ?? [], options: m.options ?? [], links: m.links ?? [], channel: m.channel ?? 'dashboard', createdAt: new Date().toISOString() }
     this.#messages.push(nuevo)
     return nuevo
   }
@@ -268,7 +278,7 @@ export class MemoryStore implements Store {
   }
 
   async recordCitationRuns(runs: NewCitationRun[]): Promise<void> {
-    this.#runs.unshift(...runs.map((r) => ({ ...r, id: this.#id('crn'), runAt: new Date().toISOString() })))
+    this.#runs.unshift(...runs.map((r) => ({ ...r, pages: r.pages ?? [], id: this.#id('crn'), runAt: new Date().toISOString() })))
   }
 
   async listCitationRuns(tenantId: string, rounds: number): Promise<CitationRun[]> {
@@ -283,6 +293,73 @@ export class MemoryStore implements Store {
 
   async clearMessages(tenantId: string): Promise<void> {
     this.#messages = this.#messages.filter((m) => m.tenantId !== tenantId)
+  }
+
+  // ---- trabajos largos del agente ----
+  #jobs: AgentJob[] = []
+
+  async createJob(input: NewAgentJob): Promise<AgentJob> {
+    const job: AgentJob = {
+      id: this.#id('job'),
+      tenantId: input.tenantId,
+      kind: input.kind,
+      status: 'queued',
+      input: input.input,
+      result: null,
+      error: null,
+      destino: input.destino ?? null,
+      attempts: 0,
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      finishedAt: null,
+    }
+    this.#jobs.push(job)
+    return { ...job }
+  }
+
+  async getJob(id: string): Promise<AgentJob | null> {
+    const j = this.#jobs.find((x) => x.id === id)
+    return j ? { ...j } : null
+  }
+
+  async listJobs(tenantId: string, limit: number): Promise<AgentJob[]> {
+    return this.#jobs
+      .filter((j) => j.tenantId === tenantId)
+      .slice(-limit)
+      .reverse()
+      .map((j) => ({ ...j }))
+  }
+
+  async claimNextJob(kinds: string[]): Promise<AgentJob | null> {
+    // Un solo hilo de JS: buscar y marcar en la misma vuelta ya es atómico.
+    const j = this.#jobs.find((x) => x.status === 'queued' && kinds.includes(x.kind))
+    if (!j) return null
+    Object.assign(j, { status: 'running', startedAt: new Date().toISOString(), attempts: j.attempts + 1 })
+    return { ...j }
+  }
+
+  async finishJob(id: string, patch: { status: 'done' | 'failed'; result?: Record<string, unknown> | null; error?: string | null }): Promise<AgentJob> {
+    const j = this.#jobs.find((x) => x.id === id)
+    if (!j) throw new Error('Trabajo no encontrado')
+    Object.assign(j, { status: patch.status, result: patch.result ?? null, error: patch.error ?? null, finishedAt: new Date().toISOString() })
+    return { ...j }
+  }
+
+  async listStaleJobs(before: string): Promise<AgentJob[]> {
+    return this.#jobs.filter((j) => j.status === 'running' && (j.startedAt ?? '') < before).map((j) => ({ ...j }))
+  }
+
+  async requeueJob(id: string): Promise<void> {
+    const j = this.#jobs.find((x) => x.id === id && x.status === 'running')
+    if (j) Object.assign(j, { status: 'queued', startedAt: null })
+  }
+
+  // ---- voz de marca ----
+  async setTenantVoiceProfile(tenantId: string, profile: VoiceProfile | null): Promise<void> {
+    const t = this.#tenants.get(tenantId)
+    if (!t) return
+    t.voiceProfile = profile
+    t.voiceProfileAt = profile ? new Date().toISOString() : null
   }
 
   // ---- M6: seguimientos de tareas verificadas ----
@@ -364,6 +441,162 @@ export class MemoryStore implements Store {
   async unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void> {
     this.#tgLinks = this.#tgLinks.filter((l) => !((filter.chatId === undefined || l.chatId === filter.chatId) && (filter.tenantId === undefined || l.tenantId === filter.tenantId)))
   }
+
+  // ---- Slack ----
+  #slackCodes = new Map<string, SlackCode>()
+  #slackInstalls = new Map<string, SlackInstall>()
+  #slackLinks: SlackLink[] = []
+  #slackEvents = new Map<string, number>()
+
+  async createSlackCode(tenantId: string, code: string, expiresAt: string, language: string): Promise<void> {
+    this.#slackCodes.set(code, { code, tenantId, language, teamId: null, userId: null, expiresAt })
+  }
+
+  async getSlackCode(code: string): Promise<SlackCode | null> {
+    const c = this.#slackCodes.get(code)
+    return c && new Date(c.expiresAt).getTime() > Date.now() ? { ...c } : null
+  }
+
+  async bindSlackCode(code: string, teamId: string, userId: string, expiresAt: string): Promise<void> {
+    const c = this.#slackCodes.get(code)
+    if (c) Object.assign(c, { teamId, userId, expiresAt })
+  }
+
+  async consumeSlackCode(teamId: string, userId: string): Promise<SlackCode | null> {
+    const ahora = Date.now()
+    const c = [...this.#slackCodes.values()].reverse().find((x) => x.teamId === teamId && x.userId === userId && new Date(x.expiresAt).getTime() > ahora)
+    if (!c) return null
+    this.#slackCodes.delete(c.code)
+    return { ...c }
+  }
+
+  async saveSlackInstall(install: Omit<SlackInstall, 'installedAt'>): Promise<void> {
+    this.#slackInstalls.set(install.teamId, { ...install, installedAt: new Date().toISOString() })
+  }
+
+  async getSlackInstall(teamId: string): Promise<SlackInstall | null> {
+    const i = this.#slackInstalls.get(teamId)
+    return i ? { ...i } : null
+  }
+
+  async deleteSlackInstall(teamId: string): Promise<void> {
+    this.#slackInstalls.delete(teamId)
+    this.#slackLinks = this.#slackLinks.filter((l) => l.teamId !== teamId)
+  }
+
+  async linkSlack(link: Omit<SlackLink, 'linkedAt' | 'active'>): Promise<void> {
+    this.#slackLinks = this.#slackLinks.filter((l) => !(l.teamId === link.teamId && l.channelId === link.channelId && l.tenantId === link.tenantId))
+    this.#slackLinks.push({ ...link, linkedAt: new Date().toISOString(), active: true })
+    await this.setActiveSlack(link.teamId, link.channelId, link.tenantId)
+  }
+
+  async getSlackLink(teamId: string, channelId: string): Promise<SlackLink | null> {
+    const todos = await this.listSlackChannel(teamId, channelId)
+    return todos.find((l) => l.active) ?? todos[0] ?? null
+  }
+
+  async listSlackChannel(teamId: string, channelId: string): Promise<SlackLink[]> {
+    return this.#slackLinks.filter((l) => l.teamId === teamId && l.channelId === channelId).map((l) => ({ ...l }))
+  }
+
+  async setActiveSlack(teamId: string, channelId: string, tenantId: string): Promise<void> {
+    for (const l of this.#slackLinks) if (l.teamId === teamId && l.channelId === channelId) l.active = l.tenantId === tenantId
+  }
+
+  async listSlackLinks(tenantId: string): Promise<SlackLink[]> {
+    return this.#slackLinks.filter((l) => l.tenantId === tenantId).map((l) => ({ ...l }))
+  }
+
+  async unlinkSlack(filter: { tenantId?: string; teamId?: string; channelId?: string }): Promise<void> {
+    this.#slackLinks = this.#slackLinks.filter(
+      (l) =>
+        !(
+          (filter.tenantId === undefined || l.tenantId === filter.tenantId) &&
+          (filter.teamId === undefined || l.teamId === filter.teamId) &&
+          (filter.channelId === undefined || l.channelId === filter.channelId)
+        ),
+    )
+  }
+
+  async claimSlackEvent(eventId: string): Promise<boolean> {
+    const ahora = Date.now()
+    if (this.#slackEvents.size > 5000) for (const [k, t] of this.#slackEvents) if (ahora - t > 86_400_000) this.#slackEvents.delete(k)
+    if (this.#slackEvents.has(eventId)) return false
+    this.#slackEvents.set(eventId, ahora)
+    return true
+  }
+  // ---- fin Slack ----
+
+  // ---- reportes programados ----
+  #schedules: ReportSchedule[] = []
+
+  async listReportSchedules(tenantId: string): Promise<ReportSchedule[]> {
+    return this.#schedules.filter((s) => s.tenantId === tenantId).map((s) => ({ ...s }))
+  }
+
+  async upsertReportSchedule(input: ReportScheduleInput): Promise<ReportSchedule> {
+    const ahora = new Date().toISOString()
+    const previa = input.id
+      ? this.#schedules.find((s) => s.id === input.id && s.tenantId === input.tenantId)
+      : input.kind === 'agent_visits'
+        ? this.#schedules.find((s) => s.tenantId === input.tenantId && s.channel === input.channel && s.target === input.target && s.kind === 'agent_visits')
+        : undefined
+    if (input.id && !previa) throw new Error('report schedule not found')
+    const fila: ReportSchedule = {
+      id: previa?.id ?? this.#id('rep'),
+      tenantId: input.tenantId,
+      channel: input.channel,
+      target: input.target,
+      kind: input.kind,
+      prompt: input.kind === 'custom' ? (input.prompt ?? null) : null,
+      frequency: input.frequency,
+      hour: input.hour,
+      weekday: input.frequency === 'weekly' ? input.weekday : null,
+      dayOfMonth: input.frequency === 'monthly' ? input.dayOfMonth : null,
+      timezone: input.timezone,
+      active: input.active ?? true,
+      nextRunAt: new Date(input.nextRunAt).toISOString(),
+      lastRunAt: previa?.lastRunAt ?? null,
+      createdAt: previa?.createdAt ?? ahora,
+      updatedAt: ahora,
+    }
+    this.#schedules = [...this.#schedules.filter((s) => s.id !== fila.id), fila]
+    return { ...fila }
+  }
+
+  async deleteReportSchedules(tenantId: string, filter: { id?: string; channel?: string; target?: string; kind?: ReportKind }): Promise<number> {
+    const antes = this.#schedules.length
+    this.#schedules = this.#schedules.filter(
+      (s) =>
+        !(
+          s.tenantId === tenantId &&
+          (filter.id === undefined || s.id === filter.id) &&
+          (filter.channel === undefined || s.channel === filter.channel) &&
+          (filter.target === undefined || s.target === filter.target) &&
+          (filter.kind === undefined || s.kind === filter.kind)
+        ),
+    )
+    return antes - this.#schedules.length
+  }
+
+  async listDueReportSchedules(now: string, limit = 200): Promise<ReportSchedule[]> {
+    const t = new Date(now).getTime()
+    return this.#schedules
+      .filter((s) => s.active && new Date(s.nextRunAt).getTime() <= t)
+      .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt))
+      .slice(0, limit)
+      .map((s) => ({ ...s }))
+  }
+
+  async markReportScheduleSent(id: string, run: { previousNextRunAt: string; sentAt: string; nextRunAt: string }): Promise<boolean> {
+    const s = this.#schedules.find((x) => x.id === id)
+    if (!s || !s.active || new Date(s.nextRunAt).getTime() !== new Date(run.previousNextRunAt).getTime()) return false
+    s.lastRunAt = run.sentAt
+    s.nextRunAt = new Date(run.nextRunAt).toISOString()
+    s.updatedAt = run.sentAt
+    return true
+  }
+  // ---- fin reportes programados ----
 
   #plans = new Map<string, AgentPlan>()
 
@@ -716,14 +949,14 @@ export class MemoryStore implements Store {
     this.#visits.push(...visits)
   }
 
-  async visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats> {
+  async visitStats(tenantId: string, opts: { days: number; from?: string; to?: string }): Promise<VisitStats> {
     const rows = this.#visits
       .filter((v) => v.tenantId === tenantId)
       .map((v) => ({
         ...v,
         agentWallet: v.paymentId ? this.#payments.find((p) => p.id === v.paymentId)?.agentWallet ?? null : null,
       }))
-    return aggregateVisits(rows, opts.days)
+    return aggregateVisits(rows, opts.days, opts.from ? { from: opts.from, to: opts.to } : undefined)
   }
 
   async findPaymentByReceiptRef(receiptRef: string) {
@@ -771,4 +1004,39 @@ export class MemoryStore implements Store {
     return new Set(this.#billing.filter((b) => b.plan === 'founder').map((b) => b.tenantId)).size
   }
   // ---- fin M9 ----
+
+  // ---- radar público: leads ----
+  #radarLeads = new Map<string, RadarLead>()
+
+  async upsertRadarLead(input: NewRadarLead): Promise<RadarLead> {
+    const clave = `${input.email}|${input.domain}`
+    const ahora = new Date().toISOString()
+    const previo = this.#radarLeads.get(clave)
+    const fila: RadarLead = {
+      id: previo?.id ?? this.#id('lead'),
+      email: input.email,
+      domain: input.domain,
+      source: input.source ?? previo?.source ?? 'radar',
+      locale: input.locale,
+      marketingConsent: input.marketingConsent,
+      lastReportAt: previo?.lastReportAt ?? null,
+      createdAt: previo?.createdAt ?? ahora,
+      updatedAt: ahora,
+    }
+    this.#radarLeads.set(clave, fila)
+    return fila
+  }
+
+  async getRadarLead(email: string, domain: string): Promise<RadarLead | null> {
+    return this.#radarLeads.get(`${email}|${domain}`) ?? null
+  }
+
+  async claimRadarReport(email: string, domain: string, notSince: string): Promise<RadarLead | null> {
+    const lead = this.#radarLeads.get(`${email}|${domain}`)
+    if (!lead || (lead.lastReportAt && lead.lastReportAt >= notSince)) return null
+    const tomado = { ...lead, lastReportAt: new Date().toISOString() }
+    this.#radarLeads.set(`${email}|${domain}`, tomado)
+    return tomado
+  }
+  // ---- fin radar ----
 }

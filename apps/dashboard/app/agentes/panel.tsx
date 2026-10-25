@@ -39,7 +39,7 @@ export function AgentesPanel({ negocios, redes }: { negocios: Negocio[]; redes: 
         <button
           type="button"
           onClick={() => setCreando(true)}
-          className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
+          className="btn btn-primario"
         >
           {d.agentes.crear}
         </button>
@@ -186,11 +186,11 @@ function FormNuevo({
         <button
           type="submit"
           disabled={pending}
-          className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+          className="btn btn-primario"
         >
           {pending ? d.agentes.creandoWallet : d.agentes.crearAgente}
         </button>
-        <button type="button" onClick={onCerrar} className="text-sm text-muted hover:text-text">
+        <button type="button" onClick={onCerrar} className="btn btn-secundario">
           {d.agentes.cancelar}
         </button>
         <span className="ml-auto text-xs text-muted">{d.agentes.notaWallet}</span>
@@ -440,7 +440,7 @@ function Resultado({ run }: { run: AgentRun }) {
           <button
             type="button"
             onClick={() => setAbierto(!abierto)}
-            className="text-xs text-accent hover:underline"
+            className="btn btn-secundario btn-chico"
           >
             {abierto
               ? d.agentes.ocultarResultado
@@ -535,11 +535,7 @@ function Boton({
       onClick={onClick}
       disabled={disabled}
       title={titulo}
-      className={`rounded-lg px-3 py-1.5 text-xs disabled:opacity-40 ${
-        principal
-          ? 'bg-text font-medium text-bg'
-          : 'border border-border text-muted hover:border-accent hover:text-text'
-      }`}
+      className={`btn btn-chico ${principal ? 'btn-primario' : 'btn-secundario'}`}
     >
       {cargando ? '…' : children}
     </button>
@@ -547,7 +543,7 @@ function Boton({
 }
 
 const input =
-  'w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text'
+  'w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text'
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (

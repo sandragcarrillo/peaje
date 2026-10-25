@@ -59,9 +59,15 @@ const T = {
   },
 }
 
-/** Botones: primero las propuestas (aplicar/descartar), después las opciones. */
-function teclado(m: AgentMessage, idioma: 'es' | 'en') {
-  const filas: { text: string; callback_data: string }[][] = []
+/**
+ * Botones: primero las tarjetas (botones con URL al reporte o la tarea),
+ * después las propuestas (aplicar/descartar) y las opciones. Sin `conAcciones`
+ * van solo las tarjetas: abren una página y no actúan sobre el negocio activo.
+ */
+function teclado(m: AgentMessage, idioma: 'es' | 'en', conAcciones = true) {
+  const filas: ({ text: string; callback_data: string } | { text: string; url: string })[][] = []
+  for (const l of m.links ?? []) if (/^https:\/\//.test(l.url)) filas.push([{ text: l.label.slice(0, 60), url: l.url }])
+  if (!conAcciones) return filas.length ? { inline_keyboard: filas } : undefined
   for (const a of m.actions.filter((x) => x.status === 'pending')) {
     filas.push([
       { text: `${T[idioma].aplicar}: ${a.summary}`.slice(0, 60), callback_data: `a:${a.id.slice(0, 8)}:y` },
@@ -72,11 +78,13 @@ function teclado(m: AgentMessage, idioma: 'es' | 'en') {
   return filas.length ? { inline_keyboard: filas } : undefined
 }
 
-async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: 'es' | 'en', encabezado?: string) {
+/** `conBotones` en false: los botones del chat actúan sobre el negocio activo, así que a otro negocio se le manda sin ellos. */
+export async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: 'es' | 'en', encabezado?: string, conBotones = true) {
   const partes = partir(encabezado ? `**${encabezado}**\n${m.text}` : m.text)
+  const botones = teclado(m, idioma, conBotones)
   for (let i = 0; i < partes.length; i++) {
     const ultima = i === partes.length - 1
-    await tg('sendMessage', { chat_id: chatId, text: aHtml(partes[i]!), parse_mode: 'HTML', ...(ultima && teclado(m, idioma) ? { reply_markup: teclado(m, idioma) } : {}) })
+    await tg('sendMessage', { chat_id: chatId, text: aHtml(partes[i]!), parse_mode: 'HTML', ...(ultima && botones ? { reply_markup: botones } : {}) })
   }
 }
 
@@ -87,7 +95,7 @@ async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 
   await tg('sendChatAction', { chat_id: chatId, action: 'typing' })
   const latido = setInterval(() => void tg('sendChatAction', { chat_id: chatId, action: 'typing' }), 4_500)
   try {
-    const m = await conversar(tenant, texto, { idioma, canal: 'telegram' })
+    const m = await conversar(tenant, texto, { idioma, canal: 'telegram', destino: { canal: 'telegram', id: String(chatId) } })
     // Con varios negocios en el chat, cada respuesta dice de cuál es.
     const varios = (await store.listTelegramChat(chatId)).length > 1
     await enviarRespuesta(chatId, m, idioma, varios ? tenant.name : undefined)
@@ -127,6 +135,8 @@ export async function procesarUpdate(u: Update): Promise<void> {
   if (!link) return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].sinLigar }))
   if (texto === '/stop') {
     await store.unlinkTelegram({ chatId, tenantId: link.tenantId })
+    // Lo programado para este chat y este negocio se va con la conexión.
+    await store.deleteReportSchedules(link.tenantId, { channel: 'telegram', target: String(chatId) }).catch(() => 0)
     const quedan = await store.listTelegramChat(chatId)
     if (quedan[0]) {
       await store.setActiveTelegram(chatId, quedan[0].tenantId)

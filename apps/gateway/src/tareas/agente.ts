@@ -13,10 +13,21 @@ import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
 import { LIMITES } from '@peaje/db'
 import { revisarAcceso } from '../acceso/revisar.js'
 // ---- M6 ----
-import { completarBorrador, MARCA_BORRADOR, tareaConBorrador } from '../ciclo/borrador.js'
+import { completarBorrador, MARCA_BORRADOR, slugDePregunta } from '../ciclo/borrador.js'
 import { resultados } from '../ciclo/seguimiento.js'
 // ---- M7 ----
 import { probarAhora, resultadoPublico } from '../comprador/misterioso.js'
+// ---- reportes programados ----
+import type { ReportKind, ReportSchedule } from '@peaje/db'
+import { proximaCorrida, validarAgenda } from '../reportes/agenda.js'
+import { canalReportes, destinosDe, fechaLocal } from '../reportes/entregar.js'
+// ---- tarjetas, trabajos largos y voz ----
+import type { AgentJobDestino, AgentMessageLink } from '@peaje/db'
+import { REPORTES, tarjetaReporte, tarjetaTarea } from './tarjetas.js'
+import { avisoDeTrabajo, encolarTrabajo } from './trabajos.js'
+import { guardarPerfilDeVoz, perfilDeVoz, type CambioDeVoz } from '../ciclo/voz.js'
+
+const MAX_CUSTOM = 5
 
 /**
  * El agente Pro que conversa con el dueño (dashboard hoy, Telegram después).
@@ -34,7 +45,19 @@ const HISTORIAL = 20
 const MAX_VUELTAS = 8
 
 type Herramienta = Anthropic.Messages.Tool & { correr: (input: Record<string, unknown>, ctx: Ctx) => Promise<unknown> }
-type Ctx = { tenant: Tenant; idioma: 'es' | 'en'; acciones: AgentAction[]; opciones: string[]; anexos: string[] }
+type Ctx = {
+  tenant: Tenant
+  idioma: 'es' | 'en'
+  acciones: AgentAction[]
+  opciones: string[]
+  anexos: string[]
+  /** Tarjetas con link bajo la respuesta (open_report, borradores). */
+  links: AgentMessageLink[]
+  /** El chat donde corre la conversación (Telegram, Slack). Sin destino es el dashboard. */
+  destino?: { canal: string; id: string }
+  /** La corrida de un pedido programado: no puede programar otro. */
+  programado?: boolean
+}
 
 const numero = (x: unknown) => (typeof x === 'number' ? x : Number(x))
 
@@ -306,12 +329,19 @@ HERRAMIENTAS.push(
       },
       required: ['question', 'why'],
     },
-    async correr(i, { tenant }) {
-      const pregunta = String(i.question ?? '').trim()
+    async correr(i, ctx) {
+      const { tenant, idioma } = ctx
+      const pregunta = String(i.question ?? '').trim().replace(/\s+/g, ' ')
       if (pregunta.length < 8) return { error: 'question is too short' }
-      const r = await tareaConBorrador(tenant, pregunta, typeof i.why === 'string' ? i.why : undefined)
-      if (!r.created && !r.updated) return { id: r.task.id, title: r.task.title, status: r.task.status, note: 'A task for this question already exists and is past "open"; the draft was not changed.' }
-      return { id: r.task.id, title: r.task.title, created: r.created, missingFacts: r.todos, excerpt: r.task.body.split('\n## Draft\n')[1]?.slice(0, 600) }
+      // Una tarea que alguien ya tomó, se verificó o se descartó no se pisa: se dice ya, sin encolar.
+      const previa = (await store.listTasks(tenant.id)).find((t) => t.key === `content:${slugDePregunta(pregunta.slice(0, 200))}`)
+      if (previa && previa.status !== 'open') {
+        ctx.links.push(tarjetaTarea(tenant, previa, idioma))
+        return { id: previa.id, title: previa.title, status: previa.status, note: 'A task for this question already exists and is past "open"; the draft was not changed. Its card is under your message.' }
+      }
+      // Tarda un minuto: corre en segundo plano y avisa en este chat con la tarjeta de la página.
+      const job = await encolarTrabajo(tenant, 'draft_page', { question: pregunta, why: typeof i.why === 'string' ? i.why : undefined }, destinoDeTrabajo(ctx))
+      return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('draft_page', idioma) }
     },
   },
   {
@@ -433,9 +463,13 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
-    'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site and saves it as a task. Tell them what facts are missing, if any. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
+    'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat with its card, missing facts included. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
+    'Short answer, full report behind a card: when you answer about what to publish or which pages to create, give the top one or two in a sentence and call open_report with "opportunities". When you answer about who AI cites instead of them, name the top one or two sites and call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. Never paste long lists or tables: the card opens the full report.',
+    'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
     // M7: comprador misterioso
     'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.',
+    // Reportes programados
+    'For anything the owner wants on a schedule ("every Monday at 8 send me...", "each morning tell me..."), use schedule_report: agent visits summary is kind agent_visits, anything else is kind custom with their request as the prompt.',
     `Reply in ${idioma === 'es' ? 'Spanish (neutral Latin American, tú)' : 'English'} unless the owner writes in another language.`,
   ].join('\n')
 }
@@ -474,6 +508,210 @@ Object.assign(ESTADOS, {
 })
 // ---- fin M7 ----
 
+// ---- reportes programados ----
+HERRAMIENTAS.push({
+  name: 'schedule_report',
+  description: [
+    'Recurring messages to the chat where the owner talks to you (Telegram today). Two kinds:',
+    '- agent_visits: a short summary of agent visits since the last one (who came, payments, top pages, change vs the period before).',
+    '- custom: any recurring request in their words ("every Monday at 8: what moved and what should we do?"). Save in `prompt` only the request, without the schedule words, as they would ask it ("What moved this week and what should we do next?"). At each run you answer that prompt and the answer goes to the same chat.',
+    'Actions: list (what is scheduled and the connected chats), set (create or change one), cancel (by id, or the agent_visits one by kind).',
+    'Times are the owner\'s local clock: hour 0-23, weekday 0 Sunday to 6 Saturday (Monday is 1), day_of_month 1-28, timezone IANA (default America/Bogota; use another only if the owner says where they are or the existing schedule has one).',
+    'If the owner does not say the hour or the day, ask once with offer_choices before calling set. After set, confirm in one sentence with the day, hour and timezone from next_run_local.',
+    'In the dashboard there is no chat here: reports go to a connected Telegram chat. Call list, then offer to set it for one of `destinations` (pass its target), or tell them to connect Telegram in My agent, Telegram section, if there is none.',
+  ].join('\n'),
+  input_schema: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['list', 'set', 'cancel'] },
+      kind: { type: 'string', enum: ['agent_visits', 'custom'] },
+      prompt: { type: 'string', description: 'custom only: the request to answer at each run, without the schedule words. Max 500 characters.' },
+      frequency: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
+      hour: { type: 'integer', minimum: 0, maximum: 23 },
+      weekday: { type: 'integer', minimum: 0, maximum: 6, description: 'weekly only. 0 Sunday, 1 Monday … 6 Saturday.' },
+      day_of_month: { type: 'integer', minimum: 1, maximum: 28, description: 'monthly only.' },
+      timezone: { type: 'string', description: 'IANA zone, e.g. America/Bogota, America/Mexico_City, America/New_York.' },
+      id: { type: 'string', description: 'The schedule id from list: to change or cancel one custom schedule.' },
+      target: { type: 'string', description: 'Only outside a chat (dashboard): the destination target from list.' },
+    },
+    required: ['action'],
+  },
+  async correr(i, ctx) {
+    const { tenant, idioma } = ctx
+    const destinos = await destinosDe(tenant.id)
+    const nombreDe = (channel: string, target: string) => destinos.find((d) => d.channel === channel && d.target === target)?.nombre ?? `${channel} ${target}`
+    const publico = (s: ReportSchedule) => ({
+      id: s.id,
+      kind: s.kind,
+      prompt: s.prompt,
+      frequency: s.frequency,
+      hour: s.hour,
+      weekday: s.weekday,
+      day_of_month: s.dayOfMonth,
+      timezone: s.timezone,
+      destination: nombreDe(s.channel, s.target),
+      here: !!ctx.destino && ctx.destino.canal === s.channel && ctx.destino.id === s.target,
+      next_run_local: `${fechaLocal(s.nextRunAt, s.timezone, idioma)} (${s.timezone})`,
+      last_run_at: s.lastRunAt,
+    })
+    // Dónde: el chat de esta conversación, o el destino que eligió el dueño en el dashboard.
+    const elegido = typeof i.target === 'string' && i.target ? destinos.find((d) => d.target === String(i.target)) : undefined
+    const donde = elegido ? { channel: elegido.channel, target: elegido.target } : ctx.destino && canalReportes(ctx.destino.canal) ? { channel: ctx.destino.canal, target: ctx.destino.id } : null
+    const sinChat = {
+      note: destinos.length
+        ? 'There is no chat in this conversation. Reports go to a connected chat: ask which one of destinations, then call set with its target.'
+        : 'No chat is connected yet. Reports go to a connected Telegram chat: tell the owner to connect one in My agent, Telegram section, then ask you again there or here.',
+      destinations: destinos.map((d) => ({ target: d.target, channel: d.channel, name: d.nombre })),
+    }
+    const todas = await store.listReportSchedules(tenant.id)
+
+    if (i.action === 'list') {
+      return { schedules: todas.map(publico), ...(donde ? { destinations: destinos.map((d) => ({ target: d.target, channel: d.channel, name: d.nombre })) } : sinChat) }
+    }
+
+    if (i.action === 'cancel') {
+      const id = typeof i.id === 'string' ? i.id : undefined
+      const enDonde = donde ? todas.filter((s) => s.channel === donde.channel && s.target === donde.target) : todas
+      let objetivo = id ? todas.filter((s) => s.id === id) : i.kind ? enDonde.filter((s) => s.kind === i.kind) : enDonde
+      if (!id && i.kind === 'custom' && objetivo.length > 1) objetivo = []
+      if (objetivo.length !== 1 && !(i.kind === 'agent_visits' && objetivo.length > 0)) {
+        return { error: objetivo.length ? 'ambiguous: pass the id' : 'nothing to cancel', schedules: enDonde.map(publico) }
+      }
+      for (const s of objetivo) await store.deleteReportSchedules(tenant.id, { id: s.id })
+      return { cancelled: objetivo.map(publico) }
+    }
+
+    if (i.action !== 'set') return { error: 'action must be list, set or cancel' }
+    if (ctx.programado) return { error: 'This is a scheduled run: answer the request, do not schedule anything.' }
+    if (!donde) return { error: 'no-chat', ...sinChat }
+    const kind: ReportKind = i.kind === 'custom' ? 'custom' : 'agent_visits'
+    const prompt = kind === 'custom' ? String(i.prompt ?? '').trim().slice(0, 500) : null
+    if (kind === 'custom' && !prompt) return { error: 'custom needs the prompt: the request to answer at each run' }
+    const previa = typeof i.id === 'string' ? todas.find((s) => s.id === i.id) : kind === 'agent_visits' ? todas.find((s) => s.kind === 'agent_visits' && s.channel === donde.channel && s.target === donde.target) : todas.find((s) => s.kind === 'custom' && s.channel === donde.channel && s.target === donde.target && s.prompt === prompt)
+    if (typeof i.id === 'string' && !previa) return { error: 'unknown id', schedules: todas.map(publico) }
+    if (kind === 'custom' && !previa && todas.filter((s) => s.kind === 'custom' && s.channel === donde.channel && s.target === donde.target).length >= MAX_CUSTOM) {
+      return { error: `at most ${MAX_CUSTOM} custom schedules per chat: cancel one first`, schedules: todas.map(publico) }
+    }
+    const agenda = validarAgenda({
+      frequency: i.frequency ?? previa?.frequency,
+      hour: i.hour ?? previa?.hour,
+      weekday: i.weekday ?? previa?.weekday,
+      dayOfMonth: i.day_of_month ?? previa?.dayOfMonth,
+      timezone: i.timezone ?? previa?.timezone,
+    })
+    if ('error' in agenda) return agenda
+    const guardada = await store.upsertReportSchedule({
+      id: previa?.id,
+      tenantId: tenant.id,
+      channel: previa?.channel ?? donde.channel,
+      target: previa?.target ?? donde.target,
+      kind,
+      prompt,
+      ...agenda,
+      weekday: agenda.weekday ?? null,
+      dayOfMonth: agenda.dayOfMonth ?? null,
+      nextRunAt: proximaCorrida(agenda).toISOString(),
+    })
+    return { saved: publico(guardada), updated: !!previa }
+  },
+})
+ESTADOS.schedule_report = { es: 'Programando el envío…', en: 'Scheduling it…' }
+
+// ---- tarjetas, trabajos largos y voz ----
+/** A dónde avisa un trabajo largo: el chat de esta conversación, o el dashboard. */
+function destinoDeTrabajo(ctx: Ctx): AgentJobDestino {
+  return ctx.destino ? { ...ctx.destino, idioma: ctx.idioma } : { canal: 'dashboard', id: 'dashboard', idioma: ctx.idioma }
+}
+
+HERRAMIENTAS.push(
+  {
+    name: 'open_report',
+    description:
+      'Put a card under your reply that opens a full report in the Peaje dashboard. "opportunities": the ranked pages worth creating, each with why, the format to use and its task. "citations": who AI assistants cite instead of the business, question by question and engine by engine, plus the formats that win. "task": one task with its full page draft (needs task_id). Use it so your reply can stay short.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        report: { type: 'string', enum: [...REPORTES, 'task'] },
+        task_id: { type: 'string', description: 'Only for report "task": from list_tasks' },
+      },
+      required: ['report'],
+    },
+    async correr(i, ctx) {
+      if (i.report === 'task') {
+        const t = await store.getTask(ctx.tenant.id, String(i.task_id ?? ''))
+        if (!t) return { error: 'task not found; call list_tasks' }
+        ctx.links.push(tarjetaTarea(ctx.tenant, t, ctx.idioma))
+        return { shown: 'task', title: t.title }
+      }
+      const r = REPORTES.find((x) => x === i.report)
+      if (!r) return { error: 'report must be opportunities, citations or task' }
+      ctx.links.push(tarjetaReporte(ctx.tenant, r, ctx.idioma))
+      return { shown: r }
+    },
+  },
+  {
+    name: 'draft_page_series',
+    description:
+      'Plan and write a set of pages on one topic: one main page that covers it and 3 to 5 pages that each answer one concrete question, linked to each other, each in the format AI assistants cite for similar questions and in the business\'s voice. Saves one content task per page. Runs in the background (a few minutes) and posts the cards in this chat when done. Costs money: only when the owner wants a set of pages, not one.',
+    input_schema: {
+      type: 'object',
+      properties: { topic: { type: 'string', description: 'The topic in the owner\'s words, e.g. "pricing for small teams"' } },
+      required: ['topic'],
+    },
+    async correr(i, ctx) {
+      const tema = String(i.topic ?? '').trim()
+      if (tema.length < 3) return { error: 'topic is too short' }
+      const job = await encolarTrabajo(ctx.tenant, 'page_series', { topic: tema.slice(0, 200) }, destinoDeTrabajo(ctx))
+      return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('page_series', ctx.idioma) }
+    },
+  },
+  {
+    name: 'get_voice_profile',
+    description: "How the business writes on its own site (language, formality, how it addresses the reader, sentence length, words it uses and avoids, sample sentences quoted from the site). Page drafts follow it. Built from the site the first time and refreshed monthly unless the owner edited it.",
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant }) {
+      const p = await perfilDeVoz(tenant)
+      return p ?? { error: 'could not read enough of the site to describe its voice' }
+    },
+  },
+  {
+    name: 'update_voice_profile',
+    description: 'Change the voice profile when the owner corrects how they write. Only pass the fields that change. Lists replace the old list. After this, drafts use the new voice and the monthly refresh no longer overwrites it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        language: { type: 'string' },
+        formality: { type: 'string' },
+        person: { type: 'string', description: 'How they address the reader, e.g. "usted", "tú", "you, we"' },
+        sentenceLength: { type: 'string' },
+        uses: { type: 'array', items: { type: 'string' } },
+        avoids: { type: 'array', items: { type: 'string' } },
+        samples: { type: 'array', items: { type: 'string' }, description: 'Sentences the owner wrote themselves' },
+        notes: { type: 'string', description: "The owner's correction in one line" },
+      },
+    },
+    async correr(i, { tenant }) {
+      return { saved: await guardarPerfilDeVoz(tenant, i as CambioDeVoz) }
+    },
+  },
+)
+Object.assign(ESTADOS, {
+  draft_page: { es: 'Empezando la página…', en: 'Starting the page…' },
+  draft_page_series: { es: 'Empezando la serie de páginas…', en: 'Starting the page series…' },
+  open_report: { es: 'Preparando el reporte…', en: 'Getting the report ready…' },
+  get_voice_profile: { es: 'Mirando cómo escribes en tu sitio…', en: 'Looking at how you write on your site…' },
+  update_voice_profile: { es: 'Guardando cómo escribes…', en: 'Saving how you write…' },
+})
+// ---- fin tarjetas, trabajos y voz ----
+
+/** Solo para scripts de prueba: corre una herramienta sin pasar por el modelo. */
+export function probarHerramienta(nombre: string, input: Record<string, unknown>, ctx: { tenant: Tenant; idioma: 'es' | 'en'; destino?: { canal: string; id: string }; programado?: boolean }) {
+  const h = HERRAMIENTAS.find((x) => x.name === nombre)
+  if (!h) throw new Error(`unknown tool ${nombre}`)
+  return h.correr(input, { acciones: [], opciones: [], anexos: [], links: [], ...ctx })
+}
+// ---- fin reportes programados ----
+
 let anthropic: Anthropic | null = null
 
 /** Límite de gasto: 40 mensajes por hora por negocio. */
@@ -490,7 +728,15 @@ function dentroDelLimite(tenantId: string): boolean {
 export async function conversar(
   tenant: Tenant,
   texto: string,
-  opciones: { idioma: 'es' | 'en'; canal?: string; alEstado?: (estado: string) => void },
+  opciones: {
+    idioma: 'es' | 'en'
+    canal?: string
+    alEstado?: (estado: string) => void
+    /** El chat de esta conversación (Telegram: el chat id). Lo usan los reportes programados. */
+    destino?: { canal: string; id: string }
+    /** True cuando lo corre un reporte programado (kind custom). */
+    programado?: boolean
+  },
 ): Promise<AgentMessage> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
   // ---- M9: el chat es Pro; el tope mensual sale del plan ----
@@ -516,7 +762,7 @@ export async function conversar(
     ...previos.map((m) => ({ role: m.role, content: m.text || '(empty)' }) as Anthropic.Messages.MessageParam),
     { role: 'user', content: texto.slice(0, 4_000) },
   ]
-  const ctx: Ctx = { tenant, idioma: opciones.idioma, acciones: [], opciones: [], anexos: [] }
+  const ctx: Ctx = { tenant, idioma: opciones.idioma, acciones: [], opciones: [], anexos: [], links: [], destino: opciones.destino, programado: opciones.programado }
   const tienePlan = (await store.getPlan(tenant.id)) !== null
   anthropic ??= new Anthropic()
 
@@ -572,6 +818,7 @@ export async function conversar(
     text: respuesta || (opciones.idioma === 'es' ? 'No pude terminar la respuesta. Prueba de nuevo.' : 'I could not finish the answer. Try again.'),
     actions: ctx.acciones,
     options: ctx.opciones,
+    links: ctx.links.filter((l, i, a) => a.findIndex((x) => x.url === l.url) === i).slice(0, 8),
     channel: canal,
   })
 }

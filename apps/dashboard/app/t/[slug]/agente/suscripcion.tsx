@@ -90,12 +90,12 @@ function Opciones({ slug, billing, fecha }: { slug: string; billing: EstadoBilli
       <div className="space-y-2">
         <p className="text-sm text-muted">{t.planSaldo(Number(billing.balanceAvailable).toFixed(2))}</p>
         <div className="flex flex-wrap gap-3">
-          {planes.map((plan) => (
+          {planes.map((plan, i) => (
             <button
               key={plan}
               disabled={pending}
               onClick={() => pagar(plan)}
-              className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+              className={`btn ${i === 0 ? 'btn-primario' : 'btn-secundario'}`}
             >
               {pending ? t.planPagando : `${t.planPagarSaldo} · ${t.planNombres[plan]} US$${billing.prices[plan].charged}`}
             </button>
@@ -147,7 +147,7 @@ function Enlace({ etiqueta, url }: { etiqueta: string; url: string }) {
     <div className="flex flex-wrap items-center gap-2">
       <span className="w-16 text-xs text-muted">{etiqueta}</span>
       <code className="min-w-0 flex-1 break-all border border-border px-2 py-1 font-mono text-xs">{url}</code>
-      <button onClick={copiar} className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-text hover:text-bg">
+      <button onClick={copiar} className="btn btn-secundario btn-chico">
         {copiado ? t.planCopiado : t.planCopiar}
       </button>
     </div>
@@ -160,7 +160,7 @@ export function Bloqueado() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-border p-4">
       <p className="text-sm text-muted">{t.bloqueado}</p>
-      <a href="#plan" className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg">
+      <a href="#plan" className="btn btn-primario">
         {t.bloqueadoCta}
       </a>
     </div>

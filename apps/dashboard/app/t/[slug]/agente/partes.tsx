@@ -6,8 +6,8 @@ import { useDict, useLocale } from '@/lib/i18n/client'
 import { buscarTareasAhora, crearClaveAgente, descartarTarea, tareaHecha } from './actions'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
-const boton = 'rounded-lg border border-border px-3 py-1.5 text-sm hover:text-text disabled:opacity-50'
-const input = 'w-full rounded-none border border-border bg-bg px-3 py-1.5 font-mono text-sm outline-none focus:border-text'
+const boton = 'btn btn-secundario btn-chico'
+const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-sm outline-none focus:border-text'
 
 export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefijo: string | null; mcpUrl: string; gateway: string }) {
   const { miAgente: t } = useDict()
@@ -59,7 +59,7 @@ export function Buscar({ slug }: { slug: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <button
         disabled={pending}
-        className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+        className="btn btn-primario"
         onClick={() =>
           start(async () => {
             setMsj(null)
@@ -166,7 +166,7 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
       </dl>
       {tarea.note ? <p className="text-xs text-muted">{tarea.note}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button className="rounded-lg bg-text px-3 py-1.5 text-sm font-medium text-bg" onClick={copiar}>
+        <button className="btn btn-primario btn-chico" onClick={copiar}>
           {copiado ? t.copiado : t.copiarIA}
         </button>
         <button className={boton} onClick={() => setAbierto(!abierto)}>
@@ -190,7 +190,7 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
           />
           <button
             disabled={pending}
-            className="rounded-lg bg-text px-3 py-1.5 text-sm text-bg disabled:opacity-50"
+            className="btn btn-primario btn-chico"
             onClick={() => correr(() => (modo === 'hecha' ? tareaHecha(slug, tarea.id, valor) : descartarTarea(slug, tarea.id, valor)))}
           >
             {modo === 'hecha' ? t.verificar : t.noSirve}

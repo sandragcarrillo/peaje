@@ -63,7 +63,7 @@ export function EnviarPanel({
       <div className="rounded-lg border border-border bg-panel p-5">
         <div className="flex items-center justify-between">
           <span className="font-mono text-sm">{shortWallet(address)}</span>
-          <button type="button" onClick={copiar} className="text-xs text-accent hover:underline">
+          <button type="button" onClick={copiar} className="btn btn-secundario btn-chico">
             {copiado ? d.dinero.copiada : d.dinero.copiarAddress}
           </button>
         </div>
@@ -127,7 +127,7 @@ export function EnviarPanel({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-text px-4 py-2.5 text-sm font-medium text-bg disabled:opacity-50"
+            className="btn btn-primario"
           >
             {pending ? d.dinero.enviando : d.dinero.enviar}
           </button>

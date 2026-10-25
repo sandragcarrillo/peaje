@@ -58,7 +58,7 @@ export function LinksPanel({
                   <button
                     disabled={pending}
                     onClick={() => startTransition(async () => borrarLink(slug, r.id))}
-                    className="font-mono text-[11px] uppercase text-muted hover:text-red-600 disabled:opacity-50"
+                    className="btn btn-secundario btn-chico hover:text-red-600"
                   >
                     {d.linksQuitar}
                   </button>
@@ -92,7 +92,7 @@ export function LinksPanel({
             name="url"
             required
             placeholder={d.linksUrlPlaceholder}
-            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+            className="mt-1 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <label className="w-40">
@@ -100,7 +100,7 @@ export function LinksPanel({
           <input
             name="title"
             placeholder={d.linksTituloPlaceholder}
-            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+            className="mt-1 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <label className="w-28">
@@ -111,12 +111,12 @@ export function LinksPanel({
             step="0.001"
             min="0"
             placeholder={d.linksPrecioPlaceholder}
-            className="mt-1 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+            className="mt-1 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
         </label>
         <button
           disabled={pending}
-          className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+          className="btn btn-primario"
         >
           {d.linksAgregar}
         </button>
@@ -161,7 +161,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
           value={urlSitemap}
           onChange={(e) => setUrlSitemap(e.target.value)}
           placeholder={d.sitemapPlaceholder}
-          className="min-w-72 flex-1 rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+          className="min-w-72 flex-1 border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
         />
         <button
           disabled={pending || !urlSitemap.trim()}
@@ -177,7 +177,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
               }
             })
           }}
-          className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
+          className="btn btn-secundario"
         >
           {pending && !items ? d.sitemapLeyendo : d.sitemapLeer}
         </button>
@@ -189,7 +189,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
             placeholder={d.sitemapBuscar}
-            className="mb-2 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+            className="mb-2 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
           <div className="flex items-center justify-between text-xs text-muted">
             <span className="flex items-center gap-2">
@@ -205,14 +205,14 @@ function ImportarSitemap({ slug }: { slug: string }) {
                     ),
                   )
                 }
-                className="text-accent hover:underline"
+                className="btn btn-secundario btn-chico"
               >
                 {d.sitemapTodas}
               </button>
               <button
                 type="button"
                 onClick={() => setSeleccion(new Set())}
-                className="text-accent hover:underline"
+                className="btn btn-secundario btn-chico"
               >
                 {d.sitemapNinguna}
               </button>
@@ -270,7 +270,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
                 }
               })
             }}
-            className="mt-3 rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50"
+            className="btn btn-primario mt-3"
           >
             {d.sitemapImportar(seleccion.size)}
           </button>

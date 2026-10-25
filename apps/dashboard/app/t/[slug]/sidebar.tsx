@@ -104,7 +104,7 @@ export function Sidebar({
       <div className="space-y-4 border-t border-border pt-4">
         <Link
           href={`${base}/rutas`}
-          className="flex w-full items-center justify-center gap-2 bg-negro px-3 py-2 font-mono text-xs font-bold tracking-[0.1em] text-white uppercase transition-colors hover:bg-tinta"
+          className="btn btn-primario btn-chico btn-ancho"
         >
           <span>{d.panel.sidebarNuevaRuta}</span>
           <span className="text-accent">+</span>

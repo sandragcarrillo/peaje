@@ -15,7 +15,7 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="text-xs text-muted hover:text-text hover:underline"
+        className="btn btn-secundario btn-chico"
       >
         {d.panel.cambiarWalletRetiro}
       </button>
@@ -47,7 +47,7 @@ export function WalletForm({ slug, wallet }: { slug: string; wallet: string | nu
         />
         <button
           disabled={pending}
-          className="rounded-lg border border-border px-4 py-2 text-sm disabled:opacity-50"
+          className="btn btn-primario"
         >
           {d.panel.guardar}
         </button>

@@ -41,8 +41,37 @@ export type Tenant = {
   /** Fin de la prueba de 14 días de Pro. */
   trialUntil: string | null
   // ---- fin M9 ----
+  // ---- voz de marca ----
+  /** Cómo escribe el negocio, leído de su sitio (o editado por el dueño). Lo usan los borradores. */
+  voiceProfile: VoiceProfile | null
+  voiceProfileAt: string | null
+  // ---- fin voz ----
   createdAt: string
 }
+
+// ---- voz de marca ----
+/** Perfil compacto de la voz del negocio. Las frases de muestra son citas literales del sitio. */
+export type VoiceProfile = {
+  /** Idioma principal del sitio, p. ej. "es" o "en". */
+  language: string
+  /** p. ej. "casual", "neutral", "formal". */
+  formality: string
+  /** Cómo le habla al lector: "tú", "usted", "vos", "you", "we"... en palabras simples. */
+  person: string
+  /** "short", "medium" o "long", con una nota si hace falta. */
+  sentenceLength: string
+  /** Palabras o giros que el negocio repite. */
+  uses: string[]
+  /** Palabras o tonos que el negocio no usa. */
+  avoids: string[]
+  /** Hasta 3 frases cortas copiadas tal cual del sitio. */
+  samples: string[]
+  /** Una línea libre (lo que el dueño agregue). */
+  notes?: string
+  /** El dueño lo editó: el refresco automático no lo pisa. */
+  editedByOwner?: boolean
+}
+// ---- fin voz ----
 
 /** Lo que el formulario del kit puede cambiar del tenant. */
 export type TenantEntityUpdate = Partial<
@@ -314,11 +343,42 @@ export type AgentMessage = {
   actions: AgentAction[]
   /** Respuestas rápidas que el agente ofrece; tocar una la manda como mensaje. */
   options: string[]
+  /** Tarjetas bajo el mensaje: el reporte completo, la tarea o la página, con su link. */
+  links: AgentMessageLink[]
   channel: string
   createdAt: string
 }
 
-export type NewAgentMessage = Pick<AgentMessage, 'tenantId' | 'role' | 'text'> & { actions?: AgentAction[]; options?: string[]; channel?: string }
+/** Una tarjeta con link que el agente deja bajo su respuesta corta. */
+export type AgentMessageLink = { label: string; url: string; kind?: 'report' | 'task' | 'page' }
+
+export type NewAgentMessage = Pick<AgentMessage, 'tenantId' | 'role' | 'text'> & { actions?: AgentAction[]; options?: string[]; links?: AgentMessageLink[]; channel?: string }
+
+// ---- trabajos largos del agente (borradores, series de páginas) ----
+
+export const AGENT_JOB_STATUSES = ['queued', 'running', 'done', 'failed'] as const
+export type AgentJobStatus = (typeof AGENT_JOB_STATUSES)[number]
+
+/** A dónde avisar cuando termina: el canal y su id (chat de Telegram, canal de Slack, 'dashboard'). */
+export type AgentJobDestino = { canal: string; id: string; idioma?: 'es' | 'en' }
+
+export type AgentJob = {
+  id: string
+  tenantId: string
+  kind: string
+  status: AgentJobStatus
+  input: Record<string, unknown>
+  result: Record<string, unknown> | null
+  error: string | null
+  destino: AgentJobDestino | null
+  /** Veces que se tomó: un trabajo que quedó colgado por un reinicio se reintenta una vez. */
+  attempts: number
+  createdAt: string
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export type NewAgentJob = Pick<AgentJob, 'tenantId' | 'kind' | 'input'> & { destino?: AgentJobDestino | null }
 
 // ---- medición de citación ----
 
@@ -335,11 +395,25 @@ export type CitationRun = {
   cited: boolean
   mentioned: boolean
   domains: string[]
+  /** Las páginas citadas completas, en orden. Corridas anteriores al 24 oct 2026 vienen vacías. */
+  pages: CitedPage[]
   answerExcerpt: string | null
   error: string | null
 }
 
-export type NewCitationRun = Omit<CitationRun, 'id' | 'runAt'>
+/** Formato de una página citada: lo que la IA eligió para contestar. */
+export const PAGE_FORMATS = ['guide', 'roundup', 'comparison', 'research', 'docs', 'forum', 'video', 'news', 'product', 'other'] as const
+export type PageFormat = (typeof PAGE_FORMATS)[number]
+
+export type CitedPage = {
+  /** null cuando el motor no da la dirección real (Gemini). */
+  url: string | null
+  title: string | null
+  domain: string
+  format: PageFormat | null
+}
+
+export type NewCitationRun = Omit<CitationRun, 'id' | 'runAt' | 'pages'> & { pages?: CitedPage[] }
 
 // ---- M6: ciclo cerrado (re-medición a 2 y 6 semanas de una tarea verificada) ----
 
@@ -377,6 +451,69 @@ export type TaskFollowup = {
 // ---- Telegram ----
 
 export type TelegramLink = { chatId: number; tenantId: string; username: string | null; language: string; linkedAt: string; active: boolean }
+
+// ---- Slack ----
+
+/** Una instalación de la app de Peaje en un workspace. `botTokenEnc` va cifrado por el gateway. */
+export type SlackInstall = {
+  teamId: string
+  teamName: string | null
+  enterpriseId: string | null
+  botTokenEnc: string
+  botUserId: string
+  /** El único que aprueba cambios de precio o de rutas desde Slack. */
+  installerUserId: string
+  installedAt: string
+}
+
+/** Un canal (o DM) conectado a un negocio. Varios negocios por canal, uno activo. */
+export type SlackLink = { teamId: string; channelId: string; tenantId: string; language: string; linkedBy: string | null; linkedAt: string; active: boolean }
+
+/** Código de un solo uso: lo crea el dashboard, el OAuth lo ata a workspace e instalador. */
+export type SlackCode = { code: string; tenantId: string; language: string; teamId: string | null; userId: string | null; expiresAt: string }
+// ---- fin Slack ----
+
+// ---- reportes programados (Telegram hoy, Slack después) ----
+
+export const REPORT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
+export type ReportFrequency = (typeof REPORT_FREQUENCIES)[number]
+/** agent_visits: el resumen de visitas de agentes. custom: un pedido en palabras del dueño que corre el agente. */
+export const REPORT_KINDS = ['agent_visits', 'custom'] as const
+export type ReportKind = (typeof REPORT_KINDS)[number]
+
+export type ReportSchedule = {
+  id: string
+  tenantId: string
+  /** 'telegram' hoy; 'slack' después. Lo resuelve el registro de canales del gateway. */
+  channel: string
+  /** Dónde se entrega dentro del canal: el chat id de Telegram, el canal de Slack. */
+  target: string
+  kind: ReportKind
+  /** Solo custom: lo que el agente responde en cada corrida. Null en agent_visits. */
+  prompt: string | null
+  frequency: ReportFrequency
+  /** Hora local 0-23 en `timezone`. */
+  hour: number
+  /** Solo weekly: 0 domingo … 6 sábado. */
+  weekday: number | null
+  /** Solo monthly: 1-28. */
+  dayOfMonth: number | null
+  /** IANA, p. ej. America/Bogota. */
+  timezone: string
+  active: boolean
+  nextRunAt: string
+  lastRunAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ReportScheduleInput = Pick<ReportSchedule, 'tenantId' | 'channel' | 'target' | 'kind' | 'frequency' | 'hour' | 'weekday' | 'dayOfMonth' | 'timezone' | 'nextRunAt'> & {
+  prompt?: string | null
+  active?: boolean
+  /** Para editar un custom puntual. Sin id, agent_visits pisa el que ya hay para ese destino. */
+  id?: string
+}
+// ---- fin reportes programados ----
 
 // ---- monitoreo: una corrida del verificador por tenant ----
 
@@ -506,6 +643,25 @@ export type VisitStats = {
   agentWallets: string[]
 }
 
+// ---- radar público: leads ----
+
+/** Quien dejó su email en el radar para medir un dominio. Una fila por (email, dominio). */
+export type RadarLead = {
+  id: string
+  email: string
+  domain: string
+  source: string
+  locale: string
+  /** Aceptó tips ocasionales. El reporte del dominio sale igual. */
+  marketingConsent: boolean
+  lastReportAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type NewRadarLead = Pick<RadarLead, 'email' | 'domain' | 'locale' | 'marketingConsent'> & { source?: string }
+// ---- fin radar ----
+
 /** Contrato de persistencia. Lo implementan MemoryStore y SupabaseStore. */
 export interface Store {
   // tenants
@@ -536,6 +692,23 @@ export interface Store {
   clearMessages(tenantId: string): Promise<void>
   /** Mensajes del dueño desde una fecha: el tope mensual del chat. */
   countUserMessagesSince(tenantId: string, since: string): Promise<number>
+  // ---- trabajos largos del agente ----
+  createJob(input: NewAgentJob): Promise<AgentJob>
+  getJob(id: string): Promise<AgentJob | null>
+  listJobs(tenantId: string, limit: number): Promise<AgentJob[]>
+  /**
+   * Toma el trabajo en cola más viejo: pasa de 'queued' a 'running' solo si
+   * nadie lo tomó antes (UPDATE condicional). Null si no hay ninguno libre.
+   */
+  claimNextJob(kinds: string[]): Promise<AgentJob | null>
+  finishJob(id: string, patch: { status: 'done' | 'failed'; result?: Record<string, unknown> | null; error?: string | null }): Promise<AgentJob>
+  /** Trabajos en 'running' desde antes de `before` (un reinicio los dejó colgados). */
+  listStaleJobs(before: string): Promise<AgentJob[]>
+  /** Devuelve un trabajo colgado a la cola, solo si sigue en 'running'. */
+  requeueJob(id: string): Promise<void>
+  // ---- voz de marca ----
+  /** Guarda (o borra con null) el perfil de voz del negocio. */
+  setTenantVoiceProfile(tenantId: string, profile: VoiceProfile | null): Promise<void>
   listCitationPrompts(tenantId: string): Promise<CitationPrompt[]>
   addCitationPrompts(tenantId: string, texts: string[], source: CitationPrompt['source']): Promise<CitationPrompt[]>
   removeCitationPrompt(tenantId: string, id: string): Promise<void>
@@ -555,6 +728,45 @@ export interface Store {
   setActiveTelegram(chatId: number, tenantId: string): Promise<void>
   listTelegramLinks(tenantId: string): Promise<TelegramLink[]>
   unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void>
+  // ---- Slack ----
+  createSlackCode(tenantId: string, code: string, expiresAt: string, language: string): Promise<void>
+  /** El código si existe y no venció (no lo consume). */
+  getSlackCode(code: string): Promise<SlackCode | null>
+  /** Después del OAuth: ata el código al workspace y a quien instaló, y alarga su vencimiento. */
+  bindSlackCode(code: string, teamId: string, userId: string, expiresAt: string): Promise<void>
+  /** Consume el código pendiente más nuevo de esa persona en ese workspace. */
+  consumeSlackCode(teamId: string, userId: string): Promise<SlackCode | null>
+  /** Crea o pisa la instalación del workspace. */
+  saveSlackInstall(install: Omit<SlackInstall, 'installedAt'>): Promise<void>
+  getSlackInstall(teamId: string): Promise<SlackInstall | null>
+  /** Borra la instalación y los canales de ese workspace (app desinstalada). */
+  deleteSlackInstall(teamId: string): Promise<void>
+  /** Liga el negocio al canal y lo deja activo (los otros del canal quedan inactivos). */
+  linkSlack(link: Omit<SlackLink, 'linkedAt' | 'active'>): Promise<void>
+  /** El negocio activo del canal. */
+  getSlackLink(teamId: string, channelId: string): Promise<SlackLink | null>
+  listSlackChannel(teamId: string, channelId: string): Promise<SlackLink[]>
+  setActiveSlack(teamId: string, channelId: string, tenantId: string): Promise<void>
+  listSlackLinks(tenantId: string): Promise<SlackLink[]>
+  unlinkSlack(filter: { tenantId?: string; teamId?: string; channelId?: string }): Promise<void>
+  /** Marca el evento como visto. False si ya estaba (reintento de Slack). */
+  claimSlackEvent(eventId: string): Promise<boolean>
+  // ---- fin Slack ----
+  // ---- reportes programados ----
+  listReportSchedules(tenantId: string): Promise<ReportSchedule[]>
+  /** Con id edita ese; sin id, agent_visits pisa el del mismo (canal, destino) y custom crea uno nuevo. Conserva last_run_at. */
+  upsertReportSchedule(input: ReportScheduleInput): Promise<ReportSchedule>
+  /** Borra los del negocio que coincidan con el filtro. Devuelve cuántos. */
+  deleteReportSchedules(tenantId: string, filter: { id?: string; channel?: string; target?: string; kind?: ReportKind }): Promise<number>
+  /** Activos con next_run_at <= now, el más atrasado primero. */
+  listDueReportSchedules(now: string, limit?: number): Promise<ReportSchedule[]>
+  /**
+   * Toma la corrida: pone last_run_at y el próximo next_run_at solo si
+   * next_run_at sigue siendo `previousNextRunAt`. True si esta llamada la
+   * tomó; dos crons a la vez no mandan dos veces.
+   */
+  markReportScheduleSent(id: string, run: { previousNextRunAt: string; sentAt: string; nextRunAt: string }): Promise<boolean>
+  // ---- fin reportes programados ----
   getPlan(tenantId: string): Promise<AgentPlan | null>
   /** Reemplaza el plan del negocio (uno por negocio). */
   savePlan(plan: NewAgentPlan): Promise<AgentPlan>
@@ -662,7 +874,8 @@ export interface Store {
   recordVisit(visit: NewVisit): Promise<void>
   /** Inserta en lote: el gateway acumula y descarga cada 2 s o 50 filas. */
   recordVisits(visits: NewVisit[]): Promise<void>
-  visitStats(tenantId: string, opts: { days: number }): Promise<VisitStats>
+  /** Ventana de `days` hasta ahora; con `from` (y opcional `to`, exclusivo) una ventana exacta. */
+  visitStats(tenantId: string, opts: { days: number; from?: string; to?: string }): Promise<VisitStats>
   /** Pago por referencia de receipt: liga la visita con el ledger. */
   findPaymentByReceiptRef(receiptRef: string): Promise<Payment | null>
 
@@ -680,6 +893,18 @@ export interface Store {
   /** Negocios distintos que pagaron founder alguna vez: el cupo es 50. */
   countFounders(): Promise<number>
   // ---- fin M9 ----
+
+  // ---- radar público: leads ----
+  /** Crea o actualiza el lead (email, dominio): pisa locale y consentimiento, conserva created_at. */
+  upsertRadarLead(input: NewRadarLead): Promise<RadarLead>
+  getRadarLead(email: string, domain: string): Promise<RadarLead | null>
+  /**
+   * Toma el envío del reporte: marca last_report_at = ahora solo si el último
+   * fue antes de `notSince` (o nunca). Devuelve el lead si lo tomó, null si
+   * ya se mandó hace poco o no existe. Dos pedidos a la vez no mandan dos correos.
+   */
+  claimRadarReport(email: string, domain: string, notSince: string): Promise<RadarLead | null>
+  // ---- fin radar ----
 }
 
 // ---- M9: cobro del agente Pro ----

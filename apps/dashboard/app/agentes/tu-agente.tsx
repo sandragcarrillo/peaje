@@ -143,7 +143,7 @@ function CabeceraAgente({
             type="button"
             onClick={copiar}
             title={d.agentes.copiarWallet}
-            className="mt-1 font-mono text-xs text-muted hover:text-text"
+            className="btn btn-secundario btn-chico mt-1"
           >
             {shortWallet(agente.walletAddress)} ⧉
           </button>
@@ -310,13 +310,13 @@ function Ask({
           onChange={(e) => setTexto(e.target.value)}
           rows={2}
           placeholder={d.agentes.askPlaceholder}
-          className="w-full rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+          className="w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
         />
         <button
           type="button"
           onClick={buscar}
           disabled={estado !== 'idle' || texto.trim().length < 5}
-          className="shrink-0 self-start border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+          className="btn btn-primario shrink-0 self-start"
         >
           {estado === 'buscando' ? d.agentes.buscando : d.agentes.buscar}
         </button>
@@ -333,11 +333,11 @@ function Ask({
                 key={c.id}
                 type="button"
                 onClick={() => setTexto(d.agentes.capPedido[c.id] ?? '')}
-                className="rounded-full border border-border px-3 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-text"
+                className="btn btn-secundario btn-chico text-muted hover:text-text"
               >
                 {d.agentes.capNombre[c.id] ?? c.id}
                 {c.precioDesde !== null ? (
-                  <span className="ml-1.5 font-mono text-[10px] text-accent">
+                  <span className="font-mono text-[10px] text-accent">
                     {d.agentes.capDesde(microMoney(c.precioDesde))}
                   </span>
                 ) : null}
@@ -452,7 +452,7 @@ function PlanCard({
           type="button"
           onClick={onComprar}
           disabled={comprando || !elegido.url}
-          className="border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+          className="btn btn-primario"
         >
           {comprando
             ? d.agentes.comprando
@@ -503,7 +503,7 @@ function BotonChico({
       onClick={onClick}
       disabled={disabled}
       title={titulo}
-      className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-text disabled:opacity-40"
+      className="btn btn-secundario btn-chico"
     >
       {cargando ? '…' : children}
     </button>
@@ -544,7 +544,7 @@ export function ActivarAgente({ negocio }: { negocio: Negocio }) {
         type="button"
         onClick={activar}
         disabled={pending}
-        className="mt-5 border border-text bg-negro px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+        className="btn btn-primario mt-5"
       >
         {pending ? d.agentes.activando : d.agentes.activar}
       </button>

@@ -88,6 +88,101 @@
   --font-mono: var(--font-chrome);
 }
 
+/*
+ * Bordes apenas redondeados en toda la app (cajas, campos, botones,
+ * desplegables). Va en la capa base: un `rounded-*` explícito en un
+ * componente sigue mandando (por ejemplo `rounded-full` en los puntos).
+ */
+@layer base {
+  :root {
+    --radio: 6px;
+  }
+  .border,
+  button,
+  input,
+  select,
+  textarea,
+  details {
+    border-radius: var(--radio);
+  }
+}
+
+@theme {
+  --radius-lg: 6px;
+}
+
+/*
+ * Botones: un solo sistema, el del Radar. Mono en negrita, mayúsculas y
+ * minúsculas (nunca todo en mayúscula), bordes de 6px.
+ *   .btn + .btn-primario   tinta sobre crema (o al revés en oscuro), con el punto verde
+ *   .btn + .btn-secundario solo borde
+ *   .btn-chico             para acciones dentro de tarjetas, tablas y barras
+ *   .btn-ancho             ocupa todo el ancho (formularios)
+ *   .btn-icono             cuadrado, para íconos (tema, idioma)
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radio);
+    padding: 0.7rem 1.25rem;
+    font-family: var(--font-chrome), ui-monospace, monospace;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms, color 120ms, opacity 120ms;
+  }
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .btn-primario {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--bg);
+  }
+  .btn-primario::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    background: var(--accent);
+  }
+  .btn-primario:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  .btn-secundario {
+    background: transparent;
+    color: var(--text);
+  }
+  .btn-secundario:hover:not(:disabled) {
+    border-color: var(--text);
+  }
+  .btn-chico {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn-ancho {
+    width: 100%;
+  }
+  .btn-icono {
+    padding: 0.5rem;
+    aspect-ratio: 1;
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--text);

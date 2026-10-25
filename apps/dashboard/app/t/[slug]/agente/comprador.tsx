@@ -97,7 +97,7 @@ export function CompradorPanel({ slug, run }: { slug: string; run: MysteryRun | 
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={probar} disabled={pending} className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50">
+        <button onClick={probar} disabled={pending} className="btn btn-primario">
           {pending ? t.compProbando : t.compProbar}
         </button>
       </div>

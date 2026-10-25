@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { getDict } from '@/lib/i18n'
 import { escanear } from '@/lib/ora'
@@ -24,6 +24,9 @@ export async function medirDominio(entrada: string): Promise<{ ok: boolean; erro
   const { radar: d } = await getDict()
   const dominio = dominioDeRadar(entrada)
   if (!dominio) return { ok: false, error: d.invalido }
+  // Medir pide correo (lo deja registrarLead en esta cookie). La página ya
+  // muestra el formulario, pero la acción se puede llamar sola: se cierra acá.
+  if (!(await cookies()).get('peaje_radar_email')?.value) return { ok: false, error: d.sinCorreoParaMedir }
   const h = await headers()
   const ip = h.get('x-real-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'desconocida'
   if (!dentroDelLimite(ip)) return { ok: false, error: d.limite }

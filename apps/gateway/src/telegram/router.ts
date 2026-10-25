@@ -3,6 +3,10 @@ import { env } from '../env.js'
 import { store } from '../store.js'
 import { bandeja, modoPrueba, tg } from './api.js'
 import { enlaceParaConectar, procesarUpdate, type Update } from './bot.js'
+// Registra Telegram como canal de los reportes programados.
+import './reportes.js'
+// Y como canal de entrega de los trabajos largos del agente (página lista, serie lista).
+import './trabajos.js'
 // ---- M9 ----
 import { sinPro } from '../billing/acceso.js'
 
@@ -66,6 +70,7 @@ telegramRouter.delete('/_internal/:slug/telegram', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
   await store.unlinkTelegram({ tenantId: tenant.id })
+  await store.deleteReportSchedules(tenant.id, { channel: 'telegram' }).catch(() => 0)
   return c.json({ ok: true })
 })
 

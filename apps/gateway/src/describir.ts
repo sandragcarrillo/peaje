@@ -16,7 +16,7 @@ import { store } from './store.js'
  */
 
 const MODELO = process.env.AGENT_MODEL ?? 'claude-sonnet-5'
-const MAX = 300
+const MAX = 400
 
 let anthropic: Anthropic | null = null
 
@@ -62,7 +62,17 @@ export async function describirSitio(tenant: Pick<Tenant, 'name' | 'originUrl'>)
     .replace(/^["'\s]+|["'\s]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-  return texto.length >= 40 ? texto.slice(0, MAX) : null
+  return texto.length >= 40 ? recortar(texto) : null
+}
+
+/** El modelo a veces se pasa del largo: se corta en el último punto, nunca a mitad de palabra. */
+function recortar(texto: string): string {
+  if (texto.length <= MAX) return texto
+  const corte = texto.slice(0, MAX)
+  const punto = corte.lastIndexOf('. ')
+  if (punto >= 40) return corte.slice(0, punto + 1)
+  const espacio = corte.lastIndexOf(' ')
+  return (espacio > 0 ? corte.slice(0, espacio) : corte).replace(/[,;:]$/, '') + '.'
 }
 
 /**

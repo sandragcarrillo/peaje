@@ -2,7 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 
 /**
  * Los motores de respuesta a los que Peaje les hace las preguntas del negocio.
- * Cada uno devuelve el texto de la respuesta y los dominios que citó. Solo se
+ * Cada uno devuelve el texto de la respuesta y las páginas que citó (URL y
+ * título; de Gemini solo el dominio). Solo se
  * usan los que tienen clave en el entorno. Son proxies de lo que ve un usuario
  * en la app de consumo (otro modelo, sin personalización, sin ubicación).
  *
@@ -13,7 +14,9 @@ import Anthropic from '@anthropic-ai/sdk'
  *   Claude: Messages con web_search_20250305, citas web_search_result_location
  */
 
-export type Respuesta = { texto: string; dominios: string[] }
+/** Una página citada tal como la devuelve el motor, antes de clasificarla. */
+export type Pagina = { url: string | null; title: string | null; domain: string }
+export type Respuesta = { texto: string; dominios: string[]; paginas: Pagina[] }
 export type Motor = { id: string; nombre: string; disponible: () => boolean; preguntar: (q: string) => Promise<Respuesta> }
 
 const TIMEOUT = 90_000
@@ -27,6 +30,27 @@ export function dominioDe(url: string): string | null {
 }
 
 const unicos = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x))]
+
+/** Páginas citadas sin repetir (por URL, o por dominio si no hay URL), en orden. */
+function paginasDe(xs: { url?: string | null; title?: string | null; domain?: string | null }[]): Pagina[] {
+  const vistas = new Set<string>()
+  const salida: Pagina[] = []
+  for (const x of xs) {
+    const domain = x.domain ?? (x.url ? dominioDe(x.url) : null)
+    if (!domain) continue
+    const url = x.url ? x.url.split('#')[0]! : null
+    const clave = url ?? domain
+    if (vistas.has(clave)) continue
+    vistas.add(clave)
+    salida.push({ url, title: x.title?.trim() || null, domain })
+  }
+  return salida
+}
+
+/** El resultado de un motor: el texto y las páginas, con los dominios derivados de ellas. */
+function respuesta(texto: string, paginas: Pagina[]): Respuesta {
+  return { texto, paginas, dominios: unicos(paginas.map((p) => p.domain)) }
+}
 
 async function json(res: Response, motor: string) {
   const cuerpo = await res.text()
@@ -51,12 +75,12 @@ export const MOTORES: Motor[] = [
       const j = await json(res, 'OpenAI')
       const partes = (j.output ?? []).filter((o: { type: string }) => o.type === 'message').flatMap((o: { content?: unknown[] }) => o.content ?? []) as {
         text?: string
-        annotations?: { type: string; url?: string }[]
+        annotations?: { type: string; url?: string; title?: string }[]
       }[]
-      return {
-        texto: partes.map((p) => p.text ?? '').join('\n'),
-        dominios: unicos(partes.flatMap((p) => (p.annotations ?? []).filter((a) => a.type === 'url_citation').map((a) => dominioDe(a.url ?? '')))),
-      }
+      return respuesta(
+        partes.map((p) => p.text ?? '').join('\n'),
+        paginasDe(partes.flatMap((p) => (p.annotations ?? []).filter((a) => a.type === 'url_citation').map((a) => ({ url: a.url, title: a.title })))),
+      )
     },
   },
   {
@@ -71,11 +95,14 @@ export const MOTORES: Motor[] = [
         signal: AbortSignal.timeout(TIMEOUT),
       })
       const j = await json(res, 'Perplexity')
-      const salida = (j.output ?? []) as { type: string; content?: { text?: string }[]; results?: { url?: string }[] }[]
-      return {
-        texto: salida.filter((o) => o.type === 'message').flatMap((o) => o.content ?? []).map((c) => c.text ?? '').join('\n'),
-        dominios: unicos(salida.filter((o) => o.type === 'search_results').flatMap((o) => (o.results ?? []).map((r) => dominioDe(r.url ?? '')))),
-      }
+      type Parte = { text?: string; annotations?: { type?: string; url?: string; title?: string }[] }
+      const salida = (j.output ?? []) as { type: string; content?: Parte[]; results?: { url?: string; title?: string }[] }[]
+      const partes = salida.filter((o) => o.type === 'message').flatMap((o) => o.content ?? [])
+      // Las citas del texto, si vienen; si no, los resultados de búsqueda, que es
+      // lo que se usaba antes (más amplio que lo citado de verdad).
+      const citadas = partes.flatMap((c) => (c.annotations ?? []).filter((a) => a.type === 'url_citation').map((a) => ({ url: a.url, title: a.title })))
+      const buscadas = salida.filter((o) => o.type === 'search_results').flatMap((o) => (o.results ?? []).map((r) => ({ url: r.url, title: r.title })))
+      return respuesta(partes.map((c) => c.text ?? '').join('\n'), paginasDe(citadas.length ? citadas : buscadas))
     },
   },
   {
@@ -93,11 +120,18 @@ export const MOTORES: Motor[] = [
       const j = await json(res, 'Gemini')
       const c = j.candidates?.[0] ?? {}
       const chunks = (c.groundingMetadata?.groundingChunks ?? []) as { web?: { uri?: string; title?: string } }[]
-      return {
-        texto: (c.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join(''),
-        // web.uri es un redirect de vertexaisearch; web.title trae el dominio.
-        dominios: unicos(chunks.map((ch) => (ch.web?.title && /\./.test(ch.web.title) ? ch.web.title.replace(/^www\./, '').toLowerCase() : dominioDe(ch.web?.uri ?? '')))),
-      }
+      // web.uri es un redirect de vertexaisearch y web.title trae el dominio:
+      // de Gemini sale el dominio, sin la página ni su título.
+      return respuesta(
+        (c.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join(''),
+        paginasDe(
+          chunks.map((ch) => ({
+            url: null,
+            title: null,
+            domain: ch.web?.title && /\./.test(ch.web.title) ? ch.web.title.replace(/^www\./, '').toLowerCase() : dominioDe(ch.web?.uri ?? ''),
+          })),
+        ),
+      )
     },
   },
   {
@@ -116,12 +150,10 @@ export const MOTORES: Motor[] = [
         { timeout: TIMEOUT },
       )
       const textos = res.content.filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-      return {
-        texto: textos.map((b) => b.text).join(''),
-        dominios: unicos(
-          textos.flatMap((b) => (b.citations ?? []).map((ct) => (ct.type === 'web_search_result_location' ? dominioDe(ct.url) : null))),
-        ),
-      }
+      return respuesta(
+        textos.map((b) => b.text).join(''),
+        paginasDe(textos.flatMap((b) => (b.citations ?? []).flatMap((ct) => (ct.type === 'web_search_result_location' ? [{ url: ct.url, title: ct.title }] : [])))),
+      )
     },
   },
 ]

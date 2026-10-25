@@ -37,12 +37,13 @@ export default async function VisitasPage({
     <div className="space-y-8">
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
 
-      <div className="flex gap-2 font-mono text-[11px] uppercase tracking-[0.12em]">
+      <div className="flex gap-2">
         {[7, 30].map((n) => (
           <Link
             key={n}
             href={n === 7 ? base : `${base}?dias=30`}
-            className={`border px-3 py-1.5 ${dias === n ? 'border-text bg-text text-bg' : 'border-border text-muted hover:text-text'}`}
+            aria-current={dias === n ? 'page' : undefined}
+            className={`btn btn-secundario btn-chico ${dias === n ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
           >
             {n === 7 ? t.ventana7 : t.ventana30}
           </Link>

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import type { Tenant, Verificacion } from '@peaje/db'
+import { PAGE_FORMATS, type PageFormat, type Tenant, type Verificacion } from '@peaje/db'
+import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
 import { dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
@@ -28,7 +29,8 @@ export type Reporte = {
   previaAt: string | null
   pagos: { count: number; revenue: string; porRuta: { path: string; count: number; revenue: string }[] }
   visitas: { total: number; pagadas: number; bots: string[] } | null
-  contenido: { pregunta: string; respuesta: string; porQue: string; fuente: string }[]
+  /** `formato` y `modelo`: el tipo de página que la IA cita para esa pregunta y una citada para imitar. */
+  contenido: { pregunta: string; respuesta: string; porQue: string; fuente: string; formato?: PageFormat; modelo?: string }[]
   /** Tareas abiertas para el coding agent del dueño, y dónde verlas. */
   tareas: { titulo: string; tipo: string; estado: string }[]
   agenteUrl: string
@@ -53,6 +55,10 @@ const SugerenciasSchema = z.object({
       porQue: z.string(),
       /** URL de la página del sitio de donde salió el dato, para que el dueño lo verifique. */
       fuente: z.string(),
+      /** El formato de la página, según lo que la IA cita para esa pregunta. */
+      formato: z.enum(PAGE_FORMATS),
+      /** Una página que la IA ya cita, para imitar su forma. Vacío si no hay evidencia. */
+      modelo: z.string(),
     }),
   ),
 })
@@ -92,26 +98,42 @@ export async function leerSitio(dominio: string): Promise<string> {
     .slice(0, 14_000)
 }
 
+/** Los formatos citados como texto para el prompt; vacío si todavía no hay mediciones con páginas. */
+function evidenciaDeFormatos(f: FormatosCitados | null): string {
+  if (!f || f.formats.length === 0) return ''
+  const lineas = f.formats.slice(0, 5).map((x) => {
+    const ejemplos = x.examples.map((e) => `${e.title ?? e.domain} <${e.url}>`).join('; ')
+    return `- ${x.format}: cited ${x.citations} times from ${x.sources} sites. Asked in: ${x.prompts.join(' | ')}. Examples: ${ejemplos || 'none with a URL'}.`
+  })
+  return `Formats AI assistants cited for this business's questions (last ${f.rounds} measurement rounds, ${f.answers} answers with pages, not counting the business's own site):\n${lineas.join('\n')}\n\n`
+}
+
 export async function sugerirContenido(tenant: Tenant, dominio: string): Promise<Reporte['contenido']> {
   if (!process.env.ANTHROPIC_API_KEY) return []
   try {
     const texto = await leerSitio(dominio)
     if (texto.length < 200) return []
+    const formatos = await formatosCitados(tenant).catch(() => null)
     anthropic ??= new Anthropic()
     const res = await anthropic.messages.parse({
       model: MODEL,
       max_tokens: 4000,
-      system:
-        'You advise small businesses on answer-engine optimization: pages that ChatGPT, Perplexity and Google AI Overviews cite when a user asks a question the business can answer. Propose 3 to 5 question-and-answer pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
+      system: [
+        'You advise small businesses on answer-engine optimization: pages that ChatGPT, Perplexity and Google AI Overviews cite when a user asks a question the business can answer. Propose 3 to 5 pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
+        'Each page has a format: guide, roundup (best options, top N, alternatives), comparison (X vs Y), research (original data or a benchmark), docs, forum, video, news, product or other.',
+        'When you are given the formats AI assistants actually cite for this business\'s questions, prefer the questions where those formats win, pick the format that won for that question, and set "modelo" to the URL of one cited example to emulate. Without that evidence, pick the format that fits the question and leave "modelo" empty. Never put a URL in "modelo" that was not in the evidence.',
+      ].join('\n'),
       messages: [
         {
           role: 'user',
-          content: `Business: ${tenant.name} (${dominio}). Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), and the URL of the page on this site where you read the facts you used. Use only facts that appear in the text; never invent numbers.`,
+          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
         },
       ],
       output_config: { format: zodOutputFormat(SugerenciasSchema) },
     })
-    return res.parsed_output?.paginas.slice(0, 5) ?? []
+    const urlsCitadas = new Set(formatos?.formats.flatMap((f) => f.examples.map((e) => e.url)) ?? [])
+    // El modelo de ejemplo solo vale si salió de la evidencia: nada de URLs inventadas.
+    return (res.parsed_output?.paginas.slice(0, 5) ?? []).map((p) => ({ ...p, modelo: urlsCitadas.has(p.modelo) ? p.modelo : '' }))
   } catch (error) {
     console.warn('[monitor] sin sugerencias de contenido', error instanceof Error ? error.message : error)
     return []

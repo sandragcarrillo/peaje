@@ -89,9 +89,9 @@ export function RetirosPanel({
               <button
                 type="button"
                 onClick={copiarWallet}
-                className="border border-border px-2.5 py-1 font-mono text-[10px] uppercase text-text hover:bg-panel-2"
+                className="btn btn-secundario btn-chico"
               >
-                {copiado ? d.dinero.copiado : `[${d.dinero.copiar}]`}
+                {copiado ? d.dinero.copiado : d.dinero.copiar}
               </button>
             </>
           ) : (
@@ -137,7 +137,7 @@ export function RetirosPanel({
                   type="button"
                   disabled={!wallet || enCurso !== null}
                   onClick={() => retirarDe(b.network)}
-                  className="border border-text bg-negro px-4 py-2 font-mono text-xs font-bold uppercase text-white transition-colors hover:bg-tinta disabled:opacity-40"
+                  className="btn btn-primario btn-chico"
                 >
                   {enCurso === b.network ? d.dinero.enviando : d.dinero.retirar}
                 </button>

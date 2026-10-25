@@ -137,16 +137,15 @@ export default function NuevoNegocio() {
                 onChange={(e) => setCode(e.target.value)}
                 required
                 placeholder={d.acceso.placeholderCodigo}
-                className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+                className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
               />
             </label>
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
             <button
               type="submit"
               disabled={pending}
-              className="flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+              className="btn btn-primario"
             >
-              <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
               {pending ? d.acceso.verificando : d.acceso.verificarYCrear}
             </button>
           </form>
@@ -173,7 +172,7 @@ export default function NuevoNegocio() {
               onChange={(e) => setName(e.target.value)}
               required
               placeholder={d.acceso.placeholderNombre}
-              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
           </label>
 
@@ -186,7 +185,7 @@ export default function NuevoNegocio() {
               onChange={(e) => setOriginUrl(e.target.value)}
               required
               placeholder={d.acceso.placeholderUrl}
-              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaUrl}</span>
           </label>
@@ -201,7 +200,7 @@ export default function NuevoNegocio() {
               onChange={(e) => setEmail(e.target.value)}
               required={!authenticated}
               placeholder={d.acceso.placeholderEmail}
-              className="mt-1.5 w-full rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaEmail}</span>
           </label>
@@ -216,9 +215,8 @@ export default function NuevoNegocio() {
             <button
               type="submit"
               disabled={pending}
-              className="flex shrink-0 items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta disabled:opacity-50"
+              className="btn btn-primario shrink-0"
             >
-              <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
               {pending
                 ? authenticated
                   ? d.acceso.creando
@@ -267,7 +265,7 @@ function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
               <button
                 type="button"
                 onClick={copiarWallet}
-                className="text-xs text-accent hover:underline"
+                className="btn btn-secundario btn-chico"
               >
                 {copiado ? d.acceso.copiado : d.acceso.copiar}
               </button>
@@ -289,9 +287,8 @@ function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
 
         <Link
           href={`/t/${slug}/score`}
-          className="mt-6 inline-flex items-center gap-2 border border-text bg-negro px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
+          className="btn btn-primario mt-6"
         >
-          <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
           {d.acceso.empezarConScore} →
         </Link>
       </div>

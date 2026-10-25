@@ -59,11 +59,8 @@ export function BloqueProxy({ base }: { base: string }) {
               key={h.id}
               type="button"
               onClick={() => setHost(h.id)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                h.id === host
-                  ? 'border-accent bg-text text-bg'
-                  : 'border-border text-muted hover:border-muted hover:text-text'
-              }`}
+              aria-pressed={h.id === host}
+              className={`btn btn-secundario btn-chico ${h.id === host ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
             >
               {etiquetas[h.id]}
             </button>
@@ -77,7 +74,7 @@ export function BloqueProxy({ base }: { base: string }) {
           <button
             type="button"
             onClick={copiar}
-            className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg"
+            className="btn btn-primario"
           >
             {copiado ? d.proxyConfigCopiada : d.proxyCopiarConfig}
           </button>

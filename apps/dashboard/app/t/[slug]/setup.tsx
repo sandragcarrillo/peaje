@@ -71,19 +71,12 @@ export async function SetupChecklist({ pasos, slug }: { pasos: PasoSetup[]; slug
       </div>
 
       <div className="flex items-center justify-end pt-2">
-        <div className="inline-flex border border-text bg-bg p-0.5">
-          <Link
-            href={siguiente.href}
-            className="flex items-center gap-2 bg-negro px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta"
-          >
-            <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+        <div className="inline-flex gap-2">
+          <Link href={siguiente.href} className="btn btn-primario">
             {d.panel.setupContinuar}
           </Link>
-          <Link
-            href={`/t/${slug}/kit`}
-            className="px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors hover:bg-panel-2"
-          >
-            KIT
+          <Link href={`/t/${slug}/kit`} className="btn btn-secundario">
+            Kit
           </Link>
         </div>
       </div>

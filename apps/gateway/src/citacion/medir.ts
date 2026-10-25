@@ -6,7 +6,8 @@ import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
-import { MOTORES, motoresDisponibles } from './motores.js'
+import { MOTORES, motoresDisponibles, type Pagina } from './motores.js'
+import { clasificarPaginas, formatosCitados, type FormatosCitados } from './formatos.js'
 
 /**
  * Una ronda de citación: cada pregunta del negocio a cada motor disponible,
@@ -47,12 +48,12 @@ export async function correrRonda(tenant: Tenant): Promise<{ roundId: string; ru
   const nombres = marcas(tenant, raiz)
   const roundId = randomUUID()
   const trabajos = prompts.flatMap((p) => motores.map((m) => ({ p, m })))
-  const filas: NewCitationRun[] = []
+  const filas: (NewCitationRun & { paginas: Pagina[] })[] = []
   for (let i = 0; i < trabajos.length; i += PARALELO) {
     const lote = trabajos.slice(i, i + PARALELO)
     filas.push(
       ...(await Promise.all(
-        lote.map(async ({ p, m }): Promise<NewCitationRun> => {
+        lote.map(async ({ p, m }): Promise<NewCitationRun & { paginas: Pagina[] }> => {
           const base = { tenantId: tenant.id, roundId, promptId: p.id, promptText: p.text, engine: m.id }
           try {
             const r = await m.preguntar(p.text)
@@ -62,17 +63,20 @@ export async function correrRonda(tenant: Tenant): Promise<{ roundId: string; ru
               cited: !!raiz && r.dominios.some((d) => esPropio(d, raiz)),
               mentioned: nombres.some((n) => texto.includes(n)),
               domains: r.dominios.slice(0, 20),
+              paginas: r.paginas.slice(0, 20),
               answerExcerpt: r.texto.slice(0, 600),
               error: null,
             }
           } catch (error) {
-            return { ...base, cited: false, mentioned: false, domains: [], answerExcerpt: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }
+            return { ...base, cited: false, mentioned: false, domains: [], paginas: [], answerExcerpt: null, error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }
           }
         }),
       )),
     )
   }
-  await store.recordCitationRuns(filas)
+  // El formato de cada página citada (guía, ranking, investigación...), una vez por ronda.
+  const conFormato = await clasificarPaginas(filas.map((f) => f.paginas))
+  await store.recordCitationRuns(filas.map(({ paginas: _, ...f }, i) => ({ ...f, pages: conFormato[i] ?? [] })))
   return { roundId, runs: filas.length, engines: motores.map((m) => m.id) }
 }
 
@@ -86,6 +90,8 @@ export type ResumenCitacion = {
   /** Los dominios que aparecen donde el negocio no, con cuántas veces. */
   competitors: { domain: string; count: number }[]
   previousShare: number | null
+  /** Qué tipo de página cita la IA para estas preguntas, de las últimas tres rondas. */
+  formats: FormatosCitados
 }
 
 function porRonda(runs: CitationRun[]) {
@@ -124,6 +130,7 @@ export async function resumenCitacion(tenant: Tenant): Promise<ResumenCitacion> 
     })),
     competitors: [...conteo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([domain, count]) => ({ domain, count })),
     previousShare: cuota(previa, 'cited'),
+    formats: await formatosCitados(tenant),
   }
 }
 

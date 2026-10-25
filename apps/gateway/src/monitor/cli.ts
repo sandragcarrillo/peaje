@@ -3,11 +3,12 @@
  * Railway (ver docs/monitor.md):
  *   tsx src/monitor/cli.ts daily    → POST /internal/monitor/run
  *   tsx src/monitor/cli.ts weekly   → POST /internal/monitor/weekly
+ *   tsx src/monitor/cli.ts schedules → POST /internal/monitor/schedules (cada hora)
  * Necesita GATEWAY_INTERNAL_URL e INTERNAL_API_SECRET.
  */
 export {}
 
-const modo = process.argv[2] === 'weekly' ? 'weekly' : 'run'
+const modo = process.argv[2] === 'weekly' ? 'weekly' : process.argv[2] === 'schedules' ? 'schedules' : 'run'
 const base = process.env.GATEWAY_INTERNAL_URL ?? process.env.GATEWAY_PUBLIC_URL
 const secret = process.env.INTERNAL_API_SECRET
 if (!base || !secret) {

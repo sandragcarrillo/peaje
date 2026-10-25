@@ -1,10 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import type { AgentTask, Tenant } from '@peaje/db'
+import type { AgentTask, PageFormat, Tenant, VoiceProfile } from '@peaje/db'
+import { COMO_SE_ARMA } from '../citacion/formatos.js'
 import { dominioVerificable, slugify } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
+import { perfilDeVoz, textoDeVoz } from './voz.js'
 
 /**
  * El borrador completo de una página que los asistentes de IA citarían: Opus
@@ -34,11 +36,28 @@ let anthropic: Anthropic | null = null
 
 export const slugDePregunta = (pregunta: string) => slugify(pregunta).slice(0, 60) || 'faq'
 
-export async function redactarBorrador(tenant: Tenant, pregunta: string, opts: { sitio?: string; porQue?: string; fuente?: string } = {}): Promise<Borrador> {
+export async function redactarBorrador(
+  tenant: Tenant,
+  pregunta: string,
+  opts: {
+    sitio?: string
+    porQue?: string
+    fuente?: string
+    formato?: PageFormat
+    modelo?: string
+    /** La voz del negocio. Sin pasarla se usa la guardada (o se arma con el sitio); null = sin voz. */
+    voz?: VoiceProfile | null
+    /** Otras páginas de la misma serie, para enlazarlas donde encajen. */
+    relacionadas?: { pregunta: string; url: string; rol: 'hub' | 'spoke' }[]
+  } = {},
+): Promise<Borrador> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
   const dominio = dominioVerificable(tenant.originUrl)
   const sitio = opts.sitio ?? (dominio ? await leerSitio(dominio).catch(() => '') : '')
   if (sitio.length < 200) throw new Error('Could not read enough of the site to write a draft')
+  const voz = opts.voz !== undefined ? opts.voz : await perfilDeVoz(tenant, { sitio }).catch(() => null)
+  const enVoz = textoDeVoz(voz)
+  const relacionadas = (opts.relacionadas ?? []).slice(0, 6)
   const hoy = new Date().toISOString().slice(0, 10)
   anthropic ??= new Anthropic()
   const res = await anthropic.messages.parse({
@@ -54,12 +73,15 @@ export async function redactarBorrador(tenant: Tenant, pregunta: string, opts: {
       '4. At least one concrete number from the business (a price, a limit, a count, a coverage) and, right next to it, where it comes from (the page of the site where it is stated, linked).',
       '5. 3 to 5 short H2 sections, each titled as a follow-up question a reader would ask next, each answer self-contained (readable alone, 2 to 5 sentences or a short list).',
       '6. A short "Sources" section (in the language of the page) linking the pages of the business\'s own site the facts come from.',
+      'When a page format is given, shape the H2 sections (step 5) to that format, for example a comparison table and one short verdict per option for a roundup, or numbered steps for a guide. Keep steps 1 to 4 and 6. When a page AI assistants already cite is given, follow its structure, never its words.',
+      'When related pages of the same site are given, link each one once where it fits naturally in the text, and end with a short "Related" list (in the language of the page) linking all of them. Use the URLs exactly as given.',
+      'When the business\'s voice is given, write the way the business writes: same person, formality and sentence length, their own words. Facts still come only from the site text.',
       'Rules: use only facts present in the site text. When a fact the page needs is missing, write a clearly marked placeholder like [TODO: confirm price] instead of inventing it, and list each one in "todos". Never invent numbers, names, clients, quotes or dates. Write in the language of the site text. Plain words, short sentences, no hype, no em dashes, no keyword stuffing. Under 700 words.',
     ].join('\n'),
     messages: [
       {
         role: 'user',
-        content: `Business: ${tenant.name} (${dominio ?? tenant.originUrl}). Today: ${hoy}.\nQuestion: ${pregunta}\n${opts.porQue ? `Why an AI assistant would cite it: ${opts.porQue}\n` : ''}${opts.fuente ? `Main source page: ${opts.fuente}\n` : ''}\nSite text (each block starts with its URL):\n${sitio.slice(0, 14_000)}`,
+        content: `Business: ${tenant.name} (${dominio ?? tenant.originUrl}). Today: ${hoy}.\nQuestion: ${pregunta}\n${opts.porQue ? `Why an AI assistant would cite it: ${opts.porQue}\n` : ''}${opts.fuente ? `Main source page: ${opts.fuente}\n` : ''}${opts.formato ? `Page format: ${opts.formato}. ${COMO_SE_ARMA[opts.formato]}\n` : ''}${opts.modelo ? `A page AI assistants already cite for this question (match its structure): ${opts.modelo}\n` : ''}${enVoz ? `Write in this business's voice: ${enVoz}\n` : ''}${relacionadas.length ? `Related pages of this series:\n${relacionadas.map((r) => `- ${r.rol === 'hub' ? 'Main page' : 'Related question'}: ${r.pregunta} <${r.url}>`).join('\n')}\n` : ''}\nSite text (each block starts with its URL):\n${sitio.slice(0, 14_000)}`,
       },
     ],
     output_config: { format: zodOutputFormat(BorradorSchema) },
@@ -73,7 +95,11 @@ export async function redactarBorrador(tenant: Tenant, pregunta: string, opts: {
 }
 
 /** El cuerpo de una tarea de contenido con borrador: instrucciones cortas + "## Draft" + la página. */
-export function cuerpoConBorrador(tenant: Tenant, dominio: string, pregunta: string, slug: string, b: Borrador, porQue?: string): string {
+/**
+ * `serie`: líneas "- Series ..." con las páginas hermanas (hub y spokes, ver
+ * ciclo/serie.ts). Van en su propia sección y completarBorrador las conserva.
+ */
+export function cuerpoConBorrador(tenant: Tenant, dominio: string, pregunta: string, slug: string, b: Borrador, porQue?: string, formato: string[] = [], serie: string[] = []): string {
   return [
     `# New page: ${pregunta}`,
     '',
@@ -88,6 +114,8 @@ export function cuerpoConBorrador(tenant: Tenant, dominio: string, pregunta: str
       : '3. Check the facts against the site one last time.',
     "4. Link it from the site's navigation or footer, and add it to the sitemap.",
     '5. Deploy, then mark this task done with the live URL. Peaje checks the page on the live site, then measures at 2 and 6 weeks whether AI assistants cite it.',
+    ...(formato.length ? ['', '## Format', '', ...formato] : []),
+    ...(serie.length ? ['', '## Series', '', ...serie] : []),
     ...(porQue ? ['', `Why an AI assistant would cite it: ${porQue}`] : []),
     MARCA_BORRADOR,
     b.markdown,
@@ -147,14 +175,17 @@ export async function completarBorrador(tenant: Tenant, taskId: string, datos: s
   const url = tarea.acceptance.find((a) => a.type === 'url')
   const slug = (url && 'url' in url ? new URL(url.url).pathname.replace(/^\//, '') : '') || tarea.key.replace(/^content:/, '') || slugDePregunta(tarea.title)
   // Se conserva lo que el dueño ya leyó como "por qué": va antes de la marca.
-  const porQue = tarea.body.split(MARCA_BORRADOR)[0]?.match(/\nWhy an AI assistant would cite it: (.*)\n?$/)?.[1]
+  const cabecera = tarea.body.split(MARCA_BORRADOR)[0] ?? ''
+  const porQue = cabecera.match(/\nWhy an AI assistant would cite it: (.*)\n?$/)?.[1]
+  // Y el formato que la IA cita para la pregunta, si la tarea lo traía.
+  const formato = cabecera.split('\n').filter((l) => l.startsWith('- Format: ') || l.startsWith('- AI assistants already cite this page'))
   const r = await store.upsertTask({
     tenantId: tenant.id,
     key: tarea.key,
     kind: tarea.kind,
     title: tarea.title,
     summary: tarea.summary,
-    body: cuerpoConBorrador(tenant, dominio, tarea.title, slug, { markdown, todos: faltan }, porQue),
+    body: cuerpoConBorrador(tenant, dominio, tarea.title, slug, { markdown, todos: faltan }, porQue, formato, cabecera.split('\n').filter((l) => l.startsWith('- Series'))),
     acceptance: tarea.acceptance,
     source: tarea.source,
   })

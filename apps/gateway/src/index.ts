@@ -7,6 +7,8 @@ import { generate } from 'mppx/discovery'
 import { agentCard } from './agents/erc8004.js'
 import { agentsRouter } from './agents/router.js'
 import { iniciarScheduler } from './agents/scheduler.js'
+// Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
+import { iniciarTrabajos } from './tareas/trabajos.js'
 import { usdcStatus } from './chainlink.js'
 import { creditReceipt, refundOriginFailure } from './charge.js'
 import { env } from './env.js'
@@ -20,8 +22,12 @@ import { matchRoute } from './router.js'
 import { rutasRouter } from './rutas.js'
 import { tareasRouter } from './tareas/router.js'
 import { registrarWebhook, telegramRouter } from './telegram/router.js'
+import { slackRouter } from './slack/router.js'
+import { reportesRouter } from './reportes/router.js'
 // ---- M7: comprador misterioso ----
 import { compradorRouter } from './comprador/router.js'
+// ---- radar público: leads y reporte por correo ----
+import { radarRouter } from './radar.js'
 // ---- M9: cobro del agente Pro ----
 import { billingRouter } from './billing/router.js'
 import { store } from './store.js'
@@ -157,8 +163,13 @@ app.route('/_internal', agentsRouter)
 app.route('/_internal', rutasRouter)
 // ---- M7: comprador misterioso ----
 app.route('/_internal', compradorRouter)
+app.route('/_internal', radarRouter)
 app.route('/', tareasRouter)
 app.route('/', telegramRouter)
+// ---- Slack: mismo agente en los canales del equipo (antes de /:slug/*, que si no se come /slack/*) ----
+app.route('/', slackRouter)
+// Reportes programados (Telegram hoy, Slack después): GET/PUT/DELETE /_internal/:slug/schedules
+app.route('/', reportesRouter)
 // ---- M9: cobro del agente Pro (antes de /:slug/*, que si no se come /_billing) ----
 app.route('/', billingRouter)
 app.route('/internal/monitor', monitorRouter)
@@ -655,4 +666,5 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[gateway] escuchando en http://localhost:${info.port}`)
   console.log(`[gateway] treasury ${env.treasuryAddress} · currency ${env.currency}`)
   iniciarScheduler()
+  iniciarTrabajos()
 })

@@ -24,6 +24,22 @@ const BOTS: [RegExp, AgentKind][] = [
 /** Nuestro propio verificador no cuenta como visita. */
 const IGNORAR_UA = /peaje-verificador/i
 
+/**
+ * Lo que lee el propio kit instalado en el sitio del negocio tampoco cuenta.
+ * El proxy pide el manifest cada minuto por instancia y PeajeHead pide el
+ * catálogo y el agent card cada hora por página, siempre que alguien (humano
+ * o bot) entra al sitio. Salen con el user-agent de Node o de Vercel. Antes
+ * se contaban como visitas de agentes y eran cerca del 75% del total.
+ */
+const LECTURAS_DEL_KIT = new Set(['/discovery/resources', '/.well-known/agent-card.json'])
+const UA_DEL_KIT = /^(node|undici|Vercel Edge Functions|Next\.js Middleware|peaje-kit(\/.*)?)$/i
+
+export function esLecturaDelKit(path: string, ua: string | null): boolean {
+  // El manifest solo lo lee el kit: ningún agente lo necesita.
+  if (path === '/kit/manifest.json') return true
+  return LECTURAS_DEL_KIT.has(path) && UA_DEL_KIT.test(ua ?? '')
+}
+
 /** La request trae una credencial de pago: el agente entendió el 402 y volvió a intentar. */
 export function traeCredencial(headers: Headers): boolean {
   return headers.has('payment-signature') || headers.has('x-payment') || (headers.get('authorization') ?? '').startsWith('Payment ')
@@ -110,6 +126,7 @@ export function registrarVisita(input: {
 }): void {
   const ua = input.headers.get('user-agent')
   if (ua && IGNORAR_UA.test(ua)) return
+  if (esLecturaDelKit(input.path, ua)) return
   let receiptRef: string | null = null
   const receipt = input.response.headers.get('Payment-Receipt')
   if (receipt) {

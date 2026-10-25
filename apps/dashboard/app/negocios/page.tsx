@@ -38,9 +38,8 @@ export default async function Negocios() {
         </div>
         <Link
           href="/nuevo"
-          className="flex shrink-0 items-center gap-2 self-start border border-text bg-negro px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.1em] text-white transition-colors hover:bg-tinta md:self-auto"
+          className="btn btn-primario shrink-0 self-start md:self-auto"
         >
-          <span className="text-accent">+</span>
           {d.acceso.registrarOtro}
         </Link>
       </section>
@@ -127,7 +126,7 @@ export default async function Negocios() {
               <div className="mt-4 flex items-center justify-end gap-2">
                 <Link
                   href={`/t/${t.slug}`}
-                  className="flex items-center gap-2 border border-text bg-negro px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-tinta"
+                  className="btn btn-secundario btn-chico"
                 >
                   {d.acceso.negociosAbrir}
                   <span aria-hidden>→</span>

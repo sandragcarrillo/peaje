@@ -125,6 +125,38 @@ export async function quitarTelegram(slug: string) {
   revalidatePath(`/t/${slug}/agente`)
 }
 
+// ---- Slack ----
+export async function conectarSlack(slug: string) {
+  await requireTenant(slug)
+  const { enlaceSlack } = await import('@/lib/gateway')
+  return enlaceSlack(slug, (await getLocale()) === 'es' ? 'es' : 'en')
+}
+
+export async function quitarSlack(slug: string, canal?: { teamId: string; channelId: string }) {
+  await requireTenant(slug)
+  const { desconectarSlack } = await import('@/lib/gateway')
+  await desconectarSlack(slug, canal)
+  revalidatePath(`/t/${slug}/agente`)
+}
+// ---- fin Slack ----
+
+// ---- reportes programados ----
+export async function programarReporte(slug: string, cambio: import('@/lib/gateway').CambioReporte) {
+  await requireTenant(slug)
+  const { guardarReporte } = await import('@/lib/gateway')
+  const r = await guardarReporte(slug, cambio)
+  revalidatePath(`/t/${slug}/agente`)
+  return r.schedule
+}
+
+export async function quitarReporte(slug: string, filtro: { id: string } | { channel: string; target: string; kind?: 'agent_visits' | 'custom' }) {
+  await requireTenant(slug)
+  const { borrarReporte } = await import('@/lib/gateway')
+  await borrarReporte(slug, filtro)
+  revalidatePath(`/t/${slug}/agente`)
+}
+// ---- fin reportes programados ----
+
 // ---- M9: pagar el plan con el saldo cobrado ----
 export async function pagarConSaldo(slug: string, plan: 'founder' | 'pro') {
   await requireTenant(slug)

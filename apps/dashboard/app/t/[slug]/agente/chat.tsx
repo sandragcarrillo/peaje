@@ -1,14 +1,16 @@
 'use client'
 
-import type { AgentAction, AgentMessage } from '@peaje/db'
+import type { AgentAction, AgentMessage, AgentMessageLink } from '@peaje/db'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useDict } from '@/lib/i18n/client'
 import { empezarDeNuevo, resolverAccion } from './actions'
+import { novedadesChat } from './chat-novedades'
 
 /** Chat con el agente Pro del negocio. El historial vive en la base (lo comparte Telegram). */
 export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] }) {
-  const { miAgente: t } = useDict()
+  const { miAgente: t, agenteReportes: r } = useDict()
   const [mensajes, setMensajes] = useState(inicial)
   const [texto, setTexto] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -21,18 +23,52 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
     fin.current?.scrollIntoView({ block: 'nearest' })
   }, [mensajes.length, pending])
 
+  // Trabajos en segundo plano (una página, una serie): mientras haya alguno,
+  // se consulta cada 8 s y el aviso de "lista" entra al chat con su tarjeta.
+  const [trabajando, setTrabajando] = useState(false)
+  const [vuelta, setVuelta] = useState(0)
+  const ultimaFecha = mensajes.filter((m) => !m.id.startsWith('tmp-')).at(-1)?.createdAt ?? null
+  useEffect(() => {
+    if (pending) return
+    let vivo = true
+    const id = setTimeout(
+      async () => {
+        try {
+          const r = await novedadesChat(slug, ultimaFecha)
+          if (!vivo) return
+          if (r.mensajes.length) {
+            setMensajes((ms) => [...ms, ...r.mensajes.filter((n) => !ms.some((m) => m.id === n.id))])
+            router.refresh()
+          }
+          setTrabajando(r.pendientes)
+          // Sigue consultando solo mientras haya trabajos (tope: 10 minutos).
+          if (r.pendientes && vuelta < 75) setVuelta((v) => v + 1)
+        } catch {
+          // Sin novedades: el próximo mensaje vuelve a mirar.
+        }
+      },
+      vuelta === 0 ? 1_500 : 8_000,
+    )
+    return () => {
+      vivo = false
+      clearTimeout(id)
+    }
+  }, [slug, pending, vuelta, ultimaFecha, router])
+
   const enviar = (valor: string) => {
     const limpio = valor.trim()
     if (!limpio || pending) return
     setError(null)
     setTexto('')
-    const provisional: AgentMessage = { id: `tmp-${Date.now()}`, tenantId: '', role: 'user', text: limpio, actions: [], options: [], channel: 'dashboard', createdAt: new Date().toISOString() }
+    const provisional: AgentMessage = { id: `tmp-${Date.now()}`, tenantId: '', role: 'user', text: limpio, actions: [], options: [], links: [], channel: 'dashboard', createdAt: new Date().toISOString() }
     setMensajes((m) => [...m, provisional])
     start(async () => {
       setEstado(null)
       try {
         const respuesta = await conversarEnVivo(slug, limpio, setEstado)
         setMensajes((m) => [...m, respuesta])
+        // Pudo dejar un trabajo en segundo plano: se vuelve a mirar.
+        setVuelta(0)
         // El agente pudo armar el plan, crear tareas o lanzar la medición: se vuelve a leer lo de abajo.
         router.refresh()
       } catch (e) {
@@ -57,7 +93,7 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
           return (
             <div className="flex flex-wrap gap-2">
               {ultimo.options.map((o) => (
-                <button key={o} onClick={() => enviar(o)} className="rounded-full border border-text/60 px-3 py-1.5 text-sm hover:bg-panel-2">
+                <button key={o} onClick={() => enviar(o)} className="btn btn-secundario btn-chico">
                   {o}
                 </button>
               ))}
@@ -65,11 +101,12 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
           )
         })()}
         {pending ? <p className="font-mono text-xs text-muted">{estado ?? t.pensando}</p> : null}
+        {!pending && trabajando ? <p className="font-mono text-xs text-muted">{r.chatTrabajando}</p> : null}
         <div ref={fin} />
       </div>
       <div className="flex flex-wrap gap-2 border-t border-border px-4 pt-3">
         {t.sugerencias.map((s) => (
-          <button key={s} disabled={pending} onClick={() => enviar(s)} className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:text-text disabled:opacity-50">
+          <button key={s} disabled={pending} onClick={() => enviar(s)} className="btn btn-secundario btn-chico text-muted hover:text-text">
             {s}
           </button>
         ))}
@@ -86,9 +123,9 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
           onChange={(e) => setTexto(e.target.value)}
           placeholder={t.chatPlaceholder}
           maxLength={4000}
-          className="flex-1 rounded-none border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+          className="flex-1 border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
         />
-        <button disabled={pending || !texto.trim()} className="rounded-lg bg-text px-4 py-2 text-sm font-medium text-bg disabled:opacity-50">
+        <button disabled={pending || !texto.trim()} className="btn btn-primario">
           {t.enviar}
         </button>
       </form>
@@ -102,7 +139,7 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
                 setMensajes([])
               })
             }
-            className="text-xs text-muted underline hover:text-text disabled:opacity-50"
+            className="btn btn-secundario btn-chico"
           >
             {t.reiniciar}
           </button>
@@ -123,8 +160,39 @@ function Mensaje({ slug, mensaje }: { slug: string; mensaje: AgentMessage }) {
         {acciones.map((a) => (
           <Accion key={a.id} slug={slug} messageId={mensaje.id} accion={a} alCambiar={setAcciones} />
         ))}
+        {mensaje.links?.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {mensaje.links.map((l) => (
+              <Tarjeta key={l.url} link={l} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
+  )
+}
+
+/** Una tarjeta del agente: abre el reporte, la tarea o la página. Las del dashboard abren en la misma pestaña. */
+function Tarjeta({ link }: { link: AgentMessageLink }) {
+  let interna: string | null = null
+  try {
+    const u = new URL(link.url)
+    if (u.pathname.startsWith('/t/')) interna = `${u.pathname}${u.search}${u.hash}`
+  } catch {
+    interna = null
+  }
+  const clase = 'btn btn-secundario btn-chico justify-start whitespace-normal text-left'
+  const marca = <span aria-hidden className="font-mono text-xs text-muted">{link.kind === 'task' ? '▤' : link.kind === 'page' ? '↗' : '▦'}</span>
+  return interna ? (
+    <Link href={interna} className={clase}>
+      {marca}
+      {link.label}
+    </Link>
+  ) : (
+    <a href={link.url} target="_blank" rel="noopener noreferrer" className={clase}>
+      {marca}
+      {link.label}
+    </a>
   )
 }
 
@@ -149,10 +217,10 @@ function Accion({ slug, messageId, accion, alCambiar }: { slug: string; messageI
       {accion.status === 'pending' ? (
         <div className="mt-2 flex items-center gap-2">
           <span className="text-xs text-muted">{t.propuesta}</span>
-          <button disabled={pending} onClick={() => resolver(true)} className="rounded-lg bg-text px-3 py-1 text-xs font-medium text-bg disabled:opacity-50">
+          <button disabled={pending} onClick={() => resolver(true)} className="btn btn-primario btn-chico">
             {t.aplicar}
           </button>
-          <button disabled={pending} onClick={() => resolver(false)} className="rounded-lg border border-border px-3 py-1 text-xs disabled:opacity-50">
+          <button disabled={pending} onClick={() => resolver(false)} className="btn btn-secundario btn-chico">
             {t.descartar}
           </button>
         </div>

@@ -1,5 +1,7 @@
 import type { Chequeo } from '@peaje/shared'
-import type { NewAgentTask, Tenant } from '@peaje/db'
+import type { NewAgentTask, PageFormat, Tenant } from '@peaje/db'
+import type { Reporte } from '../monitor/reporte.js'
+import { COMO_SE_ARMA } from '../citacion/formatos.js'
 import { dominioVerificable } from '@peaje/shared'
 import { store } from '../store.js'
 import { NOMBRE_CHEQUEO, TEXTO_MOTIVO } from '../monitor/email.js'
@@ -41,7 +43,16 @@ function promptFix(tenant: Tenant, c: Chequeo, soloAeo: boolean): string {
   ].join('\n')
 }
 
-function promptContenido(tenant: Tenant, dominio: string, s: { pregunta: string; respuesta: string; porQue: string; fuente: string }, slug: string): string {
+/** El formato que la IA cita para esta pregunta y la página que conviene imitar, como líneas de la tarea. */
+export function lineasDeFormato(s: { formato?: PageFormat; modelo?: string }): string[] {
+  if (!s.formato) return []
+  return [
+    `- Format: ${s.formato}. ${COMO_SE_ARMA[s.formato]}`,
+    ...(s.modelo ? [`- AI assistants already cite this page for the question; match its shape, not its words: ${s.modelo}`] : []),
+  ]
+}
+
+function promptContenido(tenant: Tenant, dominio: string, s: Reporte['contenido'][number], slug: string): string {
   return [
     `# New page: ${s.pregunta}`,
     '',
@@ -53,6 +64,7 @@ function promptContenido(tenant: Tenant, dominio: string, s: { pregunta: string;
     `- Title and H1: exactly "${s.pregunta}".`,
     `- First paragraph: the direct answer in two or three sentences. Outline: ${s.respuesta}`,
     `- Use only facts that are on the site. Source for this one: ${s.fuente}`,
+    ...lineasDeFormato(s),
     '- Add at least one concrete number from the business (a price, a limit, a count) and say where it comes from.',
     '- Then 3 to 5 short sections, each answering a follow-up question someone would ask next, each self-contained.',
     '- A visible "Updated <date>" line.',
@@ -258,7 +270,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         await Promise.all(
           conBorrador.map(async (s) => {
             try {
-              return [s.pregunta, await redactarBorrador(tenant, s.pregunta, { sitio, porQue: s.porQue, fuente: s.fuente })] as const
+              return [s.pregunta, await redactarBorrador(tenant, s.pregunta, { sitio, porQue: s.porQue, fuente: s.fuente, formato: s.formato, modelo: s.modelo })] as const
             } catch (error) {
               console.warn('[tareas] sin borrador', tenant.slug, error instanceof Error ? error.message : error)
               return [s.pregunta, null] as const
@@ -271,7 +283,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         const previa = previas.get(`content:${slug}`)
         const b = borradores.get(s.pregunta)
         const body = b
-          ? cuerpoConBorrador(tenant, dominio, s.pregunta, slug, b, s.porQue)
+          ? cuerpoConBorrador(tenant, dominio, s.pregunta, slug, b, s.porQue, lineasDeFormato(s))
           : previa && tieneBorrador(previa)
             ? previa.body
             : promptContenido(tenant, dominio, s, slug)
