@@ -194,7 +194,7 @@ function Copiable({ etiqueta, valor, vacio }: { etiqueta: string; valor: string 
   return (
     <div className="rounded-lg border border-border bg-bg p-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{etiqueta}</p>
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{etiqueta}</p>
         {valor ? (
           <button
             type="button"
@@ -221,7 +221,7 @@ function Copiable({ etiqueta, valor, vacio }: { etiqueta: string; valor: string 
 function Parte({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="mt-5 border-t border-border pt-4">
-      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{titulo}</p>
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{titulo}</p>
       <div className="mt-2">{children}</div>
     </div>
   )

@@ -43,10 +43,10 @@ export function BloqueProxy({ base }: { base: string }) {
   return (
     <section className="border border-border bg-panel p-6">
       <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
-        <span className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">
+        <span className="font-mono text-[11px] font-bold tracking-[0.02em]">
           002 / {d.proxyTitulo}
         </span>
-        <span className="border border-accent/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+        <span className="border border-accent/50 px-2 py-0.5 font-mono text-[10px] tracking-[0.08em] text-accent">
           {d.proxyRecomendado}
         </span>
       </div>
@@ -129,7 +129,7 @@ function Paso({
 }) {
   return (
     <div className={`mt-5 ${ultimo ? '' : 'border-b border-border pb-5'}`}>
-      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{titulo}</p>
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{titulo}</p>
       <div className="mt-2">{children}</div>
     </div>
   )

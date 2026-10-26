@@ -43,11 +43,11 @@ export default async function Wallet() {
         </section>
 
         <section className="space-y-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{t.saldos}</p>
+          <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.saldos}</p>
           <div className="grid grid-cols-2 gap-4">
             {balances.map((b) => (
               <div key={b.network} className="rounded-lg border border-border bg-panel p-3">
-                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{railLabel(b.network)}</p>
+                <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{railLabel(b.network)}</p>
                 <p className="mt-1 text-xl tabular-nums">
                   {money(b.amount)} <span className="text-xs text-muted">{b.symbol}</span>
                 </p>
@@ -58,7 +58,7 @@ export default async function Wallet() {
         </section>
 
         <section className="space-y-3">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{t.negociosTitulo}</p>
+          <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.negociosTitulo}</p>
           <ul className="divide-y divide-border rounded-lg border border-border bg-panel">
             {tenants.map((n) => (
               <li key={n.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -105,11 +105,11 @@ export default async function Wallet() {
       </section>
 
       <section className="space-y-3">
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.dinero.saldos}</p>
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.dinero.saldos}</p>
         <div className="grid grid-cols-2 gap-4">
           {balances.map((b) => (
             <div key={b.network} className="rounded-lg border border-border bg-panel p-3">
-              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{railLabel(b.network)}</p>
+              <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{railLabel(b.network)}</p>
               <p className="mt-1 text-xl tabular-nums">
                 {money(b.amount)} <span className="text-xs text-muted">{b.symbol}</span>
               </p>

@@ -215,7 +215,7 @@ function MarketStat({
   return (
     <div className="flex flex-col justify-between space-y-4 border border-border bg-panel p-5">
       <div className="flex items-center justify-between font-mono text-[10px] text-muted">
-        <span className="uppercase tracking-[0.12em]">{label}</span>
+        <span className="tracking-[0.02em]">{label}</span>
         {vivo ? <span aria-hidden className="h-2 w-2 bg-accent" /> : <span>{tag}</span>}
       </div>
       <div className={`text-4xl font-bold tracking-tight ${acento ? 'text-accent' : ''}`}>
@@ -232,7 +232,7 @@ function MarketStat({
 function Stat({ label, value, destacado }: { label: string; value: string; destacado?: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-panel p-4">
-      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{label}</p>
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{label}</p>
       <p className={`mt-2 text-2xl tabular-nums ${destacado ? 'text-accent' : ''}`}>{value}</p>
     </div>
   )
@@ -301,7 +301,7 @@ function RegistrosPorMes({ agentes, d }: { agentes: MarketAgent[]; d: Mercado })
           {meses.map((m, i) => (
             <span
               key={m.clave}
-              className={`flex-1 text-center font-mono text-[10px] uppercase ${
+              className={`flex-1 text-center font-mono text-[10px] ${
                 i === meses.length - 1 ? 'font-bold text-text' : 'text-muted'
               }`}
             >
@@ -327,14 +327,14 @@ function BarrasH({
   return (
     <section className="border border-border bg-panel p-6">
       <div className="flex items-baseline justify-between border-b border-border pb-3">
-        <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.12em]">{titulo}</h2>
-        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{nota}</p>
+        <h2 className="font-mono text-[11px] font-bold tracking-[0.02em]">{titulo}</h2>
+        <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{nota}</p>
       </div>
       <div className="mt-4 space-y-4">
         {datos.map((d) => (
           <div key={d.label} title={`${d.label}: ${d.valor}`}>
             <div className="flex items-baseline justify-between font-mono text-xs">
-              <span className="truncate uppercase">{d.label}</span>
+              <span className="truncate">{d.label}</span>
               <span className="shrink-0 pl-3 font-bold tabular-nums">{d.valor}</span>
             </div>
             <div className="mt-1.5 h-1.5 w-full bg-panel-2">

@@ -243,7 +243,7 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
       </div>
 
       <div className="mt-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{d.capaTitulo}</p>
+        <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.capaTitulo}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {chip('todo', d.capaTodo)}
           {chip('aeo', d.capaAeo)}

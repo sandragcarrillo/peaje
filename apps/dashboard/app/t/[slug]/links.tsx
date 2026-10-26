@@ -27,7 +27,7 @@ export function LinksPanel({
 
       {resources.length > 0 ? (
         <table className="mt-4 w-full text-sm">
-          <thead className="text-left font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+          <thead className="text-left font-mono text-[11px] tracking-[0.02em] text-muted">
             <tr>
               <th className="pb-2 font-normal" />
               <th className="pb-2 font-normal">{d.colRuta}</th>

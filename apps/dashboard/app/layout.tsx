@@ -12,7 +12,6 @@ import { CONTACTO } from '@/lib/legal'
 import { Logo } from './components/logo'
 import { RadarPill } from './components/radar-pill'
 import './globals.css'
-import { Providers } from './providers'
 import { PeajeHead } from '@peaje/next/head'
 import { salir } from './salir/actions'
 
@@ -56,7 +55,6 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
         */}
         <div className="overflow-x-clip">
         <LocaleProvider locale={locale}>
-        <Providers>
           <div
             aria-hidden
             className="pointer-events-none fixed inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-bg via-bg/90 to-transparent"
@@ -111,7 +109,6 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-6 pt-10 pb-20">{children}</main>
-        </Providers>
         </LocaleProvider>
         <footer className="border-t border-border px-6 py-8">
           {/* Paddle exige términos, privacidad, reembolsos y precios enlazados desde todo el sitio. */}

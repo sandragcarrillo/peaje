@@ -25,7 +25,7 @@ export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefij
     <div className="space-y-4 border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">{t.claveTitulo}</span>
+          <span className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.claveTitulo}</span>
           <p className="mt-1 text-sm">{prefijo ? t.claveActual(prefijo) : t.claveNinguna}</p>
         </div>
         <button disabled={pending} className={boton} onClick={() => start(async () => setClave(await crearClaveAgente(slug)))}>
@@ -112,7 +112,7 @@ export function ListaTareas({
   if (tareas.length === 0) return null
   return (
     <div>
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{titulo}</span>
+      <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{titulo}</span>
       <ul className="mt-2 divide-y divide-border border border-border">
         {tareas.map((x) => (
           <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
@@ -155,7 +155,7 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
   if (cerrada) {
     return (
       <li className="px-4 py-3 text-sm">
-        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
+        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
         <span className="font-medium">{tarea.title}</span>
         <p className="mt-1 text-xs text-muted">{t.estados[tarea.status] ?? tarea.status}{tarea.note ? ` · ${tarea.note}` : ''}</p>
         {tarea.status === 'verified' ? <Resultado seguimientos={seguimientos} /> : null}
@@ -166,7 +166,7 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
   return (
     <li className="space-y-3 px-4 py-4 text-sm">
       <div>
-        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
+        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
         <span className="font-medium">{tarea.title}</span>
         {tarea.status !== 'open' ? <span className="ml-2 text-xs text-muted">· {t.estados[tarea.status] ?? tarea.status}</span> : null}
       </div>
@@ -228,7 +228,7 @@ function Resultado({ seguimientos }: { seguimientos: TaskFollowup[] }) {
     const texto = (locale === 'es' ? ultimo.after?.verdictEs : null) ?? ultimo.verdict
     return (
       <p className="mt-2 border-l-2 border-border pl-2 text-xs">
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{t.resultadoTras(ultimo.kind)}</span> {texto}
+        <span className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.resultadoTras(ultimo.kind)}</span> {texto}
       </p>
     )
   }

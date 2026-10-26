@@ -7,7 +7,7 @@
 /** Kicker mono sobre un titular. `dot` le pone el punto verde de estado. */
 export function Eyebrow({ children, dot }: { children: React.ReactNode; dot?: boolean }) {
   return (
-    <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+    <p className="flex items-center gap-2 font-mono text-[11px] tracking-[0.02em] text-muted">
       {dot ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
       {children}
     </p>
@@ -37,11 +37,11 @@ export function PageHeader({
 /** Franja de pares clave:valor (§5.1): la página reportando su estado. */
 export function StatusBar({ items }: { items: [string, React.ReactNode][] }) {
   return (
-    <div className="flex flex-wrap gap-x-8 gap-y-2 border-y border-border py-2.5 font-mono text-[11px] tracking-[0.1em]">
+    <div className="flex flex-wrap gap-x-8 gap-y-2 border-y border-border py-2.5 font-mono text-[11px] tracking-[0.02em]">
       {items.map(([k, v], i) => (
         <span key={k} className="flex min-w-0 items-center gap-2">
           {i === 0 ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
-          <span className="uppercase text-muted">{k}:</span>
+          <span className="text-muted">{k}:</span>
           <span className="truncate text-text">{v}</span>
         </span>
       ))}
@@ -64,7 +64,7 @@ export function StatTile({
 }) {
   return (
     <div className="rounded-lg border border-border bg-panel p-4">
-      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
+      <p className="font-mono text-[11px] tracking-[0.02em] text-muted">
         {label}
       </p>
       <p
@@ -87,7 +87,7 @@ export function TerminalBuffer({ label, lineas }: { label: string; lineas: strin
   if (lineas.length === 0) return null
   return (
     <div className="isla-tinta overflow-hidden rounded-lg border border-border bg-bg">
-      <p className="flex items-center gap-2 border-b border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+      <p className="flex items-center gap-2 border-b border-border px-4 py-2 font-mono text-[10px] tracking-[0.02em] text-muted">
         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
         {label}
       </p>
@@ -117,7 +117,7 @@ export function SectionBar({
   meta?: React.ReactNode
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-y border-text/70 py-2 font-mono text-[11px] uppercase tracking-[0.12em]">
+    <div className="flex items-baseline justify-between gap-4 border-y border-text/70 py-2 font-mono text-[11px] tracking-[0.02em]">
       <span className="text-text">{label}</span>
       {meta ? <span className="text-muted normal-case tracking-normal">{meta}</span> : null}
     </div>
@@ -130,7 +130,7 @@ export function FooterStrip({ items }: { items: [string, React.ReactNode][] }) {
     <div className="flex flex-wrap gap-x-8 gap-y-1 border-t border-text/70 pt-3 font-mono text-[11px] tracking-[0.08em]">
       {items.map(([k, v]) => (
         <span key={k} className="flex items-center gap-2">
-          <span className="uppercase text-muted">{k}:</span>
+          <span className="text-muted">{k}:</span>
           <span className="text-text">{v}</span>
         </span>
       ))}

@@ -66,7 +66,7 @@ export function Calculadora({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              <span className="block font-mono text-[10px] tracking-[0.02em] text-muted">
                 {d.calcPrecio}
               </span>
               <div className="flex items-center border border-border bg-bg px-3 py-2">
@@ -83,7 +83,7 @@ export function Calculadora({
               </div>
             </div>
             <div className="space-y-2">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+              <span className="block font-mono text-[10px] tracking-[0.02em] text-muted">
                 {d.calcPctLabel}
               </span>
               <div className="flex items-center border border-border bg-bg px-3 py-2">
@@ -125,7 +125,7 @@ export function Calculadora({
         {/* Card de yield */}
         <div className="flex flex-col justify-between space-y-6 border border-border bg-bg p-6 lg:col-span-5">
           <div className="space-y-1">
-            <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+            <span className="block font-mono text-[10px] tracking-[0.02em] text-muted">
               {d.calcProyeccion}
             </span>
             <div className="text-5xl font-bold tracking-tight text-accent tabular-nums">

@@ -1,6 +1,6 @@
 export const mercado = {
   es: {
-    eyebrow: 'MERCADO / EN VIVO',
+    eyebrow: 'Mercado / en vivo',
     /** Etiqueta BCP-47 para Intl (fechas y números de la página). */
     intl: 'es-CO',
 
@@ -62,7 +62,7 @@ export const mercado = {
     calcPctNota: (pct: number) => `El ${pct}% del mercado ya declara soporte de pago on-chain; ajusta el supuesto si quieres.`,
   },
   en: {
-    eyebrow: 'MARKET / LIVE',
+    eyebrow: 'Market / live',
     /** Etiqueta BCP-47 para Intl (fechas y números de la página). */
     intl: 'en-US',
 

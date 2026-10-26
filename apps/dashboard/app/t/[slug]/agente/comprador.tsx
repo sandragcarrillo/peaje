@@ -54,7 +54,7 @@ export function CompradorPanel({ slug, run }: { slug: string; run: MysteryRun | 
             {misiones.map((m, i) => (
               <li key={i} className="space-y-1 px-4 py-3 text-sm">
                 <p className="font-medium">“{m.mission}”</p>
-                <p className="font-mono text-[11px] uppercase text-muted">
+                <p className="font-mono text-[11px] text-muted">
                   {m.found ? `${t.compEncontrado} · ${t.compPuesto(m.rank ?? 0)}` : t.compNoEncontrado}
                   {m.chosen ? ` · ${t.compElegido}` : m.instead ? ` · ${t.compEnTuLugar}: ${m.instead.host}${m.instead.priceUsd !== null ? ` ($${m.instead.priceUsd})` : ''}` : ''}
                 </p>

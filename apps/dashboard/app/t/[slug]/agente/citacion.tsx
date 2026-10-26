@@ -132,7 +132,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
             </p>
           ) : null}
           <table className="mt-4 w-full text-sm">
-            <thead className="text-left font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+            <thead className="text-left font-mono text-[10px] tracking-[0.02em] text-muted">
               <tr>
                 <th className="pb-2 font-normal" />
                 {motores.map((m) => (

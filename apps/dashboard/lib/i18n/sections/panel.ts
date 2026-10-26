@@ -1,10 +1,10 @@
 export const panel = {
   es: {
-    eyebrowNegocio: 'NEGOCIO',
-    consola: 'CONSOLA',
+    eyebrowNegocio: 'Negocio',
+    consola: 'Consola',
     navPortal: 'Portal dev',
-    scoreEyebrow: 'CONSOLA // AGENT-READINESS',
-    scoreAuditoria: 'AUDITORÍA',
+    scoreEyebrow: 'Consola / preparación para agentes',
+    scoreAuditoria: 'Medido',
     scoreConKit: (n: number) => `hasta ~${n} con el kit completo`,
     scoreCapacidad: (pts: number) => `Margen inmediato: +${pts} pts`,
     scoreDesde: (antes: number, ahora: number) => `De ${antes} a ${ahora} con Peaje`,
@@ -30,9 +30,9 @@ export const panel = {
     scoreMejoraNota: (delta: number) =>
       `+${delta} puntos desde que llegaste. El primer scan queda guardado como tu punto de partida.`,
     sidebarCambiar: 'Cambiar negocio',
-    estadoActivo: 'ACTIVO',
-    estadoRutas: 'RUTAS',
-    rieles: 'RIELES',
+    estadoActivo: 'activo',
+    estadoRutas: 'Rutas',
+    rieles: 'Redes',
     // layout
     necesitasEntrar: 'Necesitas entrar',
     soloEmailPre: 'El panel de ',
@@ -180,11 +180,11 @@ export const panel = {
     sitemapErrorImportar: 'No se pudo importar',
   },
   en: {
-    eyebrowNegocio: 'BUSINESS',
-    consola: 'CONSOLE',
+    eyebrowNegocio: 'Business',
+    consola: 'Console',
     navPortal: 'Dev portal',
-    scoreEyebrow: 'CONSOLE // AGENT-READINESS',
-    scoreAuditoria: 'AUDIT RUN',
+    scoreEyebrow: 'Console / agent readiness',
+    scoreAuditoria: 'Measured',
     scoreConKit: (n: number) => `up to ~${n} with the full kit`,
     scoreCapacidad: (pts: number) => `Immediate headroom: +${pts} pts`,
     scoreDesde: (antes: number, ahora: number) => `From ${antes} to ${ahora} with Peaje`,
@@ -210,9 +210,9 @@ export const panel = {
     scoreMejoraNota: (delta: number) =>
       `+${delta} points since you arrived. Your first scan is saved as the starting point.`,
     sidebarCambiar: 'Switch business',
-    estadoActivo: 'ACTIVE',
-    estadoRutas: 'ROUTES',
-    rieles: 'RAILS',
+    estadoActivo: 'active',
+    estadoRutas: 'Routes',
+    rieles: 'Networks',
     // layout
     necesitasEntrar: 'You need to sign in',
     soloEmailPre: 'The panel for ',

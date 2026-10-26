@@ -1,6 +1,6 @@
 export const dinero = {
   es: {
-    eyebrow: 'MI WALLET',
+    eyebrow: 'Mi wallet',
     // Ingresos
     ingresosTitulo: 'Ingresos',
     ingresosIntro:
@@ -51,7 +51,7 @@ export const dinero = {
     fechaLocale: 'es-CO',
   },
   en: {
-    eyebrow: 'MY WALLET',
+    eyebrow: 'My wallet',
     // Ingresos
     ingresosTitulo: 'Revenue',
     ingresosIntro:

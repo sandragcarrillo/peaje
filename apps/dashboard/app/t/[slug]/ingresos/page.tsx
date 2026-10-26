@@ -39,16 +39,16 @@ export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="border border-border bg-bg p-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{t.totalRecibido}</p>
+          <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.totalRecibido}</p>
           <p className="my-2 text-4xl font-bold tracking-tight tabular-nums">{money(ingresos.recibido)}</p>
           <p className="border-t border-border pt-3 font-mono text-[11px] text-muted">{t.totalRecibidoPie}</p>
         </div>
         <div className="border border-border bg-bg p-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{t.pagosCuenta}</p>
+          <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.pagosCuenta}</p>
           <p className="my-2 text-4xl font-bold tracking-tight tabular-nums">{ingresos.pagos}</p>
         </div>
         <div className="border border-border bg-bg p-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{d.panel.metricaCobro}</p>
+          <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.panel.metricaCobro}</p>
           <p className="my-2 font-mono text-lg">{tenant.payoutWallet ? shortWallet(tenant.payoutWallet) : d.panel.metricaCobroFalta}</p>
         </div>
       </div>
@@ -63,7 +63,7 @@ export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
               <thead>
-                <tr className="border-b border-border bg-panel font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                <tr className="border-b border-border bg-panel font-mono text-[10px] tracking-[0.02em] text-muted">
                   <th className="px-5 py-3 font-bold">{t.colFecha}</th>
                   <th className="px-5 py-3 font-bold">{t.colRuta}</th>
                   <th className="px-5 py-3 font-bold">{t.colRed}</th>

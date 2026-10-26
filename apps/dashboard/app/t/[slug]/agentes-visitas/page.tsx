@@ -62,7 +62,7 @@ export default async function VisitasPage({
               [t.metricaWallets, String(stats.agentWallets.length)],
             ].map(([label, valor], i) => (
               <div key={label} className={`p-6 ${i < 3 ? 'border-b border-border md:border-r md:border-b-0' : ''} ${i === 1 ? 'border-r-0 md:border-r' : ''}`}>
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{label}</span>
+                <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{label}</span>
                 <div className="mt-4 text-3xl font-bold">{valor}</div>
               </div>
             ))}
@@ -111,7 +111,7 @@ export default async function VisitasPage({
                 [t.embudoPagaron, stats.funnel.paid],
               ].map(([label, valor], i) => (
                 <div key={String(label)} className={`p-5 ${i < 2 ? 'border-r border-border' : ''}`}>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{label}</span>
+                  <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{label}</span>
                   <div className="mt-3 text-2xl font-bold">
                     {valor}
                     {i > 0 && stats.funnel.served402 > 0 ? (
@@ -125,7 +125,7 @@ export default async function VisitasPage({
 
           <section className="flex flex-col gap-3">
             <Cabecera texto={t.rutas} />
-            <div className="hidden grid-cols-12 gap-4 border border-border bg-panel-2 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-faint md:grid">
+            <div className="hidden grid-cols-12 gap-4 border border-border bg-panel-2 px-4 py-2 font-mono text-[10px] tracking-[0.02em] text-faint md:grid">
               <div className="col-span-4">{t.colRuta}</div>
               <div className="col-span-2 text-right">{t.colVisitas}</div>
               <div className="col-span-2 text-right">{t.colServidos}</div>
@@ -153,7 +153,7 @@ export default async function VisitasPage({
             ) : (
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t.noAtendidaMiradas}</span>
+                  <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{t.noAtendidaMiradas}</span>
                   <ul className="mt-2 divide-y divide-border border border-border">
                     {stats.unpaidDemand.map((p) => (
                       <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
@@ -168,7 +168,7 @@ export default async function VisitasPage({
                   </ul>
                 </div>
                 <div>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t.noAtendidaInexistentes}</span>
+                  <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{t.noAtendidaInexistentes}</span>
                   <ul className="mt-2 divide-y divide-border border border-border">
                     {stats.notFound.map((p) => (
                       <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
@@ -208,7 +208,7 @@ function Cabecera({ texto }: { texto: string }) {
   return (
     <div className="flex items-center gap-2 border-b border-text/70 pt-2 pb-2">
       <span aria-hidden className="h-2 w-2 bg-text" />
-      <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{texto}</span>
+      <span className="font-mono text-[11px] tracking-[0.02em]">{texto}</span>
     </div>
   )
 }
