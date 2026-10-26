@@ -1,9 +1,9 @@
 'use server'
 
+import { entrarComoDueno } from '@/lib/dueno'
 import { getDict } from '@/lib/i18n'
 import { verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
-import { store } from '@/lib/store'
 
 export type EntrarResultado =
   /** slug null = el usuario tiene varios negocios: va al selector. */
@@ -21,7 +21,8 @@ export async function entrarConPrivy(accessToken: string): Promise<EntrarResulta
   }
 
   try {
-    const tenants = await store.listTenantsByPrivyUserId(privyUserId)
+    // Incluye el re-match por email de quien viene de la app de Privy vieja.
+    const tenants = await entrarComoDueno(privyUserId)
     if (tenants.length === 0) {
       return { ok: false, error: d.acceso.errorSinNegocio }
     }

@@ -5,34 +5,65 @@ import { cookies } from 'next/headers'
 import { store } from './store'
 
 const COOKIE = 'peaje_session'
+const DURACION_S = 60 * 60 * 24 * 30
 
-// El prefijo versiona el formato: las cookies viejas (tenant-scoped) no validan.
-function sign(privyUserId: string): string {
-  const secret = process.env.INTERNAL_API_SECRET
-  if (!secret) throw new Error('Falta INTERNAL_API_SECRET')
-  return createHmac('sha256', secret).update(`u:${privyUserId}`).digest('hex')
+// El prefijo versiona el formato. v3 (oct 2026): firma con SESSION_SECRET y
+// lleva emisión y vencimiento dentro de lo firmado. Las cookies v2 (sin
+// prefijo, firmadas con INTERNAL_API_SECRET) dejan de validar.
+const PREFIJO = 'v3'
+
+let avisado = false
+
+function secreto(): string {
+  const propio = process.env.SESSION_SECRET
+  if (propio) return propio
+  // Fallback solo para que un deploy sin SESSION_SECRET no deje a todos
+  // afuera. Las cookies viejas igual dejan de validar por el prefijo v3.
+  const interno = process.env.INTERNAL_API_SECRET
+  if (!interno) throw new Error('Falta SESSION_SECRET')
+  if (!avisado) {
+    console.warn('[session] falta SESSION_SECRET: firmando sesiones con INTERNAL_API_SECRET. Configúralo.')
+    avisado = true
+  }
+  return interno
 }
 
-function packToken(privyUserId: string): string {
-  return `${privyUserId}.${sign(privyUserId)}`
+type Carga = { u: string; iat: number; exp: number }
+
+function firmar(cuerpo: string): string {
+  return createHmac('sha256', secreto()).update(`${PREFIJO}.${cuerpo}`).digest('base64url')
 }
 
-function unpackToken(token: string): string | null {
-  const dot = token.lastIndexOf('.')
-  if (dot < 0) return null
-  const privyUserId = token.slice(0, dot)
-  const given = Buffer.from(token.slice(dot + 1))
-  const expected = Buffer.from(sign(privyUserId))
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null
-  return privyUserId
+export function packToken(privyUserId: string, ahora = Math.floor(Date.now() / 1000)): string {
+  const carga: Carga = { u: privyUserId, iat: ahora, exp: ahora + DURACION_S }
+  const cuerpo = Buffer.from(JSON.stringify(carga)).toString('base64url')
+  return `${PREFIJO}.${cuerpo}.${firmar(cuerpo)}`
+}
+
+export function unpackToken(token: string, ahora = Math.floor(Date.now() / 1000)): string | null {
+  const partes = token.split('.')
+  if (partes.length !== 3 || partes[0] !== PREFIJO) return null
+  const [, cuerpo, firma] = partes as [string, string, string]
+  const dada = Buffer.from(firma)
+  const esperada = Buffer.from(firmar(cuerpo))
+  if (dada.length !== esperada.length || !timingSafeEqual(dada, esperada)) return null
+  try {
+    const carga = JSON.parse(Buffer.from(cuerpo, 'base64url').toString()) as Partial<Carga>
+    if (typeof carga.u !== 'string' || typeof carga.exp !== 'number' || typeof carga.iat !== 'number') return null
+    if (carga.exp <= ahora || carga.iat > ahora + 60) return null
+    return carga.u
+  } catch {
+    return null
+  }
 }
 
 /**
- * La sesión del dashboard identifica al USUARIO (privy_user_id), firmado con
- * INTERNAL_API_SECRET en una cookie httpOnly. Un usuario puede tener varios
- * negocios: el tenant se resuelve por slug y se valida que sea suyo. La
- * identidad la verifica Privy una sola vez al entrar; esta cookie es solo la
- * sesión local.
+ * La sesión del dashboard identifica al USUARIO (privy_user_id), firmada con
+ * SESSION_SECRET en una cookie httpOnly que vence a los 30 días (el
+ * vencimiento va firmado, no depende del navegador). Un usuario puede tener
+ * varios negocios: el tenant se resuelve por slug y se valida que sea suyo.
+ * La identidad la verifica Privy una sola vez al entrar; esta cookie es solo
+ * la sesión local.
  */
 export async function setSession(privyUserId: string) {
   const jar = await cookies()
@@ -41,7 +72,7 @@ export async function setSession(privyUserId: string) {
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: DURACION_S,
   })
 }
 

@@ -2,7 +2,8 @@
 
 import { generateEmbedSecret, slugify } from '@peaje/shared'
 import { getDict } from '@/lib/i18n'
-import { createMerchantWallet, getPrivyUserEmail, verifyPrivyAccessToken } from '@/lib/privy'
+import { entrarComoDueno } from '@/lib/dueno'
+import { asegurarWalletDueno, usuarioPrivy, verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
 import { describirSitio } from '@/lib/gateway'
 import { store } from '@/lib/store'
@@ -13,7 +14,8 @@ export type AltaResultado =
 
 /**
  * Alta de un negocio: login por email vía Privy (OTP verificado en el
- * cliente), wallet de payout creada automáticamente. Ya no hay API key.
+ * cliente). La wallet de cobro es la del dueño: una wallet de Privy a su
+ * nombre (owner = su DID), no custodial. Ya no hay API key.
  */
 export async function registrarNegocio(
   _previo: AltaResultado | null,
@@ -50,8 +52,10 @@ export async function registrarNegocio(
     return { ok: false, error: d.acceso.errorSlugTomado(slug) }
   }
 
-  const email = await getPrivyUserEmail(privyUserId)
-  const wallet = await createMerchantWallet(name)
+  const usuario = await usuarioPrivy(privyUserId)
+  const email = usuario.email
+  // Una por persona: si ya tiene (otro negocio, o la importó la migración), se reusa.
+  const wallet = await asegurarWalletDueno(privyUserId, usuario.wallet)
 
   const tenant = await store.createTenant({
     slug,
@@ -59,14 +63,18 @@ export async function registrarNegocio(
     originUrl: origin.origin + origin.pathname.replace(/\/$/, ''),
     embedSecret: generateEmbedSecret(),
     payoutWallet: wallet.address,
-    // La que Peaje custodia queda fija: solo con esta firma en nombre del negocio.
-    custodialWallet: wallet.address,
-    custodialWalletId: wallet.id,
+    ownerWallet: wallet.address,
+    ownerWalletId: wallet.id,
+    // Ya no hay wallet custodiada: Peaje no firma en nombre del negocio.
+    custodialWallet: null,
+    custodialWalletId: null,
     email,
     privyUserId,
   })
 
   await store.addAllowedOrigin(tenant.id, origin.origin)
+  // Si venía de la app de Privy vieja, sus otros negocios pasan a este DID.
+  await entrarComoDueno(privyUserId).catch((error) => console.error('[nuevo] re-match por email', error))
   await setSession(privyUserId)
   // Que llms.txt, openapi y el MCP describan el sitio desde el primer día, sin plantilla.
   describirSitio(tenant.slug)
