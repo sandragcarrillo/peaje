@@ -29,7 +29,7 @@ export const radar = {
     ejemplo: 'Ejemplo',
     ejemploDominio: 'ejemplo.com',
     ejemploFrase: 'Los agentes entienden 14 de 29 cosas.',
-    ejemploPrimero: 'Lo primero: un archivo que explica tu sitio a los agentes (llms.txt)',
+    ejemploPrimero: 'Lo primero: una guía de tu sitio para los agentes',
     ejemploPuntos: '+6 puntos',
 
     // Medición
@@ -55,38 +55,34 @@ export const radar = {
     copiarEnlace: 'Copiar enlace',
     enlaceCopiado: 'Enlace copiado',
     parcial: 'Ora no terminó de medir todo tu sitio. Lo que falta aparece con "—" más abajo.',
+    medido: (fecha: string) => `Medido el ${fecha}.`,
+    medicionVieja: (dias: number) =>
+      `Esta medición tiene ${dias} días: tu sitio puede haber cambiado. Vuelve a medir para ver cómo está hoy.`,
 
     // 02
-    s02: 'Empieza por aquí',
-    primero: (titulo: string, puntos: number) => `Lo primero: ${titulo} (+${fmt(puntos)} puntos).`,
-    copiarArreglo: 'Copiar instrucciones para mi agente de código',
-    instruccionesCopiadas: 'Instrucciones copiadas',
-    nadaPrimero: 'Tu sitio ya pasa todo lo que Peaje cubre. No hay un primer arreglo que proponerte.',
-    promptArreglo: (dominio: string, titulo: string, archivo: string, que: string, radarUrl: string) =>
-      `En el repo de mi sitio (${dominio}) quiero arreglar una cosa para que los agentes de IA lo entiendan mejor: ${titulo}${archivo ? ` (${archivo})` : ''}. Lo encontró el radar de Peaje, que usa el medidor Ora (ora.ai); el resultado está en ${radarUrl}.${
-        que ? ` Lo que dice el medidor, tal cual: "${que}"` : ''
-      } Antes de editar, muéstrame el cambio y espera mi confirmación. Haz solo ese cambio, sin tocar lo demás, dime qué archivos cambiaste y no hagas commit ni deploy: eso lo hago yo. Cuando esté publicado, vuelvo a medir.`,
-    promptArregloGateway: (dominio: string, titulo: string, signupUrl: string) =>
-      `En el repo de mi sitio (${dominio}) quiero arreglar esto para los agentes de IA: ${titulo}. Esta parte la sirve Peaje (usepeaje.com, código en https://github.com/sandragcarrillo/peaje) desde su servidor, así que primero creo mi cuenta en ${signupUrl} y te paso el identificador del negocio (slug). No hagas nada hasta que te lo pase. Con el slug, corre \`npx @peaje/cli@1 plan <slug>\`: muestra los archivos que cambiaría, sin escribir nada, en cualquier stack. Enséñame esa lista y espera mi confirmación. Con mi sí, corre \`npx @peaje/cli@1 init <slug> --yes\` y dime qué quedó para hacer a mano. No hagas commit ni deploy: eso lo hago yo.`,
-
-    // 03
-    s03: 'Lo que falta',
-    loArreglaPeaje: (n: number) => (n === 1 ? 'Esto lo arregla Peaje (1)' : `Esto lo arregla Peaje (${n})`),
+    s02: 'Lo que falta',
+    ordenNota: 'Primero lo fácil y, dentro de eso, lo que más sube tu puntaje.',
+    tuAgenteCuenta: (n: number, total: number) =>
+      n === total ? (total === 1 ? 'Tu agente la arregla.' : `Tu agente arregla las ${total}.`) : `Tu agente arregla ${n} de estas ${total}.`,
+    tuAgente: 'Lo arregla tu agente',
+    esfuerzo: { facil: 'Fácil', medio: 'Pide más trabajo', dificil: 'Toma más tiempo' },
+    masTiempo: 'También suben tu puntaje, con más trabajo',
+    notaDificil:
+      'Dependen de otros, como Google, Wikipedia u OpenAI, o de que alguien programe algo nuevo. No salen en una tarde: déjalas para después de lo de arriba.',
+    notaMedio: 'Piden a alguien que programe. No salen en una tarde: déjalas para después de lo de arriba.',
     loPonePeaje: 'lo pone Peaje',
-    enlaceEnPagina: 'enlace en tu página',
-    nadaQueArreglar: 'No falta nada de lo que Peaje cubre.',
-    otrasFaltan: (n: number) => `Otras cosas que faltan y el kit no cubre (${n})`,
+    nadaQueArreglar: 'No falta nada de lo que se pudo medir.',
     sinMedir: (n: number) => `No se pudo medir (${n})`,
     sinMedirNota: 'Esta parte no se pudo medir hoy. No la contamos ni a favor ni en contra.',
     puntos: (n: number) => `+${fmt(n)}`,
 
-    // 04
-    s04: 'Lo que ya haces bien',
+    // 03
+    s03: 'Lo que ya haces bien',
     yaBien: (n: number) => `Lo que ya haces bien (${n})`,
     nadaBien: 'Todavía nada. Por eso conviene empezar por arriba.',
 
-    // 05
-    s05: 'Déjanos arreglarlo',
+    // 04
+    s04: 'Arreglémoslo',
     queIncluye:
       'Gratis ves el diagnóstico. Con Peaje tienes tu propio agente en Telegram: te dice qué falta, te pasa los arreglos listos, te muestra cómo vas mejorando y te cuenta cuántos agentes te visitaron, cada día, cada semana o cada mes, como prefieras.',
     cierreTitulo: 'Ese es el diagnóstico. Ahora tu agente lo arregla contigo.',
@@ -128,7 +124,7 @@ export const radar = {
     ejemplo: 'Example',
     ejemploDominio: 'example.com',
     ejemploFrase: 'Agents understand 14 of 29 things.',
-    ejemploPrimero: 'First: a file that explains your site to agents (llms.txt)',
+    ejemploPrimero: 'First: a guide to your site for agents',
     ejemploPuntos: '+6 points',
 
     midiendo: 'Measuring your site. It takes about 30 seconds…',
@@ -152,34 +148,31 @@ export const radar = {
     copiarEnlace: 'Copy link',
     enlaceCopiado: 'Link copied',
     parcial: 'Ora did not finish measuring your whole site. What is missing shows up with "—" below.',
+    medido: (fecha: string) => `Measured on ${fecha}.`,
+    medicionVieja: (dias: number) =>
+      `This measurement is ${dias} days old, so your site may have changed. Measure again to see how it looks today.`,
 
-    s02: 'Start here',
-    primero: (titulo: string, puntos: number) => `First: ${titulo} (+${fmt(puntos)} points).`,
-    copiarArreglo: 'Copy instructions for my coding agent',
-    instruccionesCopiadas: 'Instructions copied',
-    nadaPrimero: 'Your site already passes everything Peaje covers. There is no first fix to suggest.',
-    promptArreglo: (dominio: string, titulo: string, archivo: string, que: string, radarUrl: string) =>
-      `In my site's repo (${dominio}) I want to fix one thing so AI agents understand it better: ${titulo}${archivo ? ` (${archivo})` : ''}. The Peaje radar found it, using the Ora scanner (ora.ai); the result is at ${radarUrl}.${
-        que ? ` What the scanner says, verbatim: "${que}"` : ''
-      } Before editing, show me the change and wait for my confirmation. Make only that change, leave everything else alone, tell me which files you changed, and do not commit or deploy: I do that. Once it is live, I will measure again.`,
-    promptArregloGateway: (dominio: string, titulo: string, signupUrl: string) =>
-      `In my site's repo (${dominio}) I want to fix this for AI agents: ${titulo}. Peaje (usepeaje.com, code at https://github.com/sandragcarrillo/peaje) serves this part from its own server, so first I create my account at ${signupUrl} and give you the business id (slug). Do nothing until I give it to you. With the slug, run \`npx @peaje/cli@1 plan <slug>\`: it lists the files it would change, without writing anything, on any stack. Show me that list and wait for my confirmation. Once I say yes, run \`npx @peaje/cli@1 init <slug> --yes\` and tell me what is left to do by hand. Do not commit or deploy: I do that.`,
-
-    s03: 'What is missing',
-    loArreglaPeaje: (n: number) => `Peaje fixes this (${n})`,
+    s02: 'What is missing',
+    ordenNota: 'Easy things first and, within those, what raises your score the most.',
+    tuAgenteCuenta: (n: number, total: number) =>
+      n === total ? (total === 1 ? 'Your agent fixes it.' : `Your agent fixes all ${total}.`) : `Your agent fixes ${n} of these ${total}.`,
+    tuAgente: 'Your agent fixes it',
+    esfuerzo: { facil: 'Easy', medio: 'Takes more work', dificil: 'Takes longer' },
+    masTiempo: 'These raise your score too, with more work',
+    notaDificil:
+      'They depend on others, like Google, Wikipedia or OpenAI, or on someone building something new. They will not happen in an afternoon, so leave them for after the list above.',
+    notaMedio: 'They need someone who codes. They will not happen in an afternoon, so leave them for after the list above.',
     loPonePeaje: 'Peaje adds it',
-    enlaceEnPagina: 'link on your page',
-    nadaQueArreglar: 'Nothing that Peaje covers is missing.',
-    otrasFaltan: (n: number) => `Other things missing that the kit does not cover (${n})`,
+    nadaQueArreglar: 'Nothing is missing from what could be measured.',
     sinMedir: (n: number) => `Could not be measured (${n})`,
     sinMedirNota: 'This part could not be measured today. We do not count it for or against you.',
     puntos: (n: number) => `+${fmt(n)}`,
 
-    s04: 'What you already do well',
+    s03: 'What you already do well',
     yaBien: (n: number) => `What you already do well (${n})`,
     nadaBien: 'Nothing yet. That is why it pays to start at the top.',
 
-    s05: 'Let us fix it',
+    s04: "Let's fix it",
     queIncluye:
       'The diagnosis is free. With Peaje you get your own agent on Telegram: it tells you what is missing, hands you the fixes ready to go, shows you how you are improving and tells you how many agents visited you, daily, weekly or monthly, as you prefer.',
     cierreTitulo: 'That is the diagnosis. Now your agent fixes it with you.',

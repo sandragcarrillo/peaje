@@ -1,7 +1,7 @@
 import { accesoPro } from '@peaje/db'
 import Link from 'next/link'
 import { barras, leer, type Barra } from '@/app/radar/datos'
-import { textoDe } from '@/app/radar/textos'
+import { textoLlanoDe } from '@/app/radar/textos'
 import { ScoreColumnas } from '@/components/score-columnas'
 import { money } from '@/lib/config'
 import { getDict, getLocale } from '@/lib/i18n'
@@ -94,7 +94,9 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
   }
 
   const l = leer(score)
-  const frenos = [...l.arreglables, ...l.otras].slice(0, 3)
+  // Lo mismo que el Radar: lo fácil y con impacto primero, lo difícil solo si no hay otra cosa.
+  const faciles = l.pasos.filter((p) => p.esfuerzo !== 'dificil')
+  const frenos = (faciles.length > 0 ? faciles : l.pasos).slice(0, 3)
   const antes = tenant.baselineScore
   const mejoro = antes !== null && score.score > antes
 
@@ -131,7 +133,7 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
                 <li key={f.check.id} className="flex items-start justify-between gap-3 py-2.5">
                   <span className="flex min-w-0 items-start gap-2.5">
                     <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-accent" />
-                    <span>{textoDe(f.check, locale).titulo}</span>
+                    <span>{textoLlanoDe(f.check, locale).titulo}</span>
                   </span>
                   {f.puntos > 0 ? (
                     <span className="shrink-0 font-mono text-xs font-bold text-accent">{d.radar.puntos(f.puntos)}</span>

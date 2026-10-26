@@ -19,7 +19,7 @@ const PRODUCTO = {
   name: 'Peaje Pro',
   tax_category: 'saas',
   description:
-    'Peaje Pro agent for one business: AI assistant citation tracking, chat with the agent, Telegram and Slack, page drafts, mystery buyer and weekly email. Billed monthly.',
+    'Peaje Pro agent for one business: AI assistant citation tracking, chat with the agent and Telegram, page drafts, mystery buyer and weekly email. 500 credits a month for agent work. Billed monthly.',
   custom_data: { app: 'peaje' },
 }
 

@@ -3,8 +3,8 @@
 import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
-import { Eyebrow } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
+import { Etiqueta } from '../acceder/etiqueta'
 import { registrarNegocio, type AltaResultado } from './actions'
 
 type Step = 'form' | 'code'
@@ -26,7 +26,6 @@ function normalizarUrl(raw: string): string | null {
 
 export default function NuevoNegocio() {
   const [step, setStep] = useState<Step>('form')
-  const [name, setName] = useState('')
   const [originUrl, setOriginUrl] = useState('')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -51,13 +50,12 @@ export default function NuevoNegocio() {
   }, [resultado, irAPlan, router])
 
   const d = useDict()
-  const { getAccessToken, authenticated, logout } = usePrivy()
+  const { getAccessToken, authenticated, logout, error: errorPrivy } = usePrivy()
   const { sendCode, loginWithCode } = useLoginWithEmail()
 
   async function enviarCodigo(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!name.trim()) return setError(d.acceso.errorFaltaNombre)
     const url = normalizarUrl(originUrl)
     if (!url) return setError(d.acceso.errorUrlInvalida)
     setOriginUrl(url)
@@ -69,7 +67,6 @@ export default function NuevoNegocio() {
         const accessToken = await getAccessToken().catch(() => null)
         if (accessToken) {
           const formData = new FormData()
-          formData.set('name', name)
           formData.set('originUrl', url)
           formData.set('privyAccessToken', accessToken)
           const r = await registrarNegocio(null, formData)
@@ -84,6 +81,9 @@ export default function NuevoNegocio() {
         await logout().catch(() => {})
       }
       if (!email.trim()) return setError(d.acceso.errorFaltaEmail)
+      // Si Privy no pudo arrancar, la causa más probable son tokens viejos
+      // guardados en el navegador: logout los borra antes de pedir el código.
+      if (errorPrivy) await logout().catch(() => {})
       await sendCode({ email })
       setStep('code')
     } catch {
@@ -102,7 +102,6 @@ export default function NuevoNegocio() {
       const accessToken = await getAccessToken()
       if (!accessToken) throw new Error('sin token')
       const formData = new FormData()
-      formData.set('name', name)
       formData.set('originUrl', normalizarUrl(originUrl) ?? originUrl)
       formData.set('privyAccessToken', accessToken)
       const r = await registrarNegocio(null, formData)
@@ -137,7 +136,7 @@ export default function NuevoNegocio() {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
         <div className="w-full max-w-sm border border-border bg-panel p-8">
-          <Eyebrow>Peaje</Eyebrow>
+          <Etiqueta>Peaje</Etiqueta>
           <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
             {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
@@ -173,25 +172,11 @@ export default function NuevoNegocio() {
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
       <div className="w-full max-w-4xl border border-border bg-panel p-8">
-        <Eyebrow dot>{d.acceso.registrarKicker}</Eyebrow>
-        <h1 className="mt-2 text-2xl font-semibold">{d.acceso.tituloRegistrar}</h1>
+        <h1 className="text-2xl font-semibold">{d.acceso.tituloRegistrar}</h1>
         <p className="mt-2 max-w-xl text-sm text-muted">{d.acceso.subtituloRegistrar}</p>
 
         <form onSubmit={enviarCodigo} className="mt-8 space-y-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <label className="block">
-            <span className="font-mono text-xs text-muted">
-              {d.acceso.campoNombre} <span className="text-accent">*</span>
-            </span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder={d.acceso.placeholderNombre}
-              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
-            />
-          </label>
-
+          <div className={`grid grid-cols-1 gap-6 ${authenticated ? '' : 'md:grid-cols-2'}`}>
           <label className="block">
             <span className="font-mono text-xs text-muted">
               {d.acceso.campoUrl} <span className="text-accent">*</span>

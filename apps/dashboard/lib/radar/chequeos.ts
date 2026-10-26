@@ -343,12 +343,12 @@ const CHEQUEOS: Record<string, Entrada> = {
   },
   'content-no-js': {
     es: t(
-      'Tu contenido no se ve sin JavaScript',
+      'Los robots de IA no ven tu contenido (JavaScript)',
       'Tu contenido se ve sin JavaScript',
       'La mayoría de los robots de IA no ejecutan JavaScript, así que si tu página lo necesita para mostrar el contenido, ven un sitio en blanco.',
     ),
     en: t(
-      'Your content does not show without JavaScript',
+      'AI bots cannot see your content (JavaScript)',
       'Your content shows without JavaScript',
       'Most AI bots do not run JavaScript, so if your page needs it to show content, they see a blank site.',
     ),
@@ -499,12 +499,12 @@ const CHEQUEOS: Record<string, Entrada> = {
   },
   'markdown-url-fallback': {
     es: t(
-      'Tus páginas no tienen versión en texto simple terminada en .md (index.md)',
+      'No se puede pedir cada página en texto simple con solo cambiar la dirección (index.md)',
       'Tus páginas tienen versión en texto simple terminada en .md (index.md)',
       'Si alguien agrega .md al final de una dirección de tu sitio, recibe esa página en texto limpio, la lectura más fácil para un agente.',
     ),
     en: t(
-      'Your pages have no plain text version ending in .md (index.md)',
+      'Agents cannot get each page as plain text just by changing the address (index.md)',
       'Your pages have a plain text version ending in .md (index.md)',
       'Adding .md to the end of a page address returns that page as clean text, the easiest read for an agent.',
     ),
@@ -549,12 +549,12 @@ const CHEQUEOS: Record<string, Entrada> = {
     es: t(
       'Los agentes no reciben tu catálogo como datos (robots.txt)',
       'Los agentes reciben tu catálogo como datos (robots.txt)',
-      'Es una línea en tu robots.txt que les entrega a los agentes tu catálogo ordenado, para que no lo saquen de tus páginas.',
+      'Es un aviso en tu sitio que les entrega a los agentes tu catálogo ordenado, para que no lo saquen de tus páginas.',
     ),
     en: t(
       'Agents do not get your catalog as data (robots.txt)',
       'Agents get your catalog as data (robots.txt)',
-      'It is a line in your robots.txt that hands agents your catalog in order, so they do not scrape it from your pages.',
+      'It is a pointer on your site that hands agents your catalog in order, so they do not scrape it from your pages.',
     ),
   },
   'openapi-spec': {
@@ -743,12 +743,12 @@ const CHEQUEOS: Record<string, Entrada> = {
     es: t(
       'Tus datos de acceso para agentes no están en formato de máquina (auth.md)',
       'Tus datos de acceso para agentes están en formato de máquina (auth.md)',
-      'Es la versión para máquinas de tu auth.md, para que un agente sepa cómo pedir acceso sin leer la guía.',
+      'Es la versión para máquinas de tu guía de acceso, para que un agente sepa cómo pedir acceso sin leer la guía.',
     ),
     en: t(
       'Your access details for agents are not machine-readable (auth.md)',
       'Your access details for agents are machine-readable (auth.md)',
-      'It is the machine version of your auth.md, so an agent knows how to request access without reading the guide.',
+      'It is the machine version of your access guide, so an agent knows how to request access without reading the guide.',
     ),
   },
   'agent-auth-endpoints-reachable': {
@@ -1634,6 +1634,22 @@ function entrada(id: string, locale: LocaleChequeo): Textos | null {
 export function textoDeChequeo(id: string, locale: 'es' | 'en'): { titulo: string; detalle: string } | null {
   const e = entrada(id, locale)
   return e ? { titulo: e.falta, detalle: e.detalle } : null
+}
+
+/**
+ * El título sin el paréntesis final con el archivo o el protocolo
+ * ("(llms.txt)", "(MCP)"). Es lo que ve el dueño en la lista de arreglos:
+ * palabras simples, sin nombres técnicos. El archivo sigue en `textoDeChequeo`
+ * para las instrucciones al agente de código, que sí lo necesita.
+ */
+export function sinArchivo(titulo: string): string {
+  return titulo.replace(/\s*\([^()]*\)\s*$/, '')
+}
+
+/** Lo que falta en palabras del dueño, sin nombres técnicos, más su "por qué importa". */
+export function textoLlano(id: string, locale: 'es' | 'en'): { titulo: string; detalle: string } | null {
+  const e = entrada(id, locale)
+  return e ? { titulo: sinArchivo(e.falta), detalle: e.detalle } : null
 }
 
 /** Versión en positivo del título, para la columna de lo que ya pasa. */

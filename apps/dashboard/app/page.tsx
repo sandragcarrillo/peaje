@@ -7,14 +7,18 @@ import { ChatEjemplo } from './components/chat-ejemplo'
 /**
  * Landing pública (copy final de San, 24 oct 2026). Crema y tinta, etiquetas
  * mono, bordes de 6px y el punto verde. Dos CTAs en todo el sitio público:
- * "Usar agente" (alta) y "Revisar mi sitio gratis" (radar).
+ * "Empezar con mi agente" (alta) y "Revisar mi sitio gratis" (radar).
  */
 
 const COMISION_PCT = 2
 
 type L = Dict['landing']
 
-/** Sección a sangre completa: se escapa del max-w-5xl del layout. */
+/**
+ * Sección a sangre completa: se escapa del max-w-5xl del layout. 100vw incluye
+ * la barra de scroll cuando el sistema la muestra; el sobrante lo corta el
+ * envoltorio con `overflow-x: clip` del layout.
+ */
 function Sangre({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-[calc(50%-50vw)] w-screen ${className}`}>{children}</div>
 }
@@ -51,7 +55,6 @@ export default async function Landing() {
             bot={t.chatBot}
             subtitulo={t.chatSubtitulo}
             tu={t.chatTu}
-            escribiendo={t.chatEscribiendo}
           />
         </div>
       </Sangre>
@@ -63,7 +66,7 @@ export default async function Landing() {
           <div className="mt-10 grid gap-8 sm:grid-cols-3">
             {t.necesitan.map((n) => (
               <div key={n.titulo} className="border-t border-border pt-5">
-                <p className="flex items-center gap-2 font-mono text-xs font-bold text-accent">
+                <p className="etiqueta flex items-center gap-2 font-bold text-accent">
                   <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
                   {n.titulo}
                 </p>
@@ -82,7 +85,7 @@ export default async function Landing() {
           <ol className="mt-10 grid gap-10 sm:grid-cols-3">
             {t.pasos.map((p, i) => (
               <li key={p.titulo} className="border-t border-border pt-5">
-                <p className="font-mono text-xs font-bold text-accent">{String(i + 1).padStart(2, '0')}</p>
+                <p className="font-mono text-[14px] font-bold tracking-[0.02em] text-accent">{String(i + 1).padStart(2, '0')}</p>
                 <h3 className="mt-3 text-lg font-semibold leading-snug">{p.titulo}</h3>
                 <p className="mt-2 text-sm text-muted">{p.texto}</p>
               </li>
@@ -91,13 +94,13 @@ export default async function Landing() {
         </section>
       </Sangre>
 
-      {/* ── Precio ───────────────────────────────────────────── */}
+      {/* ── Precios ──────────────────────────────────────────── */}
       <Sangre className="isla-crema bg-bg text-text">
         <section id="precio" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
           <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
           <div className="mt-8 grid gap-8 border border-border bg-panel p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-end">
             <div className="space-y-3">
-              <p className="flex items-center gap-2 font-mono text-xs font-bold text-accent">
+              <p className="etiqueta flex items-center gap-2 font-bold text-accent">
                 <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
                 {t.precioEtiqueta}
               </p>
@@ -116,7 +119,7 @@ export default async function Landing() {
               </Link>
             </div>
           </div>
-          <p className="mt-5 max-w-3xl text-xs text-muted">{t.letraChica(COMISION_PCT)}</p>
+          <p className="mt-5 max-w-3xl text-sm text-muted">{t.letraChica(COMISION_PCT)}</p>
         </section>
       </Sangre>
 
@@ -159,7 +162,7 @@ export default async function Landing() {
       {/* ── Para devs ────────────────────────────────────────── */}
       <Sangre className="isla-tinta border-t border-border bg-bg text-text">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-sm">
-          <span className="font-mono text-xs font-bold text-accent">{t.devsEtiqueta}</span>
+          <span className="etiqueta font-bold text-accent">{t.devsEtiqueta}</span>
           <span className="text-muted">
             {t.devsTexto} <code className="font-mono text-text">npx @peaje/cli@1 init &lt;slug&gt;</code>
           </span>

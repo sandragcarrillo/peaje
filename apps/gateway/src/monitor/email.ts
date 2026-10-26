@@ -15,14 +15,17 @@ const estilo = 'font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;fo
 const mono = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:#f4f4f4;padding:10px 12px;border-radius:4px;white-space:pre-wrap'
 
 /** `text` es la versión en texto plano (la usan los clientes sin HTML y ayuda con los filtros de spam). */
-export async function enviarCorreo(to: string, subject: string, html: string, opts?: { replyTo?: string; text?: string }): Promise<void> {
+/** Un adjunto de Resend. Con `content_id`, la imagen se embebe y el HTML la usa como `cid:<content_id>`. */
+export type Adjunto = { filename: string; content: string; content_id?: string }
+
+export async function enviarCorreo(to: string, subject: string, html: string, opts?: { replyTo?: string; text?: string; attachments?: Adjunto[] }): Promise<void> {
   const key = process.env.RESEND_API_KEY
   const from = process.env.AGENTS_FROM_EMAIL
   if (!key || !from) throw new Error('Falta RESEND_API_KEY o AGENTS_FROM_EMAIL en el gateway')
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from, to, subject, html, ...(opts?.text ? { text: opts.text } : {}), ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}) }),
+    body: JSON.stringify({ from, to, subject, html, ...(opts?.text ? { text: opts.text } : {}), ...(opts?.replyTo ? { reply_to: opts.replyTo } : {}), ...(opts?.attachments?.length ? { attachments: opts.attachments } : {}) }),
     signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) throw new Error(`Resend respondió ${res.status}: ${await res.text()}`)

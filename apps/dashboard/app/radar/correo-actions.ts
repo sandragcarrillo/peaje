@@ -5,8 +5,9 @@ import { after } from 'next/server'
 import { mandarReporteRadar, guardarLeadRadar, type ReporteRadar } from '@/lib/gateway'
 import { dictFor, getLocale, type Locale } from '@/lib/i18n'
 import { cachedScore, gradeDe, prevision } from '@/lib/ora'
-import { dominioDeRadar } from './dominio'
-import { textoDeChequeo } from '@/lib/radar/chequeos'
+import { leer, principales } from './datos'
+import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
+import { textoLlanoDe } from './textos'
 
 /**
  * El radar pide email y dominio antes de medir. El lead se guarda en el
@@ -89,12 +90,15 @@ export async function registrarLead(input: {
  */
 export async function enviarReporte(dominio: string): Promise<boolean> {
   try {
-    const email = emailValido((await cookies()).get(COOKIE)?.value)
+    const jar = await cookies()
+    const email = emailValido(jar.get(COOKIE)?.value)
     const limpio = dominioDeRadar(dominio)
     if (!email || !limpio) return false
     if (!dentroDelLimite('reporte', await ipDe(), TOPE_REPORTE)) return false
     const locale = await getLocale()
-    after(() => reportar(email, limpio, locale))
+    // Recién medido: el correo lleva esta medición, no la que Ora tiene en su CDN.
+    const fresco = dominiosFrescos(jar.get(COOKIE_FRESCO)?.value).includes(limpio)
+    after(() => reportar(email, limpio, locale, fresco))
     return true
   } catch (err) {
     console.error('[radar] enviarReporte falló', err)
@@ -102,24 +106,20 @@ export async function enviarReporte(dominio: string): Promise<boolean> {
   }
 }
 
-/** Arma el reporte con el puntaje en cache de Ora y lo manda por el gateway. Nunca lanza. */
-async function reportar(email: string, dominio: string, locale: Locale): Promise<void> {
+/** Arma el reporte con el puntaje de Ora y lo manda por el gateway. Nunca lanza. */
+async function reportar(email: string, dominio: string, locale: Locale, fresco = false): Promise<void> {
   try {
-    const score = await cachedScore(dominio)
+    const score = await cachedScore(dominio, { fresco })
     if (!score) return
     const p = prevision(score)
-    const fixes: ReporteRadar['fixes'] = p.arreglables
-      // En el idioma del visitante y en palabras de dueño; el nombre de Ora (en inglés) solo si el chequeo es desconocido.
-      .map((a) => {
-        const texto = textoDeChequeo(a.check.id, locale === 'en' ? 'en' : 'es')
-        return {
-          name: texto?.titulo ?? a.check.name,
-          recommendation: texto?.detalle ?? a.check.recommendation ?? null,
-          points: a.check.estScoreGain ?? a.check.maxScore ?? null,
-        }
-      })
-      .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
+    // Los tres primeros de la lista del radar (lo fácil y que más suma), en el
+    // idioma del visitante y en palabras de dueño, sin nombres técnicos.
+    const fixes: ReporteRadar['fixes'] = principales(leer(score))
       .slice(0, 3)
+      .map((f) => {
+        const texto = textoLlanoDe(f.check, locale)
+        return { name: texto.titulo, recommendation: texto.detalle || null, points: f.puntos > 0 ? f.puntos : null }
+      })
     const r = await mandarReporteRadar({
       email,
       domain: dominio,

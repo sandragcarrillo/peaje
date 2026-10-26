@@ -54,12 +54,35 @@ export function hostsCandidatos(domain: string): string[] {
   return [...new Set([domain, raiz, `www.${raiz}`])]
 }
 
-async function scoreDe(host: string): Promise<OraScore | null> {
+/**
+ * Escaneos frescos que pidió esta instancia, por host, durante una hora. El
+ * GET de Ora pasa por un CDN con `max-age=3600`: justo después de medir puede
+ * seguir devolviendo el escaneo anterior. Lo que devolvió el POST es lo más
+ * nuevo que hay, así que cuenta como candidato.
+ */
+const UNA_HORA = 3_600_000
+const recientes = new Map<string, { score: OraScore; en: number }>()
+
+function guardarReciente(domain: string, score: OraScore): void {
+  const ahora = Date.now()
+  for (const [host, r] of recientes) if (ahora - r.en > UNA_HORA) recientes.delete(host)
+  if (recientes.size > 500) recientes.clear()
+  for (const host of hostsCandidatos(domain)) recientes.set(host, { score, en: ahora })
+}
+
+function recienteDe(domain: string): OraScore | null {
+  const r = recientes.get(domain)
+  return r && Date.now() - r.en <= UNA_HORA ? r.score : null
+}
+
+async function scoreDe(host: string, fresco = false): Promise<OraScore | null> {
   // Ora a veces devuelve un 429/5xx transitorio; un fallo puntual no puede
   // verse como "tu sitio no tiene score". Un reintento corto y timeout.
+  // `fresco`: un parámetro distinto en cada pedido salta el CDN de Ora.
+  const url = `${BASE}/score/${host}${fresco ? `?v=${Date.now()}` : ''}`
   for (let intento = 0; intento < 2; intento++) {
     try {
-      const res = await fetch(`${BASE}/score/${host}`, {
+      const res = await fetch(url, {
         cache: 'no-store',
         signal: AbortSignal.timeout(15_000),
       })
@@ -75,8 +98,18 @@ async function scoreDe(host: string): Promise<OraScore | null> {
   return null
 }
 
-export async function cachedScore(domain: string): Promise<OraScore | null> {
-  const scores = (await Promise.all(hostsCandidatos(domain).map(scoreDe))).filter((s): s is OraScore => s !== null)
+/**
+ * El escaneo más reciente de Ora para el dominio. Con `fresco` (justo después
+ * de medir) pide saltando el CDN de Ora; sin él, lo que Ora tenga en cache,
+ * que puede tener hasta una hora.
+ */
+export async function cachedScore(domain: string, opciones: { fresco?: boolean } = {}): Promise<OraScore | null> {
+  const scores = (await Promise.all(hostsCandidatos(domain).map((h) => scoreDe(h, opciones.fresco)))).filter(
+    (s): s is OraScore => s !== null,
+  )
+  // Al final: con la misma fecha gana lo que devolvió el GET, que es el completo.
+  const propio = recienteDe(domain)
+  if (propio) scores.push(propio)
   if (scores.length === 0) return null
   return scores.sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))[0]!
 }
@@ -90,7 +123,9 @@ export async function freshScan(domain: string): Promise<OraScore | null> {
     cache: 'no-store',
   })
   if (!res.ok) return null
-  return (await res.json()) as OraScore
+  const score = (await res.json()) as OraScore
+  guardarReciente(domain, score)
+  return score
 }
 
 
@@ -104,7 +139,11 @@ export async function escanear(domain: string): Promise<{ score: OraScore } | { 
       cache: 'no-store',
       signal: AbortSignal.timeout(90_000),
     })
-    if (res.ok) return { score: (await res.json()) as OraScore }
+    if (res.ok) {
+      const score = (await res.json()) as OraScore
+      guardarReciente(domain, score)
+      return { score }
+    }
     const cuerpo = (await res.json().catch(() => ({}))) as { error?: string }
     return { error: res.status === 400 && /not reachable/i.test(cuerpo.error ?? '') ? 'inalcanzable' : 'fallo' }
   } catch {

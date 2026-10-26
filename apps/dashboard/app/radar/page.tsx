@@ -6,10 +6,10 @@ import { getDict, getLocale, type Dict, type Locale } from '@/lib/i18n'
 import { PRECIOS_USD } from '@peaje/db'
 import { cachedScore, gradeDe } from '@/lib/ora'
 import { Copiar } from './compartir'
-import { leer, primero, type Fila, type Lectura } from './datos'
-import { dominioDeRadar } from './dominio'
+import { leer, masTiempo, principales, type Lectura, type Paso } from './datos'
+import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
 import { Formulario, MandarInforme, Medir } from './partes'
-import { enFrase, textoDe, textoOk } from './textos'
+import { textoLlanoDe, textoOk } from './textos'
 
 /**
  * Radar público: cualquier dominio. Ver un resultado ya medido es abierto
@@ -23,14 +23,20 @@ const COOKIE_CORREO = 'peaje_radar_email'
 type Props = { searchParams: Promise<{ d?: string; medir?: string }> }
 type T = Dict['radar']
 
-/** Una sola consulta a Ora por request: la comparten la metadata y la página. */
-const puntaje = cache((dominio: string) => cachedScore(dominio))
+/**
+ * Una sola consulta a Ora por request: la comparten la metadata y la página.
+ * Si el visitante acaba de medir este dominio, se lee saltando el CDN de Ora.
+ */
+const puntaje = cache((dominio: string, fresco: boolean) => cachedScore(dominio, { fresco }))
+
+const recienMedido = (jar: Awaited<ReturnType<typeof cookies>>, dominio: string) =>
+  dominiosFrescos(jar.get(COOKIE_FRESCO)?.value).includes(dominio)
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const [{ d: entrada }, { radar: t }, locale] = await Promise.all([searchParams, getDict(), getLocale()])
+  const [{ d: entrada }, { radar: t }, locale, jar] = await Promise.all([searchParams, getDict(), getLocale(), cookies()])
   const dominio = dominioDeRadar(entrada)
   if (!dominio) return { title: t.metaTituloGeneral, description: t.metaDescripcionGeneral }
-  const score = await puntaje(dominio)
+  const score = await puntaje(dominio, recienMedido(jar, dominio))
   let linea = ''
   if (score) {
     const l = leer(score)
@@ -57,7 +63,7 @@ export default async function Radar({ searchParams }: Props) {
   const correo = jar.get(COOKIE_CORREO)?.value ?? ''
   const conCorreo = correo !== ''
   const dominio = dominioDeRadar(entrada)
-  const score = dominio ? await puntaje(dominio) : null
+  const score = dominio ? await puntaje(dominio, recienMedido(jar, dominio)) : null
   const pideMedir = medir === '1'
 
   // Medir necesita correo; ver un resultado ya medido, no.
@@ -183,34 +189,57 @@ function Seccion({ n, titulo, children, tono = 'bg-bg' }: { n: string; titulo: s
   )
 }
 
-/** El archivo (o el lugar) que arregla un check, en palabras simples. */
-function archivoDe(t: T, f: Fila): string | null {
-  if (!f.bloque) return null
-  if (f.viaGateway) return t.loPonePeaje
-  if (f.bloque === 'discovery link') return t.enlaceEnPagina
-  return f.bloque
+/** Más de esto y la medición ya no cuenta como "de hoy": se avisa al lado de la fecha. */
+const DIAS_VIEJA = 7
+
+/** Fecha de la medición de Ora en el idioma del visitante, y cuántos días tiene. */
+function fechaDe(iso: string | null, locale: Locale): { fecha: string; dias: number } | null {
+  const ms = iso ? Date.parse(iso) : Number.NaN
+  if (Number.isNaN(ms)) return null
+  // En UTC: es la fecha que guarda Ora, la misma para cualquiera que abra el enlace.
+  const fecha = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(ms)
+  return { fecha, dias: Math.max(0, Math.floor((Date.now() - ms) / 86_400_000)) }
 }
 
-function Filas({ t, locale, filas, tono }: { t: T; locale: Locale; filas: Fila[]; tono: 'accent' | 'muted' }) {
+function Etiqueta({ children, tono }: { children: React.ReactNode; tono: 'accent' | 'muted' }) {
+  return (
+    <span
+      className={`inline-block border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.04em] ${
+        tono === 'accent' ? 'border-accent text-accent' : 'border-border text-muted'
+      }`}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** Cada arreglo en palabras del dueño: qué falta, por qué importa, cuánto trabajo pide y si lo hace su agente. */
+function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
   return (
     <ul className="divide-y divide-border/60 text-sm">
-      {filas.map((f) => {
-        const titulo = textoDe(f.check, locale).titulo
-        const crudo = archivoDe(t, f)
-        // Los textos de chequeos.ts ya traen el archivo entre paréntesis: no se repite.
-        const archivo = crudo && !titulo.toLowerCase().includes(crudo.toLowerCase()) ? crudo : null
+      {pasos.map((p) => {
+        const { titulo, detalle } = textoLlanoDe(p.check, locale)
         return (
-          <li key={f.check.id} className="flex items-start justify-between gap-3 py-2.5">
+          <li key={p.check.id} className="flex items-start justify-between gap-3 py-3">
             <span className="flex min-w-0 items-start gap-2.5">
-              <span aria-hidden className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${tono === 'accent' ? 'bg-accent' : 'bg-faint'}`} />
-              <span>
-                {titulo}
-                {archivo ? <span className="font-mono text-xs text-muted"> ({archivo})</span> : null}
+              <span
+                aria-hidden
+                className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${p.loArreglaTuAgente ? 'bg-accent' : 'bg-faint'}`}
+              />
+              <span className="min-w-0 space-y-1">
+                <span className="block">{titulo}</span>
+                {detalle ? <span className="block text-xs text-muted">{detalle}</span> : null}
+                <span className="flex flex-wrap gap-1.5 pt-0.5">
+                  <Etiqueta tono="muted">{t.esfuerzo[p.esfuerzo]}</Etiqueta>
+                  {p.loArreglaTuAgente ? <Etiqueta tono="accent">{t.tuAgente}</Etiqueta> : null}
+                </span>
               </span>
             </span>
-            {f.puntos > 0 ? (
-              <span className={`shrink-0 font-mono text-xs font-bold ${tono === 'accent' ? 'text-accent' : 'text-muted'}`}>
-                {t.puntos(f.puntos)}
+            {p.puntos > 0 ? (
+              <span
+                className={`shrink-0 font-mono text-xs font-bold ${p.loArreglaTuAgente ? 'text-accent' : 'text-muted'}`}
+              >
+                {t.puntos(p.puntos)}
               </span>
             ) : null}
           </li>
@@ -235,15 +264,10 @@ function Resultado({
 }) {
   const margen = l.estimado - l.actual
   const enlace = `${BASE}/radar?d=${encodeURIComponent(dominio)}`
-  const signup = `${BASE}/nuevo?url=${encodeURIComponent(dominio)}`
-  const top = primero(l)
-  const topTexto = top ? textoDe(top.check, locale) : null
-  const que = top ? [top.check.details, top.check.recommendation].filter(Boolean).join(' ') : ''
-  const promptTop = top && topTexto
-    ? top.viaGateway
-      ? t.promptArregloGateway(dominio, topTexto.titulo, signup)
-      : t.promptArreglo(dominio, topTexto.titulo, archivoDe(t, top) ?? '', que, enlace)
-    : ''
+  const lista = principales(l)
+  const despues = masTiempo(l, lista)
+  const deTuAgente = lista.filter((p) => p.loArreglaTuAgente).length
+  const medicion = fechaDe(l.medido, locale)
 
   return (
     <div className="space-y-6 py-6">
@@ -251,15 +275,20 @@ function Resultado({
 
       {/* 01 */}
       <section className="border border-border bg-bg">
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-panel px-6 py-2.5 font-mono text-[11px] tracking-[0.04em] text-muted">
-          <div className="flex min-w-0 items-baseline gap-3">
-            <span className="font-bold text-accent">01</span>
-            <span className="truncate text-text">{t.s01}</span>
-            <span className="hidden truncate sm:inline">· {dominio}</span>
-          </div>
-          <Medir dominio={dominio} conCorreo={conCorreo} />
+        <div className="flex items-center gap-3 border-b border-border bg-panel px-6 py-2.5 font-mono text-[11px] tracking-[0.04em] text-muted">
+          <span className="font-bold text-accent">01</span>
+          <span className="truncate text-text">{t.s01}</span>
+          <span className="hidden truncate sm:inline">· {dominio}</span>
         </div>
         <div className="space-y-6 p-6 lg:p-8">
+          <div className="flex flex-col items-start gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-2xl text-sm text-muted">
+              {medicion ? <span className="text-text">{t.medido(medicion.fecha)}</span> : null}
+              {medicion && medicion.dias > DIAS_VIEJA ? <span> {t.medicionVieja(medicion.dias)}</span> : null}
+            </p>
+            <Medir dominio={dominio} conCorreo={conCorreo} />
+          </div>
+
           <div className="space-y-2">
             <p className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl">
               {t.frase(l.bien.length, l.total, dominio)}
@@ -303,34 +332,25 @@ function Resultado({
 
       {/* 02 */}
       <Seccion n="02" titulo={t.s02} tono="bg-panel">
-        {top && topTexto ? (
-          <div className="space-y-4">
-            <p className="text-xl font-semibold leading-snug">{t.primero(enFrase(topTexto.titulo), top.puntos)}</p>
-            {topTexto.detalle ? <p className="max-w-2xl text-sm text-muted">{topTexto.detalle}</p> : null}
-            <Copiar texto={promptTop} etiqueta={t.copiarArreglo} copiado={t.instruccionesCopiadas} variante="lleno" />
+        {lista.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted">
+              {t.ordenNota}
+              {deTuAgente > 0 ? ` ${t.tuAgenteCuenta(deTuAgente, lista.length)}` : ''}
+            </p>
+            <Pasos t={t} locale={locale} pasos={lista} />
           </div>
         ) : (
-          <p className="text-sm">{t.nadaPrimero}</p>
+          <p className="text-sm text-accent">{t.nadaQueArreglar}</p>
         )}
-      </Seccion>
-
-      {/* 03 */}
-      <Seccion n="03" titulo={t.s03}>
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold">{t.loArreglaPeaje(l.arreglables.length)}</h3>
-          {l.arreglables.length > 0 ? (
-            <Filas t={t} locale={locale} filas={l.arreglables} tono="accent" />
-          ) : (
-            <p className="text-sm text-accent">{t.nadaQueArreglar}</p>
-          )}
-        </div>
-        {l.otras.length > 0 ? (
-          <details className="border-t border-border pt-4">
-            <summary className="cursor-pointer text-sm text-muted hover:text-text">{t.otrasFaltan(l.otras.length)}</summary>
-            <div className="mt-3">
-              <Filas t={t} locale={locale} filas={l.otras} tono="muted" />
-            </div>
-          </details>
+        {despues.length > 0 ? (
+          <div className="space-y-2 border-t border-border pt-4">
+            <h3 className="text-sm font-semibold">{t.masTiempo}</h3>
+            <p className="text-xs text-muted">
+              {despues.some((p) => p.esfuerzo === 'dificil') ? t.notaDificil : t.notaMedio}
+            </p>
+            <Pasos t={t} locale={locale} pasos={despues} />
+          </div>
         ) : null}
         {l.sinMedir.length > 0 ? (
           <div className="space-y-2 border-t border-border pt-4">
@@ -339,7 +359,7 @@ function Resultado({
             <ul className="divide-y divide-border/60 text-sm">
               {l.sinMedir.map((c) => (
                 <li key={c.id} className="flex items-start justify-between gap-3 py-2.5 text-muted">
-                  <span>{textoDe(c, locale).titulo}</span>
+                  <span>{textoLlanoDe(c, locale).titulo}</span>
                   <span className="shrink-0 font-mono text-xs">—</span>
                 </li>
               ))}
@@ -348,8 +368,8 @@ function Resultado({
         ) : null}
       </Seccion>
 
-      {/* 04 */}
-      <Seccion n="04" titulo={t.s04}>
+      {/* 03 */}
+      <Seccion n="03" titulo={t.s03}>
         {l.bien.length > 0 ? (
           <details>
             <summary className="cursor-pointer text-sm font-semibold">{t.yaBien(l.bien.length)}</summary>
@@ -367,8 +387,8 @@ function Resultado({
         )}
       </Seccion>
 
-      {/* 05 */}
-      <Seccion n="05" titulo={t.s05}>
+      {/* 04 */}
+      <Seccion n="04" titulo={t.s04}>
         <p className="max-w-2xl text-sm text-muted">{t.queIncluye}</p>
         <div className="space-y-3 border-t border-border pt-5">
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>

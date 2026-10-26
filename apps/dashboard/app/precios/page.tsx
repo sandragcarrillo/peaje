@@ -17,30 +17,54 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: d.precios.metaTitulo, description: d.precios.metaDescripcion }
 }
 
+/**
+ * Una tarjeta de plan. Las dos tienen la misma forma: nombre, precio, texto,
+ * lista y, pegado al fondo, una nota y el botón. Así quedan parejas aunque
+ * una lista sea más larga.
+ */
 function Plan({
   nombre,
   precio,
+  antes,
   unidad,
   texto,
-  children,
+  incluye,
+  nota,
+  cta,
   destacado,
 }: {
   nombre: string
   precio: string
+  /** Precio tachado al lado (el normal, cuando se muestra el de fundador). */
+  antes?: string
   unidad?: string
   texto: string
-  children?: React.ReactNode
+  incluye: string[]
+  nota: string
+  cta: React.ReactNode
   destacado?: boolean
 }) {
   return (
-    <div className={`flex flex-col rounded-lg border bg-panel p-5 ${destacado ? 'border-accent' : 'border-border'}`}>
-      <p className="font-mono text-xs text-muted">{nombre}</p>
-      <p className="mt-3 text-3xl font-semibold tabular-nums">
+    <div className={`flex h-full flex-col rounded-lg border bg-panel p-6 ${destacado ? 'border-accent' : 'border-border'}`}>
+      <p className="etiqueta text-muted">{nombre}</p>
+      <p className="mt-3 flex items-baseline gap-2 text-4xl font-semibold tabular-nums">
         {precio}
-        {unidad ? <span className="ml-1.5 text-sm font-normal text-muted">{unidad}</span> : null}
+        {antes ? <span className="text-lg font-normal text-muted line-through">{antes}</span> : null}
+        {unidad ? <span className="text-sm font-normal text-muted">{unidad}</span> : null}
       </p>
       <p className="mt-3 text-sm text-muted">{texto}</p>
-      {children}
+      <ul className="mt-5 flex flex-col gap-2 text-sm">
+        {incluye.map((x) => (
+          <li key={x} className="flex gap-2.5">
+            <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-accent" />
+            <span>{x}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-auto space-y-4 pt-6">
+        <p className="border-t border-border pt-4 text-sm text-muted">{nota}</p>
+        {cta}
+      </div>
     </div>
   )
 }
@@ -51,49 +75,39 @@ export default async function Precios() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <p className="font-mono text-xs text-muted">{P.kicker}</p>
+      <p className="etiqueta text-muted">{P.kicker}</p>
       <h1 className="mt-2 text-3xl font-semibold">{P.titulo}</h1>
       <p className="mt-3 max-w-2xl text-[15px] text-muted">{P.intro}</p>
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-2">
-        <Plan nombre={P.radarNombre} precio={P.gratis} texto={P.radarTexto} />
-        <Plan nombre={P.kitNombre} precio={P.gratis} texto={P.kitTexto}>
-          <ul className="mt-4 flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted">
-            {P.kitIncluye.map((x) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ul>
-          <p className="mt-4 border-t border-border pt-3 text-xs text-muted">{P.kitComision(COMISION_PCT)}</p>
-        </Plan>
+      <div className="mt-10 grid items-stretch gap-4 md:grid-cols-2">
         <Plan
-          nombre={P.founderNombre}
+          nombre={P.gratisNombre}
+          precio="US$0"
+          texto={P.gratisTexto}
+          incluye={P.gratisIncluye}
+          nota={P.kitComision(COMISION_PCT)}
+          cta={
+            <Link href="/radar" className="btn btn-secundario btn-ancho">
+              {P.ctaRadar}
+            </Link>
+          }
+        />
+        <Plan
+          nombre={P.proNombre}
           precio={`US$${PRECIOS_USD.founder}`}
+          antes={`US$${PRECIOS_USD.pro}`}
           unidad={P.alMes}
-          texto={P.founderTexto(CUPOS_FOUNDER)}
+          texto={P.proTexto}
+          incluye={[...P.proIncluye, P.limites(LIMITES.pro.preguntas, LIMITES.pro.creditos)]}
+          nota={P.proNota(CUPOS_FOUNDER, PRECIOS_USD.pro)}
+          cta={
+            <Link href="/nuevo?plan=1" className="btn btn-primario btn-ancho">
+              {P.ctaAgente}
+            </Link>
+          }
           destacado
-        >
-          <p className="mt-4 border-t border-border pt-3 font-mono text-xs text-muted">
-            {P.limites(LIMITES.founder.preguntas, LIMITES.founder.creditos)}
-          </p>
-        </Plan>
-        <Plan nombre={P.proNombre} precio={`US$${PRECIOS_USD.pro}`} unidad={P.alMes} texto={P.proTexto(CUPOS_FOUNDER)}>
-          <p className="mt-4 border-t border-border pt-3 font-mono text-xs text-muted">
-            {P.limites(LIMITES.pro.preguntas, LIMITES.pro.creditos)}
-          </p>
-        </Plan>
+        />
       </div>
-
-      <section className="mt-12 border-t border-border pt-6">
-        <h2 className="text-xl font-semibold">{P.proIncluyeTitulo}</h2>
-        <ul className="mt-4 grid gap-x-8 gap-y-2 text-[15px] text-muted sm:grid-cols-2">
-          {P.proIncluye.map((x) => (
-            <li key={x} className="flex gap-2">
-              <span aria-hidden className="text-accent">›</span>
-              <span>{x}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <section className="mt-12 border-t border-border pt-6">
         <h2 className="text-xl font-semibold">{P.creditosTitulo}</h2>
@@ -102,7 +116,7 @@ export default async function Precios() {
           {P.creditosCostos(COSTOS_CREDITOS).map((c) => (
             <div key={c.que} className="flex items-baseline justify-between gap-4 py-2">
               <dt>{c.que}</dt>
-              <dd className="font-mono text-xs tabular-nums text-muted">{P.creditos(c.cuanto)}</dd>
+              <dd className="etiqueta tabular-nums text-muted">{P.creditos(c.cuanto)}</dd>
             </div>
           ))}
         </dl>

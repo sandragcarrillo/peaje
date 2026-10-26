@@ -15,7 +15,7 @@ export type MensajeChat = {
 export const landing = {
   es: {
     // CTAs de todo el sitio público (nav, hero y cierre).
-    ctaAgente: 'Usar agente',
+    ctaAgente: 'Empezar con mi agente',
     ctaRadar: 'Revisar mi sitio gratis',
     ctaDashboard: 'Ir a mi panel',
     campoDominio: 'Tu sitio',
@@ -33,7 +33,6 @@ export const landing = {
     chatBot: 'Peaje',
     chatSubtitulo: 'tu agente',
     chatTu: 'Tú',
-    chatEscribiendo: 'Peaje está escribiendo…',
     chat: [
       { de: 'dueno', texto: '¿Qué me falta para que ChatGPT me recomiende?' },
       {
@@ -69,7 +68,7 @@ export const landing = {
     pasos: [
       {
         titulo: 'Mira cómo te ve la IA hoy',
-        texto: 'Pega tu sitio y en menos de un minuto ves qué falta. Gratis y sin cuenta.',
+        texto: 'Pega tu sitio y en menos de un minuto ves qué falta. Gratis, solo con tu email.',
       },
       {
         titulo: 'Habla con tu agente en Telegram',
@@ -83,7 +82,7 @@ export const landing = {
     ],
 
     // Precio
-    precioTitulo: 'Precio',
+    precioTitulo: 'Precios',
     precioMonto: (usd: number) => `US$${usd} al mes`,
     precioEtiqueta: 'Precio de fundador',
     precioNormal: (usd: number) => `Precio normal: US$${usd} al mes.`,
@@ -147,7 +146,7 @@ export const landing = {
     devsPortal: 'Portal para desarrolladores',
   },
   en: {
-    ctaAgente: 'Use the agent',
+    ctaAgente: 'Start with my agent',
     ctaRadar: 'Check my site free',
     ctaDashboard: 'Go to my dashboard',
     campoDominio: 'Your site',
@@ -163,7 +162,6 @@ export const landing = {
     chatBot: 'Peaje',
     chatSubtitulo: 'your agent',
     chatTu: 'You',
-    chatEscribiendo: 'Peaje is typing…',
     chat: [
       { de: 'dueno', texto: 'What am I missing for ChatGPT to recommend me?' },
       {
@@ -197,7 +195,7 @@ export const landing = {
     pasos: [
       {
         titulo: 'See how AI sees you today',
-        texto: 'Paste your site and in under a minute you see what is missing. Free, no account.',
+        texto: 'Paste your site and in under a minute you see what is missing. Free, just your email.',
       },
       {
         titulo: 'Talk to your agent on Telegram',
@@ -210,7 +208,7 @@ export const landing = {
       },
     ],
 
-    precioTitulo: 'Price',
+    precioTitulo: 'Pricing',
     precioMonto: (usd: number) => `US$${usd} a month`,
     precioEtiqueta: 'Founder price',
     precioNormal: (usd: number) => `Regular price: US$${usd} a month.`,

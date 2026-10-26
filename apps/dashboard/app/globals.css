@@ -52,23 +52,20 @@
   --accent-text: var(--tinta);
 }
 
-.dark .isla-tinta {
-  --bg: var(--tinta);
-}
-
 .isla-tinta {
   --bg: var(--tinta);
   --panel: #24231f;
   --panel-2: var(--tinta-suave);
   --border: var(--linea-oscura);
   --text: #f4f0e7;             /* inverse-on-surface */
-  --muted: #8c8880;
+  /* 9:1 sobre la tinta (el #8c8880 de antes no llegaba a AA sobre el panel del navbar). */
+  --muted: #c9c4ba;
   --faint: #6e6a62;
   --accent: var(--verde);
   --accent-text: var(--tinta);
 }
 
-/* Isla crema: las secciones claras de la landing, iguales en los dos temas. */
+/* Isla crema: las secciones claras de la landing y del sitio público. */
 .isla-crema {
   --bg: var(--crema);
   --panel: var(--crema-2);
@@ -79,6 +76,31 @@
   --faint: var(--gris-tenue);
   --accent: var(--verde-profundo);
   --accent-text: #fff;
+}
+
+/*
+ * En oscuro el sitio público cambia de verdad: las islas crema pasan a tinta
+ * (los mismos tokens que .dark) y las islas tinta quedan un tono más claro,
+ * para que las secciones se sigan distinguiendo. Van después de las islas
+ * para ganarles en el orden.
+ */
+.dark .isla-crema {
+  --bg: #161512;
+  --panel: #201f1c;
+  --panel-2: #262521;
+  --border: #38362f;
+  --text: #f4f0e7;
+  --muted: #a49e92;
+  --faint: #7a776f;
+  --accent: var(--verde);
+  --accent-text: var(--tinta);
+}
+
+.dark .isla-tinta {
+  --bg: #211f1c;
+  --panel: #2a2824;
+  --panel-2: #312f2a;
+  --border: #403d36;
 }
 
 @theme inline {
@@ -196,6 +218,17 @@
   }
 }
 
+/*
+ * Etiquetas mono chicas (eyebrows, links del navbar, pie, chrome del chat):
+ * nunca menos de 13px, con un poco de aire entre letras.
+ */
+@utility etiqueta {
+  font-family: var(--font-chrome), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -311,14 +344,30 @@ h1, h2 {
   .gota-centro { animation: none; }
 }
 
-/* Conversación de ejemplo del hero (app/components/chat-ejemplo.tsx): aparece mensaje a mensaje, una vez. */
-.chat-msg {
-  transition: opacity 320ms ease, transform 320ms ease;
+/*
+ * Conversación de ejemplo del hero (app/components/chat-ejemplo.tsx). El
+ * primer intercambio viene visible en el HTML; el resto entra mensaje a
+ * mensaje con animaciones CSS que arrancan con el primer pintado, sin esperar
+ * a que cargue el JS. Cada mensaje trae su momento en --aparece y cada
+ * "escribiendo…" su ventana en --desde y --dura.
+ *
+ * El estado normal de un mensaje es visible: solo la animación lo oculta
+ * mientras espera (fill-mode both). Si el navegador no corre animaciones, se
+ * ve todo de una.
+ */
+.chat-msg[data-entra] {
+  animation: chat-entrar 320ms ease var(--aparece, 0ms) both;
 }
-.chat-msg[data-oculto='true'],
-.chat-msg[data-oculto='espera'] {
+@keyframes chat-entrar {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.chat-escribiendo {
   opacity: 0;
-  transform: translateY(6px);
+  animation: chat-tecleo var(--dura, 0ms) step-end var(--desde, 0ms) 1;
+}
+@keyframes chat-tecleo {
+  from, to { opacity: 1; }
 }
 .chat-punto {
   width: 5px;
@@ -332,8 +381,18 @@ h1, h2 {
   50% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chat-msg { transition: none; }
-  .chat-msg[data-oculto='true'],
-  .chat-msg[data-oculto='espera'] { opacity: 1; transform: none; }
+  .chat-msg[data-entra] { animation: none; }
   .chat-escribiendo { display: none; }
+}
+
+/* El "404" de app/not-found.tsx: el número hecho de puntos, que se desvanecen hacia abajo. */
+.cuatrocientos {
+  color: transparent;
+  background-image: radial-gradient(var(--text) 1.3px, transparent 1.6px);
+  background-size: 7px 7px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-mask-image: linear-gradient(to bottom, black 35%, rgb(0 0 0 / 0.25));
+  mask-image: linear-gradient(to bottom, black 35%, rgb(0 0 0 / 0.25));
+  opacity: 0.55;
 }

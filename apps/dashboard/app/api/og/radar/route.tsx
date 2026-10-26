@@ -29,7 +29,7 @@ const TEXTO = {
     respuesta: (x: number, y: number) => `Los agentes entienden ${x} de las ${y} cosas que buscan.`,
     puntajes: (hoy: number, g: string, est: number, ge: string) => `Hoy ${hoy} de 100 (${g}). Con Peaje, hasta ~${est} (${ge}).`,
     puntajeAlto: (hoy: number, g: string) => `Hoy ${hoy} de 100 (${g}). Ya pasa todo lo que Peaje cubre.`,
-    generico: 'Mídelo gratis en medio minuto: qué encuentra un agente, qué le falta y por dónde empezar.',
+    generico: 'Mídelo gratis en menos de un minuto: qué encuentra un agente, qué le falta y por dónde empezar.',
     cta: 'Mide el tuyo gratis en usepeaje.com/radar',
   },
   en: {
@@ -38,7 +38,7 @@ const TEXTO = {
     respuesta: (x: number, y: number) => `AI agents understand ${x} of the ${y} things they look for.`,
     puntajes: (hoy: number, g: string, est: number, ge: string) => `Today ${hoy} out of 100 (${g}). With Peaje, up to ~${est} (${ge}).`,
     puntajeAlto: (hoy: number, g: string) => `Today ${hoy} out of 100 (${g}). It already passes everything Peaje covers.`,
-    generico: 'Check it free in half a minute: what an agent finds, what it is missing and where to start.',
+    generico: 'Check it free in under a minute: what an agent finds, what it is missing and where to start.',
     cta: 'Check yours free at usepeaje.com/radar',
   },
 }

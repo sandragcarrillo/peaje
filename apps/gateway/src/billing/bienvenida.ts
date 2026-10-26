@@ -1,5 +1,6 @@
 import { PRECIOS_USD, type PlanPago, type Tenant } from '@peaje/db'
-import { enviarCorreo } from '../monitor/email.js'
+import { enviarCorreo, type Adjunto } from '../monitor/email.js'
+import { LOGO_CID, LOGO_PNG_BASE64 } from './logo-correo.js'
 import { store } from '../store.js'
 
 /**
@@ -142,13 +143,14 @@ const CREMA = '#fdf9f0'
 const BORDE = '#ece5d6'
 const FUENTE = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 
-export type CorreoBienvenida = { subject: string; preheader: string; html: string; text: string }
+export type CorreoBienvenida = { subject: string; preheader: string; html: string; text: string; adjuntos: Adjunto[] }
 
 export function correoBienvenida(o: { idioma: IdiomaBienvenida; plan: PlanPago; slug: string; negocio: string; base?: string }): CorreoBienvenida {
   const base = (o.base ?? DASHBOARD()).replace(/\/$/, '')
   const agente = `${base}/t/${encodeURIComponent(o.slug)}/agente`
   const urls = { agente, telegram: `${agente}#telegram`, plan: `${agente}#plan` }
-  const logo = `${base}/email/peaje-logo.png`
+  // Embebido: se ve aunque el programa de correo bloquee imágenes externas.
+  const logo = `cid:${LOGO_CID}`
   const c = copia(o.idioma, o.plan, o.negocio, urls)
 
   const p = (html: string, extra = '') => `<p style="margin:0 0 16px;font-family:${FUENTE};font-size:16px;line-height:1.55;color:${TINTA};${extra}">${html}</p>`
@@ -200,7 +202,7 @@ export function correoBienvenida(o: { idioma: IdiomaBienvenida; plan: PlanPago; 
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px">
 <tr><td style="padding:0 4px 20px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td valign="middle" style="padding:0 10px 0 0"><img src="${esc(logo)}" width="40" height="40" alt="" style="display:block;width:40px;height:40px;border:0;border-radius:9px"></td>
+<td valign="middle" style="padding:0 10px 0 0"><img src="${esc(logo)}" width="40" height="40" alt="Peaje" style="display:block;width:40px;height:40px;border:0;border-radius:9px"></td>
 <td valign="middle" class="tinta" style="font-family:${FUENTE};font-size:22px;font-weight:700;letter-spacing:-0.01em;color:${TINTA}">Peaje</td>
 </tr></table>
 </td></tr>
@@ -245,7 +247,8 @@ ${pie(`${link(`${base}/terms`, c.terminos)} &nbsp;&middot;&nbsp; ${link(`${base}
     `${c.privacidad}: ${base}/privacy`,
   ].join('\n')
 
-  return { subject: c.subject, preheader: c.preheader, html, text }
+  const adjuntos: Adjunto[] = [{ filename: 'peaje-logo.png', content: LOGO_PNG_BASE64, content_id: LOGO_CID }]
+  return { subject: c.subject, preheader: c.preheader, html, text, adjuntos }
 }
 
 // ---------------------------------------------------------------- envío
@@ -275,7 +278,7 @@ export async function mandarBienvenida(o: { tenant: Tenant; plan: PlanPago; cust
   try {
     const idioma = await idiomaDelDueno(tenant, o.custom)
     const correo = correoBienvenida({ idioma, plan, slug: tenant.slug, negocio: tenant.name })
-    await enviarCorreo(tenant.email, correo.subject, correo.html, { text: correo.text, replyTo: process.env.RADAR_REPLY_TO || undefined })
+    await enviarCorreo(tenant.email, correo.subject, correo.html, { text: correo.text, replyTo: process.env.RADAR_REPLY_TO || undefined, attachments: correo.adjuntos })
     console.log('[bienvenida] enviada', { tenant: tenant.slug, plan, idioma })
     return 'sent'
   } catch (error) {

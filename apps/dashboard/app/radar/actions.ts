@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { getDict } from '@/lib/i18n'
 import { escanear } from '@/lib/ora'
-import { dominioDeRadar } from './dominio'
+import { COOKIE_FRESCO, DURACION_FRESCO_S, dominioDeRadar, dominiosFrescos } from './dominio'
 
 /** Mediciones por IP por hora: el radar es público y cada una le pega a Ora. */
 const TOPE = 6
@@ -32,6 +32,17 @@ export async function medirDominio(entrada: string): Promise<{ ok: boolean; erro
   if (!dentroDelLimite(ip)) return { ok: false, error: d.limite }
   const resultado = await escanear(dominio)
   if ('error' in resultado) return { ok: false, error: resultado.error === 'inalcanzable' ? d.inalcanzable(dominio) : d.fallo }
+  // La página que se abre después tiene que mostrar esta medición, no la que
+  // Ora todavía tiene en su CDN: la cookie le pide leer saltando ese cache.
+  const jar = await cookies()
+  const frescos = [dominio, ...dominiosFrescos(jar.get(COOKIE_FRESCO)?.value).filter((x) => x !== dominio)].slice(0, 5)
+  jar.set(COOKIE_FRESCO, frescos.join(','), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV !== 'development',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: DURACION_FRESCO_S,
+  })
   revalidatePath('/radar')
   return { ok: true }
 }

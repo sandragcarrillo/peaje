@@ -1,6 +1,6 @@
 import type { Locale } from '@/lib/i18n'
 import type { OraCheck } from '@/lib/ora'
-import { textoDeChequeo, textoDeChequeoOk } from '@/lib/radar/chequeos'
+import { sinArchivo, textoDeChequeo, textoDeChequeoOk, textoLlano } from '@/lib/radar/chequeos'
 
 /**
  * Texto en palabras del dueño para cada check del radar. Si Ora agrega un
@@ -13,6 +13,15 @@ export function textoDe(check: OraCheck, locale: Locale): { titulo: string; deta
       detalle: check.recommendation ?? check.description ?? '',
     }
   )
+}
+
+/**
+ * Lo mismo para la lista de arreglos del radar: título sin archivo ni
+ * protocolo. Si el id es nuevo, el nombre de Ora sin la recomendación técnica
+ * (trae código y nombres de API que al dueño no le dicen nada).
+ */
+export function textoLlanoDe(check: OraCheck, locale: Locale): { titulo: string; detalle: string } {
+  return textoLlano(check.id, locale) ?? { titulo: sinArchivo(check.name), detalle: '' }
 }
 
 /**
@@ -36,11 +45,4 @@ export function textoOk(check: OraCheck & { details?: string }, locale: Locale):
   const sinRobots = SIN_ROBOTS[check.id]
   if (sinRobots && /no robots\.txt (\(http|found)|robots\.txt not found/i.test(check.details ?? '')) return sinRobots[locale]
   return textoDeChequeoOk(check.id, locale) ?? check.name
-}
-
-/** Para usar el título dentro de una frase ("Lo primero: no hay..."), sin romper siglas. */
-export function enFrase(titulo: string): string {
-  const [a, b] = titulo
-  if (!a || !b || b !== b.toLowerCase()) return titulo
-  return a.toLowerCase() + titulo.slice(1)
 }

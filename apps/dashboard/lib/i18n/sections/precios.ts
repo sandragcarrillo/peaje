@@ -16,27 +16,23 @@ export const precios = {
     alMes: 'al mes',
     incluye: 'Incluye',
 
-    radarNombre: 'Radar',
-    radarTexto:
-      'Pon tu dominio y en medio minuto ves qué encuentra un agente cuando llega, tu puntaje de hoy y hasta dónde sube con Peaje. Sin cuenta.',
-
-    kitNombre: 'Kit',
-    kitTexto:
-      'Un comando en tu proyecto deja tu sitio legible para agentes. Cada ruta puede tener precio, incluido cero. Cobrar es opcional.',
-    kitIncluye: [
+    gratisNombre: 'Gratis',
+    gratisTexto: 'Mide tu sitio y déjalo listo para los agentes de IA. Sin tarjeta.',
+    gratisIncluye: [
+      'Radar: tu puntaje de hoy, qué falla y hasta dónde sube, en menos de un minuto y solo con tu email',
       'llms.txt, openapi.json, servidor MCP, agent cards y JSON-LD generados para tu sitio',
       'Rutas con precio que responden 402 en tu propio dominio',
       'Registro de visitas de agentes',
       'Monitor diario y tareas para arreglar lo que falla',
     ],
     kitComision: (pct: number) =>
-      `Si cobras a agentes, Peaje se queda con el ${pct}% de cada pago. Peaje acredita el resto a la wallet de tu negocio. Esos pagos están separados de la suscripción Pro y Paddle no los procesa.`,
+      `Si cobras a agentes, Peaje se queda con el ${pct}% de cada pago y acredita el resto a la wallet de tu negocio. Esos pagos van aparte de la suscripción Pro: no pasan por Paddle, que solo procesa el pago de Pro con tarjeta.`,
 
-    founderNombre: 'Pro founder',
-    founderTexto: (cupos: number) =>
-      `Lo mismo que Pro, con descuento de fundador para los primeros ${cupos} negocios que se suscriben. Mantienes este precio mientras tu suscripción siga activa. Si la cancelas y vuelves, pagas el precio Pro.`,
     proNombre: 'Pro',
-    proTexto: (cupos: number) => `El precio de Pro cuando se toman los ${cupos} cupos de fundador.`,
+    proTexto: 'Todo lo gratis, más tu agente: te dice qué arreglar, te prepara las páginas y mide si la IA te recomienda.',
+    proNota: (cupos: number, pro: number) =>
+      `Precio de fundador para los primeros ${cupos} negocios que se suscriben, y lo mantienes mientras tu suscripción siga activa. Después de esos ${cupos}, Pro cuesta US$${pro} al mes. Si cancelas y vuelves, pagas el precio normal.`,
+    ctaAgente: 'Empezar con mi agente',
     limites: (preguntas: number, creditos: number) =>
       `${creditos} créditos al mes para el trabajo del agente y ${preguntas} preguntas medidas en asistentes de IA. Hablar con tu agente es gratis.`,
 
@@ -58,7 +54,6 @@ export const precios = {
     creditosRenuevan:
       'Los créditos se renuevan el 1 de cada mes. Los que no usas no pasan al mes siguiente, y no se pueden comprar créditos extra.',
 
-    proIncluyeTitulo: 'Qué hace el agente Pro',
     proIncluye: [
       'Arma un plan según tu objetivo y conversa contigo en el dashboard y en Telegram',
       'Mide si ChatGPT, Claude, Perplexity y Gemini citan tu sitio para las preguntas de tu negocio',
@@ -75,7 +70,7 @@ export const precios = {
 
     cobroTitulo: 'Cómo se cobra',
     cobroTexto:
-      'Nuestro proceso de pedido lo realiza nuestro revendedor en línea Paddle.com. Paddle.com es el Merchant of Record de todos nuestros pedidos: procesa el pago, calcula los impuestos de tu país y emite la factura. La suscripción se cobra cada mes en dólares y se renueva sola hasta que la canceles. Peaje nunca ve los datos de tu tarjeta.',
+      'Pagas con tarjeta. El pago lo procesa Paddle.com, nuestro revendedor en línea y Merchant of Record (vendedor registrado) de todos nuestros pedidos: cobra, calcula los impuestos de tu país y te envía el recibo y la factura por correo. La suscripción se cobra cada mes en dólares y se renueva sola hasta que la canceles. Peaje nunca ve los datos de tu tarjeta.',
     cobroEnlaces: 'Lee los términos y la política de reembolso antes de suscribirte.',
     terminos: 'Términos',
     reembolsos: 'Reembolsos',
@@ -120,27 +115,23 @@ export const precios = {
     alMes: 'a month',
     incluye: 'Includes',
 
-    radarNombre: 'Radar',
-    radarTexto:
-      'Enter your domain and in half a minute you see what an agent finds when it arrives, your score today and how far it goes with Peaje. No account.',
-
-    kitNombre: 'Kit',
-    kitTexto:
-      'One command in your project makes your site readable by agents. Every route can have a price, including zero. Charging is optional.',
-    kitIncluye: [
+    gratisNombre: 'Free',
+    gratisTexto: 'Measure your site and get it ready for AI agents. No card.',
+    gratisIncluye: [
+      'Radar: your score today, what fails and how far it can go, in under a minute and with just your email',
       'llms.txt, openapi.json, an MCP server, agent cards and JSON-LD generated for your site',
       'Priced routes that answer 402 on your own domain',
       'A log of agent visits',
       'A daily monitor and tasks to fix what breaks',
     ],
     kitComision: (pct: number) =>
-      `If you charge agents, Peaje keeps ${pct}% of each payment. Peaje credits the rest to your business wallet. Those payments are separate from the Pro subscription and are never processed by Paddle.`,
+      `If you charge agents, Peaje keeps ${pct}% of each payment and credits the rest to your business wallet. Those payments are separate from the Pro subscription: they do not go through Paddle, which only processes the Pro card payment.`,
 
-    founderNombre: 'Pro founder',
-    founderTexto: (cupos: number) =>
-      `Everything in Pro, at a founder discount for the first ${cupos} businesses that subscribe. You keep this price while your subscription stays active. If you cancel and come back, you pay the Pro price.`,
     proNombre: 'Pro',
-    proTexto: (cupos: number) => `The Pro price once the ${cupos} founder spots are taken.`,
+    proTexto: 'Everything in Free, plus your agent: it tells you what to fix, prepares the pages and tracks whether AI recommends you.',
+    proNota: (cupos: number, pro: number) =>
+      `Founder price for the first ${cupos} businesses that subscribe, and you keep it while your subscription stays active. After those ${cupos}, Pro costs US$${pro} a month. If you cancel and come back, you pay the regular price.`,
+    ctaAgente: 'Start with my agent',
     limites: (preguntas: number, creditos: number) =>
       `${creditos} credits a month for the agent's work and ${preguntas} questions tracked in AI assistants. Talking to your agent is free.`,
 
@@ -161,7 +152,6 @@ export const precios = {
     creditosRenuevan:
       'Credits renew on the 1st of each month. Unused credits do not carry over, and you cannot buy extra credits.',
 
-    proIncluyeTitulo: 'What the Pro agent does',
     proIncluye: [
       'Builds a plan around your goal and talks with you on the dashboard and on Telegram',
       'Measures whether ChatGPT, Claude, Perplexity and Gemini cite your site for your business questions',
@@ -178,7 +168,7 @@ export const precios = {
 
     cobroTitulo: 'How billing works',
     cobroTexto:
-      'Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders: it processes the payment, calculates the taxes for your country and issues the invoice. The subscription is billed monthly in US dollars and renews automatically until you cancel. Peaje never sees your card details.',
+      'You pay by card. The payment is processed by Paddle.com, our online reseller and the Merchant of Record for all our orders: it charges you, calculates the taxes for your country and emails you the receipt and the invoice. The subscription is billed monthly in US dollars and renews automatically until you cancel. Peaje never sees your card details.',
     cobroEnlaces: 'Read the terms and the refund policy before you subscribe.',
     terminos: 'Terms',
     reembolsos: 'Refunds',

@@ -10,6 +10,7 @@ import { LocaleProvider } from '@/lib/i18n/client'
 import { currentTenant } from '@/lib/session'
 import { CONTACTO } from '@/lib/legal'
 import { Logo } from './components/logo'
+import { RadarPill } from './components/radar-pill'
 import './globals.css'
 import { Providers } from './providers'
 import { PeajeHead } from '@peaje/next/head'
@@ -40,9 +41,20 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             __html: `try{var t=localStorage.getItem('peaje_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,
           }}
         />
-        <PeajeHead slug="peaje" originHost="usepeaje.com" />
+        {/* Con `name` PeajeHead no pide la agent card al gateway (dice "Peaje"): un fetch menos antes del primer byte. */}
+        <PeajeHead slug="peaje" originHost="usepeaje.com" name="Peaje" />
       </head>
       <body className={`${sans.variable} ${mono.variable} antialiased`}>
+        {/*
+          Las secciones a sangre de la landing miden 100vw, y 100vw incluye la
+          barra de scroll vertical cuando el sistema la muestra (Windows, Linux,
+          macOS con "mostrar siempre"): sobraban ~15px de scroll horizontal.
+          `overflow-x: clip` en este envoltorio de ancho completo corta ese
+          sobrante sin crear un contenedor de scroll, así el navbar sticky sigue
+          pegado. En el body no sirve: ahí se pasa al viewport como `hidden` y
+          la página igual se puede correr de lado.
+        */}
+        <div className="overflow-x-clip">
         <LocaleProvider locale={locale}>
         <Providers>
           <div
@@ -70,25 +82,30 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                 </nav>
               ) : (
                 <>
-                  {/* Enlaces al centro, como en boringmarketing.com; el Radar gratis destacado. */}
-                  <nav aria-label={d.nav.linkProducto} className="hidden items-center gap-6 font-mono text-xs md:flex">
+                  {/*
+                    Enlaces al centro desde lg, como en boringmarketing.com; debajo
+                    de lg solo queda la píldora del Radar a la derecha. En el
+                    teléfono el CTA largo no entra junto al Radar y el idioma: ahí
+                    se esconde y queda el del hero de cada página.
+                  */}
+                  <nav aria-label={d.nav.linkProducto} className="etiqueta hidden items-center gap-6 lg:flex">
                     <Link href="/#producto" className="text-muted hover:text-text">{d.nav.linkProducto}</Link>
                     <Link href="/#como-funciona" className="text-muted hover:text-text">{d.nav.linkComo}</Link>
                     <Link href="/precios" className="text-muted hover:text-text">{d.nav.linkPrecios}</Link>
-                    <Link href="/radar" className="font-bold text-accent hover:text-text">{d.nav.linkRadar}</Link>
+                    <RadarPill texto={d.nav.linkRadar} />
                   </nav>
                   <div className="flex items-center gap-2 text-sm sm:gap-3">
-                    <Link href="/radar" className="font-mono text-xs font-bold text-accent md:hidden">
-                      {d.nav.linkRadar}
-                    </Link>
-                    <Link href="/acceder" className="hidden px-1 font-mono text-xs text-muted hover:text-text sm:inline">
+                    <span className="contents lg:hidden">
+                      <RadarPill texto={d.nav.linkRadar} />
+                    </span>
+                    <Link href="/acceder" className="etiqueta hidden px-1 text-muted hover:text-text md:inline">
                       {d.nav.entrar}
                     </Link>
                     <span className="hidden lg:contents">
                       <ThemeToggle />
                     </span>
                     <LanguageToggle locale={locale} />
-                    <Link href="/nuevo" className="btn btn-primario btn-chico">
+                    <Link href="/nuevo" className="btn btn-primario btn-chico hidden text-[13px] sm:inline-flex">
                       {d.nav.usarAgente}
                     </Link>
                   </div>
@@ -103,7 +120,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
           {/* Paddle exige términos, privacidad, reembolsos y precios enlazados desde todo el sitio. */}
           <nav
             aria-label={d.legal.pieNav}
-            className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 font-mono text-xs text-muted"
+            className="etiqueta mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 text-muted"
           >
             <Link href="/precios" className="hover:text-text">{d.legal.piePrecios}</Link>
             <Link href="/terms" className="hover:text-text">{d.legal.pieTerminos}</Link>
@@ -111,8 +128,9 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             <Link href="/reembolsos" className="hover:text-text">{d.legal.pieReembolsos}</Link>
             <a href={`mailto:${CONTACTO}`} className="hover:text-text">{d.legal.pieContacto}</a>
           </nav>
-          <p className="mx-auto mt-4 max-w-5xl text-center font-mono text-xs text-muted">Peaje · 2026</p>
+          <p className="etiqueta mx-auto mt-4 max-w-5xl text-center text-muted">Peaje · 2026</p>
         </footer>
+        </div>
       </body>
     </html>
   )
