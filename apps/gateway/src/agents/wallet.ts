@@ -8,8 +8,11 @@ import { arcPublicClient, arcTestnet } from '../arc.js'
 import { publicClient } from '../chain.js'
 
 /**
- * Wallet de un agente comprador: una cuenta EVM custodiada por Privy, igual
- * que la del merchant. No hay contrato ni deploy.
+ * Wallet de un agente comprador: una cuenta EVM de Privy controlada por la
+ * app (la configurada en PRIVY_APP_ID / PRIVY_APP_SECRET; ninguna app está
+ * fija en el código). Desde la migración de oct 2026 la del negocio es del
+ * dueño (no custodial); la del agente sigue siendo de la app hasta resolver la
+ * custodia (ver docs/privy-migracion.md). No hay contrato ni deploy.
  *
  * Por qué wallet propia y no una sub-cuenta contable: así el presupuesto es el
  * saldo real de una address. Un bug no puede gastar más de lo que hay.

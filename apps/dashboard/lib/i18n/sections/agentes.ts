@@ -1,18 +1,16 @@
 export const agentes = {
   es: {
     eyebrow: 'TU AGENTE',
-    fondeoOk: (monto: string) =>
-      `Fondos enviados: ${monto} van en camino a la wallet del agente. El presupuesto se actualiza en unos segundos.`,
     accionOk: 'Listo.',
     verHtml: (kb: number) => `Ver el HTML comprado (${kb} KB)`,
     titulo: 'Tu agente',
     intro:
       'Un agente que compra por ti. Tiene su propia wallet: el presupuesto que le das es su saldo real, así que no puede gastar de más. Busca en el mercado completo de servicios para agentes, te muestra qué compraría, y solo gasta cuando apruebas.',
     variosNegocios:
-      'Los fondos salen del saldo de uno de tus negocios; eliges cuál al crear el agente.',
+      'Le mandas fondos a su dirección desde tu wallet; Peaje no guarda saldo.',
     sinVentasPre: '¿Todavía no vendes por Peaje?',
     sinVentasLink: 'Ve a tu panel',
-    sinVentasPost: 'para tener saldo con el que fondear agentes.',
+    sinVentasPost: 'para empezar a cobrar.',
 
     // Crear
     crear: '+ Crear agente',
@@ -23,10 +21,7 @@ export const agentes = {
     mision: 'Qué tiene que conseguirte',
     misionPlaceholder:
       'Describe qué información necesitas y para qué. Mientras más específico, mejor elige: tema, tipo de contenido y para qué lo vas a usar.',
-    fondosDe: 'Fondos de',
     pagaEn: 'Paga en',
-    opcionRed: (label: string, symbol: string, saldo: string) =>
-      `${label} (${symbol}) · tienes ${saldo}`,
     topePorCompra: 'Tope por compra',
     ademasDeGuardar: 'Además de guardarlo aquí',
     entregaDashboard: 'Solo guardarlo en Peaje',
@@ -46,13 +41,10 @@ export const agentes = {
     // Tarjeta
     registradoErc: (id: string) => `Registrado en ERC-8004 como agente #${id}`,
     corridas: (n: number) => `${n} corrida${n === 1 ? '' : 's'}`,
-    fondosDeNegocio: (nombre: string) => `fondos de ${nombre}`,
     avisaA: (destino: string) => `avisa a ${destino}`,
     proxima: (fecha: string) => `próxima ${fecha}`,
     presupuesto: (symbol: string) => `${symbol} de presupuesto`,
     fallo: 'Falló la acción.',
-    sinSaldoEn: (red: string) => `Sin saldo en ${red}`,
-    fondear: 'Fondear',
     correrAhora: 'Correr ahora',
     pausar: 'Pausar',
     reanudar: 'Reanudar',
@@ -82,7 +74,6 @@ export const agentes = {
     errorNombre: 'Ponle un nombre al agente.',
     errorMision: 'Describe qué tiene que hacer el agente.',
     errorCrear: 'No se pudo crear el agente.',
-    errorFondear: 'No se pudo fondear al agente.',
     errorCorrer: 'No se pudo correr la misión.',
     errorDevolver: 'No se pudo devolver el saldo.',
     errorEstado: 'No se pudo cambiar el estado.',
@@ -156,16 +147,14 @@ export const agentes = {
     errorPlanear: 'No se pudo consultar el mercado. Intenta de nuevo.',
     ocupado: 'Tu agente está terminando otra compra. Dale unos segundos y vuelve a intentar.',
     faltaSaldoCompra:
-      'A tu agente le falta saldo para esta compra. Fondéalo arriba y vuelve a intentar.',
-    faltaSaldoNegocio: 'Tu negocio no tiene saldo suficiente en esa red para fondear.',
+      'A tu agente le falta saldo para esta compra. Mándale fondos a su dirección y vuelve a intentar.',
+    fondearDirecto:
+      'Para fondearlo, manda pathUSD (Tempo), USDC o USDG a esta dirección desde tu wallet. Ese saldo es todo su presupuesto.',
     respuestaTitulo: 'La respuesta',
     resultadosPasados: 'Resultados anteriores',
-    fondearRed: 'Red',
-    fondearDesde: 'Desde',
-    origenWallet: (saldo: string) => `Tu wallet · ${saldo}`,
     pasosTitulo: 'Así funciona',
     pasos: [
-      { titulo: 'Fondéalo', detalle: 'Pasa saldo de tu negocio a la wallet del agente. Ese es todo su presupuesto: no puede gastar más.' },
+      { titulo: 'Fondéalo', detalle: 'Manda fondos a la dirección del agente desde tu wallet. Ese es todo su presupuesto: no puede gastar más.' },
       { titulo: 'Pídele algo', detalle: 'En tus palabras. Busca entre miles de servicios que venden datos a agentes.' },
       { titulo: 'Aprueba el plan', detalle: 'Te muestra qué compraría, a qué precio y por qué, antes de gastar un centavo.' },
       { titulo: 'Recibe la respuesta', detalle: 'Paga, lee lo que compró y te responde. El recibo queda en el historial.' },
@@ -188,18 +177,16 @@ export const agentes = {
   },
   en: {
     eyebrow: 'YOUR AGENT',
-    fondeoOk: (monto: string) =>
-      `Funds sent: ${monto} is on its way to the agent wallet. The budget updates in a few seconds.`,
     accionOk: 'Done.',
     verHtml: (kb: number) => `View the purchased HTML (${kb} KB)`,
     titulo: 'Your agent',
     intro:
       'An agent that buys for you. It has its own wallet: the budget you give it is its real balance, so it cannot overspend. It searches the full market of agent services, shows you what it would buy, and only spends when you approve.',
     variosNegocios:
-      'Funds come out of the balance of one of your businesses; you pick which one when you create the agent.',
+      'You send funds to its address from your own wallet; Peaje does not hold a balance.',
     sinVentasPre: 'Not selling through Peaje yet?',
     sinVentasLink: 'Go to your panel',
-    sinVentasPost: 'to build up a balance you can fund agents with.',
+    sinVentasPost: 'to start getting paid.',
 
     // Crear
     crear: '+ Create agent',
@@ -210,10 +197,7 @@ export const agentes = {
     mision: 'What it should get you',
     misionPlaceholder:
       'Describe what information you need and what for. The more specific, the better it chooses: topic, type of content and how you plan to use it.',
-    fondosDe: 'Funded by',
     pagaEn: 'Pays on',
-    opcionRed: (label: string, symbol: string, saldo: string) =>
-      `${label} (${symbol}) · you have ${saldo}`,
     topePorCompra: 'Max per purchase',
     ademasDeGuardar: 'On top of saving it here',
     entregaDashboard: 'Just save it in Peaje',
@@ -233,13 +217,10 @@ export const agentes = {
     // Tarjeta
     registradoErc: (id: string) => `Registered in ERC-8004 as agent #${id}`,
     corridas: (n: number) => `${n} run${n === 1 ? '' : 's'}`,
-    fondosDeNegocio: (nombre: string) => `funded by ${nombre}`,
     avisaA: (destino: string) => `notifies ${destino}`,
     proxima: (fecha: string) => `next ${fecha}`,
     presupuesto: (symbol: string) => `${symbol} budget`,
     fallo: 'The action failed.',
-    sinSaldoEn: (red: string) => `No balance on ${red}`,
-    fondear: 'Fund',
     correrAhora: 'Run now',
     pausar: 'Pause',
     reanudar: 'Resume',
@@ -269,7 +250,6 @@ export const agentes = {
     errorNombre: 'Give the agent a name.',
     errorMision: 'Describe what the agent has to do.',
     errorCrear: 'Could not create the agent.',
-    errorFondear: 'Could not fund the agent.',
     errorCorrer: 'Could not run the mission.',
     errorDevolver: 'Could not return the funds.',
     errorEstado: 'Could not change the status.',
@@ -343,16 +323,14 @@ export const agentes = {
     errorPlanear: 'Could not check the market. Try again.',
     ocupado: 'Your agent is finishing another purchase. Give it a few seconds and try again.',
     faltaSaldoCompra:
-      'Your agent lacks balance for this purchase. Fund it above and try again.',
-    faltaSaldoNegocio: 'Your business does not have enough balance on that network to fund it.',
+      'Your agent lacks balance for this purchase. Send funds to its address and try again.',
+    fondearDirecto:
+      'To fund it, send pathUSD (Tempo), USDC or USDG to this address from your wallet. That balance is its whole budget.',
     respuestaTitulo: 'The answer',
     resultadosPasados: 'Past results',
-    fondearRed: 'Network',
-    fondearDesde: 'From',
-    origenWallet: (saldo: string) => `Your wallet · ${saldo}`,
     pasosTitulo: 'How it works',
     pasos: [
-      { titulo: 'Fund it', detalle: 'Move balance from your business to the agent wallet. That is its whole budget: it cannot spend more.' },
+      { titulo: 'Fund it', detalle: 'Send funds to the agent address from your own wallet. That is its whole budget: it cannot spend more.' },
       { titulo: 'Ask for something', detalle: 'In your own words. It searches thousands of services that sell data to agents.' },
       { titulo: 'Approve the plan', detalle: 'It shows what it would buy, at what price and why, before spending a cent.' },
       { titulo: 'Get the answer', detalle: 'It pays, reads what it bought, and answers you. The receipt stays in the history.' },

@@ -5,15 +5,12 @@ import {
   isSettlementNetwork,
   networkFromReceiptMethod,
   TEMPO_SPLIT_RAIL,
-  type NetworkId,
-  type SettlementNetwork,
 } from '@peaje/shared'
 import { Receipt } from 'mppx'
-import { withdrawFromSettlement } from './settlement.js'
 import { resolvePayer } from './chain.js'
 import { env } from './env.js'
+import { reembolsarTempo } from './reembolsos.js'
 import { store } from './store.js'
-import { custodiaDe, sendPayout } from './treasury.js'
 
 export type ChargeContext = {
   tenantId: string
@@ -27,8 +24,12 @@ export type ChargeContext = {
   /** Costo de red pagado por el agente, si el settlement lo anotó. */
   networkFee?: string | null
   // ---- Tempo splits ----
-  /** Reparto de la oferta de Tempo de este cobro (ver contexto.ts). null = custodial. */
+  /** Reparto de la oferta de Tempo de este cobro (ver contexto.ts). null = cobro propio. */
   tempoSplit?: { neto: string; fee: string } | null
+  /** Reparto que hizo PeajeSettlementV3 según su evento (ver contexto.ts). */
+  reparto?: { neto: string; fee: string } | null
+  /** Dirección a la que llegó el neto en la tx del pago. */
+  payoutAddress?: string | null
 }
 
 export type ReceiptInfo = {
@@ -49,12 +50,14 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
   const split = receipt.method === 'tempo' && (!ctx.network || ctx.network === 'tempo') ? (ctx.tempoSplit ?? null) : null
   const network: string = split ? TEMPO_SPLIT_RAIL : (ctx.network ?? networkFromReceiptMethod(receipt.method))
 
-  // El agente pagó el precio listado (bruto). El negocio recibe el neto; la
-  // diferencia es el take rate de Peaje y se queda en la treasury, donde el
-  // pago ya cayó on-chain. Un solo punto de cobro: acá.
+  // El agente pagó el precio listado (bruto). El negocio recibe el neto en su
+  // wallet en la misma transacción; la diferencia es el 2% de Peaje. El
+  // ledger es historial: no hay saldo que retirar. Un solo punto de registro: acá.
+  // En los rieles de contrato los montos salen del evento PaymentSettled.
+  const exacto = split ?? (isSettlementNetwork(network) ? (ctx.reparto ?? null) : null)
   const bruto = Number(ctx.priceUsd)
-  const fee = split ? Number(split.fee) : bruto * env.feePct
-  const neto = split ? Number(split.neto) : Math.max(0, bruto - fee)
+  const fee = exacto ? Number(exacto.fee) : bruto * env.feePct
+  const neto = exacto ? Number(exacto.neto) : Math.max(0, bruto - fee)
 
   const payment = await store.recordPayment({
     tenantId: ctx.tenantId,
@@ -68,6 +71,8 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
     platformFee: fee.toFixed(6),
     // Costo de red que pagó el agente encima del precio (lo anota el settlement).
     networkFee: ctx.networkFee ?? '0',
+    // ---- pagos directos ----
+    payoutAddress: split || exacto ? (ctx.payoutAddress ?? null) : null,
   })
 
   console.log('[charge] pago acreditado', {
@@ -93,68 +98,26 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
 }
 
 /**
- * Pago condicionado: si el origin del negocio no respondió a un request ya
- * pagado, devolvemos el pago al agente desde la treasury de esa red y lo
- * marcamos refundeado (deja de contar para el balance del tenant).
- * Devuelve el hash del refund, o null si no se pudo (queda el camino manual).
+ * Reembolso si el origin falló con un pago ya cobrado. En los rieles de
+ * contrato no pasa: el settlement se envía solo si el origen respondió
+ * (ver liquidacion-v3.ts). En Tempo (split o custodial viejo) lo devuelve la
+ * treasury, entero y con topes (ver reembolsos.ts).
+ * Devuelve el hash del refund, o null si no se pudo.
  */
 export async function refundOriginFailure(payment: Payment): Promise<string | null> {
   if (payment.refundTx) return payment.refundTx // Receipt re-presentado: ya se devolvió.
-  // ---- Tempo splits ----
-  // El neto de un pago con split ya está en la wallet del negocio, fuera de
-  // Peaje: la treasury no puede devolverlo sin pagar de su bolsillo la parte
-  // del negocio. Queda sin reembolso automático y a la vista en el log.
-  if (isDirectRail(payment.network)) {
-    console.warn('[refund] NO SOPORTADO: pago de Tempo con split directo, el neto ya está en la wallet del negocio', {
-      payment: payment.id,
-      tenant: payment.tenantId,
-      amount: payment.amount,
-      receipt: payment.receiptRef,
-    })
-    return null
+  if (isDirectRail(payment.network) || payment.network === 'tempo') {
+    const r = await reembolsarTempo(payment)
+    return r.ok ? r.tx : null
   }
-  if (!isNetworkId(payment.network)) return null
-
-  const payer = await resolvePayer(payment.network, payment.receiptRef)
-  if (!payer) {
-    console.warn('[refund] no se pudo resolver el pagador de', payment.receiptRef)
-    return null
-  }
-
-  try {
-    const hash =
-      isSettlementNetwork(payment.network)
-        ? await refundFromSettlement(payment.network, payment, payer as `0x${string}`)
-        : await sendPayout(payment.network, payer as `0x${string}`, payment.amount)
-    await store.markPaymentRefunded(payment.id, hash)
-    console.log('[refund] pago devuelto', {
-      payment: payment.id,
-      network: payment.network,
-      to: payer,
-      amount: payment.amount,
-      tx: hash,
-    })
-    return hash
-  } catch (error) {
-    console.error('[refund] fallo el refund de', payment.id, error)
-    return null
-  }
-}
-
-/**
- * En redes con settlement el pago quedó acreditado al comerciante dentro de
- * PeajeSettlement, no en la treasury: el reembolso sale de ese saldo, firmado
- * por su wallet.
- */
-async function refundFromSettlement(
-  network: SettlementNetwork,
-  payment: Payment,
-  payer: `0x${string}`,
-): Promise<`0x${string}`> {
-  const tenant = await store.getTenantById(payment.tenantId)
-  const custodia = tenant ? custodiaDe(tenant) : null
-  if (!custodia) throw new Error('El negocio no tiene wallet custodiada para reembolsar desde el contrato')
-  return withdrawFromSettlement(network, custodia, payer, payment.amount)
+  console.warn('[refund] NO SOPORTADO en esta red', {
+    payment: payment.id,
+    tenant: payment.tenantId,
+    network: payment.network,
+    amount: payment.amount,
+    receipt: payment.receiptRef,
+  })
+  return null
 }
 
 /**

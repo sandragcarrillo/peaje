@@ -9,7 +9,7 @@ import remarkGfm from 'remark-gfm'
 import { microMoney, money, shortWallet } from '@/lib/config'
 import type { AgenteConSaldo, Capacidad, PlanDeCompra, ServicioDelPlan } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
-import { barrerAgente, crearAgente, fondearAgente, fondearDesdeWallet, planearParaAgente, confirmarCompra } from './actions'
+import { barrerAgente, crearAgente, planearParaAgente, confirmarCompra } from './actions'
 import { Resultados } from './panel'
 
 /**
@@ -18,20 +18,16 @@ import { Resultados } from './panel'
  * cripto queda debajo del capó: saldos en dólares, wallet copiable, y listo.
  */
 
-type Negocio = { slug: string; nombre: string; disponible: Record<string, string> }
+type Negocio = { slug: string; nombre: string }
 
 export function TuAgente({
   agente,
   negocio,
-  negocios,
-  walletSaldos,
   corridas,
   capacidades,
 }: {
   agente: AgenteConSaldo
   negocio: Negocio
-  negocios: Negocio[]
-  walletSaldos: Record<string, string>
   corridas: AgentRun[]
   capacidades: Capacidad[]
 }) {
@@ -44,7 +40,7 @@ export function TuAgente({
 
   return (
     <div className="space-y-6">
-      <CabeceraAgente agente={agente} negocio={negocio} negocios={negocios} walletSaldos={walletSaldos} />
+      <CabeceraAgente agente={agente} negocio={negocio} />
       {sinSaldo ? <PasoAPaso /> : null}
       <Ask agente={agente} negocio={negocio} capacidades={capacidades} />
       {corridas.length > 0 ? (
@@ -64,42 +60,16 @@ export function TuAgente({
   )
 }
 
-/** Wallet y saldos del agente, con fondeo. Sin jerga: dólares y una dirección. */
-function CabeceraAgente({
-  agente,
-  negocio,
-  negocios,
-  walletSaldos,
-}: {
-  agente: AgenteConSaldo
-  negocio: Negocio
-  negocios: Negocio[]
-  walletSaldos: Record<string, string>
-}) {
+/**
+ * Wallet y saldos del agente. Sin jerga: dólares y una dirección. Se fondea
+ * mandando fondos a esa dirección desde tu wallet: Peaje no guarda saldos.
+ */
+function CabeceraAgente({ agente, negocio }: { agente: AgenteConSaldo; negocio: Negocio }) {
   const d = useDict()
   const router = useRouter()
-  const [monto, setMonto] = useState('0.10')
-  const [redFondeo, setRedFondeo] = useState(isNetworkId(agente.network) ? agente.network : 'tempo')
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [aviso, setAviso] = useState<{ texto: string; ok: boolean } | null>(null)
-
-  // La plata puede salir de cualquiera de tus negocios con saldo en esa red,
-  // o directo de tu wallet personal.
-  const WALLET = '__wallet__'
-  const saldoWallet = Number(walletSaldos[redFondeo] ?? 0)
-  const conSaldoEnRed = negocios.filter((n) => Number(n.disponible[redFondeo] ?? 0) > 0)
-  const opciones = [
-    ...conSaldoEnRed.map((n) => ({ id: n.slug, saldo: Number(n.disponible[redFondeo] ?? 0) })),
-    ...(saldoWallet > 0 ? [{ id: WALLET, saldo: saldoWallet }] : []),
-  ]
-  const [origen, setOrigen] = useState(negocio.slug)
-  const origenValido = opciones.some((o) => o.id === origen)
-    ? origen
-    : (opciones[0]?.id ?? negocio.slug)
-
-  const red = isNetworkId(agente.network) ? NETWORKS[agente.network] : null
   const saldo = Number(agente.balance ?? 0)
-  const disponible = opciones.find((o) => o.id === origenValido)?.saldo ?? 0
 
   async function accion(nombre: string, fn: () => Promise<{ ok: boolean; error?: string }>, exito?: string) {
     setOcupado(nombre)
@@ -166,57 +136,9 @@ function CabeceraAgente({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-        <input
-          value={monto}
-          onChange={(e) => setMonto(e.target.value)}
-          inputMode="decimal"
-          className="w-20 rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-xs outline-none focus:border-accent"
-        />
-        <select
-          value={redFondeo}
-          onChange={(e) => setRedFondeo(e.target.value as typeof redFondeo)}
-          className="rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-xs outline-none focus:border-accent"
-          title={d.agentes.fondearRed}
-        >
-          {NETWORK_IDS.map((id) => (
-            <option key={id} value={id}>
-              {NETWORKS[id].label}
-            </option>
-          ))}
-        </select>
-        {opciones.length > 1 ? (
-          <select
-            value={origenValido}
-            onChange={(e) => setOrigen(e.target.value)}
-            className="max-w-44 rounded-lg border border-border bg-bg px-2 py-1.5 font-mono text-xs outline-none focus:border-accent"
-            title={d.agentes.fondearDesde}
-          >
-            {opciones.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.id === WALLET
-                  ? d.agentes.origenWallet(money(o.saldo))
-                  : `${negocios.find((n) => n.slug === o.id)?.nombre ?? o.id} · ${money(o.saldo)}`}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        <BotonChico
-          onClick={() =>
-            accion(
-              'fondear',
-              () =>
-                origenValido === WALLET
-                  ? fondearDesdeWallet(negocio.slug, agente.id, monto, redFondeo)
-                  : fondearAgente(negocio.slug, agente.id, monto, redFondeo, origenValido),
-              d.agentes.fondeoOk(`$${monto}`),
-            )
-          }
-          disabled={ocupado !== null || disponible <= 0}
-          cargando={ocupado === 'fondear'}
-          titulo={disponible <= 0 ? d.agentes.sinSaldoEn(redFondeo) : undefined}
-        >
-          {d.agentes.fondear}
-        </BotonChico>
+        <button type="button" onClick={copiar} className="btn btn-secundario btn-chico">
+          {d.agentes.copiarWallet}
+        </button>
         <BotonChico
           onClick={() => accion('barrer', () => barrerAgente(negocio.slug, agente.id))}
           disabled={ocupado !== null || saldo <= 0}
@@ -225,12 +147,9 @@ function CabeceraAgente({
         >
           {d.agentes.devolverSaldo}
         </BotonChico>
-        <span className="ml-auto max-w-md text-xs text-muted">{d.agentes.enviaUsdcNota}</span>
+        <span className="ml-auto max-w-md text-xs text-muted">{d.agentes.fondearDirecto}</span>
       </div>
-
-      {disponible <= 0 ? (
-        <p className="mt-3 text-sm text-amber-500">{d.agentes.faltaSaldoNegocio}</p>
-      ) : null}
+      <p className="mt-2 text-xs text-muted">{d.agentes.enviaUsdcNota}</p>
 
       {aviso ? (
         <p className={`mt-3 flex items-center gap-2 text-sm ${aviso.ok ? 'text-accent' : 'text-amber-500'}`}>

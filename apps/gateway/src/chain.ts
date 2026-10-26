@@ -13,13 +13,18 @@ export const publicClient = createPublicClient({
 
 /**
  * El Receipt de MPP no trae la wallet del agente, solo el hash de la tx.
- * En Tempo el agente broadcastea él mismo: el pagador es `tx.from`. En Arc
- * broadcastea nuestra treasury (relayer), así que se resuelve por el evento
- * Transfer (ver arc.ts).
+ * En Tempo el agente broadcastea él mismo: el pagador es `tx.from`. En las
+ * redes con contrato broadcastea el relayer, así que se resuelve por el
+ * evento PaymentSettled (ver settlement.ts).
  */
 export async function resolvePayer(network: NetworkId, txHash: string): Promise<string | null> {
-  if (network === 'arc') return resolveArcPayer(txHash)
-  if (isSettlementNetwork(network)) return resolveSettlementPayer(network, txHash)
+  // Arc liquida en PeajeSettlementV3 como las demás redes EVM; un pago viejo
+  // sin evento de settlement cae a leer el Transfer.
+  if (isSettlementNetwork(network)) {
+    const pagador = await resolveSettlementPayer(network, txHash)
+    if (pagador || network !== 'arc') return pagador
+    return resolveArcPayer(txHash)
+  }
   try {
     const tx = await publicClient.getTransaction({ hash: txHash as `0x${string}` })
     return tx.from ?? null

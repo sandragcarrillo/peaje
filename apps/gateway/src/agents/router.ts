@@ -1,19 +1,16 @@
-import { SaldoInsuficiente, type Agent, type AgentDelivery } from '@peaje/db'
+import type { Agent, AgentDelivery } from '@peaje/db'
 import {
   AGENT_FREQUENCIES,
   explorerTxUrl,
   NETWORK_IDS,
   isNetworkId,
-  isSettlementNetwork,
   type NetworkId,
   nextRunAt,
   type AgentFrequencyId,
 } from '@peaje/shared'
 import { Hono } from 'hono'
 import { env } from '../env.js'
-import { saldosPorRed } from '../saldos.js'
 import { store } from '../store.js'
-import { payoutFromTenant } from '../treasury.js'
 import { capacidadesDelMercado } from './discovery.js'
 import { estadoRegistro, registrarAgente } from './erc8004.js'
 import { correrYReprogramar, planearCompra } from './runner.js'
@@ -167,68 +164,23 @@ agentsRouter.post('/:slug/agents/:id/register', async (c) => {
 })
 
 /**
- * Fondear un agente es un retiro del saldo del tenant hacia la wallet del
- * agente: la plata sale del ledger del negocio y pasa a ser el techo duro del
- * agente. Por eso reusa el mismo camino que un retiro externo.
+ * Fondear desde el saldo del negocio ya no existe: Peaje no guarda saldos
+ * (cada pago llega a la wallet de cobro del negocio). El dueño le manda
+ * fondos a la dirección del agente desde su propia wallet.
  */
 agentsRouter.post('/:slug/agents/:id/fund', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
-
   const agent = await store.getAgent(c.req.param('id'))
   if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
-
-  const body = await c.req.json<{ amount?: string; network?: string; fromSlug?: string }>()
-  // La persona elige la red del fondeo (cualquier riel) y de qué negocio suyo
-  // sale la plata. El dashboard ya verificó que ambos negocios son del mismo
-  // usuario; esta API es interna y solo la llama el dashboard.
-  const network = isNetworkId(body.network ?? '') ? (body.network as NetworkId) : isNetworkId(agent.network) ? agent.network : 'arc'
-  const pagador = body.fromSlug ? await store.getTenantBySlug(body.fromSlug) : tenant
-  if (!pagador) return c.json({ error: 'Negocio de origen no encontrado' }, 404)
-  const monto = Number(body.amount)
-  if (!Number.isFinite(monto) || monto <= 0) return c.json({ error: 'Monto inválido.' }, 400)
-
-  const balances = await saldosPorRed(pagador)
-  const disponible = Number(balances.find((b) => b.network === network)?.available ?? 0)
-  if (monto > disponible + 1e-9) {
-    return c.json(
-      { error: `Saldo insuficiente en ${network}: disponible $${disponible.toFixed(6)}`, code: 'fondos-negocio' },
-      400,
-    )
-  }
-
-  // Registro atómico en los rieles de treasury (ver withdrawals.ts).
-  let withdrawal
-  try {
-    withdrawal = await store.createWithdrawal(
-      { tenantId: pagador.id, amount: monto.toFixed(6), toWallet: agent.walletAddress, network },
-      { checkAvailable: !isSettlementNetwork(network) },
-    )
-  } catch (error) {
-    if (error instanceof SaldoInsuficiente) return c.json({ error: `Saldo insuficiente en ${network}`, code: 'fondos-negocio' }, 409)
-    throw error
-  }
-
-  try {
-    const hash = await payoutFromTenant(pagador, network, agent.walletAddress as `0x${string}`, monto.toFixed(6))
-    await store.updateWithdrawal(withdrawal.id, { txRef: hash })
-    // Con saldo, el agente ya puede correr: se programa para ahora. Si el
-    // fondeo llegó por otra red de prueba, el agente pasa a operar en esa.
-    const actualizado = await store.updateAgent(agent.id, {
-      status: 'idle',
-      nextRunAt: new Date().toISOString(),
-      ...(network !== agent.network ? { network } : {}),
-    })
-    return c.json({
-      agent: await conSaldo(actualizado),
-      tx: hash,
-      explorerUrl: explorerTxUrl(network, hash, env.testnet),
-    })
-  } catch (error) {
-    await store.updateWithdrawal(withdrawal.id, { status: 'failed' })
-    console.error('[agents] fallo el fondeo', error)
-    return c.json({ error: 'No se pudo fondear al agente. Reintenta.' }, 502)
-  }
+  return c.json(
+    {
+      error: `Peaje no guarda saldo para fondear agentes. Manda fondos a la dirección del agente desde tu wallet: ${agent.walletAddress}`,
+      code: 'fondeo-directo',
+      address: agent.walletAddress,
+    },
+    410,
+  )
 })
 
 agentsRouter.post('/:slug/agents/:id/run', async (c) => {

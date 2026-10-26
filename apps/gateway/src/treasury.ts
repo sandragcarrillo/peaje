@@ -1,11 +1,11 @@
-import { isGatewayRail, isNetworkId, isSettlementNetwork, NETWORKS, railLabel, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
+import { isGatewayRail, isNetworkId, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
 import { createClient, http, parseUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
-import { arcPayoutConfirmed, arcTreasuryBalance, sendArcPayout } from './arc.js'
-import { sendTreasuryPayout, treasuryTokenBalance, txConfirmed, withdrawFromSettlement, type Custodia } from './settlement.js'
-import { retirarGateway, retiroGatewayConfirmado, saldoGatewayTreasury } from './circle.js'
+import { arcTreasuryBalance, sendArcPayout } from './arc.js'
+import { sendTreasuryPayout, treasuryTokenBalance } from './settlement.js'
+import { retirarGateway, saldoGatewayTreasury } from './circle.js'
 import { publicClient } from './chain.js'
 import { env } from './env.js'
 
@@ -42,15 +42,6 @@ async function tempoTreasuryBalance(): Promise<string> {
   return balance.formatted ?? String(balance.amount)
 }
 
-async function tempoPayoutConfirmed(hash: `0x${string}`): Promise<boolean | null> {
-  try {
-    const receipt = await publicClient.getTransactionReceipt({ hash })
-    return receipt.status === 'success'
-  } catch {
-    return null
-  }
-}
-
 /** Manda `amount` (decimal, ej "12.45") del token de la red a `to`. Devuelve el hash. */
 export async function sendPayout(
   network: NetworkId | string,
@@ -85,48 +76,4 @@ export async function treasuryBalance(network: NetworkId | string): Promise<stri
     case 'robinhood':
       return treasuryTokenBalance(network)
   }
-}
-
-/** true si la tx ya está minada y salió bien. null si todavía no aparece. */
-export async function payoutConfirmed(
-  network: NetworkId | string,
-  hash: `0x${string}`,
-): Promise<boolean | null> {
-  if (isGatewayRail(network)) return retiroGatewayConfirmado(network, hash)
-  if (!isNetworkId(network)) return null
-  switch (network) {
-    case 'tempo':
-      return tempoPayoutConfirmed(hash)
-    case 'arc':
-      return arcPayoutConfirmed(hash)
-    case 'arbitrum':
-    case 'arbitrum-usdg':
-    case 'robinhood':
-      return txConfirmed(network, hash)
-  }
-}
-
-/**
- * Saca plata del saldo de un negocio hacia `to` (retiro o fondeo de agente).
- * En Tempo y Arc ese saldo vive en la treasury; en las redes con settlement
- * vive en PeajeSettlement a nombre de la wallet de cobro del negocio.
- */
-export async function payoutFromTenant(
-  tenant: TenantCustodia,
-  network: NetworkId | string,
-  to: `0x${string}`,
-  amount: string,
-): Promise<`0x${string}`> {
-  if (!isSettlementNetwork(network)) return sendPayout(network, to, amount)
-  const custodia = custodiaDe(tenant)
-  if (!custodia) throw new Error(`El negocio no tiene wallet custodiada por Peaje en ${railLabel(network)}`)
-  return withdrawFromSettlement(network, custodia, to, amount)
-}
-
-export type TenantCustodia = { custodialWallet: string | null; custodialWalletId: string | null }
-
-/** La wallet custodiada del negocio, o null si no tiene (negocio viejo sin migrar). */
-export function custodiaDe(tenant: TenantCustodia): Custodia | null {
-  if (!tenant.custodialWallet || !tenant.custodialWalletId) return null
-  return { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId }
 }

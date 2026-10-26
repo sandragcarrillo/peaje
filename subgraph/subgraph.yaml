@@ -3,28 +3,32 @@ indexerHints:
   prune: auto
 schema:
   file: ./schema.graphql
+# PeajeSettlementV3 en Arbitrum Sepolia (docs/pagos-directos.md). Cada pago
+# reparte en la misma tx: el neto llega a la wallet del negocio, no hay
+# retiros. Antes de `graph deploy`: poner la dirección del deploy de v3 y su
+# bloque (contracts/broadcast/DeployPeajeSettlementV3.s.sol/421614/run-latest.json).
+# El subgraph viejo de v2 (0x36F9…1231) queda publicado con su historial.
 dataSources:
   - kind: ethereum
-    name: PeajeSettlement
+    name: PeajeSettlementV3
     network: arbitrum-sepolia
     source:
-      address: "0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231"
-      abi: PeajeSettlement
-      startBlock: 313383460
+      address: "0x0000000000000000000000000000000000000000"
+      abi: PeajeSettlementV3
+      startBlock: 0
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - Payment
-        - Withdrawal
         - Account
       abis:
-        - name: PeajeSettlement
-          file: ./abis/PeajeSettlement.json
+        - name: PeajeSettlementV3
+          file: ./abis/PeajeSettlementV3.json
       eventHandlers:
-        - event: PaymentSettled(indexed bytes32,indexed address,indexed address,address,uint256,uint256,uint256)
+        - event: PaymentSettled(indexed bytes32,indexed address,indexed address,address,uint256,uint256,uint256,uint256)
           handler: handlePaymentSettled
-        - event: Withdrawn(indexed address,indexed address,indexed address,uint256)
-          handler: handleWithdrawn
+        - event: StraySettled(indexed bytes32,indexed address,indexed address)
+          handler: handleStraySettled
       file: ./src/mapping.ts

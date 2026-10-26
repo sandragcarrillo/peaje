@@ -1,31 +1,14 @@
 import 'server-only'
-import { fromBaseUnits, isSettlementNetwork, NETWORK_IDS, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
-import {
-  createClient,
-  createPublicClient,
-  createWalletClient,
-  defineChain,
-  erc20Abi,
-  http,
-  parseUnits,
-  type LocalAccount,
-} from 'viem'
+import { fromBaseUnits, NETWORK_IDS, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
+import { createClient, createPublicClient, erc20Abi, http } from 'viem'
 import { tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
-import { merchantViemAccount } from './privy'
 
 /**
- * Operaciones sobre la wallet Peaje del merchant (custodiada por Privy):
- * saldos por red y envío de fondos a cualquier address externa. La firma
- * ocurre en Privy vía el adapter de viem; la clave nunca toca este proceso.
+ * Lectura de saldos de una wallet en todas las redes donde se cobra. Peaje ya
+ * no envía fondos desde wallets de negocios: los pagos llegan directo a la
+ * dirección de cobro (docs/pagos-directos.md).
  */
-
-const arcTestnet = defineChain({
-  id: NETWORKS.arc.testnet.chainId,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  rpcUrls: { default: { http: [NETWORKS.arc.testnet.rpcUrl] } },
-})
 
 const tempoPublic = createClient({ chain: tempoModerato, transport: http() })
 
@@ -65,53 +48,4 @@ export async function walletBalances(address: `0x${string}`): Promise<WalletBala
     }),
   )
   return leidos.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
-}
-
-/**
- * Envía `amount` (decimal) del token de la red desde la wallet que Peaje
- * custodia para el negocio a `to`. Devuelve el hash. La wallet sale del id
- * guardado al crear el negocio (tenant.custodialWalletId), nunca de buscar una
- * address: la de cobro la edita el dueño.
- */
-export async function sendFromMerchantWallet(
-  custodia: { address: `0x${string}`; walletId: string },
-  network: NetworkId,
-  to: `0x${string}`,
-  amount: string,
-): Promise<`0x${string}`> {
-  const { address: walletAddress, walletId } = custodia
-  // El cast aplaca la inferencia de TS (la firma doble tempo+EVM del account de
-  // Privy revienta el checker); en runtime firma ambos tipos de tx igual.
-  const account = merchantViemAccount(walletId, walletAddress) as unknown as LocalAccount
-
-  // En las redes con settlement el saldo del negocio vive en PeajeSettlement y
-  // el gas es ETH: esos retiros los hace el gateway con un retiro firmado.
-  // Arc también liquida por contrato, pero la wallet puede enviar por su
-  // cuenta: el gas se paga en el mismo USDC. En Arbitrum y Robinhood el gas
-  // es ETH y esta wallet no tiene.
-  if (isSettlementNetwork(network) && network !== 'arc') {
-    throw new Error(`${NETWORKS[network].label} withdrawals go through Peaje: use Withdraw in your business dashboard.`)
-  }
-
-  if (network === 'arc') {
-    const wallet = createWalletClient({ account, chain: arcTestnet, transport: http() })
-    return wallet.writeContract({
-      address: NETWORKS.arc.token,
-      abi: erc20Abi,
-      functionName: 'transfer',
-      args: [to, parseUnits(amount, NETWORKS.arc.decimals)],
-    })
-  }
-
-  // Tempo: el gas se paga en el mismo token (feeToken); Privy firma el tx type 118.
-  const wallet = createClient({
-    account,
-    chain: { ...tempoModerato, feeToken: TOKENS.pathUsd },
-    transport: http(),
-  })
-  return Actions.token.transfer(wallet, {
-    to,
-    token: TOKENS.pathUsd,
-    amount: parseUnits(amount, NETWORKS.tempo.decimals),
-  })
 }

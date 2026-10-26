@@ -1,6 +1,6 @@
 'use client'
 
-import { explorerTxUrl, isNetworkId, NETWORKS, railLabel } from '@peaje/shared'
+import { railLabel } from '@peaje/shared'
 import Link from 'next/link'
 import { useState } from 'react'
 import { resumenWallet, type ResumenWallet } from '@/app/t/[slug]/actions'
@@ -9,8 +9,8 @@ import { useDict } from '@/lib/i18n/client'
 
 /**
  * Menú de cuenta: se abre desde el email en el navbar. Arriba la wallet
- * (balance, enviar/recibir, actividad) y abajo el submenu de navegación
- * personal (Mis negocios). El agente vive dentro de cada negocio (Mi agente). La vista completa vive en /wallet.
+ * (balance, recibir, ingresos) y abajo el submenu de navegación
+ * personal (Mis negocios). El agente vive dentro de cada negocio (Mi agente).
  */
 export function AccountMenu({ slug, email }: { slug: string; email: string }) {
   const d = useDict()
@@ -43,6 +43,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
   }
 
   const total = data ? data.balances.reduce((s, b) => s + Number(b.amount), 0) : 0
+  const conSaldo = data ? data.balances.filter((b) => Number(b.amount) > 0) : []
 
   return (
     <div className="relative">
@@ -115,21 +116,21 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
 
                 <div>
                   <p className="text-3xl font-medium tabular-nums">{money(total)}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    {data.balances
-                      .map((b) => `${money(b.amount)} ${b.symbol} · ${railLabel(b.network)}`)
-                      .join('  ·  ')}
-                  </p>
+                  {/* Solo lo que hay: una línea por moneda y red con saldo. */}
+                  {conSaldo.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-xs text-muted">
+                      {conSaldo.map((b) => (
+                        <li key={`${b.network}-${b.symbol}`} className="flex justify-between gap-3">
+                          <span>{b.symbol} · {railLabel(b.network)}</span>
+                          <span className="tabular-nums text-text">{money(b.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
 
+                {/* Sin enviar ni retiros: cada pago llega directo a la dirección de cobro. */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Link
-                    href="/wallet"
-                    onClick={() => setOpen(false)}
-                    className="btn btn-primario btn-chico"
-                  >
-                    {d.dinero.enviar}
-                  </Link>
                   <button
                     type="button"
                     onClick={() => setModo('recibir')}
@@ -137,57 +138,14 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                   >
                     {d.dinero.recibir}
                   </button>
+                  <Link
+                    href={`/t/${slug}/ingresos`}
+                    onClick={() => setOpen(false)}
+                    className="btn btn-secundario btn-chico"
+                  >
+                    {d.dinero.verIngresos}
+                  </Link>
                 </div>
-
-                {data.retiros.length > 0 ? (
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
-                      {d.dinero.actividadReciente}
-                    </p>
-                    <ul className="mt-2 space-y-1.5">
-                      {data.retiros.map((w) => (
-                        <li key={w.id} className="flex items-center gap-2 font-mono text-xs text-muted">
-                          <span
-                            className={
-                              w.status === 'confirmed'
-                                ? 'text-accent'
-                                : w.status === 'failed'
-                                  ? 'text-red-600'
-                                  : 'text-amber-700'
-                            }
-                          >
-                            ●
-                          </span>
-                          <span>{d.dinero.retiroItem(money(w.amount))}</span>
-                          {w.txRef && isNetworkId(w.network) ? (
-                            <a
-                              href={explorerTxUrl(w.network, w.txRef)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-accent hover:underline"
-                            >
-                              tx
-                            </a>
-                          ) : null}
-                          <span className="ml-auto">
-                            {new Date(w.createdAt).toLocaleDateString(d.dinero.fechaLocale, {
-                              day: '2-digit',
-                              month: 'short',
-                            })}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                <Link
-                  href="/wallet"
-                  onClick={() => setOpen(false)}
-                  className="btn btn-secundario btn-chico btn-ancho"
-                >
-                  {d.dinero.verWalletCompleta}
-                </Link>
 
               </div>
             )}

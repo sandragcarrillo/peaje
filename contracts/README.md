@@ -1,5 +1,7 @@
 # PeajeSettlement
 
+> **v3 (not deployed yet):** `src/PeajeSettlementV3.sol` replaces custody with a stateless split: in the same `settle` call, 98% of the price goes straight to the merchant's wallet and 2% plus the network fee to the fee recipient. No balances, no withdrawals, fee fixed at 2%, owner meant to be a Safe, plus a pause-only guardian. Tests in `test/v3/`, deploy script `script/DeployPeajeSettlementV3.s.sol`, design, security model and deploy order in [`docs/contrato-v3.md`](../docs/contrato-v3.md). Everything below describes v2, which stays deployed on testnets until its balances are withdrawn.
+
 On-chain settlement for Peaje payments. An AI agent signs an EIP-3009 `transferWithAuthorization` for the amount in an HTTP 402 challenge (the merchant's price plus that rail's network cost); the Peaje gateway submits it through `settle`, which pulls the stablecoin into the contract, credits the merchant the price net of the platform fee, and credits the platform the fee plus the network cost, all in one transaction. Merchants withdraw whenever they want, directly or through a gasless signed withdrawal.
 
 Why the network cost is explicit: settling one payment on Arbitrum costs the relayer about $0.008 in gas, and a 2% fee on a $0.02 request is $0.0004. Without it, every small payment lost money. The agent chooses the rail, so the agent pays that rail's cost, shown in the 402; the merchant always nets `price × (1 − fee)`.

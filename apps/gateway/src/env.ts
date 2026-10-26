@@ -6,10 +6,29 @@ import {
   type SettlementNetwork,
 } from '@peaje/shared'
 
-function settlementAddress(variable: string, deployed: `0x${string}` | undefined): `0x${string}` | null {
-  const value = process.env[variable]
-  if (value === 'off') return null
-  return (value as `0x${string}` | undefined) ?? deployed ?? null
+/**
+ * PeajeSettlementV3 de una red, solo desde el env. Sin dirección (o con
+ * `off`) el riel no ofrece nada: no hay fallback a v2, que guardaba saldos.
+ */
+function settlementV3(variable: string): `0x${string}` | null {
+  const value = process.env[variable]?.trim()
+  if (!value || value === 'off') return null
+  if (!/^0x[0-9a-fA-F]{40}$/.test(value)) throw new Error(`${variable} no es una dirección válida`)
+  return value as `0x${string}`
+}
+
+function llave(name: string): `0x${string}` | null {
+  const value = process.env[name]?.trim()
+  if (!value) return null
+  if (!/^0x[0-9a-fA-F]{64}$/.test(value)) throw new Error(`${name} no es una llave privada válida`)
+  return value as `0x${string}`
+}
+
+const treasuryPrivateKey = required('TREASURY_PRIVATE_KEY') as `0x${string}`
+const relayerPrivateKey = llave('RELAYER_PRIVATE_KEY')
+// El relayer es una llave caliente con solo gas: nunca la de la treasury.
+if (relayerPrivateKey && relayerPrivateKey.toLowerCase() === treasuryPrivateKey.toLowerCase()) {
+  throw new Error('RELAYER_PRIVATE_KEY no puede ser la misma llave que TREASURY_PRIVATE_KEY')
 }
 
 function required(name: string): string {
@@ -26,8 +45,13 @@ export const env = {
   treasuryAddress: required('TREASURY_ADDRESS') as `0x${string}`,
   currency: (process.env.MPP_CURRENCY ?? DEFAULT_CURRENCY) as `0x${string}`,
   testnet: (process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet',
-  /** Clave de la treasury. Solo testnet. Firma los retiros. */
-  treasuryPrivateKey: required('TREASURY_PRIVATE_KEY') as `0x${string}`,
+  /** Clave de la treasury. Solo testnet. Firma lo que es de Peaje (relayar barridos de agentes). */
+  treasuryPrivateKey,
+  /**
+   * Relayer de PeajeSettlementV3: EOA aparte, con solo gas nativo, habilitada
+   * en el contrato con `setRelayer`. Sin ella los rieles de contrato no ofrecen nada.
+   */
+  relayerPrivateKey,
   /** Secreto compartido entre dashboard y gateway para la API interna. */
   internalSecret: required('INTERNAL_API_SECRET'),
   rpcUrl: tempoConfig((process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet').rpcUrl,
@@ -41,22 +65,38 @@ export const env = {
     arc: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
   } satisfies Record<SettlementNetwork, string>,
   /**
-   * PeajeSettlement por red. Por defecto la dirección desplegada que trae el
-   * paquete compartido; `<RED>_SETTLEMENT_ADDRESS=off` apaga ese riel.
+   * PeajeSettlementV3 por red (testnet hoy). USDC y USDG de Arbitrum comparten
+   * cadena y contrato. Ver docs/pagos-directos.md.
    */
-  settlementContracts: {
-    arbitrum: settlementAddress('ARBITRUM_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.arbitrum),
-    'arbitrum-usdg': settlementAddress('ARBITRUM_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS['arbitrum-usdg']),
-    robinhood: settlementAddress('ROBINHOOD_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.robinhood),
-    arc: settlementAddress('ARC_SETTLEMENT_ADDRESS', SETTLEMENT_CONTRACTS.arc),
+  settlementV3: {
+    arbitrum: settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
+    'arbitrum-usdg': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
+    robinhood: settlementV3('PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET'),
+    arc: settlementV3('PEAJE_SETTLEMENT_V3_ARC_TESTNET'),
   } satisfies Record<SettlementNetwork, `0x${string}` | null>,
+  /**
+   * Mainnet: se leen para validarlas, pero ningún riel las usa todavía (el
+   * gateway opera contra testnet). Se conectan cuando NETWORKS tenga mainnet.
+   */
+  settlementV3Mainnet: {
+    'arbitrum-one': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_ONE'),
+    'robinhood-mainnet': settlementV3('PEAJE_SETTLEMENT_V3_ROBINHOOD_MAINNET'),
+    'arc-mainnet': settlementV3('PEAJE_SETTLEMENT_V3_ARC_MAINNET'),
+  },
+  /** PeajeSettlement v2 (guardaba saldos): solo para leer pagos viejos. */
+  settlementV2: SETTLEMENT_CONTRACTS,
+  /**
+   * Circle Nanopayments (gateway-arbitrum, gateway-arc): junta los pagos en el
+   * saldo Gateway de la treasury y obliga a retirar. Apagado salvo `true`.
+   */
+  circleNanopayments: process.env.CIRCLE_NANOPAYMENTS_ENABLED === 'true',
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
   /**
    * Take rate de Peaje por transacción (0.02 = 2%). El agente paga el precio
-   * listado completo; al ledger del negocio se acredita el neto. Como todo
-   * el pago cae on-chain en la treasury, la diferencia queda ahí: ese es el
-   * revenue de la plataforma.
+   * listado completo y el negocio recibe el neto en su wallet. En los rieles
+   * de contrato el 2% es fijo en PeajeSettlementV3 (FEE_BPS); esto lo usa el
+   * split de Tempo y el registro del ledger.
    */
   feePct: Math.min(0.1, Math.max(0, Number(process.env.PEAJE_FEE_PCT ?? '0.02'))),
 }

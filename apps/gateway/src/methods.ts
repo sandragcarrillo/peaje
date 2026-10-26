@@ -1,18 +1,30 @@
 import { GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS, splitPrecio, TOKEN_DECIMALS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
-import { settleAuthorization } from './settlement.js'
+import { contratoV3, settleAuthorization } from './settlement.js'
 import { conCostoRed } from './costoRed.js'
 import { settleGateway } from './circle.js'
 import { formatUnits, parseUnits } from 'viem'
 import { usdcStatus } from './chainlink.js'
-import { contextoCobro } from './contexto.js'
+import { contextoCobro, esDireccion, type ContextoCobro } from './contexto.js'
 import { env } from './env.js'
+
+/**
+ * A quién le paga este cobro. Un negocio sin dirección de cobro no tiene
+ * ninguna oferta: el 98% no tiene a dónde ir y Peaje ya no lo guarda.
+ * La treasury no sirve de wallet de cobro (sería volver a la custodia).
+ */
+export function merchantDelCobro(contexto: Pick<ContextoCobro, 'merchant'> | undefined): `0x${string}` | null {
+  const merchant = contexto?.merchant
+  if (!esDireccion(merchant)) return null
+  if (merchant.toLowerCase() === env.treasuryAddress.toLowerCase()) return null
+  return merchant
+}
 
 /**
  * Métodos de cobro del gateway, compartidos por las instancias HTTP y MCP.
  * Un solo challenge 402 lleva una oferta por riel: el agente elige dónde
- * paga (Tempo con pathUSD, o USDC/USDG vía PeajeSettlement en Arbitrum,
- * Robinhood y Arc); al negocio le da igual el rail.
+ * paga (Tempo con pathUSD, o USDC/USDG vía PeajeSettlementV3 en Arbitrum,
+ * Robinhood y Arc). En todos el neto llega directo a la wallet del negocio.
  */
 export function chargeMethods() {
   const depegGuard = async (rail: string) => {
@@ -27,25 +39,31 @@ export function chargeMethods() {
   })
 
   // ---- Tempo splits ----
-  // Si el negocio tiene wallet de cobro, la oferta de Tempo usa el split
-  // nativo de mppx: una sola transacción del agente con dos transfers, el neto
-  // a la wallet del negocio y el 2% a la treasury. mppx verifica que la
-  // transacción traiga exactamente esos transfers (y el reparto va en la parte
-  // del challenge que no puede cambiar entre el 402 y el pago), así que un
-  // cliente que ignore el split no puede pagarle solo a uno. Sin wallet de
-  // cobro (o sin contexto, como el cobro de planes) queda el Tempo custodial.
-  // El gas lo paga el agente en su propia transacción: no hay costo de red.
+  // La oferta de Tempo usa el split nativo de mppx: una sola transacción del
+  // agente con dos transfers, el neto a la wallet del negocio y el 2% a la
+  // treasury. mppx verifica que la transacción traiga exactamente esos
+  // transfers (y el reparto va en la parte del challenge que no puede cambiar
+  // entre el 402 y el pago). Sin wallet de cobro no hay oferta de Tempo: ya
+  // no hay cobro custodial. Solo los cobros de Peaje (planes) van enteros a
+  // la treasury. El gas lo paga el agente en su propia transacción.
   Object.assign(tempoRail, {
+    canOffer: async () => {
+      const contexto = contextoCobro.getStore()
+      return !!contexto && (contexto.propio || merchantDelCobro(contexto) !== null)
+    },
     adjust: (opciones: { amount: string | number }) => {
       const contexto = contextoCobro.getStore()
-      const merchant = contexto?.merchant
-      if (!contexto || !merchant || !/^0x[0-9a-fA-F]{40}$/.test(merchant)) return opciones
-      if (merchant.toLowerCase() === env.treasuryAddress.toLowerCase()) return opciones
+      if (!contexto || contexto.propio) return opciones
+      const merchant = merchantDelCobro(contexto)
+      // Sin merchant la oferta no se muestra (canOffer); si llegara una
+      // credencial igual, su challenge no coincide con este y mppx la rechaza.
+      if (!merchant) return opciones
       const { netMicro, feeMicro } = splitPrecio(
         parseUnits(String(opciones.amount), TOKEN_DECIMALS),
         BigInt(Math.round(env.feePct * 10_000)),
       )
       contexto.tempoSplit = { neto: formatUnits(netMicro, TOKEN_DECIMALS), fee: formatUnits(feeMicro, TOKEN_DECIMALS) }
+      contexto.payoutAddress = merchant
       return {
         ...opciones,
         recipient: merchant,
@@ -56,10 +74,12 @@ export function chargeMethods() {
     },
   })
 
-  // Una oferta por red con PeajeSettlement configurado. El recipient es el
-  // contrato, no la treasury: el split negocio/Peaje ocurre on-chain en `settle`.
+  // Una oferta por red con PeajeSettlementV3 y relayer configurados. El
+  // recipient es el contrato: el reparto negocio/Peaje ocurre on-chain en
+  // `settle`, en la misma transacción. Los cobros de Peaje (planes) no usan
+  // estos rieles: el contrato no acepta al fee recipient como merchant.
   const settlementRails = SETTLEMENT_NETWORKS.flatMap((network) => {
-    const contrato = env.settlementContracts[network]
+    const contrato = contratoV3(network)
     if (!contrato) return []
     const def = NETWORKS[network]
     const rail = evm.charge({
@@ -68,9 +88,13 @@ export function chargeMethods() {
       decimals: def.decimals,
       authorization: def.eip3009!,
       recipient: contrato,
+      canOffer: async () => {
+        const contexto = contextoCobro.getStore()
+        return !!contexto && !contexto.propio && merchantDelCobro(contexto) !== null
+      },
       settle: async ({ payload, request }) => {
         if (def.tokenSymbol === 'USDC') await depegGuard(def.label)
-        // El agente firmó precio + costo de red. El contrato acredita al
+        // El agente firmó precio + costo de red. El contrato le manda al
         // negocio el precio menos el 2% y a Peaje el 2% más el costo de red.
         const contexto = contextoCobro.getStore()
         const precio = contexto?.priceUsd ? parseUnits(contexto.priceUsd, def.decimals) : BigInt(request.amount)
@@ -88,27 +112,28 @@ export function chargeMethods() {
     ]
   })
 
-  // Circle Nanopayments: una oferta x402 por cadena soportada. El agente firma
-  // contra el Gateway Wallet de Circle (no contra el token), Circle liquida en
-  // lote y el gas es de ellos: sin costo de red. Van al final para que un
-  // cliente MPP nativo, que toma la primera oferta de su cadena, use el
-  // contrato; el cliente de Circle busca la oferta por su dominio.
-  const gatewayRails = GATEWAY_RAIL_IDS.map((rail) => {
-    const def = GATEWAY_RAILS[rail]
-    return evm.charge({
-      currency: def.token,
-      chainId: def.chainId,
-      decimals: def.decimals,
-      authorization: { name: 'GatewayWalletBatched', version: '1', verifyingContract: def.verifyingContract } as { name: string; version: string },
-      recipient: env.treasuryAddress,
-      // Circle exige autorizaciones válidas 7 días; el cliente firma con este valor.
-      x402: { maxTimeoutSeconds: 604_900 },
-      settle: async ({ request }) => {
-        await depegGuard(def.label)
-        return settleGateway(rail)({ request })
-      },
-    })
-  })
+  // Circle Nanopayments: apagado por defecto (CIRCLE_NANOPAYMENTS_ENABLED).
+  // Junta los pagos en el saldo Gateway de la treasury y el negocio tendría
+  // que retirar: no encaja con el pago directo. El código queda para cuando
+  // Circle permita liquidar a la wallet de cada negocio.
+  const gatewayRails = env.circleNanopayments
+    ? GATEWAY_RAIL_IDS.map((rail) => {
+        const def = GATEWAY_RAILS[rail]
+        return evm.charge({
+          currency: def.token,
+          chainId: def.chainId,
+          decimals: def.decimals,
+          authorization: { name: 'GatewayWalletBatched', version: '1', verifyingContract: def.verifyingContract } as { name: string; version: string },
+          recipient: env.treasuryAddress,
+          // Circle exige autorizaciones válidas 7 días; el cliente firma con este valor.
+          x402: { maxTimeoutSeconds: 604_900 },
+          settle: async ({ request }) => {
+            await depegGuard(def.label)
+            return settleGateway(rail)({ request })
+          },
+        })
+      })
+    : []
 
   // Todos los rieles EVM comparten el método `evm`: la tupla que mppx usa para
   // tipar `mppx.charge` es Tempo más un EVM, sin importar cuántos haya.

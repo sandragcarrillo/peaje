@@ -1,4 +1,6 @@
-[
+// Generado por scripts/abi-v3.mjs desde contracts/out/PeajeSettlementV3.sol/PeajeSettlementV3.json.
+// No editar a mano: `cd contracts && forge build` y después `pnpm --filter @peaje/gateway abi:v3`.
+export const settlementV3Abi = [
   {
     "type": "constructor",
     "inputs": [
@@ -8,53 +10,42 @@
         "internalType": "address"
       },
       {
+        "name": "guardian_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "feeRecipient_",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "feeBps_",
-        "type": "uint16",
-        "internalType": "uint16"
+        "name": "relayers",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "maxNetworkFees",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "DOMAIN_SEPARATOR",
+    "name": "FEE_BPS",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "MAX_FEE_BPS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "WITHDRAW_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -68,87 +59,20 @@
   },
   {
     "type": "function",
-    "name": "claimable",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "eip712Domain",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "fields",
-        "type": "bytes1",
-        "internalType": "bytes1"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "version",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "verifyingContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "salt",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "extensions",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "feeBps",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "feeRecipient",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "guardian",
     "inputs": [],
     "outputs": [
       {
@@ -218,25 +142,6 @@
   },
   {
     "type": "function",
-    "name": "nonces",
-    "inputs": [
-      {
-        "name": "owner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -283,21 +188,32 @@
   },
   {
     "type": "function",
-    "name": "recoverSurplus",
+    "name": "quote",
     "inputs": [
       {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
+        "name": "networkFee",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "net",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "fee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -331,15 +247,23 @@
   },
   {
     "type": "function",
-    "name": "setFee",
+    "name": "setFeeRecipient",
     "inputs": [
       {
-        "name": "feeBps_",
-        "type": "uint16",
-        "internalType": "uint16"
-      },
-      {
         "name": "feeRecipient_",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setGuardian",
+    "inputs": [
+      {
+        "name": "guardian_",
         "type": "address",
         "internalType": "address"
       }
@@ -382,7 +306,7 @@
       {
         "name": "auth",
         "type": "tuple",
-        "internalType": "struct PeajeSettlement.Authorization",
+        "internalType": "struct PeajeSettlementV3.Authorization",
         "components": [
           {
             "name": "from",
@@ -443,19 +367,73 @@
   },
   {
     "type": "function",
-    "name": "totalOwed",
+    "name": "settleStray",
     "inputs": [
       {
         "name": "token",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "merchant",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "from",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "networkFee",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "net",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "straySettled",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -481,84 +459,36 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "withdraw",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "withdrawWithSignature",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "to",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "signature",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
-    "name": "EIP712DomainChanged",
-    "inputs": [],
+    "name": "FeeRecipientUpdated",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "next",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "FeeUpdated",
+    "name": "GuardianUpdated",
     "inputs": [
       {
-        "name": "feeBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       },
       {
-        "name": "feeRecipient",
+        "name": "next",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -646,7 +576,13 @@
         "internalType": "address"
       },
       {
-        "name": "amount",
+        "name": "gross",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "net",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -687,8 +623,14 @@
   },
   {
     "type": "event",
-    "name": "SurplusRecovered",
+    "name": "StraySettled",
     "inputs": [
+      {
+        "name": "nonce",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
       {
         "name": "token",
         "type": "address",
@@ -696,16 +638,10 @@
         "internalType": "address"
       },
       {
-        "name": "to",
+        "name": "payer",
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -749,35 +685,36 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "Withdrawn",
+    "type": "error",
+    "name": "AuthorizationNotUsed",
     "inputs": [
       {
-        "name": "token",
+        "name": "payer",
         "type": "address",
-        "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "account",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
+        "name": "nonce",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "BalanceNotRestored",
+    "inputs": [
       {
-        "name": "to",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
+        "name": "before",
         "type": "uint256",
-        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "afterSettle",
+        "type": "uint256",
         "internalType": "uint256"
       }
-    ],
-    "anonymous": false
+    ]
   },
   {
     "type": "error",
@@ -791,18 +728,7 @@
   },
   {
     "type": "error",
-    "name": "FeeTooHigh",
-    "inputs": [
-      {
-        "name": "feeBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InsufficientBalance",
+    "name": "InsufficientStray",
     "inputs": [
       {
         "name": "available",
@@ -818,28 +744,40 @@
   },
   {
     "type": "error",
-    "name": "InvalidAccountNonce",
+    "name": "InvalidFeeRecipient",
     "inputs": [
       {
-        "name": "account",
+        "name": "feeRecipient",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "currentNonce",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   },
   {
     "type": "error",
-    "name": "InvalidShortString",
-    "inputs": []
+    "name": "InvalidGuardian",
+    "inputs": [
+      {
+        "name": "guardian",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
-    "name": "InvalidSignature",
+    "name": "InvalidMerchant",
+    "inputs": [
+      {
+        "name": "merchant",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "LengthMismatch",
     "inputs": []
   },
   {
@@ -860,8 +798,14 @@
   },
   {
     "type": "error",
-    "name": "NoSurplus",
-    "inputs": []
+    "name": "NotPauser",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
@@ -919,23 +863,17 @@
   },
   {
     "type": "error",
-    "name": "SignatureExpired",
+    "name": "StrayAlreadySettled",
     "inputs": [
       {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "StringTooLong",
-    "inputs": [
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      },
       {
-        "name": "str",
-        "type": "string",
-        "internalType": "string"
+        "name": "nonce",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -976,4 +914,4 @@
     "name": "ZeroAmount",
     "inputs": []
   }
-]
+] as const

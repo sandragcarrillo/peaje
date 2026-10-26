@@ -1,35 +1,26 @@
 type Account @entity(immutable: false) {
   id: Bytes!
+  "Neto recibido en la wallet del negocio (suma de PaymentSettled.net)."
   totalReceived: BigInt!
   totalFees: BigInt!
   totalNetworkFees: BigInt!
-  totalWithdrawn: BigInt!
   paymentCount: Int!
   payments: [Payment!]! @derivedFrom(field: "merchant")
-  withdrawals: [Withdrawal!]! @derivedFrom(field: "account")
 }
 
-type Payment @entity(immutable: true) {
+type Payment @entity(immutable: false) {
   id: Bytes!
   nonce: Bytes!
   token: Bytes!
   merchant: Account!
   payer: Bytes!
-  amount: BigInt!
+  "Lo que firmó el agente: net + fee + networkFee."
+  gross: BigInt!
+  net: BigInt!
   fee: BigInt!
   networkFee: BigInt!
-  net: BigInt!
-  blockNumber: BigInt!
-  timestamp: BigInt!
-  txHash: Bytes!
-}
-
-type Withdrawal @entity(immutable: true) {
-  id: Bytes!
-  token: Bytes!
-  account: Account!
-  to: Bytes!
-  amount: BigInt!
+  "Repartido por el Safe con settleStray (la autorización se usó fuera de Peaje)."
+  stray: Boolean!
   blockNumber: BigInt!
   timestamp: BigInt!
   txHash: Bytes!

@@ -1,6 +1,6 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
-import { PaymentSettled, Withdrawn } from "../generated/PeajeSettlement/PeajeSettlement"
-import { Account, Payment, Withdrawal } from "../generated/schema"
+import { PaymentSettled, StraySettled } from "../generated/PeajeSettlementV3/PeajeSettlementV3"
+import { Account, Payment } from "../generated/schema"
 
 function loadAccount(address: Bytes): Account {
   let account = Account.load(address)
@@ -9,17 +9,15 @@ function loadAccount(address: Bytes): Account {
     account.totalReceived = BigInt.zero()
     account.totalFees = BigInt.zero()
     account.totalNetworkFees = BigInt.zero()
-    account.totalWithdrawn = BigInt.zero()
     account.paymentCount = 0
   }
   return account
 }
 
+// v3 trae el neto en el evento: es exactamente lo que llegó a la wallet del negocio.
 export function handlePaymentSettled(event: PaymentSettled): void {
-  const net = event.params.amount.minus(event.params.fee).minus(event.params.networkFee)
-
   const merchant = loadAccount(event.params.merchant)
-  merchant.totalReceived = merchant.totalReceived.plus(net)
+  merchant.totalReceived = merchant.totalReceived.plus(event.params.net)
   merchant.totalFees = merchant.totalFees.plus(event.params.fee)
   merchant.totalNetworkFees = merchant.totalNetworkFees.plus(event.params.networkFee)
   merchant.paymentCount = merchant.paymentCount + 1
@@ -30,28 +28,23 @@ export function handlePaymentSettled(event: PaymentSettled): void {
   payment.token = event.params.token
   payment.merchant = merchant.id
   payment.payer = event.params.payer
-  payment.amount = event.params.amount
+  payment.gross = event.params.gross
+  payment.net = event.params.net
   payment.fee = event.params.fee
   payment.networkFee = event.params.networkFee
-  payment.net = net
+  payment.stray = false
   payment.blockNumber = event.block.number
   payment.timestamp = event.block.timestamp
   payment.txHash = event.transaction.hash
   payment.save()
 }
 
-export function handleWithdrawn(event: Withdrawn): void {
-  const account = loadAccount(event.params.account)
-  account.totalWithdrawn = account.totalWithdrawn.plus(event.params.amount)
-  account.save()
-
-  const withdrawal = new Withdrawal(event.transaction.hash.concatI32(event.logIndex.toI32()))
-  withdrawal.token = event.params.token
-  withdrawal.account = account.id
-  withdrawal.to = event.params.to
-  withdrawal.amount = event.params.amount
-  withdrawal.blockNumber = event.block.number
-  withdrawal.timestamp = event.block.timestamp
-  withdrawal.txHash = event.transaction.hash
-  withdrawal.save()
+// StraySettled va justo después de su PaymentSettled en la misma tx y no trae
+// montos (no se cuenta dos veces): solo marca ese pago como repartido por el Safe.
+export function handleStraySettled(event: StraySettled): void {
+  const id = event.transaction.hash.concatI32(event.logIndex.toI32() - 1)
+  const payment = Payment.load(id)
+  if (payment == null) return
+  payment.stray = true
+  payment.save()
 }

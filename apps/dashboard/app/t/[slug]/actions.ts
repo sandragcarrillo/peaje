@@ -1,14 +1,11 @@
 'use server'
 
-import { isNetworkId, explorerTxUrl } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
-import { getWithdrawal, requestWithdrawal } from '@/lib/gateway'
 import { getDict } from '@/lib/i18n'
 import { avisarIndexNow } from '@/lib/indexnow'
-import { idSiEsCustodiada } from '@/lib/privy'
+import { validarDireccionDelNegocio } from '@/lib/direccion-propia-server'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
-import { sendFromMerchantWallet } from '@/lib/walletops'
 
 export async function crearRuta(slug: string, formData: FormData) {
   const tenant = await requireTenant(slug)
@@ -56,134 +53,57 @@ export async function borrarRuta(slug: string, routeId: string) {
   revalidatePath(`/t/${slug}`)
 }
 
-export async function guardarWallet(slug: string, formData: FormData) {
-  const tenant = await requireTenant(slug)
-  const wallet = String(formData.get('wallet') ?? '').trim()
-  if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
-    throw new Error((await getDict()).panel.errorWalletInvalida)
-  }
-  // Una wallet que Peaje custodia solo puede ser la de este negocio: la de
-  // otro negocio o la de un agente no se puede reclamar como propia.
-  const id = await idSiEsCustodiada(wallet)
-  if (id && id !== tenant.custodialWalletId) {
-    throw new Error((await getDict()).panel.errorWalletAjena)
-  }
-  await store.setPayoutWallet(tenant.id, wallet)
-  revalidatePath(`/t/${slug}`)
-}
+export type GuardarWalletResultado = { ok: true; address: string } | { ok: false; error: string }
 
-export type RetiroEstado = {
-  id: string
-  status: 'pending' | 'confirmed' | 'failed'
-  amount: string
-  toWallet: string
-  explorerUrl: string | null
-}
-
-export async function retirar(slug: string, formData: FormData): Promise<RetiroEstado> {
-  await requireTenant(slug)
-  const amount = String(formData.get('amount') ?? '').trim()
-  const network = String(formData.get('network') ?? 'tempo').trim()
-  const result = await requestWithdrawal(slug, { network, ...(amount ? { amount } : {}) })
-  revalidatePath(`/t/${slug}`)
-  return {
-    id: result.withdrawal.id,
-    status: result.withdrawal.status,
-    amount: result.withdrawal.amount,
-    toWallet: result.withdrawal.toWallet,
-    explorerUrl: result.explorerUrl,
-  }
-}
-
-export async function estadoRetiro(slug: string, id: string): Promise<RetiroEstado> {
-  await requireTenant(slug)
-  const result = await getWithdrawal(slug, id)
-  if (result.withdrawal.status !== 'pending') revalidatePath(`/t/${slug}`)
-  return {
-    id: result.withdrawal.id,
-    status: result.withdrawal.status,
-    amount: result.withdrawal.amount,
-    toWallet: result.withdrawal.toWallet,
-    explorerUrl: result.explorerUrl,
-  }
-}
-
-export type EnvioResultado =
-  | { ok: true; tx: string; explorerUrl: string }
-  | { ok: false; error: string }
-
-/** Envía fondos desde la wallet Peaje (Privy) del merchant a una address externa. */
-export async function enviarFondos(slug: string, formData: FormData): Promise<EnvioResultado> {
+/**
+ * "Usar mi propia dirección": el dueño pone una address suya para cobrar.
+ * Se valida checksum, que no sea la treasury, ni un contrato en las redes
+ * donde cobramos, ni la wallet de un agente u otra cuenta de Peaje (ver
+ * lib/direccion-propia.ts). Con `wallet` vacío vuelve a su wallet de Privy.
+ */
+export async function guardarWallet(slug: string, formData: FormData): Promise<GuardarWalletResultado> {
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
-  // Se envía desde la wallet que Peaje custodia para este negocio, nunca desde
-  // la de cobro (el dueño puede poner ahí cualquier address).
-  if (!tenant.custodialWallet || !tenant.custodialWalletId) return { ok: false, error: d.panel.errorNegocioSinWallet }
-  const custodia = { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId }
+  const textos = d.walletPropia.errores
+  const raw = String(formData.get('wallet') ?? '').trim()
+  const delDueno = { id: tenant.ownerWalletId, address: tenant.ownerWallet }
 
-  const to = String(formData.get('to') ?? '').trim()
-  const network = String(formData.get('network') ?? '').trim()
-  const amount = Number(String(formData.get('amount') ?? '').replace(',', '.').trim())
-
-  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) return { ok: false, error: d.panel.errorDestinoInvalido }
-  if (!isNetworkId(network)) return { ok: false, error: d.panel.errorRedInvalida }
-  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: d.panel.errorMontoInvalido }
-  if (to.toLowerCase() === custodia.address.toLowerCase()) {
-    return { ok: false, error: d.panel.errorMismoDestino }
+  if (!raw) {
+    if (!tenant.ownerWallet) return { ok: false, error: textos.sinWalletPropia }
+    await store.setTenantWallets(tenant.id, { payoutWallet: tenant.ownerWallet })
+    revalidatePath(`/t/${slug}`, 'layout')
+    revalidatePath('/wallet')
+    return { ok: true, address: tenant.ownerWallet }
   }
 
   try {
-    const tx = await sendFromMerchantWallet(
-      custodia,
-      network,
-      to as `0x${string}`,
-      amount.toFixed(6),
-    )
-    revalidatePath(`/t/${slug}/wallet`)
-    return { ok: true, tx, explorerUrl: explorerTxUrl(network, tx) }
+    const r = await validarDireccionDelNegocio(raw, delDueno)
+    if (!r.ok) return { ok: false, error: textos[r.motivo] }
+    await store.setTenantWallets(tenant.id, { payoutWallet: r.address })
+    revalidatePath(`/t/${slug}`, 'layout')
+    revalidatePath('/wallet')
+    return { ok: true, address: r.address }
   } catch (error) {
-    console.error('[wallet] fallo el envío', error)
-    const msg = error instanceof Error ? error.message : ''
-    return {
-      ok: false,
-      error: msg.includes('custodia') ? msg : d.panel.errorEnvio,
-    }
+    console.error('[wallet] no se pudo guardar la dirección propia', error)
+    return { ok: false, error: textos.generico }
   }
 }
 
 export type ResumenWallet = {
   address: string
   balances: { network: string; symbol: string; amount: string }[]
-  retiros: {
-    id: string
-    amount: string
-    status: 'pending' | 'confirmed' | 'failed'
-    network: string
-    txRef: string | null
-    createdAt: string
-  }[]
 }
 
-/** Datos del popover de wallet del navbar: saldos live + últimos retiros. */
+/**
+ * Datos del popover de wallet del navbar: saldos live de la wallet del dueño.
+ * Sin retiros ni envíos: los pagos llegan directo a la dirección de cobro.
+ */
 export async function resumenWallet(slug: string): Promise<ResumenWallet | null> {
   const tenant = await requireTenant(slug)
-  if (!tenant.custodialWallet) return null
+  // La del dueño si ya migró; la custodiada si es un negocio de antes.
+  const address = tenant.ownerWallet ?? tenant.custodialWallet
+  if (!address) return null
   const { walletBalances } = await import('@/lib/walletops')
-  const [balances, retiros] = await Promise.all([
-    walletBalances(tenant.custodialWallet as `0x${string}`),
-    store.listWithdrawals(tenant.id, 5),
-  ])
-  return {
-    address: tenant.custodialWallet,
-    balances,
-    retiros: retiros.map((w) => ({
-      id: w.id,
-      amount: w.amount,
-      status: w.status,
-      network: w.network,
-      txRef: w.txRef,
-      createdAt: w.createdAt,
-    })),
-  }
+  return { address, balances: await walletBalances(address as `0x${string}`) }
 }
 
 // ---- links con precio ----

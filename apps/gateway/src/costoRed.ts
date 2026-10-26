@@ -2,10 +2,11 @@ import { NETWORKS, SETTLEMENT_NETWORKS, type SettlementNetwork } from '@peaje/sh
 import { createPublicClient, http } from 'viem'
 import { ethUsd } from './chainlink.js'
 import { env } from './env.js'
+import { contratoV3 } from './settlement.js'
 
 /**
  * Costo de red por riel: lo que el relayer gasta en gas para liquidar UN pago
- * en PeajeSettlement, en dólares. Se le cobra al agente encima del precio
+ * en PeajeSettlementV3, en dólares. Se le cobra al agente encima del precio
  * (ver methods.ts) y el contrato lo acredita a Peaje junto con el 2%.
  *
  * Se calcula en segundo plano cada 30 s y se lee en sincrónico: el 402 se
@@ -13,8 +14,12 @@ import { env } from './env.js'
  * todavía, el recargo es 0 y Peaje absorbe ese pago: mejor que rechazarlo.
  */
 
-/** Gas de `settle` medido en Arbitrum Sepolia (tx 0x8789a7a3…): 146.990. Con margen. */
-const GAS_SETTLE = 160_000n
+/**
+ * Gas de `settle` en PeajeSettlementV3: ~155k en estado estable y 190k a 195k
+ * el primer pago a una wallet que nunca tuvo el token (docs/contrato-v3.md).
+ * 170k por 1,2 de margen (204k) cubre los dos.
+ */
+export const GAS_SETTLE = 170_000n
 /** Margen sobre el precio del gas del momento: el bloque siguiente puede ser más caro. */
 const MARGEN = 1.2
 /**
@@ -66,7 +71,7 @@ async function calcular(network: SettlementNetwork): Promise<number> {
 
 async function refrescar(): Promise<void> {
   for (const network of SETTLEMENT_NETWORKS) {
-    if (!env.settlementContracts[network]) continue
+    if (!contratoV3(network)) continue
     try {
       costos.set(network, await calcular(network))
     } catch (error) {

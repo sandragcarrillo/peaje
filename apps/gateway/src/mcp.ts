@@ -4,8 +4,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Resource, Route, Tenant } from '@peaje/db'
 import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
-import { contextoCobro, nuevoContexto } from './contexto.js'
+import { contextoCobro, nuevoContexto, prepararOrigen, type ContextoCobro } from './contexto.js'
 import { creditPayment, refundOriginFailure } from './charge.js'
+import { motivoNoLiquidado, sinDireccionDeCobro, tieneDireccionDeCobro } from './cobro.js'
+import { cortado, registrarFalloOrigen, respuestaCortado } from './cortacircuito.js'
 import { docsBase } from './base.js'
 import { env } from './env.js'
 import { chargeMethods } from './methods.js'
@@ -23,6 +25,27 @@ const mcpMppx = Mppx.create({
   methods: chargeMethods(),
   transport: Transport.mcpSdk(),
 })
+
+/** Lo que el settlement anotó en el contexto y el ledger necesita. */
+function liquidado(cobro: ContextoCobro) {
+  return {
+    network: cobro.network,
+    networkFee: cobro.networkFee,
+    tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
+    reparto: cobro.reparto,
+    payoutAddress: cobro.payoutAddress,
+  }
+}
+
+/** Pago adelantado servido una vez: sin receipt (no hubo tx de Peaje), el Safe reparte después. */
+function pendienteDeReparto(texto: string) {
+  return { content: [{ type: 'text' as const, text: texto }], _meta: { 'peaje/payment': 'pending-split' } }
+}
+
+/** Resultado de tool con error legible para el agente (sin cobrar). */
+function errorTexto(cuerpo: Record<string, string>) {
+  return { content: [{ type: 'text' as const, text: JSON.stringify(cuerpo) }], isError: true }
+}
 
 /** `GET /api/empresas/:nit` → `get_api_empresas_by_nit` */
 export function toolName(route: Route): string {
@@ -185,7 +208,7 @@ function buildServer(
       {
         description:
           precio > 0
-            ? `Fetch "${titulo}" from ${tenant.name}. Costs $${precio} per call (MPP; pay in pathUSD on Tempo or USDC on Arc). No API key needed.`
+            ? `Fetch "${titulo}" from ${tenant.name}. Costs $${precio} per call (MPP; pay in pathUSD on Tempo, or USDC/USDG on Arbitrum, Robinhood or Arc). No API key needed.`
             : `Fetch "${titulo}" from ${tenant.name}. Free.`,
         inputSchema: {
           max_chars: z.number().int().positive().optional().describe('Return at most this many characters of the content, from the start. Omit for the whole thing.'),
@@ -204,26 +227,33 @@ function buildServer(
           return { content: [{ type: 'text' as const, text: recortar(await libre.text()) }] }
         }
 
-        const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
-        const result = await contextoCobro.run(cobro, () => mcpMppx.charge({ amount: resource.priceUsd, description: titulo })(extra))
-        if (result.status === 402) throw result.challenge
+        if (!tieneDireccionDeCobro(tenant)) return errorTexto(sinDireccionDeCobro(tenant))
 
-        // Ya pagó: si la fuente falla de acá en más, sellamos igual y
-        // devolvemos la plata on-chain, como en el flujo HTTP de /r/:slug.
-        let body: string
-        let originFallo = false
-        try {
-          const upstream = await fetch(resource.url, { redirect: 'follow' })
-          body = await upstream.text()
-        } catch (err) {
-          console.error('[mcp] recurso no disponible', { tenant: tenant.slug, resource: resource.slug, err })
-          originFallo = true
-          body = JSON.stringify({
-            error: 'We could not fetch the resource you already paid for.',
-            hint: 'The payment is refunded to your wallet on-chain automatically. If it does not arrive, keep the receipt reference and contact support.',
-          })
+        const pausa = cortado(tenant.id)
+        if (pausa) return errorTexto((await respuestaCortado(tenant, pausa).json()) as Record<string, string>)
+
+        const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd, { tenantId: tenant.id, path: `mcp:/r/${resource.slug}` })
+        // En los rieles de contrato la fuente se lee antes de enviar el
+        // settlement: si falla, no se cobra (ver liquidacion-v3.ts).
+        const origen = prepararOrigen(cobro, async () => {
+          try {
+            const upstream = await fetch(resource.url, { redirect: 'follow' })
+            if (upstream.status >= 500) registrarFalloOrigen(tenant)
+            return { valor: await upstream.text(), fallo: upstream.status >= 500 }
+          } catch (err) {
+            console.error('[mcp] recurso no disponible', { tenant: tenant.slug, resource: resource.slug, err })
+            registrarFalloOrigen(tenant)
+            return { valor: JSON.stringify({ error: 'We could not fetch this resource.', hint: 'If you were charged, keep the receipt reference and contact support.' }), fallo: true }
+          }
+        })
+        const result = await contextoCobro.run(cobro, () => mcpMppx.charge({ amount: resource.priceUsd, description: titulo })(extra))
+        if (result.status === 402) {
+          if (cobro.sinLiquidar === 'adelantado' && cobro.servirAdelantado) return pendienteDeReparto((await origen()).valor)
+          if (cobro.sinLiquidar) return errorTexto(motivoNoLiquidado(cobro.sinLiquidar))
+          throw result.challenge
         }
 
+        const { valor: body, fallo: originFallo } = await origen()
         const sealed = result.withReceipt({ content: [{ type: 'text' as const, text: originFallo ? body : recortar(body) }] })
 
         const receipt = (sealed._meta?.['org.paymentauth/receipt'] ?? {}) as {
@@ -232,7 +262,7 @@ function buildServer(
         }
         if (receipt.reference) {
           const payment = await creditPayment(
-            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, network: cobro.network, networkFee: cobro.networkFee, tempoSplit: cobro.tempoSplit /* ---- Tempo splits ---- */ },
+            { tenantId: tenant.id, routeId: null, path: `mcp:/r/${resource.slug}`, priceUsd: resource.priceUsd, ...liquidado(cobro) },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
           if (originFallo) await refundOriginFailure(payment)
@@ -255,7 +285,7 @@ function buildServer(
     server.registerTool(
       toolName(route),
       {
-        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Costs $${Number(route.priceUsd)} per call (MPP; pay in pathUSD on Tempo or USDC on Arc).`,
+        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Costs $${Number(route.priceUsd)} per call (MPP; pay in pathUSD on Tempo, or USDC/USDG on Arbitrum, Robinhood or Arc).`,
         inputSchema: shape,
         annotations: {
           title: route.description ?? `${route.method} ${route.pathPattern}`,
@@ -265,15 +295,7 @@ function buildServer(
         },
       },
       async (args: Record<string, unknown>, extra) => {
-        const cobro = nuevoContexto(tenant.payoutWallet, route.priceUsd)
-        const result = await contextoCobro.run(cobro, () =>
-          mcpMppx.charge({
-            amount: route.priceUsd,
-            description: route.description ?? `${tenant.name} · ${route.pathPattern}`,
-          })(extra),
-        )
-
-        if (result.status === 402) throw result.challenge
+        if (!tieneDireccionDeCobro(tenant)) return errorTexto(sinDireccionDeCobro(tenant))
 
         // Reconstruye el path real reemplazando :params con los argumentos.
         let path = route.pathPattern
@@ -281,43 +303,49 @@ function buildServer(
         const query = new URLSearchParams((args.query as Record<string, string>) ?? {})
         const url = `http://origin.internal${path}${query.size ? `?${query}` : ''}`
 
-        // El pago ya se validó/liquidó arriba: si el origin falla de acá en
-        // más, el agente ya pagó. Sellamos el receipt igual, sobre un texto
-        // de error, y devolvemos la plata al agente (refund on-chain).
-        let body: string
-        let originFallo = false
-        try {
-          const upstream = await proxyToOrigin(new Request(url, { method: route.method }), tenant, path)
-          body = await upstream.text()
-        } catch (err) {
-          console.error('[mcp] origin no respondió', { tenant: tenant.slug, tool: toolName(route), err })
-          originFallo = true
-          body = JSON.stringify({
-            error: 'The business origin did not respond to this already-paid tool call.',
-            hint: 'The payment is refunded to your wallet on-chain automatically. If it does not arrive, keep the receipt reference and contact support.',
-          })
+        const pausa = cortado(tenant.id)
+        if (pausa) return errorTexto((await respuestaCortado(tenant, pausa).json()) as Record<string, string>)
+
+        const cobro = nuevoContexto(tenant.payoutWallet, route.priceUsd, { tenantId: tenant.id, path: `mcp:${toolName(route)}` })
+        // Liquidar después del origen (rieles de contrato): si el origen falla
+        // o responde 5xx, el settlement no se envía y el agente no paga.
+        const origen = prepararOrigen(cobro, async () => {
+          try {
+            const upstream = await proxyToOrigin(new Request(url, { method: route.method }), tenant, path)
+            if (upstream.status >= 500) registrarFalloOrigen(tenant)
+            return { valor: await upstream.text(), fallo: upstream.status >= 500 }
+          } catch (err) {
+            console.error('[mcp] origin no respondió', { tenant: tenant.slug, tool: toolName(route), err })
+            registrarFalloOrigen(tenant)
+            return { valor: JSON.stringify({ error: 'The business origin did not respond.', hint: 'If you were charged, keep the receipt reference and contact support.' }), fallo: true }
+          }
+        })
+        const result = await contextoCobro.run(cobro, () =>
+          mcpMppx.charge({
+            amount: route.priceUsd,
+            description: route.description ?? `${tenant.name} · ${route.pathPattern}`,
+          })(extra),
+        )
+
+        if (result.status === 402) {
+          if (cobro.sinLiquidar === 'adelantado' && cobro.servirAdelantado) return pendienteDeReparto((await origen()).valor)
+          if (cobro.sinLiquidar) return errorTexto(motivoNoLiquidado(cobro.sinLiquidar))
+          throw result.challenge
         }
 
+        const { valor: body, fallo: originFallo } = await origen()
         const sealed = result.withReceipt({
           content: [{ type: 'text' as const, text: body }],
         })
 
-        // Acredita el pago al ledger por el mismo camino que el flujo HTTP.
+        // Registra el pago en el ledger por el mismo camino que el flujo HTTP.
         const receipt = (sealed._meta?.['org.paymentauth/receipt'] ?? {}) as {
           reference?: string
           method?: string
         }
         if (receipt.reference) {
           const payment = await creditPayment(
-            {
-              tenantId: tenant.id,
-              routeId: route.id,
-              path: `mcp:${toolName(route)}`,
-              priceUsd: route.priceUsd,
-              network: cobro.network,
-              networkFee: cobro.networkFee,
-              tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
-            },
+            { tenantId: tenant.id, routeId: route.id, path: `mcp:${toolName(route)}`, priceUsd: route.priceUsd, ...liquidado(cobro) },
             { reference: receipt.reference, method: receipt.method ?? 'tempo' },
           )
           if (originFallo) await refundOriginFailure(payment)

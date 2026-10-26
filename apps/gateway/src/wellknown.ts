@@ -1,6 +1,7 @@
 import type { Route, Tenant } from '@peaje/db'
-import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { isSettlementNetwork, NETWORKS, NETWORK_IDS } from '@peaje/shared'
 import { env } from './env.js'
+import { contratoV3 } from './settlement.js'
 
 /**
  * Archivos de agent-readiness servidos por tenant. Cada uno mapea a un check
@@ -464,8 +465,12 @@ export function bazaarResources(
   const ahora = new Date().toISOString()
 
   const accepts = (priceUsd: string, resource: string) =>
-    NETWORK_IDS.map((id) => {
+    NETWORK_IDS.flatMap((id) => {
       const n = NETWORKS[id]
+      // Mismo destino que el 402: el contrato v3 en las redes EVM, la wallet
+      // de cobro del negocio en Tempo. Sin wallet de cobro no hay ofertas.
+      const payTo = isSettlementNetwork(id) ? contratoV3(id) : tenant.payoutWallet
+      if (!payTo || !tenant.payoutWallet) return []
       return {
         scheme: 'exact',
         network: `eip155:${n.testnet.chainId}`,
@@ -473,7 +478,7 @@ export function bazaarResources(
         resource,
         description: `Pay-per-call access to ${tenant.name}`,
         mimeType: 'application/json',
-        payTo: env.treasuryAddress,
+        payTo,
         maxTimeoutSeconds: 300,
         asset: n.token,
         ...(n.eip3009

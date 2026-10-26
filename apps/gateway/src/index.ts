@@ -10,9 +10,9 @@ import { iniciarScheduler } from './agents/scheduler.js'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
 import { iniciarTrabajos } from './tareas/trabajos.js'
 import { usdcStatus } from './chainlink.js'
-import { creditReceipt, refundOriginFailure } from './charge.js'
+import { origenCaido } from './cobro.js'
+import { cobrarYServir } from './cobrar.js'
 import { env } from './env.js'
-import { contextoCobro, nuevoContexto } from './contexto.js'
 import { iniciarCostoRed } from './costoRed.js'
 import { marcarCobro, registrarVisita } from './visitas.js'
 import { monitorRouter } from './monitor/index.js'
@@ -47,7 +47,8 @@ import { developersHtml } from './developers.js'
 import { problema } from './problem.js'
 import { rateLimit } from './ratelimit.js'
 import * as wk from './wellknown.js'
-import { withdrawals } from './withdrawals.js'
+import { interno } from './interno.js'
+import { relayerAddress } from './settlement.js'
 
 
 /**
@@ -108,6 +109,9 @@ app.get('/health', async (c) => {
     ok: true,
     network: env.testnet ? 'testnet' : 'mainnet',
     settlementNetworks: NETWORK_IDS,
+    // Rieles de PeajeSettlementV3 prendidos (dirección + relayer) y Circle.
+    settlementV3: Object.fromEntries(Object.entries(env.settlementV3).map(([red, dir]) => [red, !!dir && !!relayerAddress])),
+    circleNanopayments: env.circleNanopayments,
     // Depeg guard (Chainlink USDC/USD): con depeg, el rail de Arc se pausa.
     usdcPeg: { price: usdc.price, depegged: usdc.depegged, checkedAt: usdc.checkedAt },
   })
@@ -156,9 +160,9 @@ app.get('/:slug/openapi.json', async (c) => {
   })
 })
 
-// El ledger interno vive dentro del router de withdrawals: comparte su
-// middleware de auth (antes estaba acá afuera y quedaba expuesto sin token).
-app.route('/_internal', withdrawals)
+// El ledger interno vive en el router interno: comparte su middleware de
+// auth (antes estaba acá afuera y quedaba expuesto sin token).
+app.route('/_internal', interno)
 app.route('/_internal', agentsRouter)
 app.route('/_internal', rutasRouter)
 // ---- M7: comprador misterioso ----
@@ -299,69 +303,34 @@ app.get('/:slug/r/:rslug', async (c) => {
     )
   }
 
-  // Precio 0 = link gratis: se sirve directo, sin 402.
-  const gratis = Number(resource.priceUsd) <= 0
-  if (!gratis) marcarCobro(c.req.raw, { routeId: null, priceUsd: resource.priceUsd })
-
-  const cobro = nuevoContexto(tenant.payoutWallet, resource.priceUsd)
-  cobro.x402Header = c.req.header('payment-signature') ?? null
-  const result = gratis
-    ? null
-    : await contextoCobro.run(cobro, () =>
-        mppx.charge({
-          amount: resource.priceUsd,
-          description: resource.title ?? resource.slug,
-        })(conUrlExterna(c.req.raw, tenant)),
-      )
-
-  if (result && result.status === 402) return result.challenge
-
-  let respuesta: Response
-  let originFallo = false
-  try {
+  const traer = async () => {
     const upstream = await fetch(resource.url, { redirect: 'follow' })
     const headers = new Headers(upstream.headers)
     headers.delete('content-encoding')
     headers.delete('content-length')
-    respuesta = new Response(upstream.body, { status: upstream.status, headers })
-  } catch (err) {
-    console.error('[gateway] no se pudo traer el recurso', { tenant: tenant.slug, resource: resource.slug, err })
-    originFallo = true
-    respuesta = c.json(
-      {
-        error: 'We could not fetch the resource you already paid for.',
-        hint: 'The payment is refunded to your wallet automatically (see the Payment-Refund header). If it does not arrive, keep the receipt and contact support.',
-      },
-      502,
-    )
+    return new Response(upstream.body, { status: upstream.status, headers })
   }
-  if (!result) return respuesta
-  const sealed = result.withReceipt(respuesta)
 
-  const payment = await creditReceipt(sealed, {
-    tenantId: tenant.id,
-    routeId: null,
-    path: `/r/${resource.slug}`,
-    priceUsd: resource.priceUsd,
-    network: cobro.network,
-    networkFee: cobro.networkFee,
-    tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
-    payer: cobro.payer,
-  })
-
-  // Pago condicionado: origin caído = plata de vuelta al agente.
-  if (originFallo && payment) {
-    const refund = await refundOriginFailure(payment)
-    if (refund) {
-      try {
-        sealed.headers.set('Payment-Refund', refund)
-      } catch {
-        // headers inmutables: el refund igual quedó registrado y on-chain
-      }
+  // Precio 0 = link gratis: se sirve directo, sin 402.
+  if (Number(resource.priceUsd) <= 0) {
+    try {
+      return await traer()
+    } catch (err) {
+      console.error('[gateway] no se pudo traer el recurso', { tenant: tenant.slug, resource: resource.slug, err })
+      return origenCaido('We could not fetch this resource.')
     }
   }
-
-  return sealed
+  marcarCobro(c.req.raw, { routeId: null, priceUsd: resource.priceUsd })
+  return cobrarYServir({
+    tenant,
+    cobrable: conUrlExterna(c.req.raw, tenant),
+    priceUsd: resource.priceUsd,
+    description: resource.title ?? resource.slug,
+    routeId: null,
+    path: `/r/${resource.slug}`,
+    pedirOrigen: traer,
+    mensajeCaido: 'We could not fetch this resource.',
+  })
 })
 
 /**
@@ -603,61 +572,18 @@ app.all('/:slug/*', async (c) => {
 
   if (!match) return proxyToOrigin(c.req.raw, tenant, path)
   marcarCobro(c.req.raw, { routeId: match.route.id, priceUsd: match.route.priceUsd })
-
-  const cobro = nuevoContexto(tenant.payoutWallet, match.route.priceUsd)
-  cobro.x402Header = c.req.header('payment-signature') ?? null
-  const result = await contextoCobro.run(cobro, () =>
-    mppx.charge({
-      amount: match.route.priceUsd,
-      description: match.route.description ?? `${tenant.name} · ${path}`,
-    })(conUrlExterna(c.req.raw, tenant)),
-  )
-
-  if (result.status === 402) return result.challenge
-
-  // El pago ya se validó/liquidó arriba: si el origin falla de acá en más, el
-  // agente ya pagó. Sellamos el receipt igual (sobre una respuesta de error)
-  // para que el pago quede acreditado, y devolvemos la plata (Payment-Refund).
-  let upstream: Response
-  let originFallo = false
-  try {
-    upstream = await proxyToOrigin(c.req.raw, tenant, path)
-  } catch (err) {
-    console.error('[gateway] origin no respondió', { tenant: tenant.slug, path, err })
-    originFallo = true
-    upstream = c.json(
-      {
-        error: 'The business origin did not respond to this already-paid request.',
-        hint: 'The payment is refunded to your wallet automatically (see the Payment-Refund header). If it does not arrive, keep the receipt and contact support.',
-      },
-      502,
-    )
-  }
-  const sealed = result.withReceipt(upstream)
-
-  const payment = await creditReceipt(sealed, {
-    tenantId: tenant.id,
+  // Ver cobrar.ts: sin dirección de cobro no hay ofertas, y en los rieles de
+  // contrato el pago se envía solo si el origen respondió sin 5xx.
+  return cobrarYServir({
+    tenant,
+    cobrable: conUrlExterna(c.req.raw, tenant),
+    priceUsd: match.route.priceUsd,
+    description: match.route.description ?? `${tenant.name} · ${path}`,
     routeId: match.route.id,
     path,
-    priceUsd: match.route.priceUsd,
-    network: cobro.network,
-    networkFee: cobro.networkFee,
-    tempoSplit: cobro.tempoSplit, // ---- Tempo splits ----
-    payer: cobro.payer,
+    pedirOrigen: () => proxyToOrigin(c.req.raw, tenant, path),
+    mensajeCaido: 'The business origin did not respond.',
   })
-
-  if (originFallo && payment) {
-    const refund = await refundOriginFailure(payment)
-    if (refund) {
-      try {
-        sealed.headers.set('Payment-Refund', refund)
-      } catch {
-        // headers inmutables: el refund igual quedó registrado y on-chain
-      }
-    }
-  }
-
-  return sealed
 })
 
 iniciarCostoRed()
@@ -665,6 +591,9 @@ void registrarWebhook()
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`[gateway] escuchando en http://localhost:${info.port}`)
   console.log(`[gateway] treasury ${env.treasuryAddress} · currency ${env.currency}`)
+  const rieles = Object.entries(env.settlementV3).filter(([, dir]) => dir).map(([red]) => red)
+  if (rieles.length && !relayerAddress) console.error('[gateway] hay PeajeSettlementV3 configurado pero falta RELAYER_PRIVATE_KEY: esos rieles no ofrecen nada')
+  else console.log(`[gateway] PeajeSettlementV3: ${rieles.join(', ') || 'ninguno'} · relayer ${relayerAddress ?? '-'}`)
   iniciarScheduler()
   iniciarTrabajos()
 })

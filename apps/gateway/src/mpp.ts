@@ -7,9 +7,9 @@ import { chargeMethods } from './methods.js'
 /**
  * Instancia MPP del gateway (transporte HTTP).
  *
- * `recipient` es siempre la treasury de la plataforma: el reparto por tenant
- * ocurre en el ledger interno, no on-chain. Los métodos de cobro (una oferta
- * por red) viven en methods.ts, compartidos con la instancia MCP.
+ * Cada oferta le paga directo al negocio: el split nativo de Tempo o
+ * PeajeSettlementV3 en las redes EVM, en la misma transacción. Los métodos de
+ * cobro (una oferta por red) viven en methods.ts, compartidos con la instancia MCP.
  */
 const USDC_TOKENS = new Set(
   NETWORK_IDS.filter((id) => NETWORKS[id].tokenSymbol === 'USDC').map((id) => NETWORKS[id].token.toLowerCase()),

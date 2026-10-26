@@ -20,6 +20,18 @@ depth = 64
 fail_on_revert = false
 
 [rpc_endpoints]
+# Public RPCs, checked against the official docs on 2026-10-25 (all rate-limited; use a
+# provider URL for the deploy itself if they throttle):
+#   arbitrum_sepolia   421614   https://sepolia-rollup.arbitrum.io/rpc        docs.arbitrum.io
+#   robinhood_testnet  46630    https://rpc.testnet.chain.robinhood.com       docs.robinhood.com/chain/connecting
+#   arc_testnet        5042002  https://rpc.testnet.arc.io                    docs.arc.io/arc/references/rpc-endpoints
+#   arbitrum_one       42161    https://arb1.arbitrum.io/rpc                  docs.arbitrum.io
+#   robinhood_mainnet  4663     https://rpc.mainnet.chain.robinhood.com       docs.robinhood.com/chain/connecting
+#   arc_mainnet        5042     https://rpc.mainnet.arc.io                    docs.arc.io/arc/references/rpc-endpoints
 arbitrum_sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 robinhood_testnet = "${ROBINHOOD_TESTNET_RPC_URL}"
+arc_testnet = "${ARC_TESTNET_RPC_URL}"
+arbitrum_one = "${ARBITRUM_ONE_RPC_URL}"
+robinhood_mainnet = "${ROBINHOOD_MAINNET_RPC_URL}"
+arc_mainnet = "${ARC_MAINNET_RPC_URL}"
 tempo_testnet = "${TEMPO_TESTNET_RPC_URL}"

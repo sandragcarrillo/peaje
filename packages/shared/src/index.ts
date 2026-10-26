@@ -33,7 +33,7 @@ type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string }
 export type NetworkDef = {
   id: NetworkId
   label: string
-  /** Token con el que se cobra y del que salen los retiros en esta red. */
+  /** Token con el que se cobra en esta red. */
   token: `0x${string}`
   tokenSymbol: string
   decimals: number
@@ -133,7 +133,7 @@ export const CHAIN_LABELS: string[] = [
   ...new Map(NETWORK_IDS.map((id) => [NETWORKS[id].testnet.chainId, (NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)])).values(),
 ]
 
-/** Redes donde los pagos se liquidan en PeajeSettlement y no en la treasury. */
+/** Redes EVM donde los pagos se reparten en PeajeSettlementV3 (neto directo a la wallet del negocio). */
 export const SETTLEMENT_NETWORKS = [
   'arbitrum',
   'arbitrum-usdg',
@@ -147,9 +147,11 @@ export function isSettlementNetwork(network: string): network is SettlementNetwo
 }
 
 /**
- * PeajeSettlement desplegado (y verificado) por red. En estas redes el saldo
- * de cada negocio vive en el contrato: la fuente de verdad es `claimable`, no
- * el ledger. Deploys: contracts/broadcast/DeployPeajeSettlement.s.sol/<chainId>.
+ * PeajeSettlement v2 desplegado por red: guardaba el saldo de cada negocio
+ * (`claimable`). Ya no recibe pagos: el gateway usa PeajeSettlementV3, cuya
+ * dirección sale del env (PEAJE_SETTLEMENT_V3_*, docs/pagos-directos.md).
+ * Queda solo para leer pagos viejos y vaciar saldos que sigan ahí.
+ * Deploys: contracts/broadcast/DeployPeajeSettlement.s.sol/<chainId>.
  */
 export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
   // v2 (settle con costo de red). USDC y USDG comparten cadena y contrato.
@@ -160,7 +162,7 @@ export const SETTLEMENT_CONTRACTS: Partial<Record<NetworkId, `0x${string}`>> = {
   arc: '0xc0a98a8091a987bbb86f149f61253094e663d0ed',
 }
 
-/** Bloque del deploy: desde ahí indexa el subgraph. */
+/** Bloque del deploy de v2 (historial). El subgraph de v3 lleva el suyo en subgraph.yaml. */
 export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
   arbitrum: 313383460,
   robinhood: 125368290,
@@ -171,8 +173,9 @@ export const SETTLEMENT_START_BLOCKS: Partial<Record<NetworkId, number>> = {
  * Rieles de Circle Nanopayments (Gateway). No son redes nuevas: son la misma
  * cadena y el mismo USDC, pero el agente paga desde un saldo depositado en el
  * contrato Gateway de Circle, sin gas y sin transacción por pago. Van aparte
- * de NETWORKS porque no se leen ni se fondean como una wallet: el saldo del
- * negocio sale del ledger y los retiros del saldo Gateway de la treasury.
+ * de NETWORKS porque no se leen ni se fondean como una wallet. Apagados por
+ * defecto (CIRCLE_NANOPAYMENTS_ENABLED): juntan los pagos en el saldo Gateway
+ * de la treasury y el negocio tendría que retirar.
  */
 export type GatewayRailId = 'gateway-arbitrum' | 'gateway-arc'
 
@@ -245,9 +248,9 @@ export function railLabel(network: string): string {
 /**
  * Riel de ledger para pagos de Tempo liquidados con split nativo: en la misma
  * transacción el neto llega a la wallet de cobro del negocio y el fee a Peaje.
- * No es una NetworkId (no se fondea ni se retira): ese dinero ya está en la
- * wallet del negocio, así que su saldo retirable es siempre 0. Los pagos
- * custodiales de Tempo siguen bajo 'tempo' y se retiran como siempre.
+ * No es una NetworkId (no se fondea): ese dinero ya está en la wallet del
+ * negocio. Los pagos custodiales viejos de Tempo quedan bajo 'tempo'; ya no
+ * se crean (sin wallet de cobro no hay oferta de Tempo).
  */
 export const TEMPO_SPLIT_RAIL = 'tempo-split'
 
@@ -264,6 +267,7 @@ export function splitPrecio(priceMicro: bigint, feeBps: bigint): { netMicro: big
   return { netMicro: priceMicro - feeMicro, feeMicro }
 }
 
+/** `claimable` de PeajeSettlement v2: solo para revisar saldos viejos (scripts/privy-barrer.mts). */
 export const CLAIMABLE_ABI = [
   {
     type: 'function',

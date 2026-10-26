@@ -5,48 +5,45 @@ import {
   defineChain,
   erc20Abi,
   http,
-  parseAbi,
-  parseEventLogs,
   parseSignature,
   parseUnits,
   type Chain,
   type LocalAccount,
   type PublicClient,
-  type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { agentAccount } from './agents/wallet.js'
+import { settlementV3Abi } from './abi/settlement-v3.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
+import { AutorizacionUsada, eip3009Abi, liquidarV3, OrigenFallo, pagadorDeLogs, PagoAdelantado, type AutorizacionFirmada, type RielV3 } from './liquidacion-v3.js'
+import { store } from './store.js'
 
 /**
- * Redes con settlement on-chain (Arbitrum, Robinhood). Los pagos no caen en
- * la treasury: caen en PeajeSettlement, que acredita al comerciante y el fee
- * de Peaje en la misma transacción. El gas es ETH en estas redes, así que la
- * treasury actúa de relayer: comerciantes y agentes nunca necesitan ETH.
+ * Redes EVM con PeajeSettlementV3 (Arbitrum USDC y USDG, Robinhood, Arc). El
+ * agente firma una autorización EIP-3009 a favor del contrato y el relayer la
+ * somete con `settle`: en la misma transacción el 98% llega a la wallet de
+ * cobro del negocio y el 2% más el costo de red al fee recipient del contrato.
+ * Nada queda en Peaje y no hay retiros (docs/pagos-directos.md).
+ *
+ * Dos llaves distintas: el relayer (RELAYER_PRIVATE_KEY, solo gas nativo)
+ * firma `settle`; la treasury firma lo que es de Peaje (relayar el barrido
+ * de un agente, pagos de su propio saldo).
  */
 
-export const settlementAbi = parseAbi([
-  'struct Authorization { address from; uint256 value; uint256 validAfter; uint256 validBefore; bytes32 nonce; uint8 v; bytes32 r; bytes32 s; }',
-  'function settle(address token, address merchant, Authorization auth, uint256 networkFee) returns (uint256)',
-  'function withdrawWithSignature(address token, address account, uint256 amount, address to, uint256 deadline, bytes signature)',
-  'function claimable(address token, address account) view returns (uint256)',
-  'function nonces(address owner) view returns (uint256)',
-  'event PaymentSettled(bytes32 indexed nonce, address indexed token, address indexed merchant, address payer, uint256 amount, uint256 fee, uint256 networkFee)',
-])
-
-const eip3009Abi = parseAbi([
-  'function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
-])
-
-const relayer = privateKeyToAccount(env.treasuryPrivateKey)
+const treasury = privateKeyToAccount(env.treasuryPrivateKey)
+const relayer = env.relayerPrivateKey ? privateKeyToAccount(env.relayerPrivateKey) : null
 
 type Riel = {
   chain: Chain
   publicClient: PublicClient
-  relayerClient: WalletClient<ReturnType<typeof http>, Chain, typeof relayer>
+  treasuryClient: ReturnType<typeof walletClient>
+  relayerClient: ReturnType<typeof walletClient> | null
   token: `0x${string}`
   decimals: number
+}
+
+function walletClient(account: LocalAccount, chain: Chain, rpcUrl: string) {
+  return createWalletClient({ account, chain, transport: http(rpcUrl) })
 }
 
 const rieles = new Map<SettlementNetwork, Riel>()
@@ -60,14 +57,15 @@ function riel(network: SettlementNetwork): Riel {
   const chain = defineChain({
     id: def.testnet.chainId,
     name: `${def.label} Testnet`,
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    nativeCurrency: network === 'arc' ? { name: 'USDC', symbol: 'USDC', decimals: 18 } : { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl] } },
     blockExplorers: { default: { name: def.label, url: def.testnet.explorerUrl } },
   })
   const nuevo: Riel = {
     chain,
     publicClient: createPublicClient({ chain, transport: http(rpcUrl) }),
-    relayerClient: createWalletClient({ account: relayer, chain, transport: http(rpcUrl) }),
+    treasuryClient: walletClient(treasury, chain, rpcUrl),
+    relayerClient: relayer ? walletClient(relayer, chain, rpcUrl) : null,
     token: def.token,
     decimals: def.decimals,
   }
@@ -75,20 +73,114 @@ function riel(network: SettlementNetwork): Riel {
   return nuevo
 }
 
-export function settlementContract(network: SettlementNetwork): `0x${string}` {
-  const contrato = env.settlementContracts[network]
-  if (!contrato) throw new Error(`El riel de ${NETWORKS[network].label} está apagado: no hay PeajeSettlement configurado`)
-  return contrato
+/** PeajeSettlementV3 de la red, o null si el riel está apagado (sin dirección o sin relayer). */
+export function contratoV3(network: SettlementNetwork): `0x${string}` | null {
+  if (!relayer) return null
+  return env.settlementV3[network]
 }
 
-type Authorization = {
-  from: string
-  to: string
-  value: string
-  validAfter: string
-  validBefore: string
-  nonce: string
-  signature: string
+/** Address del relayer (pública): para /health y logs. Nunca la llave. */
+export const relayerAddress = relayer?.address ?? null
+
+/**
+ * El agente firmó la autorización EIP-3009 con `to` = el contrato. El
+ * merchant sale del contexto del cobro (la wallet de cobro del negocio),
+ * nunca del payload del agente. Ver liquidacion-v3.ts para el orden:
+ * simulación, origen, envío.
+ */
+export async function settleAuthorization(
+  network: SettlementNetwork,
+  payload: AutorizacionFirmada,
+  networkFee: bigint,
+): Promise<{ reference: string }> {
+  const contrato = contratoV3(network)
+  const r = riel(network)
+  if (!contrato || !r.relayerClient) throw new Error(`El riel de ${NETWORKS[network].label} está apagado: falta PeajeSettlementV3 o RELAYER_PRIVATE_KEY`)
+  const contexto = contextoCobro.getStore()
+  const rielV3: RielV3 = { publicClient: r.publicClient, relayer: r.relayerClient, contrato, token: r.token }
+
+  try {
+    const liquidado = await liquidarV3(
+      rielV3,
+      { merchant: contexto?.merchant, auth: payload, networkFee },
+      {
+        antesDeEnviar: contexto?.origen ?? undefined,
+        alAdelantado: async (info) => {
+          const registro = await store.recordStray({
+            network,
+            contract: info.contrato,
+            token: info.token,
+            payer: info.payer,
+            nonce: info.nonce,
+            value: info.value.toString(),
+            networkFee: info.networkFee.toString(),
+            merchant: info.merchant,
+            tenantId: contexto?.tenantId ?? null,
+            path: contexto?.path ?? null,
+          }).catch((error: unknown) => {
+            // Sin la fila, el log de abajo es el registro: trae todo lo que pide settleStray.
+            console.error('[settlement] no se pudo guardar el pago adelantado', error instanceof Error ? error.message : error)
+            return null
+          })
+          console.warn('[settlement] PAGO ADELANTADO: fondos en PeajeSettlementV3, pendiente de settleStray por el Safe', {
+            stray: registro?.stray.id ?? null,
+            nuevo: registro?.nuevo ?? null,
+            network,
+            contrato: info.contrato,
+            payer: info.payer,
+            nonce: info.nonce,
+            value: info.value.toString(),
+            networkFee: info.networkFee.toString(),
+            merchant: info.merchant,
+            tenant: contexto?.tenantId ?? null,
+          })
+          // Se sirve solo si esta llamada creó la fila: la fila única por
+          // (contrato, token, pagador, nonce) es lo que impide servir dos veces.
+          return registro?.nuevo === true
+        },
+      },
+    )
+    if (contexto) {
+      contexto.network = network
+      contexto.networkFee = fromBaseUnits(networkFee, r.decimals)
+      contexto.payoutAddress = liquidado.merchant
+      contexto.reparto = { neto: fromBaseUnits(liquidado.net, r.decimals), fee: fromBaseUnits(liquidado.fee, r.decimals) }
+    }
+    return { reference: liquidado.hash }
+  } catch (error) {
+    if (contexto && error instanceof OrigenFallo) contexto.sinLiquidar = 'origen'
+    else if (contexto && error instanceof PagoAdelantado) {
+      contexto.sinLiquidar = 'adelantado'
+      contexto.servirAdelantado = error.servir
+      contexto.network = network
+      contexto.payoutAddress = error.info.merchant
+    } else if (contexto && error instanceof AutorizacionUsada) contexto.sinLiquidar = 'usada'
+    else if (contexto && contexto.origenLlamado) contexto.sinLiquidar = 'envio'
+    console.warn(`[settlement] ${NETWORKS[network].label}: no se liquidó`, error instanceof Error ? error.message : error)
+    throw error
+  }
+}
+
+/** El pagador real sale del evento PaymentSettled (v3 o v2): `tx.from` es el relayer. */
+export async function resolveSettlementPayer(network: SettlementNetwork, txHash: string): Promise<string | null> {
+  try {
+    const receipt = await riel(network).publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` })
+    return pagadorDeLogs(receipt.logs)
+  } catch (error) {
+    console.warn(`[${network}] no se pudo resolver el pagador de`, txHash, error)
+    return null
+  }
+}
+
+/** Fee recipient del contrato (lo fija el Safe, no el env). null si no se puede leer. */
+export async function feeRecipientV3(network: SettlementNetwork): Promise<`0x${string}` | null> {
+  const contrato = contratoV3(network)
+  if (!contrato) return null
+  try {
+    return await riel(network).publicClient.readContract({ address: contrato, abi: settlementV3Abi, functionName: 'feeRecipient' })
+  } catch {
+    return null
+  }
 }
 
 function vrs(signature: `0x${string}`) {
@@ -97,120 +189,8 @@ function vrs(signature: `0x${string}`) {
 }
 
 /**
- * El agente firmó la autorización EIP-3009 con `to` = el contrato. El relayer
- * la somete vía `settle`, que decide a qué comerciante acreditar: por eso el
- * comerciante sale del contexto del cobro y no del payload del agente.
- */
-export async function settleAuthorization(
-  network: SettlementNetwork,
-  payload: Authorization,
-  networkFee: bigint,
-): Promise<{ reference: string }> {
-  const { publicClient, relayerClient, token, decimals } = riel(network)
-  const contexto = contextoCobro.getStore()
-  const merchant = contexto?.merchant ?? relayer.address
-
-  const signature = payload.signature as `0x${string}`
-  if ((signature.length - 2) / 2 !== 65) {
-    throw new Error(`[${network}] PeajeSettlement solo acepta firmas EOA de 65 bytes`)
-  }
-
-  const hash = await relayerClient.writeContract({
-    address: settlementContract(network),
-    abi: settlementAbi,
-    functionName: 'settle',
-    args: [
-      token,
-      merchant,
-      {
-        from: payload.from as `0x${string}`,
-        value: BigInt(payload.value),
-        validAfter: BigInt(payload.validAfter),
-        validBefore: BigInt(payload.validBefore),
-        nonce: payload.nonce as `0x${string}`,
-        ...vrs(signature),
-      },
-      networkFee,
-    ],
-  })
-
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 })
-  if (receipt.status !== 'success') throw new Error(`[${network}] settlement revertido: ${hash}`)
-
-  if (contexto) {
-    contexto.network = network
-    contexto.networkFee = fromBaseUnits(networkFee, decimals)
-  }
-  return { reference: hash }
-}
-
-/** El pagador real sale del evento PaymentSettled: `tx.from` es el relayer. */
-export async function resolveSettlementPayer(network: SettlementNetwork, txHash: string): Promise<string | null> {
-  try {
-    const receipt = await riel(network).publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` })
-    const logs = parseEventLogs({ abi: settlementAbi, eventName: 'PaymentSettled', logs: receipt.logs })
-    return logs[0]?.args.payer ?? null
-  } catch (error) {
-    console.warn(`[${network}] no se pudo resolver el pagador de`, txHash, error)
-    return null
-  }
-}
-
-/** La wallet que Peaje custodia para un negocio (ver custodiaDe en treasury.ts). */
-export type Custodia = { address: `0x${string}`; walletId: string }
-
-/**
- * Retiro de lo que el contrato le debe a un comerciante. Firma su wallet
- * custodiada (Privy), identificada por el id guardado al crear el negocio,
- * nunca buscada por address: la address de cobro la edita el dueño.
- */
-export async function withdrawFromSettlement(
-  network: SettlementNetwork,
-  custodia: Custodia,
-  to: `0x${string}`,
-  amount: string,
-): Promise<`0x${string}`> {
-  const { chain, publicClient, relayerClient, token, decimals } = riel(network)
-  const contrato = settlementContract(network)
-  const merchant = custodia.address
-  const firmante = agentAccount(custodia.walletId, merchant)
-
-  const value = parseUnits(amount, decimals)
-  const nonce = await publicClient.readContract({
-    address: contrato,
-    abi: settlementAbi,
-    functionName: 'nonces',
-    args: [merchant],
-  })
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 600)
-
-  const signature = await firmante.signTypedData({
-    domain: { name: 'PeajeSettlement', version: '1', chainId: chain.id, verifyingContract: contrato },
-    types: {
-      Withdraw: [
-        { name: 'token', type: 'address' },
-        { name: 'account', type: 'address' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'to', type: 'address' },
-        { name: 'nonce', type: 'uint256' },
-        { name: 'deadline', type: 'uint256' },
-      ],
-    },
-    primaryType: 'Withdraw',
-    message: { token, account: merchant, amount: value, to, nonce, deadline },
-  })
-
-  return relayerClient.writeContract({
-    address: contrato,
-    abi: settlementAbi,
-    functionName: 'withdrawWithSignature',
-    args: [token, merchant, value, to, deadline, signature],
-  })
-}
-
-/**
  * Transfer del stablecoin firmado por una wallet sin ETH (un agente que
- * devuelve su saldo): firma EIP-3009 y el relayer paga el gas.
+ * devuelve su saldo): firma EIP-3009 y la treasury paga el gas.
  */
 export async function relayTokenTransfer(
   network: SettlementNetwork,
@@ -218,7 +198,7 @@ export async function relayTokenTransfer(
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
-  const { chain, relayerClient, token, decimals } = riel(network)
+  const { chain, treasuryClient, token, decimals } = riel(network)
   const value = parseUnits(amount, decimals)
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 600)
   const nonce = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')}` as `0x${string}`
@@ -240,7 +220,7 @@ export async function relayTokenTransfer(
   })
   const { v, r, s } = vrs(signature)
 
-  return relayerClient.writeContract({
+  return treasuryClient.writeContract({
     address: token,
     abi: eip3009Abi,
     functionName: 'transferWithAuthorization',
@@ -254,26 +234,14 @@ export async function tokenBalance(network: SettlementNetwork, address: `0x${str
   return fromBaseUnits(raw, decimals)
 }
 
-/** Lo que el contrato le debe hoy a una cuenta, en decimal. */
-export async function claimableEnContrato(network: SettlementNetwork, account: `0x${string}`): Promise<string> {
-  const { publicClient, token, decimals } = riel(network)
-  const raw = await publicClient.readContract({
-    address: settlementContract(network),
-    abi: settlementAbi,
-    functionName: 'claimable',
-    args: [token, account],
-  })
-  return fromBaseUnits(raw, decimals)
-}
-
-/** Transfer desde la treasury (su propio saldo, no el de los comerciantes). */
+/** Transfer desde la treasury (su propio saldo, nunca el de un negocio). */
 export async function sendTreasuryPayout(
   network: SettlementNetwork,
   to: `0x${string}`,
   amount: string,
 ): Promise<`0x${string}`> {
-  const { relayerClient, token, decimals } = riel(network)
-  return relayerClient.writeContract({
+  const { treasuryClient, token, decimals } = riel(network)
+  return treasuryClient.writeContract({
     address: token,
     abi: erc20Abi,
     functionName: 'transfer',
@@ -282,7 +250,7 @@ export async function sendTreasuryPayout(
 }
 
 export async function treasuryTokenBalance(network: SettlementNetwork): Promise<string> {
-  return tokenBalance(network, relayer.address)
+  return tokenBalance(network, treasury.address)
 }
 
 export async function txConfirmed(network: SettlementNetwork, hash: `0x${string}`): Promise<boolean | null> {

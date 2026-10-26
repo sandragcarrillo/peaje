@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache'
 import * as gateway from '@/lib/gateway'
 import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
-import { sendFromMerchantWallet } from '@/lib/walletops'
-import { isNetworkId } from '@peaje/shared'
 
 /**
  * Acciones de agentes compradores. Todo pasa por el gateway, que es donde
@@ -26,7 +24,6 @@ async function fallo(error: unknown, porDefecto: string): Promise<{ ok: false; e
     const d = await getDict()
     const porCodigo: Record<string, string> = {
       busy: d.agentes.ocupado,
-      'fondos-negocio': d.agentes.faltaSaldoNegocio,
     }
     if (porCodigo[code]) return { ok: false, error: porCodigo[code] }
   }
@@ -64,26 +61,6 @@ export async function crearAgente(
     return { ok: true, data: { id: agent.id } }
   } catch (error) {
     return await fallo(error, d.agentes.errorCrear)
-  }
-}
-
-export async function fondearAgente(
-  slug: string,
-  id: string,
-  amount: string,
-  red?: string,
-  fromSlug?: string,
-): Promise<Resultado<{ balance: string | null }>> {
-  await requireTenant(slug)
-  // El origen también tiene que ser un negocio del usuario: sin esto,
-  // cualquier sesión podría drenar saldos ajenos por slug.
-  if (fromSlug && fromSlug !== slug) await requireTenant(fromSlug)
-  try {
-    const { agent } = await gateway.fundAgent(slug, id, amount.replace(',', '.'), red, fromSlug)
-    revalidatePath('/agentes')
-    return { ok: true, data: { balance: agent.balance } }
-  } catch (error) {
-    return await fallo(error, (await getDict()).agentes.errorFondear)
   }
 }
 
@@ -181,39 +158,5 @@ export async function confirmarCompra(
       return { ok: false, error: d.agentes.ocupado }
     }
     return await fallo(error, d.agentes.errorCorrer)
-  }
-}
-
-
-/**
- * Fondeo desde la wallet PERSONAL (custodiada): transferencia directa de la
- * wallet del usuario a la del agente, sin pasar por el ledger del negocio.
- */
-export async function fondearDesdeWallet(
-  slug: string,
-  agentId: string,
-  amount: string,
-  red: string,
-): Promise<Resultado<{ tx: string }>> {
-  const tenant = await requireTenant(slug)
-  const d = await getDict()
-  if (!tenant.custodialWallet || !tenant.custodialWalletId) return { ok: false, error: d.agentes.errorFondear }
-  if (!isNetworkId(red)) return { ok: false, error: d.agentes.errorFondear }
-
-  const { agents } = await gateway.listAgents(slug)
-  const agente = agents.find((a) => a.id === agentId)
-  if (!agente) return { ok: false, error: d.agentes.errorFondear }
-
-  try {
-    const tx = await sendFromMerchantWallet(
-      { address: tenant.custodialWallet as `0x${string}`, walletId: tenant.custodialWalletId },
-      red,
-      agente.walletAddress as `0x${string}`,
-      Number(amount.replace(',', '.')).toFixed(6),
-    )
-    revalidatePath('/agentes')
-    return { ok: true, data: { tx } }
-  } catch (error) {
-    return await fallo(error, d.agentes.errorFondear)
   }
 }
