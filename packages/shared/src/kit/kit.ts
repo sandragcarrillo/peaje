@@ -20,8 +20,27 @@ import {
   type Entidad,
   type Oferta,
 } from './bloques'
-import { esHost, generarProxy, HOSTS, rutasABorrar, type Host, type Patron } from './rutas'
+import { patronPermitido, patronReenviable, prefijosApiValidos } from './proxy-runtime'
+import {
+  esHost,
+  generarProxy,
+  HOSTS,
+  PREFIJOS_API_POR_DEFECTO,
+  RUTAS_DINAMICAS,
+  RUTAS_PROXY,
+  rutasABorrar,
+  type Host,
+  type Patron,
+} from './rutas'
 import type { Chequeo } from './verificar'
+
+/**
+ * Los paths del dominio que las reglas de Peaje pasan a servir: si el sitio
+ * ya tiene una página propia en alguno, la regla de Peaje gana y la tapa.
+ */
+export function rutasReenviadas(): string[] {
+  return [...RUTAS_PROXY.map((r) => r.path), ...RUTAS_DINAMICAS.map((r) => `${r.prefijo}*`)]
+}
 
 export const KIT_VERSION = '2026-09-22'
 
@@ -125,6 +144,27 @@ export function construirKit(e: EntradaKit): Kit {
         'Next.js: add `peajeProxy({ slug })` from @peaje/next/proxy as your proxy.ts (Next 16) or middleware.ts, or wrap the one you have, and set PEAJE_ORIGIN_SECRET (Kit page of the dashboard) in the hosting environment. That charges the priced API routes on your domain at runtime; the rewrites alone only cover the fixed catalog paths and /r/ links.',
       )
     }
+    // El proxy en runtime solo reenvía rutas de API bajo los prefijos declarados en código.
+    const fuera = (e.patrones ?? []).filter((p) => patronReenviable(p.path) && !patronPermitido(p.path, PREFIJOS_API_POR_DEFECTO))
+    if (fuera.length > 0) {
+      // Con su primer segmento como prefijo, ¿pasaría? Una ruta de un solo
+      // segmento a la raíz (`/about`) o en un path reservado nunca pasa.
+      const prefijoDe = (path: string) => prefijosApiValidos([`/${path.split('/').filter(Boolean)[0] ?? ''}/`])
+      const sugeribles = fuera.filter((p) => patronPermitido(p.path, prefijoDe(p.path)))
+      const nunca = fuera.filter((p) => !sugeribles.includes(p))
+      const lista = (ps: Patron[]) => ps.map((p) => `${p.method} ${p.path}`).join(', ')
+      if (sugeribles.length > 0) {
+        const prefijos = [...new Set([...PREFIJOS_API_POR_DEFECTO, ...sugeribles.flatMap((p) => prefijoDe(p.path))])]
+        manual.push(
+          `Priced API routes outside ${PREFIJOS_API_POR_DEFECTO.join(' and ')} are not forwarded from your domain by default: ${lista(sugeribles)}. To charge them on your domain, pass \`apiPrefixes: [${prefijos.map((x) => `'${x}'`).join(', ')}]\` to peajeProxy() or to the @peaje/proxy middleware (in the Cloudflare Worker, edit API_PREFIXES). Until then they charge only at the gateway URL.`,
+        )
+      }
+      if (nunca.length > 0) {
+        manual.push(
+          `Priced routes that charge only at the gateway URL, never on your domain: ${lista(nunca)}. A single path at the root or a reserved path (login, auth, _next...) looks like a page of the site, so the proxy never forwards it. Move it under /api/ in the dashboard to charge it on your domain.`,
+        )
+      }
+    }
   }
 
   if (falta('json-ld') || (conAgentes && falta('links'))) {
@@ -146,7 +186,14 @@ export function construirKit(e: EntradaKit): Kit {
     files.push({
       path: 'public/robots.txt',
       mode: 'create',
-      content: robotsTxt({ originHost: e.originHost, rutasPagas, sinEntrenamiento: e.sinEntrenamiento ?? false, conPagos: conAgentes }),
+      content: robotsTxt({
+        originHost: e.originHost,
+        rutasPagas,
+        sinEntrenamiento: e.sinEntrenamiento ?? false,
+        conPagos: conAgentes,
+        // Las rutas de API con patrón no son una URL para listar, pero igual cobran.
+        cobra: rutasPagas.length > 0 || (e.patrones ?? []).length > 0,
+      }),
       nota: 'Only if there is no robots.txt yet. If app/robots.ts exists, edit that one instead; Next fails the build with both.',
     })
   }
@@ -162,8 +209,8 @@ export function construirKit(e: EntradaKit): Kit {
   }
   manual.push(
     conAgentes
-      ? 'Deploy. Only after the deploy is live, run the verification (see INSTALL.md). Before that everything answers 404 and there is nothing to fix.'
-      : 'Deploy. Only after the deploy is live, run the verification (see INSTALL.md).',
+      ? 'Deploy. Ask the owner before committing or deploying. Only after the deploy is live, run the verification (see INSTALL.md). Before that everything answers 404 and there is nothing to fix.'
+      : 'Deploy. Ask the owner before committing or deploying. Only after the deploy is live, run the verification (see INSTALL.md).',
   )
 
   const layersQuery = conAgentes ? '' : '?layers=aeo'
@@ -238,24 +285,30 @@ export function installMd(k: Kit): string {
 Gateway for this business: ${k.gateway}
 Files and data: ${k.gateway}/kit.json${k.host === 'unknown' ? '?host=next|vercel|cloudflare|nginx|caddy' : `?host=${k.host}`}
 
-## Do this first
-Run \`npx @peaje/cli@1 init ${k.slug} --yes --json\` at the repo root BEFORE reading any file. It detects the stack, applies steps 1, 2 and 4 below and prints one JSON object: \`written\` (what it changed), \`moved\` (static copies it backed up), \`manual\` (the only things left for you) and \`next\`. Do not re-read or re-verify the files it wrote; trust the JSON and work only on \`manual\`. Skip \`peaje plan\` and \`--help\`. Only if the command is unavailable or exits with code 3, fall back to the steps below by hand.
+## With a terminal
+1. At the repo root run \`npx @peaje/cli@1 plan ${k.slug} --json\`. It writes nothing: \`wouldWrite\` and \`wouldMove\` list every file it would create, edit or move, and \`collisions\` lists the site's own pages that Peaje would replace.
+2. Show that list to the owner and wait for a yes.
+3. Run \`npx @peaje/cli@1 init ${k.slug} --yes --json\`. It applies steps 1, 2, 4 and 5 below and prints \`written\`, \`moved\` (backed up to .peaje-backup/, never deleted), \`manual\` (what is left for you) and \`next\`.
+4. Review the change with \`git status\` and \`git diff\`, then do what \`manual\` lists.
+If the CLI is unavailable or exits with code 3, do the steps below by hand.
 
 ## Rules
 - Do NOT rewrite the contents of the files in kit.json. Write them as given; only merge where the file already exists.
 - Do NOT create static copies of anything the proxy serves (openapi.json, .well-known/*, pricing.md...). A copy wins over the proxy and freezes. Your own llms.txt is fine: the gateway merges it.
+- Do NOT commit, push or deploy without the owner's yes.
 - Do NOT run the verification before the deploy is live. 404s before deploy are not bugs.
 
 ## Steps
+Before step 1, check whether the site already serves any of these paths as its own page or route: ${rutasReenviadas().filter((p) => p !== '/llms.txt').join(', ')}. Peaje's rules take precedence there (an app/docs/page.tsx stops showing and /docs becomes the Peaje developer portal). If any exists, tell the owner which ones and ask before continuing.
 1. Proxy (the only step that moves the score). Merge the proxy file for your host into the existing config. Next.js: spread the rules into \`rewrites().beforeFiles\`; if \`rewrites()\` returns an array today, convert it to \`{ beforeFiles: [...peaje], afterFiles: [...existing] }\`. Keep wrappers like withSentryConfig/withNextIntl around the object. If a middleware/proxy \`matcher\` exists, exclude mcp, r/, discovery/, checkout_sessions, agentic_commerce/ and docs.
 2. Head. Put peaje/head.html inside the <head> of the homepage: in Next.js app router that is the root layout, as JSX (\`<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ... }} />\` and plain \`<link>\` tags). If JSON-LD already exists, add this block next to it, do not replace it. The Organization node (logo, phone, address, profiles) comes from the data the owner filled in the Peaje dashboard: do not edit it here, change it there.
 3. Footer. Add the visible \`<a href="/developers">API for agents</a>\` to the footer or nav.
 4. robots.txt. Create public/robots.txt only if none exists. If app/robots.ts exists, edit it (allow the bots, keep the Sitemap line) and do not create the static file.
-5. Remove the paths listed in \`remove\` if they exist as static files or route handlers.
-6. Build, commit, deploy. Ask the owner to deploy if you cannot.
+5. Remove the paths listed in \`remove\` if they exist as static files or route handlers (move them out of the way, do not delete the owner's code).
+6. Build. Ask the owner before committing or deploying.
 7. After the deploy is live:
    ${verify}
-   Every check is measured from the business domain, not the gateway. If proxy shows missing paths, a rule is missing or the matcher swallows it. If frescura lists paths, a static copy is still winning: delete it.
+   Every check is measured from the business domain, not the gateway. If proxy shows missing paths, a rule is missing or the matcher swallows it. If frescura lists paths, a static copy is still winning: move it out of the way.
 `
 }
 
@@ -267,18 +320,19 @@ function installMdAeo(k: Kit): string {
   return `# Make ${k.originHost} readable by answer engines (Peaje, AEO layer only)
 
 Files and data: ${k.gateway}/kit.json?layers=aeo${k.host === 'unknown' ? '' : `&host=${k.host}`}
-Shortcut (Next.js): \`npx @peaje/cli@1 init ${k.slug} --only aeo --yes --json\`
+With a terminal: run \`npx @peaje/cli@1 plan ${k.slug} --only aeo --json\` at the repo root (writes nothing, lists every file it would create or edit), show the list to the owner and wait for a yes, then run \`npx @peaje/cli@1 init ${k.slug} --only aeo --yes --json\` and review the change with \`git diff\`. If the CLI is unavailable or exits with code 3, do the steps below by hand.
 
-This layer does NOT connect the domain to the gateway: no proxy, no 402, no MCP on the domain. It only makes the business entity readable and keeps the citing bots allowed. Add the agents layer later with the same command without \`--only aeo\`.
+This layer does NOT connect the domain to the gateway: no proxy, no 402, no MCP on the domain. It only makes the business entity readable and keeps the citing bots allowed. Add the agents layer later with the same commands without \`--only aeo\`.
 
 ## Rules
 - Do NOT rewrite the contents of the files in kit.json. Write them as given; only merge where the file already exists.
+- Do NOT commit, push or deploy without the owner's yes.
 - Do NOT run the verification before the deploy is live.
 
 ## Steps
 1. Head. Put peaje/head.html inside the <head> of the homepage: in Next.js app router that is the root layout, as JSX (\`<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ... }} />\`). If JSON-LD already exists, add this block next to it, do not replace it. The Organization data (logo, phone, address, profiles) comes from the Peaje dashboard: change it there, not here.
 2. robots.txt. Create public/robots.txt only if none exists. If one exists, or app/robots.ts exists, merge: allow the named answer-engine bots, remove any bare \`Disallow: /\`, keep the Sitemap line.
-3. Build, commit, deploy. Ask the owner to deploy if you cannot.
+3. Build. Ask the owner before committing or deploying.
 4. After the deploy is live:
    curl -s ${k.verifyUrl}   # JSON: json-ld, robots and bots with ok:true
    If bots fails, the WAF or a bot fight mode is blocking search bots: that is fixed in the CDN panel, not in the repo.

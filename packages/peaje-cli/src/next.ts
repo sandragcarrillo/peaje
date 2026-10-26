@@ -98,14 +98,29 @@ function indentacionDeLinea(src: string, indice: number): string {
   return /^[ \t]*/.exec(src.slice(inicio, indice))?.[0] ?? ''
 }
 
+/** Un host que se puede escribir tal cual como atributo JSX: `cafeandino.com`, `localhost:3000`. */
+function hostValido(host: string | null | undefined): host is string {
+  return typeof host === 'string' && /^[a-z0-9.-]+(:\d+)?$/i.test(host)
+}
+
 /**
- * Pone `<PeajeHead slug="..." />` en el root layout del app router. Con
- * `<head>` existente va adentro; sin `<head>` pero con `<html>` y `<body>`,
- * se crea el `<head>` justo antes del `<body>`.
+ * Pone `<PeajeHead slug="..." originHost="..." />` en el root layout del app
+ * router. Con `<head>` existente va adentro; sin `<head>` pero con `<html>` y
+ * `<body>`, se crea el `<head>` justo antes del `<body>`.
+ *
+ * `originHost` importa: sin él el componente lee el host de la request con
+ * `next/headers` y todas las páginas bajo el layout pasan a ser dinámicas.
+ * Un `<PeajeHead slug="..." />` que ya estaba sin el host lo recibe.
  */
-export function insertarPeajeHead(src: string, slug: string): Edicion {
-  if (/\bPeajeHead\b/.test(src)) return { ok: false, motivo: 'already' }
-  const etiqueta = `<PeajeHead slug=${JSON.stringify(slug)} />`
+export function insertarPeajeHead(src: string, slug: string, originHost?: string | null): Edicion {
+  const host = hostValido(originHost) ? originHost : null
+  if (/\bPeajeHead\b/.test(src)) {
+    const tag = /<PeajeHead\b([^>]*?)\s*\/>/.exec(src)
+    if (!host || !tag || /\boriginHost\b/.test(tag[1] ?? '') || tag.index === undefined) return { ok: false, motivo: 'already' }
+    const nuevo = `<PeajeHead${tag[1]} originHost=${JSON.stringify(host)} />`
+    return { ok: true, src: `${src.slice(0, tag.index)}${nuevo}${src.slice(tag.index + tag[0].length)}` }
+  }
+  const etiqueta = `<PeajeHead slug=${JSON.stringify(slug)}${host ? ` originHost=${JSON.stringify(host)}` : ''} />`
   const importe = `import { PeajeHead } from '@peaje/next/head'`
 
   const head = /<head(\s[^>]*)?(?<!\/)>/.exec(src)

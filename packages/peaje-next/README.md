@@ -50,7 +50,19 @@ Set `PEAJE_ORIGIN_SECRET` in your hosting environment variables (copy it from th
 
 The rewrites above are fixed at build time, so they cannot know about an API route you add to your dashboard tomorrow. `peajeProxy` fetches `/{slug}/kit/manifest.json` from the gateway, keeps it for 60 seconds, and rewrites any request that matches a priced route (`/api/forecast`, `/api/history/:city`, `/api/batch/*`) to the gateway, which answers 402 or, once paid, forwards to your origin. Catch-all patterns (`/*`, `/:id` at the root) are not forwarded from your domain: they would send the whole site to the gateway.
 
+What the manifest can and cannot change on your domain (since 0.3.0):
+
+- The fixed paths (`/llms.txt`, `/openapi.json`, `/mcp`, `/.well-known/*`, `/developers`, `/docs`, ...) and the `/r/` and `/checkout_sessions/` prefixes come only from the list bundled in this package. Paths the manifest adds are ignored.
+- Priced API routes from the manifest are forwarded only under `apiPrefixes`, which you set in code. The default is `['/api/', '/v1/']`. A route the dashboard prices elsewhere (say `GET /weather/:city`) keeps charging at the gateway URL, and the proxy logs one warning naming it; to charge it on your domain, pass `peajeProxy({ slug, apiPrefixes: ['/api/', '/v1/', '/weather/'] })`.
+- Never forwarded, whatever the manifest or `apiPrefixes` say: the root `/` and reserved app paths (`/login`, `/logout`, `/signin`, `/signup`, `/register`, `/auth`, `/oauth`, `/session`, `/account`, `/admin`, `/dashboard`, `/api/auth` for NextAuth, `/_next`, `/_vercel`, `/static`, `/assets`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml`), and everything under them.
+
+So a gateway bug or a compromised gateway cannot take over a page of your site. Upgrading from 0.2.x: if your priced routes live outside `/api/` and `/v1/`, add their prefix to `apiPrefixes` before you deploy 0.3.0.
+
+Cookies: the requests the proxy forwards to the gateway leave out the `cookie` header, so your visitors' session cookies never leave your domain. `authorization` is forwarded (it carries the MPP credential). If the handler of a priced route reads a cookie, it no longer gets one through Peaje; agents do not send your site's cookies anyway. The build-time rewrites from `withPeaje` cannot drop headers; with `peajeProxy` in place (and its matcher covering those paths) it handles them first.
+
 With your own middleware: `export default peajeProxy({ slug }, myMiddleware)`. Peaje runs first; when the request is not one of its routes, yours runs.
+
+Options: `slug` (required), `gateway`, `secret` (default `process.env.PEAJE_ORIGIN_SECRET`) and `apiPrefixes` (default `['/api/', '/v1/']`).
 
 ## 2. Head
 
@@ -62,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <PeajeHead slug="cafe-andino" />
+        <PeajeHead slug="cafe-andino" originHost="cafeandino.com" />
       </head>
       <body>{children}</body>
     </html>
@@ -72,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 The offers in the JSON-LD come from your gateway (`/discovery/resources`) and are revalidated hourly. If the gateway is unreachable, the component renders the block without offers and never throws: a Peaje outage cannot break your build or your pages.
 
-Props: `slug` (required), `gateway`, `originHost` and `name`. Without `originHost` the component reads the request host through `next/headers`, which makes the layout dynamic; pass `originHost="cafeandino.com"` to keep static rendering.
+Props: `slug` (required), `gateway`, `originHost` and `name`. Pass `originHost="cafeandino.com"`: without it the component reads the request host through `next/headers`, which makes every page under the layout dynamic. `npx @peaje/cli@1 init` writes it for you.
 
 ## 3. Footer
 

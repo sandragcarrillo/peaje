@@ -154,30 +154,63 @@ function LoQueHace({ arranque, preguntas }: { arranque: Arranque | null; pregunt
 function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; fecha: Fecha; creditos: number }) {
   const { miAgente: t } = useDict()
   const planes: Plan[] = billing.founder.available ? ['founder', 'pro'] : ['pro']
+  const { estado, abrir, disponible } = useCheckout(slug, paddle)
+  const hayAlguno = planes.some(disponible)
+  // Sin respuesta del gateway no se muestra founder: no se sabe si quedan cupos.
+  const tarjetas = (billing.respaldo ? ['pro'] : ['founder', 'pro']) as Plan[]
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {/* Sin respuesta del gateway no se muestra founder: no se sabe si quedan cupos. */}
-        {((billing.respaldo ? ['pro'] : ['founder', 'pro']) as Plan[]).map((plan) => {
+      {/* Tarjetas con su botón y, al lado, lo que hay que saber antes de pagar. */}
+      <div className={`grid gap-3 md:grid-cols-2 ${tarjetas.length > 1 ? 'lg:grid-cols-3' : ''}`}>
+        {tarjetas.map((plan, i) => {
           const p = billing.prices[plan]
           const cerrado = plan === 'founder' && !billing.founder.available
+          const puede = planes.includes(plan) && disponible(plan)
           return (
-            <div key={plan} className={`space-y-2 border border-border p-4 ${cerrado ? 'opacity-60' : ''}`}>
-              <p className="font-mono text-[11px] text-muted">{t.planNombres[plan]}</p>
-              <p className="text-lg font-semibold">{t.planPrecio(p.usd)}</p>
-              <p className="text-sm">{t.planLimites(p.limits.preguntas, creditos)}</p>
-              {plan === 'founder' ? (
-                <p className="text-xs text-muted">
-                  {billing.founder.alreadyFounder ? t.planYaFounder : cerrado ? t.planFounderAgotado : t.planFounderCupos(billing.founder.slotsLeft)}
-                </p>
+            <div key={plan} className={`flex flex-col justify-between gap-4 border border-border p-4 ${cerrado ? 'opacity-60' : ''}`}>
+              <div className="space-y-2">
+                <p className="font-mono text-[11px] text-muted">{t.planNombres[plan]}</p>
+                <p className="text-lg font-semibold">{t.planPrecio(p.usd)}</p>
+                <p className="text-sm">{t.planLimites(p.limits.preguntas, creditos)}</p>
+                {plan === 'founder' ? (
+                  <p className="text-xs text-muted">
+                    {billing.founder.alreadyFounder ? t.planYaFounder : cerrado ? t.planFounderAgotado : t.planFounderCupos(billing.founder.slotsLeft)}
+                  </p>
+                ) : null}
+              </div>
+              {puede ? (
+                <button
+                  type="button"
+                  disabled={estado === 'abriendo'}
+                  onClick={() => void abrir(plan)}
+                  className={`btn btn-ancho ${planes.filter(disponible)[0] === plan ? 'btn-primario' : 'btn-secundario'}`}
+                >
+                  {estado === 'abriendo' ? t.planAbriendo : t.planSuscribirmeCorto(t.planNombres[plan] ?? plan)}
+                </button>
               ) : null}
             </div>
           )
         })}
-      </div>
 
-      <Checkout slug={slug} billing={billing} paddle={paddle} planes={planes} />
+        <div className={`space-y-3 self-center ${tarjetas.length > 1 ? 'md:col-span-2 lg:col-span-1' : ''}`}>
+          {hayAlguno ? <p className="text-sm">{t.planCancelas}</p> : <p className="text-sm text-muted">{t.planTarjetaNoDisponible(CONTACTO)}</p>}
+          <p className="text-xs text-muted">{t.planCobroTarjeta}</p>
+          {estado === 'completado' ? <p className="text-sm">{t.planCheckoutListo}</p> : null}
+          {estado === 'error' ? <p className="text-sm text-red-600">{t.planCheckoutError}</p> : null}
+          <p className="text-xs text-muted">
+            {t.planLegal.antes}
+            <Link href="/terms" className="underline hover:text-text">
+              {t.planLegal.terminos}
+            </Link>
+            {t.planLegal.medio}
+            <Link href="/reembolsos" className="underline hover:text-text">
+              {t.planLegal.reembolsos}
+            </Link>
+            {t.planLegal.despues}
+          </p>
+        </div>
+      </div>
 
       {billing.crypto ? <PagoCripto billing={billing} planes={planes} /> : null}
     </div>
@@ -186,12 +219,10 @@ function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; bi
 
 type EstadoCheckout = 'inactivo' | 'abriendo' | 'abierto' | 'completado' | 'error'
 
-/** Botones de suscripción: abren el checkout overlay de Paddle con el negocio en customData. */
-function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; planes: Plan[] }) {
-  const { miAgente: t } = useDict()
+/** El checkout overlay de Paddle: abre con el negocio en customData y sigue sus eventos. */
+function useCheckout(slug: string, paddle: PaddleCliente) {
   const locale = useLocale()
   const [estado, setEstado] = useState<EstadoCheckout>('inactivo')
-
   useEffect(() => {
     escucharPaddle((ev) => {
       switch (ev.name) {
@@ -221,7 +252,6 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
   }, [slug])
 
   const disponible = (plan: Plan) => !!paddle.clientToken && !!paddle.prices[plan]
-  const hayAlguno = planes.some(disponible)
 
   const abrir = async (plan: Plan) => {
     const priceId = paddle.prices[plan]
@@ -244,36 +274,7 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
     }
   }
 
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted">{t.planCobroTarjeta}</p>
-      {hayAlguno ? <p className="text-sm">{t.planCancelas}</p> : null}
-      {hayAlguno ? (
-        <div className="flex flex-wrap gap-3">
-          {planes.filter(disponible).map((plan, i) => (
-            <button key={plan} type="button" disabled={estado === 'abriendo'} onClick={() => void abrir(plan)} className={`btn ${i === 0 ? 'btn-primario' : 'btn-secundario'}`}>
-              {estado === 'abriendo' ? t.planAbriendo : t.planSuscribirme(t.planNombres[plan] ?? plan, billing.prices[plan].usd)}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted">{t.planTarjetaNoDisponible(CONTACTO)}</p>
-      )}
-      {estado === 'completado' ? <p className="text-sm">{t.planCheckoutListo}</p> : null}
-      {estado === 'error' ? <p className="text-sm text-red-600">{t.planCheckoutError}</p> : null}
-      <p className="text-xs text-muted">
-        {t.planLegal.antes}
-        <Link href="/terms" className="underline hover:text-text">
-          {t.planLegal.terminos}
-        </Link>
-        {t.planLegal.medio}
-        <Link href="/reembolsos" className="underline hover:text-text">
-          {t.planLegal.reembolsos}
-        </Link>
-        {t.planLegal.despues}
-      </p>
-    </div>
-  )
+  return { estado, abrir, disponible }
 }
 
 /** "Gestionar suscripción": una sesión nueva del portal de Paddle por clic (no se guarda ni se abre en iframe). */

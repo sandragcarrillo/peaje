@@ -47,7 +47,7 @@ export default function NuevoNegocio() {
   }, [])
 
   useEffect(() => {
-    if (resultado?.ok) router.replace(irAPlan ? `/t/${resultado.slug}/agente#plan` : `/t/${resultado.slug}/listo`)
+    if (resultado?.ok) router.replace(irAPlan ? `/t/${resultado.slug}/agente#plan` : `/t/${resultado.slug}`)
   }, [resultado, irAPlan, router])
 
   const d = useDict()

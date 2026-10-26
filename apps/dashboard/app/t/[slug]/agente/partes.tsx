@@ -3,6 +3,7 @@
 import type { AgentTask, TaskFollowup } from '@peaje/db'
 import { useState, useTransition } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
+import { Copiable } from '../kit/comando'
 import { buscarTareasAhora, crearClaveAgente, descartarTarea, tareaHecha } from './actions'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
@@ -16,7 +17,9 @@ export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefij
   const k = clave ?? t.placeholderClave
   const claude = `claude mcp add --transport http peaje ${mcpUrl} --header "Authorization: Bearer ${k}"`
   const cursor = JSON.stringify({ mcpServers: { peaje: { url: mcpUrl, headers: { Authorization: `Bearer ${k}` } } } }, null, 2)
-  const terminal = `PEAJE_AGENT_KEY=${k} npx @peaje/cli@1 tasks${gateway.includes('localhost') ? ` --gateway ${gateway}` : ''}`
+  // Sin la clave en el comando: el CLI la lee de PEAJE_AGENT_KEY, así no queda
+  // en el historial de la terminal ni en una captura de pantalla.
+  const terminal = `npx @peaje/cli@1 tasks${gateway.includes('localhost') ? ` --gateway ${gateway}` : ''}`
 
   return (
     <div className="space-y-4 border border-border p-4">
@@ -31,22 +34,29 @@ export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefij
       </div>
       {clave ? (
         <div>
-          <pre className={pre}>{clave}</pre>
+          <span className="text-xs text-muted">{t.claveVariable}</span>
+          <div className="mt-1">
+            {/* Tapada en pantalla; copiar usa el texto real. */}
+            <Copiable texto={`export PEAJE_AGENT_KEY=${clave}`} secreto={clave} />
+          </div>
           <p className="mt-1 text-xs text-red-600">{t.claveUnaVez}</p>
         </div>
       ) : null}
-      <Bloque titulo={t.claudeCode} texto={claude} />
-      <Bloque titulo={t.cursor} texto={cursor} />
-      <Bloque titulo={t.terminal} texto={terminal} />
+      <Bloque titulo={t.claudeCode} texto={claude} secreto={clave} />
+      <Bloque titulo={t.cursor} texto={cursor} secreto={clave} />
+      <Bloque titulo={t.terminal} texto={terminal} nota={t.terminalNota} />
     </div>
   )
 }
 
-function Bloque({ titulo, texto }: { titulo: string; texto: string }) {
+function Bloque({ titulo, texto, secreto, nota }: { titulo: string; texto: string; secreto?: string | null; nota?: string }) {
   return (
     <div>
       <span className="text-xs text-muted">{titulo}</span>
-      <pre className={`mt-1 ${pre}`}>{texto}</pre>
+      <div className="mt-1">
+        {secreto ? <Copiable texto={texto} secreto={secreto} /> : <pre className={pre}>{texto}</pre>}
+      </div>
+      {nota ? <p className="mt-1 text-xs text-muted">{nota}</p> : null}
     </div>
   )
 }
@@ -65,7 +75,13 @@ export function Buscar({ slug }: { slug: string }) {
             setMsj(null)
             try {
               const r = await buscarTareasAhora(slug)
-              setMsj('error' in r ? t.buscarEspera(r.retryInSeconds) : t.buscarResultado(r.creadas, r.actualizadas, r.cerradas))
+              setMsj(
+                'error' in r
+                  ? r.error === 'not-enough-credits'
+                    ? r.message
+                    : t.buscarEspera(r.retryInSeconds)
+                  : t.buscarResultado(r.creadas, r.actualizadas, r.cerradas),
+              )
             } catch (e) {
               setMsj(e instanceof Error ? e.message : String(e))
             }

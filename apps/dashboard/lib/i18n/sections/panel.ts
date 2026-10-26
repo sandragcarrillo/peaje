@@ -2,7 +2,7 @@ export const panel = {
   es: {
     eyebrowNegocio: 'NEGOCIO',
     consola: 'CONSOLA',
-    navPortal: 'PORTAL DEV',
+    navPortal: 'Portal dev',
     scoreEyebrow: 'CONSOLA // AGENT-READINESS',
     scoreAuditoria: 'AUDITORÍA',
     scoreConKit: (n: number) => `hasta ~${n} con el kit completo`,
@@ -22,12 +22,14 @@ export const panel = {
     setupListo: '[✓] Listo',
     setupPendiente: '[ ] Te falta esto',
     pasoLabel: (n: number) => `Paso 0${n}`,
-    sidebarNuevaRuta: 'Nueva ruta',
+    sidebarActivarAgente: 'Activar mi agente',
+    sidebarVerMejoras: 'Ver mejoras',
+    sidebarCobros: 'Cobros (opcional)',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje está conectado: tu sitio pasó de ${antes} a ${ahora} para agentes.`,
     scoreMejoraNota: (delta: number) =>
       `+${delta} puntos desde que llegaste. El primer scan queda guardado como tu punto de partida.`,
-    sidebarCambiar: 'CAMBIAR NEGOCIO',
+    sidebarCambiar: 'Cambiar negocio',
     estadoActivo: 'ACTIVO',
     estadoRutas: 'RUTAS',
     rieles: 'RIELES',
@@ -39,10 +41,9 @@ export const panel = {
 
     // sidebar
     cambiarNegocio: 'cambiar de sitio →',
-    navDashboard: 'Dashboard',
-    navScore: 'Score',
-    navRutas: 'Agregar rutas',
-    navKit: 'Haz que te encuentren',
+    navDashboard: 'Inicio',
+    navRutas: 'Rutas',
+    navKit: 'Mejoras',
     navVisitas: 'Visitas de agentes',
     navAgente: 'Mi agente',
     navIngresos: 'Ingresos',
@@ -181,7 +182,7 @@ export const panel = {
   en: {
     eyebrowNegocio: 'BUSINESS',
     consola: 'CONSOLE',
-    navPortal: 'DEV PORTAL',
+    navPortal: 'Dev portal',
     scoreEyebrow: 'CONSOLE // AGENT-READINESS',
     scoreAuditoria: 'AUDIT RUN',
     scoreConKit: (n: number) => `up to ~${n} with the full kit`,
@@ -201,12 +202,14 @@ export const panel = {
     setupListo: '[✓] Done',
     setupPendiente: '[ ] Action needed',
     pasoLabel: (n: number) => `Step 0${n}`,
-    sidebarNuevaRuta: 'New route',
+    sidebarActivarAgente: 'Turn on my agent',
+    sidebarVerMejoras: 'See improvements',
+    sidebarCobros: 'Getting paid (optional)',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje is connected: your site went from ${antes} to ${ahora} for agents.`,
     scoreMejoraNota: (delta: number) =>
       `+${delta} points since you arrived. Your first scan is saved as the starting point.`,
-    sidebarCambiar: 'SWITCH BUSINESS',
+    sidebarCambiar: 'Switch business',
     estadoActivo: 'ACTIVE',
     estadoRutas: 'ROUTES',
     rieles: 'RAILS',
@@ -218,10 +221,9 @@ export const panel = {
 
     // sidebar
     cambiarNegocio: 'switch site →',
-    navDashboard: 'Dashboard',
-    navScore: 'Score',
-    navRutas: 'Add routes',
-    navKit: 'Get discovered',
+    navDashboard: 'Home',
+    navRutas: 'Routes',
+    navKit: 'Improvements',
     navVisitas: 'Agent visits',
     navAgente: 'My agent',
     navIngresos: 'Revenue',

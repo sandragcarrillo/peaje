@@ -1,4 +1,4 @@
-import { accesoPro, COSTOS_CREDITOS, periodoCreditos, type Tenant } from '@peaje/db'
+import { accesoPro, COSTOS_CREDITOS, periodoCreditos, type AccionCreditos, type Tenant } from '@peaje/db'
 import { store } from '../store.js'
 
 /**
@@ -64,6 +64,61 @@ export function avisoCreditos(s: Saldo, idioma: Idioma): string | null {
   return idioma === 'es'
     ? `Te ${s.quedan === 1 ? 'queda 1 crédito' : `quedan ${s.quedan} créditos`} de ${s.total} este mes. Se renuevan el ${fecha}.`
     : `You have ${s.quedan} of ${s.total} credits left this month. They renew on ${fecha}.`
+}
+
+/**
+ * Lo que devuelven el dashboard y el MCP del dueño cuando no alcanza: el
+ * mismo texto que la línea del chat. `retryInSeconds` (hasta que se renueva
+ * el cupo) va para las pantallas que ya muestran una espera.
+ */
+export type SinCreditos = {
+  error: 'not-enough-credits'
+  message: string
+  cost: number
+  remaining: number
+  renewsAt: string
+  retryInSeconds: number
+}
+
+export function sinCreditos(s: Saldo, costo: number, idioma: Idioma, ahora = new Date()): SinCreditos {
+  return {
+    error: 'not-enough-credits',
+    message: lineaSinCreditos({ costo, quedan: s.quedan, renueva: s.renueva }, idioma),
+    cost: costo,
+    remaining: s.quedan,
+    renewsAt: s.renueva,
+    retryInSeconds: Math.max(0, Math.ceil((new Date(s.renueva).getTime() - ahora.getTime()) / 1000)),
+  }
+}
+
+/**
+ * Cobra una acción pedida fuera del chat (botones del dashboard, MCP del
+ * dueño) al mismo precio que en el chat. Reserva antes de correr, así dos
+ * clics seguidos no gastan dos veces el mismo saldo, y devuelve lo cobrado si
+ * la acción falla o no entrega nada (`entrego`, igual que COBRO en
+ * agente.ts), como trabajos.ts con un trabajo fallido. Las corridas
+ * programadas del monitor no pasan por acá: siguen gratis.
+ */
+export async function cobrarAccion<T>(
+  tenant: Tenant,
+  accion: AccionCreditos,
+  o: { idioma: Idioma; motivo: string; entrego: (r: T) => boolean },
+  correr: () => Promise<T>,
+): Promise<{ sinCreditos: SinCreditos } | { valor: T }> {
+  const costo = COSTOS_CREDITOS[accion]
+  const saldo = await saldoCreditos(tenant)
+  if (costo > saldo.quedan) return { sinCreditos: sinCreditos(saldo, costo, o.idioma) }
+  const cobrado = await anotarCreditos(tenant.id, costo, o.motivo)
+  const devolver = () => (cobrado ? anotarCreditos(tenant.id, -costo, `devolución:${o.motivo}`) : Promise.resolve(true))
+  let valor: T
+  try {
+    valor = await correr()
+  } catch (error) {
+    await devolver()
+    throw error
+  }
+  if (!o.entrego(valor)) await devolver()
+  return { valor }
 }
 
 /** Lo que ven el dashboard y el agente: saldo y lista de precios. */

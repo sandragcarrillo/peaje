@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { coincidePatron, crearProxyRuntime, generarProxy, manifiestoProxy, patronARegex, patronANext, patronReenviable, reglasNext, secretoOrigen } from '../src/kit/index'
+import {
+  coincidePatron,
+  crearProxyRuntime,
+  esReservado,
+  generarProxy,
+  manifiestoProxy,
+  patronARegex,
+  patronANext,
+  patronPermitido,
+  patronReenviable,
+  prefijosApiValidos,
+  reglasNext,
+  secretoOrigen,
+} from '../src/kit/index'
 
 const base = 'https://gateway.example/cafe-andino'
 const patrones = [
@@ -94,9 +107,67 @@ test('sin secreto: discovery y /r/ sí, rutas de API no, y lo reporta', async ()
   assert.equal((await proxy.sinSecreto()).length, 3)
 })
 
-test('crearProxyRuntime sin manifiesto usa el respaldo y no lanza', async () => {
+test('crearProxyRuntime sin manifiesto usa la lista del paquete y no lanza', async () => {
   const fetchImpl = (async () => new Response('nope', { status: 500 })) as unknown as typeof fetch
-  const proxy = crearProxyRuntime({ base, fetchImpl, respaldo: { rutas: ['/llms.txt'], prefijos: ['/r/'], patrones: [] } })
+  const proxy = crearProxyRuntime({ base, fetchImpl, secreto: 'x' })
+  assert.deepEqual(await proxy.decidir({ method: 'GET', pathname: '/llms.txt', headers: new Headers() }), { destino: `${base}/llms.txt` })
   assert.deepEqual(await proxy.decidir({ method: 'GET', pathname: '/r/x', headers: new Headers() }), { destino: `${base}/r/x` })
   assert.equal(await proxy.decidir({ method: 'GET', pathname: '/api/forecast', headers: new Headers() }), null)
+})
+
+test('el manifiesto no agrega rutas fijas ni prefijos, y no reenvía API fuera de los prefijos declarados', async () => {
+  const hostil = {
+    version: 'x',
+    base,
+    rutas: ['/llms.txt', '/login', '/', '/pricing'],
+    prefijos: ['/r/', '/blog/', '/'],
+    patrones: [
+      { method: 'GET', path: '/api/forecast' },
+      { method: 'GET', path: '/v1/quote' },
+      { method: 'GET', path: '/login' },
+      { method: 'POST', path: '/auth/*' },
+      { method: 'GET', path: '/api/auth/*' },
+      { method: 'GET', path: '/api/*' },
+      { method: 'GET', path: '/_next/static/*' },
+      { method: 'GET', path: '/weather/:city' },
+      { method: 'GET', path: '/:x/forecast' },
+      { method: 'GET', path: '/api' },
+    ],
+  }
+  const fetchImpl = (async () => new Response(JSON.stringify(hostil), { status: 200 })) as unknown as typeof fetch
+  const proxy = crearProxyRuntime({ base, fetchImpl, secreto: 's' })
+  const d = (pathname: string, method = 'GET') => proxy.decidir({ method, pathname, headers: new Headers() })
+  for (const p of ['/login', '/', '/pricing', '/blog/hola', '/auth/callback', '/api/auth/session', '/API/Auth/session', '/_next/static/x.js', '/weather/bogota', '/es/forecast', '/api']) {
+    assert.equal(await d(p, p.startsWith('/auth') ? 'POST' : 'GET'), null, p)
+  }
+  assert.deepEqual(await d('/api/forecast'), { destino: `${base}/api/forecast` })
+  assert.deepEqual(await d('/v1/quote'), { destino: `${base}/v1/quote` })
+  assert.deepEqual(await d('/api/otra/cosa'), { destino: `${base}/api/otra/cosa` }, '/api/* sigue dentro del prefijo declarado')
+  assert.deepEqual(await d('/llms.txt'), { destino: `${base}/llms.txt` }, 'las fijas del paquete siguen')
+  const fuera = (await proxy.fueraDePrefijos()).map((p) => `${p.method} ${p.path}`)
+  assert.ok(fuera.includes('GET /weather/:city') && fuera.includes('GET /api/auth/*') && fuera.includes('GET /login'))
+  assert.ok(!fuera.includes('GET /api/forecast'))
+})
+
+test('apiPrefixes propios: se aceptan, y la raíz y los reservados nunca', async () => {
+  assert.deepEqual(prefijosApiValidos(['weather', '/Weather/', '/', '', '/_next/', '/api/auth', '/data/v2']), ['/weather/', '/data/v2/'])
+  assert.ok(patronPermitido('/weather/:city', ['/weather/']))
+  assert.ok(!patronPermitido('/weather', ['/weather/']), 'tiene que colgar del prefijo')
+  assert.ok(!patronPermitido('/:x/weather', ['/weather/']))
+  assert.ok(esReservado('/Login/') && esReservado('/api/auth/x') && esReservado('/') && !esReservado('/api/x') && !esReservado('/authors'))
+  const fetchImpl = (async () =>
+    new Response(JSON.stringify(manifiestoProxy(base, '1', [{ method: 'GET', path: '/weather/:city' }, { method: 'GET', path: '/api/forecast' }])), { status: 200 })) as unknown as typeof fetch
+  const proxy = crearProxyRuntime({ base, fetchImpl, secreto: 's', prefijosApi: ['/weather/', '/'] })
+  assert.deepEqual(await proxy.decidir({ method: 'GET', pathname: '/weather/bogota', headers: new Headers() }), { destino: `${base}/weather/bogota` })
+  assert.equal(await proxy.decidir({ method: 'GET', pathname: '/api/forecast', headers: new Headers() }), null, 'con prefijos propios, /api/ ya no va por defecto')
+  assert.deepEqual(proxy.prefijosApi, ['/weather/'])
+})
+
+test('el Worker de Cloudflare aplica las mismas reglas y no manda cookies', () => {
+  const worker = generarProxy('cloudflare', base)
+  assert.ok(worker.includes("const API_PREFIXES = ['/api/', '/v1/']"))
+  assert.ok(worker.includes("'/api/auth'"))
+  assert.ok(worker.includes("headers.delete('cookie')"))
+  assert.ok(!worker.includes('m.rutas'), 'las rutas fijas no salen del manifiesto')
+  assert.ok(!worker.includes('—'))
 })

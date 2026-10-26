@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, posix } from 'node:path'
 import { rutasABorrar } from '@peaje/shared'
+import { buscarColisiones } from './colisiones'
 import { comandoInstalar } from './detectar'
 import { agregarDependencia, envolverNextConfig, insertarJsonLdEstatico, insertarPeajeHead, nextConfigNuevo, proxyNuevo } from './next'
 import {
@@ -18,7 +19,7 @@ import {
 } from './servidores'
 import type { Accion, Deteccion, Kit, Plan } from './tipos'
 
-export const VERSION_PEAJE_NEXT = '^0.2.1'
+export const VERSION_PEAJE_NEXT = '^0.3.0'
 export const CARPETA_BACKUP = '.peaje-backup'
 
 const BLOQUEA_TODO = /^Disallow:\s*\/\s*$/m
@@ -106,7 +107,26 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
   if (stack === 'next' && soloAeo) {
     planificarNextAeo(det, kit, acciones, manual)
   } else if (stack === 'next') {
-    planificarNext(det, slug, acciones, manual, next)
+    const aplicado = planificarNext(det, slug, kit.originHost, acciones, manual, next)
+    // Con withPeaje o PeajeHead en el repo, el snippet de referencia bajo
+    // peaje/ sobra: el dueño revisaría dos versiones de lo mismo.
+    const sobran = new Set<string>()
+    if (aplicado.config) sobran.add('peaje/next.config.ts')
+    if (aplicado.head) {
+      const head = kit.files.find((f) => basename(f.path) === 'head.html')
+      if (head && /"@type":\s*"Organization"/.test(head.content)) {
+        // PeajeHead no renderiza el Organization: ese nodo solo está en el snippet.
+        manual.push(
+          `<PeajeHead /> renders the WebAPI JSON-LD and the discovery links, not the Organization node from your dashboard data. Copy only the Organization object from peaje/head.html into a <script type="application/ld+json"> next to <PeajeHead /> in ${det.layout ?? 'the root layout'}.`,
+        )
+      } else {
+        sobran.add('peaje/head.html')
+      }
+    }
+    for (let i = acciones.length - 1; i >= 0; i--) {
+      const a = acciones[i]!
+      if (a.tipo === 'write' && sobran.has(a.path)) acciones.splice(i, 1)
+    }
   } else if (reconocido) {
     manual.push(
       `Put the tags from peaje/head.html inside the <head> of your homepage template${stack === 'static' ? '' : ` (${stack})`}. Keep any JSON-LD you already have; add this block next to it.`,
@@ -127,6 +147,10 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
   // (g) copias que tapan al proxy. Sin capa de agentes no hay proxy que tapar.
   if (!soloAeo) acciones.push(...planificarLimpieza(dir, kit.remove.length > 0 ? kit.remove : rutasABorrar(), timestamp))
 
+  // Páginas propias que las reglas de Peaje van a tapar: el dueño tiene que saberlo antes del deploy.
+  const movidos = new Set(acciones.flatMap((a) => (a.tipo === 'move' ? [a.desde] : [])))
+  const colisiones = soloAeo ? [] : buscarColisiones(dir, movidos)
+
   // Lo que el kit ya dice a mano, sin repetir lo que este CLI resolvió.
   for (const m of kit.manual) {
     if (/in `remove` exists|Delete that static copy/.test(m) && acciones.some((a) => a.tipo === 'move')) continue
@@ -139,11 +163,15 @@ export function planificar(det: Deteccion, kit: Kit, { slug, timestamp }: Opcion
     manual.push(m)
   }
 
-  next.push(soloAeo ? `Build and deploy.` : `Build and deploy. Nothing answers on your domain before the deploy is live.`)
+  next.push(
+    soloAeo
+      ? `Review the change (git diff) and build. Ask the owner before committing or deploying.`
+      : `Review the change (git diff) and build. Ask the owner before committing or deploying. Nothing answers on your domain before the deploy is live.`,
+  )
   next.push(`After the deploy: npx @peaje/cli@1 verify ${slug}${soloAeo ? ' --only aeo' : ''} --wait 600`)
   if (kit.paidPath) next.push(`Then: curl -sIL https://${kit.originHost}${kit.paidPath} should return 402.`)
 
-  return { acciones, manual, next }
+  return { acciones, manual, next, colisiones }
 }
 
 const SECRETO_MANUAL =
@@ -268,9 +296,18 @@ export function fusionarRobots(existente: string, kit: string): string | null {
   return `${base}\n\n${bloque}\n`
 }
 
-function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual: string[], next: string[]): void {
+function planificarNext(
+  det: Deteccion,
+  slug: string,
+  originHost: string | undefined,
+  acciones: Accion[],
+  manual: string[],
+  next: string[],
+): { config: boolean; head: boolean } {
   const { dir } = det
   let tocaInstalar = false
+  const aplicado = { config: false, head: false }
+  const tagHead = `<PeajeHead slug=${JSON.stringify(slug)}${originHost ? ` originHost=${JSON.stringify(originHost)}` : ''} />`
 
   // (d) next.config
   if (det.nextConfig) {
@@ -279,8 +316,10 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
     if (r.ok) {
       acciones.push({ tipo: 'edit', path: det.nextConfig, content: r.src, motivo: 'wrapped with withPeaje()' })
       tocaInstalar = true
+      aplicado.config = true
     } else if (r.motivo === 'already') {
       acciones.push({ tipo: 'skip', path: det.nextConfig, motivo: 'already uses withPeaje' })
+      aplicado.config = true
     } else {
       manual.push(
         `${det.nextConfig} is not a plain \`export default X\` (a wrapper like withSentryConfig is in the way). Wrap the inner config: \`withPeaje(nextConfig, { slug: "${slug}" })\` from @peaje/next, keeping the outer wrapper. Or spread peaje/next.config.ts into rewrites().beforeFiles by hand.`,
@@ -291,6 +330,7 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
     const nuevo = nextConfigNuevo(slug, existe(dir, 'tsconfig.json'))
     acciones.push({ tipo: 'write', path: nuevo.path, content: nuevo.content, motivo: 'no next.config found, created with withPeaje()' })
     tocaInstalar = true
+    aplicado.config = true
   }
 
   // (d2) el middleware: es lo que pone el 402 de las rutas de API en el dominio,
@@ -316,14 +356,23 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
 
   // (e) head
   if (det.router === 'app' && det.layout) {
-    const r = insertarPeajeHead(leer(dir, det.layout), slug)
+    const original = leer(dir, det.layout)
+    const r = insertarPeajeHead(original, slug, originHost)
     if (r.ok) {
-      acciones.push({ tipo: 'edit', path: det.layout, content: r.src, motivo: 'added <PeajeHead /> to <head>' })
+      const yaEstaba = /\bPeajeHead\b/.test(original)
+      acciones.push({
+        tipo: 'edit',
+        path: det.layout,
+        content: r.src,
+        motivo: yaEstaba ? 'added originHost to <PeajeHead /> so the pages stay static' : 'added <PeajeHead /> to <head>',
+      })
       tocaInstalar = true
+      aplicado.head = true
     } else if (r.motivo === 'already') {
       acciones.push({ tipo: 'skip', path: det.layout, motivo: 'already renders <PeajeHead />' })
+      aplicado.head = true
     } else {
-      manual.push(`${det.layout} has no <head> and no <html>/<body> pair to anchor to. Render \`<PeajeHead slug="${slug}" />\` (from @peaje/next/head) inside the <head> of the root layout.`)
+      manual.push(`${det.layout} has no <head> and no <html>/<body> pair to anchor to. Render \`${tagHead}\` (from @peaje/next/head) inside the <head> of the root layout.`)
       tocaInstalar = true
     }
   } else if (det.router === 'pages') {
@@ -331,7 +380,7 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
       `Pages router: PeajeHead is a server component and does not run there. Paste the tags from peaje/head.html into the <Head> of pages/_document.tsx (the JSON-LD as <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ... }} />).`,
     )
   } else {
-    manual.push(`No root layout found. Render \`<PeajeHead slug="${slug}" />\` (from @peaje/next/head) inside the <head> of the root layout, or paste peaje/head.html there.`)
+    manual.push(`No root layout found. Render \`${tagHead}\` (from @peaje/next/head) inside the <head> of the root layout, or paste peaje/head.html there.`)
     tocaInstalar = true
   }
 
@@ -342,6 +391,7 @@ function planificarNext(det: Deteccion, slug: string, acciones: Accion[], manual
     if (nuevo) acciones.push({ tipo: 'edit', path: pkgPath, content: nuevo, motivo: 'added @peaje/next to dependencies' })
     next.unshift(`${comandoInstalar(det.gestor, '@peaje/next')}   # installs the dependency added to package.json`)
   }
+  return aplicado
 }
 
 /**

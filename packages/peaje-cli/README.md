@@ -3,7 +3,8 @@
 Install [Peaje](https://api.usepeaje.com) on your site in one command. Peaje charges AI agents per request (MPP, HTTP 402) and publishes your catalog, MCP server and OpenAPI spec; this CLI makes all of that answer on your own domain.
 
 ```sh
-npx @peaje/cli@1 init <slug> --yes
+npx @peaje/cli@1 plan <slug>         # writes nothing: every file it would create, edit or move
+npx @peaje/cli@1 init <slug> --yes   # once you have reviewed that list
 ```
 
 `<slug>` is the business slug from your Peaje dashboard. `@1` pins the major so a future `peaje@2` never changes behavior under a script.
@@ -17,11 +18,12 @@ Requires Node 20 or newer. No runtime dependencies.
 1. Detects the stack (Next.js, Nuxt, Astro, SvelteKit, Remix, React Router, Hono, Express, Vite, static) and the host (Next, Vercel, Cloudflare Workers, nginx, Caddy) by reading `package.json` and the config files in the directory. In a monorepo with several sites it stops and asks for `--dir`.
 2. Downloads the kit for that host from the gateway.
 3. Writes it:
-   - new files (`public/robots.txt`) only if they do not exist;
-   - snippets to merge (`peaje/next.config.ts`, `peaje/head.html`, ...) always under `peaje/`, exactly as the gateway sent them.
-4. Next.js: wraps a plain `next.config.*` with `withPeaje()` from `@peaje/next`, writes `proxy.ts` (Next 16) or `middleware.ts` (older) with `peajeProxy()` so priced API routes answer 402 on your domain at runtime (if you already have one, you get the one-line wrap as an instruction), adds `@peaje/next` to `package.json` (you run the install; the command is printed) and renders `<PeajeHead slug="..." />` in the `<head>` of the app router root layout. Configs wrapped in `withSentryConfig(...)` or similar, and the pages router, are left for you with an exact instruction.
+   - `public/robots.txt` if there is none; if there is one, it appends a block between `# peaje:begin` and `# peaje:end` (see [What it touches](#what-it-touches-and-what-it-does-not));
+   - snippets to merge (`peaje/next.config.ts`, `peaje/head.html`, ...) under `peaje/`, exactly as the gateway sent them. In Next.js they are skipped when step 4 already applied them (`withPeaje()` in the config, `<PeajeHead />` in the layout).
+4. Next.js: wraps a plain `next.config.*` with `withPeaje()` from `@peaje/next`, writes `proxy.ts` (Next 16) or `middleware.ts` (older) with `peajeProxy()` so priced API routes answer 402 on your domain at runtime (if you already have one, you get the one-line wrap as an instruction), adds `@peaje/next` to `package.json` (you run the install; the command is printed) and renders `<PeajeHead slug="..." originHost="..." />` in the `<head>` of the app router root layout. `originHost` keeps the pages static; an existing `<PeajeHead slug="..." />` without it gets it added. Configs wrapped in `withSentryConfig(...)` or similar, and the pages router, are left for you with an exact instruction.
 5. Other stacks get the same runtime proxy from [`@peaje/proxy`](../peaje-proxy): see [Outside Next.js](#outside-nextjs).
 6. Moves static copies that would shadow the proxy (`public/openapi.json`, `app/mcp/route.ts`, ...) to `.peaje-backup/<timestamp>/`. Nothing is ever deleted.
+7. Warns about the site's own pages that Peaje replaces. Peaje's rules run before the site's routes on the paths it serves (`/docs`, `/developers`, `/mcp`, `/openapi.json`, `/.well-known/*`, `/r/*`, `/checkout_sessions`, ...), so an `app/docs/page.tsx` (route groups included), `pages/docs.tsx`, `src/routes/docs/+page.svelte` or `public/docs/index.html` stops showing and `/docs` becomes the Peaje developer portal. Each one is printed as a warning before the file list and returned in `collisions` with `--json`. Move the page or agree it with the owner before deploying.
 
 Without `--yes` it prints the plan and asks for confirmation on a TTY. Without a TTY and without `--yes` it exits with code 2 instead of hanging.
 
@@ -29,7 +31,7 @@ Flags: `--dir <path>`, `--host next|vercel|cloudflare|nginx|caddy`, `--gateway <
 
 ### `peaje plan <slug>`
 
-Same as `init`, writes nothing. Use it to see what would change.
+Same as `init`, writes nothing. Use it to see what would change, collisions included. With `--json` the object has `dryRun: true`, the planned files in `wouldWrite` and `wouldMove`, and `written` and `moved` empty (nothing was written).
 
 ### `peaje verify <slug> [--wait <seconds>]`
 
@@ -69,28 +71,41 @@ All of them need `PEAJE_ORIGIN_SECRET` in the hosting environment (Kit page of t
 
 ## What it touches and what it does not
 
-Touches: `next.config.*` (only when it is a plain `export default X` or `module.exports = X`), the root `app/layout.*`, a new root `middleware.*` (Vite on Vercel), one `app.use(...)` line in an unambiguous Express or Hono entry file, `package.json` dependencies, `public/robots.txt` (only if missing), files under `peaje/`, and moves shadowing copies to `.peaje-backup/`.
+Touches: `next.config.*` (only when it is a plain `export default X` or `module.exports = X`), the root `app/layout.*`, a new `proxy.*` or `middleware.*` (Next.js, and Vite on Vercel), one `app.use(...)` line in an unambiguous Express or Hono entry file, `package.json` dependencies, `public/robots.txt` (created if missing; an existing one gets a block appended between `# peaje:begin` and `# peaje:end` with the named answer-engine bots and the paid paths, and your own rules are left as they are), files under `peaje/`, and moves shadowing copies to `.peaje-backup/`.
 
-Does not touch: anything else. It never runs your package manager, never deletes files, never rewrites a config it cannot parse, never edits an existing `robots.txt` or `app/robots.ts` (it tells you what to change instead), and never edits your footer: add the visible `<a href="/developers">API for agents</a>` yourself.
+Does not touch: anything else. It never runs your package manager, never deletes files, never rewrites a config it cannot parse, never edits `app/robots.ts` (it tells you what to change there instead), and never edits your footer: add the visible `<a href="/developers">API for agents</a>` yourself.
 
 ## For coding agents
 
 ```sh
-npx @peaje/cli@1 init <slug> --yes --json      # one JSON object: { ok, stack, host, written, moved, manual, next }
+npx @peaje/cli@1 plan <slug> --json            # writes nothing: { dryRun: true, wouldWrite, wouldMove, collisions, manual, next }
+# show wouldWrite, wouldMove and collisions to the owner and wait for a yes
+npx @peaje/cli@1 init <slug> --yes --json      # { ok, dryRun: false, stack, host, written, moved, collisions, manual, next }
+git status && git diff                         # review what changed
 # apply what is in `manual`, run the install command from `next`
 <build>
-<deploy>
-npx @peaje/cli@1 verify <slug> --wait 600 --json
+# ask the owner before committing or deploying
+npx @peaje/cli@1 verify <slug> --wait 600 --json   # only after the deploy is live
 ```
 
 Exit codes: `0` ok, `1` error or failed verification, `2` confirmation needed (no TTY, no `--yes`), `3` stack not recognized. On `3` the full kit is written under `peaje/` so you can translate it to the host by hand.
 
 `--gateway` (or `PEAJE_GATEWAY_URL`) points the CLI at a different gateway, for local development.
 
-## License
-
-MIT
-
 ## Answer engines only
 
 `npx @peaje/cli@1 init <slug> --only aeo` installs just the answer-engine layer: a robots.txt that allows the citing bots by name and an Organization JSON-LD in the homepage head. No proxy, no 402, no npm dependency. Use it when the business only wants ChatGPT, Perplexity and Google to read the site correctly; run the same command without `--only aeo` later to add the agents layer. `peaje verify <slug> --only aeo` checks only that layer.
+
+## Uninstall
+
+`init` only writes the files it lists, so undoing it is reverting those files:
+
+1. Revert what it wrote or edited. The list is `written` in the `--json` output (or the `Files:` block it printed); with git, `git checkout -- <file>` for edited files and delete the new ones (`proxy.ts` or `middleware.ts`, `peaje/`). In `next.config.*` remove the `withPeaje(...)` wrap and its import; in the root layout remove `<PeajeHead ... />` and its import; in Express or Hono remove the `app.use(peaje...)` line and its import.
+2. In `robots.txt`, delete everything between `# peaje:begin` and `# peaje:end`, both lines included (or the whole file if `init` created it).
+3. Restore anything it moved: each `.peaje-backup/<timestamp>/<path>` goes back to `<path>`. Then delete `.peaje-backup/`.
+4. Remove the dependency: `npm uninstall @peaje/next` or `npm uninstall @peaje/proxy` (or the `pnpm remove` / `yarn remove` / `bun remove` equivalent).
+5. Delete `PEAJE_ORIGIN_SECRET` from the hosting environment variables (or `wrangler secret delete PEAJE_ORIGIN_SECRET` on Cloudflare), then deploy.
+
+## License
+
+MIT

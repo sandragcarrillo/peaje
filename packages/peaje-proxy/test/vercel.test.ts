@@ -44,3 +44,13 @@ test('vercel: con middleware propio, corre solo si Peaje no toma la request', as
   await mw(req('/llms.txt'))
   assert.equal(llamado, 1)
 })
+
+test('vercel: la cookie del sitio queda fuera del override de headers; authorization sigue', async () => {
+  const mw = peajeVercel({ slug: SLUG, gateway: gw.url, secret: SECRETO })
+  const res = await mw(req('/api/forecast', { headers: { cookie: 'session=abc', authorization: 'Payment xyz' } }))
+  const lista = (res.headers.get('x-middleware-override-headers') ?? '').split(',')
+  assert.ok(!lista.includes('cookie'))
+  assert.equal(res.headers.get('x-middleware-request-cookie'), null)
+  assert.ok(lista.includes('authorization'))
+  assert.equal(res.headers.get('x-middleware-request-authorization'), 'Payment xyz')
+})

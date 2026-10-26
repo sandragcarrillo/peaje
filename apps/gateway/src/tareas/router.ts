@@ -15,6 +15,7 @@ import { correrRonda, maxPreguntas, resumenCitacion, sugerirPrompts } from '../c
 // ---- M9: lo Pro pregunta a un solo lugar ----
 import { accesoPro, sinPro } from '../billing/acceso.js'
 import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
+import { cobrarAccion } from './creditos.js'
 
 /**
  * Tareas del agente Pro.
@@ -31,6 +32,12 @@ import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
  * Para el dashboard, con el secreto interno:
  *   POST /_internal/:slug/tasks/generate  busca tareas nuevas (con contenido: una llamada a Opus)
  *   POST /_internal/:slug/tasks/:id/done  {url?} igual que el dueño
+ *
+ * Lo que en el chat cuesta créditos cuesta lo mismo pedido desde un botón o
+ * desde el MCP del dueño (cobrarAccion, en creditos.ts): buscar tareas con
+ * Pro, armar el plan y medir la citación. Sin saldo: 429 con
+ * `error: 'not-enough-credits'` y el mismo texto del chat en `message`
+ * (`language` en el cuerpo, es o en). El monitor diario sigue gratis.
  */
 export const tareasRouter = new Hono<{ Bindings: HttpBindings; Variables: { tenant: Tenant } }>()
 
@@ -144,8 +151,22 @@ export async function buscarTareas(tenant: Tenant) {
   return { ...(await generarTareas(tenant, { conContenido: accesoPro(tenant).activo })) }
 }
 
+/**
+ * buscarTareas a pedido del dueño (botón del dashboard, MCP de su coding
+ * agent). Con Pro es la búsqueda con contenido y cuesta `informe`, como
+ * refresh_tasks en el chat; sin Pro es la de arreglos, gratis.
+ */
+export async function buscarTareasDelDueno(tenant: Tenant, idioma: 'es' | 'en', canal: 'dashboard' | 'owner-mcp') {
+  if (!accesoPro(tenant).activo) return buscarTareas(tenant)
+  const r = await cobrarAccion(tenant, 'informe', { idioma, motivo: `${canal}:refresh_tasks`, entrego: (x) => !('error' in x) }, () => buscarTareas(tenant))
+  return 'sinCreditos' in r ? r.sinCreditos : r.valor
+}
+
+const idiomaDe = (b: Record<string, unknown>) => (b.language === 'es' ? 'es' : 'en')
+
 tareasRouter.post('/_internal/:slug/tasks/generate', async (c) => {
-  const r = await buscarTareas(c.get('tenant'))
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const r = await buscarTareasDelDueno(c.get('tenant'), idiomaDe(b), 'dashboard')
   return c.json(r, 'error' in r ? 429 : 200)
 })
 
@@ -167,10 +188,16 @@ tareasRouter.post('/_internal/:slug/tasks/plan', async (c) => {
   const capacity = Array.isArray(b.capacity) ? PLAN_CAPACITIES.filter((x) => (b.capacity as unknown[]).includes(x)) : []
   if (!goal) return c.json({ error: 'goal must be recommendations, agent-sales or both' }, 400)
   const tenant = c.get('tenant')
-  const bloqueo = sinPro(tenant, b.language === 'es' ? 'es' : 'en') // M9
+  const idioma = idiomaDe(b)
+  const bloqueo = sinPro(tenant, idioma) // M9
   if (bloqueo) return c.json(bloqueo, 403)
-  await generarPlan(tenant, { goal, goalDetail: String(b.goalDetail ?? ''), capacity, cadence, language: b.language === 'es' ? 'es' : 'en' })
-  return c.json({ plan: await planConAvance(tenant) })
+  // Cuesta lo mismo que build_plan en el chat.
+  const r = await cobrarAccion(tenant, 'informe', { idioma, motivo: 'dashboard:build_plan', entrego: () => true }, async () => {
+    await generarPlan(tenant, { goal, goalDetail: String(b.goalDetail ?? ''), capacity, cadence, language: idioma })
+    return planConAvance(tenant)
+  })
+  if ('sinCreditos' in r) return c.json(r.sinCreditos, 429)
+  return c.json({ plan: r.valor })
 })
 
 /** Un mensaje del dueño al agente; devuelve la respuesta ya guardada. */
@@ -210,10 +237,15 @@ tareasRouter.delete('/_internal/:slug/tasks/citations/prompts/:id', async (c) =>
 })
 
 tareasRouter.post('/_internal/:slug/tasks/citations/run', async (c) => {
-  const bloqueo = sinPro(c.get('tenant')) // M9
+  const b = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const tenant = c.get('tenant')
+  const idioma = idiomaDe(b)
+  const bloqueo = sinPro(tenant, idioma) // M9
   if (bloqueo) return c.json(bloqueo, 403)
-  const r = await medirAhora(c.get('tenant'))
-  return c.json(r, 'error' in r ? 429 : 200)
+  // Cuesta lo mismo que run_citation_check en el chat; si toca esperar, se devuelve.
+  const r = await cobrarAccion(tenant, 'informe', { idioma, motivo: 'dashboard:run_citation_check', entrego: (x) => !('error' in x) }, () => medirAhora(tenant))
+  if ('sinCreditos' in r) return c.json(r.sinCreditos, 429)
+  return c.json(r.valor, 'error' in r.valor ? 429 : 200)
 })
 
 /** Una ronda a pedido por negocio cada 6 horas: cada ronda son preguntas × motores consultas pagas. */

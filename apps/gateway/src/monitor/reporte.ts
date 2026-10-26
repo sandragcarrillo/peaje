@@ -175,7 +175,12 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
   }
 
   const soloAeo = fallando.every((f) => f.id === 'json-ld' || f.id === 'robots' || f.id === 'bots')
-  const comando = `npx @peaje/cli@1 init ${tenant.slug}${soloAeo && fallando.length > 0 ? ' --only aeo' : ''} --yes`
+  // Plan primero (no escribe nada); init solo con el sí del dueño a esa lista.
+  const capa = soloAeo && fallando.length > 0 ? ' --only aeo' : ''
+  const comando = [
+    `npx @peaje/cli@1 plan ${tenant.slug}${capa}   # lists every file it would change, writes nothing`,
+    `npx @peaje/cli@1 init ${tenant.slug}${capa} --yes   # only after the owner approves that list`,
+  ].join('\n')
 
   return {
     dominio,

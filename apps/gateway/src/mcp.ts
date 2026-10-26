@@ -10,6 +10,7 @@ import { motivoNoLiquidado, sinDireccionDeCobro, tieneDireccionDeCobro } from '.
 import { cortado, registrarFalloOrigen, respuestaCortado } from './cortacircuito.js'
 import { docsBase } from './base.js'
 import { env } from './env.js'
+import { leerLegible } from './legible.js'
 import { chargeMethods } from './methods.js'
 import { proxyToOrigin } from './proxy.js'
 import { store } from './store.js'
@@ -115,7 +116,7 @@ function vendibles(routes: Route[], resources: Resource[]): Route[] {
   ]
 }
 
-function buildServer(
+export function buildServer(
   tenant: Tenant,
   routes: Route[],
   resources: Resource[],
@@ -224,7 +225,7 @@ function buildServer(
         const recortar = (texto: string) => (args.max_chars ? texto.slice(0, args.max_chars) : texto)
         if (precio <= 0) {
           const libre = await fetch(resource.url, { redirect: 'follow' })
-          return { content: [{ type: 'text' as const, text: recortar(await libre.text()) }] }
+          return { content: [{ type: 'text' as const, text: recortar(await leerLegible(libre, resource.url)) }] }
         }
 
         if (!tieneDireccionDeCobro(tenant)) return errorTexto(sinDireccionDeCobro(tenant))
@@ -239,7 +240,8 @@ function buildServer(
           try {
             const upstream = await fetch(resource.url, { redirect: 'follow' })
             if (upstream.status >= 500) registrarFalloOrigen(tenant)
-            return { valor: await upstream.text(), fallo: upstream.status >= 500 }
+            // Una página HTML llega como markdown legible; JSON, texto y lo demás, tal cual.
+            return { valor: await leerLegible(upstream, resource.url), fallo: upstream.status >= 500 }
           } catch (err) {
             console.error('[mcp] recurso no disponible', { tenant: tenant.slug, resource: resource.slug, err })
             registrarFalloOrigen(tenant)
@@ -275,6 +277,7 @@ function buildServer(
 
   for (const route of routes) {
     const params = pathParams(route)
+    const gratis = Number(route.priceUsd) <= 0
     const shape: Record<string, z.ZodType> = {}
     for (const p of params) shape[p] = z.string().describe(`Path segment :${p}`)
     shape.query = z
@@ -285,7 +288,9 @@ function buildServer(
     server.registerTool(
       toolName(route),
       {
-        description: `${route.description ?? `${route.method} ${route.pathPattern}`} · Costs $${Number(route.priceUsd)} per call (MPP; pay in pathUSD on Tempo, or USDC/USDG on Arbitrum, Robinhood or Arc).`,
+        description: gratis
+          ? `${route.description ?? `${route.method} ${route.pathPattern}`} · Free.`
+          : `${route.description ?? `${route.method} ${route.pathPattern}`} · Costs $${Number(route.priceUsd)} per call (MPP; pay in pathUSD on Tempo, or USDC/USDG on Arbitrum, Robinhood or Arc).`,
         inputSchema: shape,
         annotations: {
           title: route.description ?? `${route.method} ${route.pathPattern}`,
@@ -295,13 +300,24 @@ function buildServer(
         },
       },
       async (args: Record<string, unknown>, extra) => {
-        if (!tieneDireccionDeCobro(tenant)) return errorTexto(sinDireccionDeCobro(tenant))
-
         // Reconstruye el path real reemplazando :params con los argumentos.
         let path = route.pathPattern
         for (const p of params) path = path.replace(`:${p}`, encodeURIComponent(String(args[p] ?? '')))
         const query = new URLSearchParams((args.query as Record<string, string>) ?? {})
         const url = `http://origin.internal${path}${query.size ? `?${query}` : ''}`
+
+        // Precio 0 = ruta gratis, como un link gratis: directo al origen, sin 402 ni receipt.
+        if (gratis) {
+          try {
+            const upstream = await proxyToOrigin(new Request(url, { method: route.method }), tenant, path)
+            return { content: [{ type: 'text' as const, text: await upstream.text() }], ...(upstream.status >= 400 ? { isError: true } : {}) }
+          } catch (err) {
+            console.error('[mcp] origin no respondió (ruta gratis)', { tenant: tenant.slug, tool: toolName(route), err })
+            return errorTexto({ error: 'The business origin did not respond.', hint: 'Try again in a minute.' })
+          }
+        }
+
+        if (!tieneDireccionDeCobro(tenant)) return errorTexto(sinDireccionDeCobro(tenant))
 
         const pausa = cortado(tenant.id)
         if (pausa) return errorTexto((await respuestaCortado(tenant, pausa).json()) as Record<string, string>)

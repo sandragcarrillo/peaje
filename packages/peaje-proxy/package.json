@@ -1,6 +1,6 @@
 {
   "name": "@peaje/proxy",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Peaje for any server: answer HTTP 402 (MPP, x402) for your priced API routes on your own domain. Fetch handler plus Express, Hono and Vercel Routing Middleware adapters.",
   "license": "MIT",
   "repository": {
@@ -8,10 +8,13 @@
     "url": "git+https://github.com/sandragcarrillo/peaje.git",
     "directory": "packages/peaje-proxy"
   },
+  "homepage": "https://github.com/sandragcarrillo/peaje/tree/main/packages/peaje-proxy#readme",
+  "bugs": "https://github.com/sandragcarrillo/peaje/issues",
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

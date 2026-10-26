@@ -1,3 +1,4 @@
+import { accesoPro } from '@peaje/db'
 import Link from 'next/link'
 import { gatewayUrl } from '@/lib/config'
 import { getDict } from '@/lib/i18n'
@@ -49,15 +50,16 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
           slug={tenant.slug}
           name={tenant.name}
           valores={{
-            score: score ? String(score.score) : '—',
-            rutas: String(resources.length),
-            ingresos: `$${Number(balance.revenue).toFixed(2)}`,
+            score: score ? String(score.score) : undefined,
+            rutas: resources.length > 0 ? String(resources.length) : undefined,
+            ingresos: Number(balance.revenue) > 0 ? `${Number(balance.revenue).toFixed(2)}` : undefined,
           }}
+          pro={accesoPro(tenant).activo}
           portalUrl={`${gatewayUrl}/${tenant.slug}/developers`}
         />
         <main className="min-w-0 flex-1 space-y-8 p-6 lg:p-10">
           <p className="border border-border bg-panel px-4 py-2.5 text-xs text-muted">
-            <span className="mr-2 font-mono tracking-[0.1em] text-accent">{d.dinero.modoPruebaEtiqueta}</span>
+            <span className="mr-2 font-mono text-accent">{d.dinero.modoPruebaEtiqueta}</span>
             {d.dinero.modoPrueba}
           </p>
           {children}

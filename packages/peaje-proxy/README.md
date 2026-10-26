@@ -90,9 +90,17 @@ export default { fetch: async (req: Request) => (await peaje(req)) ?? app(req) }
 
 - The catalog paths: `/llms.txt`, `/openapi.json`, `/mcp`, `/.well-known/*` Peaje files, `/developers`, `/docs` and the rest of the kit list.
 - `/r/*` priced links and `/checkout_sessions/*`.
-- Your priced API routes from the dashboard (`GET /api/forecast`, `/api/history/:city`, `/api/batch/*`), matching the method. Catch-alls at the root (`/*`, `/:id`) are never forwarded from your domain: they would send the whole site to the gateway.
+- Your priced API routes from the dashboard (`GET /api/forecast`, `/api/history/:city`, `/api/batch/*`), matching the method, but only under `apiPrefixes` (default `['/api/', '/v1/']`). Catch-alls at the root (`/*`, `/:id`) are never forwarded from your domain: they would send the whole site to the gateway.
 
-The forwarded request keeps method, body and query, and carries `x-forwarded-host` and `x-forwarded-proto` so the 402 challenge names your domain (strict x402 clients abort when it does not). If the gateway is unreachable, the catalog paths are still forwarded from a built-in list; priced API routes resume when the manifest loads.
+The forwarded request keeps method, body, query and `authorization` (the MPP credential), and carries `x-forwarded-host` and `x-forwarded-proto` so the 402 challenge names your domain (strict x402 clients abort when it does not). It leaves out the `cookie` header: your visitors' session cookies never leave your domain, and a priced route's handler no longer receives cookies through Peaje. If the gateway is unreachable, the catalog paths are still forwarded; priced API routes resume when the manifest loads.
+
+### What the manifest cannot do (since 0.2.0)
+
+- Add fixed paths or prefixes. Those come only from the list bundled in this package; anything extra in the manifest is ignored.
+- Forward an API route outside `apiPrefixes`. A route priced elsewhere (`GET /weather/:city`) keeps charging at the gateway URL and you get one warning in the logs naming it. To charge it on your domain: `{ slug, apiPrefixes: ['/api/', '/v1/', '/weather/'] }`.
+- Touch the root `/` or reserved app paths, whatever `apiPrefixes` says: `/login`, `/logout`, `/signin`, `/signup`, `/register`, `/auth`, `/oauth`, `/session`, `/account`, `/admin`, `/dashboard`, `/api/auth`, `/_next`, `/_vercel`, `/static`, `/assets`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml` and everything under them.
+
+Upgrading from 0.1.x: if your priced routes live outside `/api/` and `/v1/`, add their prefix to `apiPrefixes` before you deploy 0.2.0.
 
 ## Options
 
@@ -101,6 +109,7 @@ The forwarded request keeps method, body and query, and carries `x-forwarded-hos
 | `slug` | required, the business slug from your dashboard |
 | `secret` | `process.env.PEAJE_ORIGIN_SECRET` |
 | `gateway` | `process.env.PEAJE_GATEWAY_URL` or `https://api.usepeaje.com` |
+| `apiPrefixes` | `['/api/', '/v1/']`: where your priced API routes live; the root and reserved paths are never accepted |
 
 ## License
 

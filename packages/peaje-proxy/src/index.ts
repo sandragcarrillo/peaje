@@ -12,8 +12,13 @@
  * Los adaptadores (`/express`, `/hono`, `/vercel`) usan `crearPeaje`, que
  * separa decidir de reenviar: en Express el body no se lee hasta saber que la
  * request es de Peaje, así los body parsers de la app no pierden nada.
+ *
+ * Desde 0.2.0 el manifiesto solo aporta rutas de API, y solo bajo `apiPrefixes`
+ * (por defecto `/api/` y `/v1/`) y fuera de los paths reservados: un gateway
+ * no puede tapar una página del sitio. Las cookies del sitio no viajan al
+ * gateway.
  */
-import { crearProxyRuntime, PEAJE_HOST_HEADER, RUTAS_DINAMICAS, RUTAS_PROXY } from '@peaje/shared'
+import { crearProxyRuntime, HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER, PREFIJOS_API_POR_DEFECTO, type ProxyRuntime } from '@peaje/shared'
 
 export const GATEWAY_POR_DEFECTO = 'https://api.usepeaje.com'
 
@@ -28,6 +33,13 @@ export type OpcionesPeaje = {
   secret?: string
   /** URL pública del gateway. Por defecto `PEAJE_GATEWAY_URL` o la de producción. */
   gateway?: string
+  /**
+   * Prefijos bajo los que viven tus rutas de API con precio. Una ruta del
+   * dashboard fuera de ellos cobra solo en la URL del gateway, no en tu
+   * dominio. Por defecto `['/api/', '/v1/']`. La raíz y los paths reservados
+   * (`/login`, `/auth`, `/api/auth`, `/_next`...) nunca se aceptan.
+   */
+  apiPrefixes?: string[]
   /** Para tests o runtimes sin fetch global. */
   fetch?: typeof fetch
 }
@@ -62,6 +74,30 @@ const SALTO = ['host', 'connection', 'keep-alive', 'proxy-connection', 'transfer
 
 let avisado = false
 
+/**
+ * Un aviso por proceso con lo que el sitio no cobra en su dominio: rutas de API
+ * sin PEAJE_ORIGIN_SECRET, y rutas fuera de `apiPrefixes` (o en un path
+ * reservado), que el manifiesto ya no puede reenviar.
+ */
+function avisar(runtime: ProxyRuntime, conSecreto: boolean): void {
+  if (!conSecreto) {
+    void runtime.sinSecreto().then((faltan) => {
+      if (faltan.length > 0) {
+        console.warn(
+          `[peaje] ${faltan.length} priced API route(s) are not charged on this domain because PEAJE_ORIGIN_SECRET is not set: ${faltan.map((p) => `${p.method} ${p.path}`).join(', ')}. Copy it from the Kit page of your Peaje dashboard into your hosting environment variables.`,
+        )
+      }
+    })
+  }
+  void runtime.fueraDePrefijos().then((fuera) => {
+    if (fuera.length > 0) {
+      console.warn(
+        `[peaje] ${fuera.length} priced API route(s) are outside apiPrefixes (${runtime.prefijosApi.join(', ') || 'none'}) or on a reserved path, so they are charged only at the gateway URL, not on this domain: ${fuera.map((p) => `${p.method} ${p.path}`).join(', ')}. A route under a prefix of its own (/weather/:city) is charged here once that prefix is in the apiPrefixes option; a single path at the root or a reserved path never is.`,
+      )
+    }
+  })
+}
+
 /** Solo para tests: vuelve a permitir el aviso de secreto faltante. */
 export function _reiniciarAviso(): void {
   avisado = false
@@ -72,25 +108,14 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
   const base = baseDe(opciones)
   const secreto = opciones.secret ?? env('PEAJE_ORIGIN_SECRET') ?? null
   const fetchImpl = opciones.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
-  const runtime = crearProxyRuntime({
-    base,
-    secreto,
-    fetchImpl,
-    respaldo: { rutas: RUTAS_PROXY.map((x) => x.path), prefijos: RUTAS_DINAMICAS.map((x) => x.prefijo), patrones: [] },
-  })
+  const runtime = crearProxyRuntime({ base, secreto, fetchImpl, prefijosApi: opciones.apiPrefixes ?? PREFIJOS_API_POR_DEFECTO })
 
   return {
     base,
     async decidir({ method, url, headers }) {
-      if (!secreto && !avisado) {
+      if (!avisado) {
         avisado = true
-        void runtime.sinSecreto().then((faltan) => {
-          if (faltan.length > 0) {
-            console.warn(
-              `[peaje] ${faltan.length} priced API route(s) are not charged on this domain because PEAJE_ORIGIN_SECRET is not set: ${faltan.map((p) => `${p.method} ${p.path}`).join(', ')}. Copy it from the Kit page of your Peaje dashboard into your hosting environment variables.`,
-            )
-          }
-        })
+        avisar(runtime, Boolean(secreto))
       }
       const d = await runtime.decidir({ method, pathname: url.pathname, search: url.search, headers })
       return d?.destino ?? null
@@ -98,6 +123,9 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
     async reenviar(destino, { method, url, headers, body }) {
       const salida = new Headers(headers)
       for (const h of SALTO) salida.delete(h)
+      // Las cookies del sitio (la sesión de quien navega) no salen hacia el
+      // gateway; `authorization` sí: ahí viaja la credencial MPP.
+      for (const h of HEADERS_NO_REENVIADOS) salida.delete(h)
       // Detrás de otro proxy (Railway, Render, un load balancer) el host de la
       // URL es el interno: manda el que ya venía reenviado, si venía.
       const primero = (h: string) => headers.get(h)?.split(',')[0]?.trim() || null

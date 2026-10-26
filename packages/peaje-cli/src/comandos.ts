@@ -30,21 +30,27 @@ export type SalidaInit = {
   codigo: 0 | 3
 }
 
+/**
+ * En dry-run `written` y `moved` van vacíos (no se escribió ni movió nada) y
+ * lo planeado sale en `wouldWrite` y `wouldMove`. Antes el plan listaba lo
+ * planeado bajo `written` y un agente que solo leía ese campo creía que el
+ * repo ya había cambiado.
+ */
 export function resultadoDe(det: Deteccion, kit: Kit, plan: Plan, escrito: { written: string[]; moved: string[] } | null): Resultado {
   const dry = escrito === null
-  const written = dry
-    ? plan.acciones.filter((a) => a.tipo === 'write' || a.tipo === 'edit').map((a) => (a as { path: string }).path)
-    : escrito.written
-  const moved = dry ? plan.acciones.filter((a) => a.tipo === 'move').map((a) => `${a.desde} -> ${a.hasta}`) : escrito.moved
+  const collisions = (plan.colisiones ?? []).map(({ path, file, kind, message }) => ({ path, file, kind, message }))
+  const base = { ok: det.stack !== 'unknown', dryRun: dry, stack: det.stack, host: kit.host }
+  if (!dry) return { ...base, written: escrito.written, moved: escrito.moved, collisions, manual: plan.manual, next: plan.next }
   return {
-    ok: det.stack !== 'unknown',
-    stack: det.stack,
-    host: kit.host,
-    written,
-    moved,
+    ...base,
+    written: [],
+    moved: [],
+    wouldWrite: plan.acciones.filter((a) => a.tipo === 'write' || a.tipo === 'edit').map((a) => (a as { path: string }).path),
+    wouldMove: plan.acciones.filter((a) => a.tipo === 'move').map((a) => `${a.desde} -> ${a.hasta}`),
+    collisions,
     manual: plan.manual,
     next: plan.next,
-    ...(dry ? { skipped: plan.acciones.filter((a) => a.tipo === 'skip').map((a) => ({ path: a.path, motivo: a.motivo })) } : {}),
+    skipped: plan.acciones.filter((a) => a.tipo === 'skip').map((a) => ({ path: a.path, motivo: a.motivo })),
   }
 }
 

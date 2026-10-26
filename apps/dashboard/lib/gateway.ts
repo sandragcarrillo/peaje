@@ -131,13 +131,21 @@ export function listAgentRuns(slug: string, id: string) {
 
 // ---- tareas del agente Pro ----
 
-export type ResultadoBusqueda = { creadas: number; actualizadas: number; cerradas: number } | { error: 'too-soon'; retryInSeconds: number }
+/**
+ * Sin créditos para lo que se pidió (429, como la espera): `message` es el
+ * mismo texto que muestra el chat, con la fecha en que se renuevan.
+ * `retryInSeconds` es lo que falta para eso.
+ */
+export type SinCreditos = { error: 'not-enough-credits'; message: string; cost: number; remaining: number; renewsAt: string; retryInSeconds: number }
 
-/** Busca tareas nuevas. 429 no es error para la UI: trae cuánto esperar. */
-export async function buscarTareas(slug: string): Promise<ResultadoBusqueda> {
+export type ResultadoBusqueda = { creadas: number; actualizadas: number; cerradas: number } | { error: 'too-soon'; retryInSeconds: number } | SinCreditos
+
+/** Busca tareas nuevas. 429 no es error para la UI: trae cuánto esperar o el aviso de créditos. */
+export async function buscarTareas(slug: string, language: string): Promise<ResultadoBusqueda> {
   const res = await fetch(`${base}/_internal/${slug}/tasks/generate`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${secret}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ language }),
     cache: 'no-store',
   })
   const data = (await res.json()) as ResultadoBusqueda & { error?: string }
@@ -215,12 +223,17 @@ export function quitarPregunta(slug: string, id: string) {
   return internal<{ ok: boolean }>(`/${slug}/tasks/citations/prompts/${id}`, { method: 'DELETE' })
 }
 
-/** 429 trae cuánto esperar; no es error para la UI. */
-export async function medirCitacion(slug: string): Promise<{ error?: 'too-soon'; retryInSeconds?: number }> {
-  const res = await fetch(`${base}/_internal/${slug}/tasks/citations/run`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, cache: 'no-store' })
-  const data = (await res.json()) as { error?: string; retryInSeconds?: number }
+/** 429 trae cuánto esperar o el aviso de créditos; no es error para la UI. */
+export async function medirCitacion(slug: string, language: string): Promise<{ error?: 'too-soon' | 'not-enough-credits'; retryInSeconds?: number; message?: string }> {
+  const res = await fetch(`${base}/_internal/${slug}/tasks/citations/run`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ language }),
+    cache: 'no-store',
+  })
+  const data = (await res.json()) as { error?: string; retryInSeconds?: number; message?: string }
   if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
-  return data as { error?: 'too-soon'; retryInSeconds?: number }
+  return data as { error?: 'too-soon' | 'not-enough-credits'; retryInSeconds?: number; message?: string }
 }
 
 // ---- M7: comprador misterioso ----
@@ -231,12 +244,17 @@ export async function leerComprador(slug: string) {
   return (await internal<{ run: CorridaComprador | null }>(`/${slug}/mystery`)).run
 }
 
-/** Corre el comprador misterioso. 429 trae cuánto esperar; no es error para la UI. */
-export async function correrComprador(slug: string): Promise<{ run?: CorridaComprador; error?: 'too-soon'; retryInSeconds?: number }> {
-  const res = await fetch(`${base}/_internal/${slug}/mystery/run`, { method: 'POST', headers: { authorization: `Bearer ${secret}` }, cache: 'no-store' })
-  const data = (await res.json()) as { run?: CorridaComprador; error?: string; retryInSeconds?: number }
+/** Corre el comprador misterioso. 429 trae cuánto esperar o el aviso de créditos; no es error para la UI. */
+export async function correrComprador(slug: string, language: string): Promise<{ run?: CorridaComprador; error?: 'too-soon' | 'not-enough-credits'; retryInSeconds?: number; message?: string }> {
+  const res = await fetch(`${base}/_internal/${slug}/mystery/run`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ language }),
+    cache: 'no-store',
+  })
+  const data = (await res.json()) as { run?: CorridaComprador; error?: string; retryInSeconds?: number; message?: string }
   if (!res.ok && res.status !== 429) throw new Error(data.error ?? `Gateway respondió ${res.status}`)
-  return data as { run?: CorridaComprador; error?: 'too-soon'; retryInSeconds?: number }
+  return data as { run?: CorridaComprador; error?: 'too-soon' | 'not-enough-credits'; retryInSeconds?: number; message?: string }
 }
 // ---- fin M7 ----
 

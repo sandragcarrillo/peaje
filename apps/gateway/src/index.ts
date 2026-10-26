@@ -570,7 +570,8 @@ app.all('/:slug/*', async (c) => {
   const routes = await store.listRoutes(tenant.id)
   const match = matchRoute(routes, c.req.method, path)
 
-  if (!match) return proxyToOrigin(c.req.raw, tenant, path)
+  // Sin ruta, o una ruta con precio 0 (gratis, como un link gratis): directo al origen, sin 402.
+  if (!match || Number(match.route.priceUsd) <= 0) return proxyToOrigin(c.req.raw, tenant, path)
   marcarCobro(c.req.raw, { routeId: match.route.id, priceUsd: match.route.priceUsd })
   // Ver cobrar.ts: sin dirección de cobro no hay ofertas, y en los rieles de
   // contrato el pago se envía solo si el origen respondió sin 5xx.

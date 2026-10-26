@@ -245,7 +245,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             {d.verificaInicio}
             {d.verificar}
             {d.verificaFin}
-            <Link href={`/t/${tenant.slug}/score`} className="text-accent underline">
+            <Link href={`/t/${tenant.slug}`} className="text-accent underline">
               {d.verificaLink}
             </Link>
           </p>

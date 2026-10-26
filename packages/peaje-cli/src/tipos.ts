@@ -1,5 +1,6 @@
 /** Tipos del CLI. Los del kit vienen de shared para que nunca diverjan del gateway. */
 import type { Host, Kit } from '@peaje/shared'
+import type { Colision } from './colisiones'
 
 export type { Host, Kit }
 
@@ -45,15 +46,29 @@ export type Plan = {
   acciones: Accion[]
   manual: string[]
   next: string[]
+  /** Páginas o handlers propios del sitio que las reglas de Peaje van a tapar. */
+  colisiones?: Colision[]
 }
+
+export type { Colision }
 
 /** Lo que imprime `--json`: un único objeto, nada más en stdout. */
 export type Resultado = {
   ok: boolean
+  /** true en `plan` (y cuando `init` no pudo confirmar): no se escribió nada. */
+  dryRun: boolean
   stack: Stack
   host: Host | 'unknown'
+  /** Lo que se escribió. En dry-run va vacío: lo que se escribiría está en `wouldWrite`. */
   written: string[]
+  /** Lo que se movió a `.peaje-backup/`. En dry-run va vacío: ver `wouldMove`. */
   moved: string[]
+  /** Solo en dry-run: cada archivo que se crearía o editaría. */
+  wouldWrite?: string[]
+  /** Solo en dry-run: cada copia que se movería a `.peaje-backup/`. */
+  wouldMove?: string[]
+  /** Páginas propias del sitio que Peaje reemplaza en el dominio, con el aviso para el dueño. */
+  collisions: { path: string; file: string; kind: 'page' | 'route'; message: string }[]
   manual: string[]
   next: string[]
   /** Solo en dry-run: lo que se habría dejado como estaba y por qué. */

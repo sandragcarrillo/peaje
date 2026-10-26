@@ -258,3 +258,76 @@ test('capas: solo aeo trae Organization sin #api, robots sin 402 y nada del prox
   )
   assert.deepEqual(filtrados.map((c) => c.id), ['json-ld', 'robots', 'bots'])
 })
+
+test('INSTALL.md: plan primero, sí del dueño, init después; sin commit ni deploy sin permiso', () => {
+  const kit = construirKit({ slug: 'cafe-andino', nombre: 'Café Andino', originHost: 'cafeandino.com', base, ofertas, host: 'next' })
+  const md = installMd(kit)
+  const plan = md.indexOf('npx @peaje/cli@1 plan cafe-andino')
+  const init = md.indexOf('npx @peaje/cli@1 init cafe-andino --yes --json')
+  assert.ok(plan > 0 && init > plan, 'plan va antes que init')
+  assert.ok(md.includes('wait for a yes'))
+  assert.ok(md.includes('git diff'))
+  assert.ok(!md.includes('BEFORE reading any file') && !md.includes('Skip `peaje plan`') && !md.includes('Do not re-read'))
+  assert.ok(md.includes('6. Build. Ask the owner before committing or deploying.'))
+  assert.ok(!md.includes('Build, commit, deploy'))
+  // Antes del paso 1: los paths que Peaje toma, para revisar si el sitio ya los sirve.
+  const antes = md.slice(md.indexOf('## Steps'), md.indexOf('\n1. Proxy'))
+  for (const p of ['/docs', '/developers', '/mcp', '/r/*', '/checkout_sessions/*']) assert.ok(antes.includes(p), p)
+  assert.ok(antes.includes('ask before continuing'))
+  assert.ok(!md.includes('—'))
+  const aeo = installMd(construirKit({ slug: 's', nombre: 'S', originHost: 's.com', base, ofertas: [], capas: ['aeo'] }))
+  assert.ok(aeo.indexOf('plan s --only aeo') < aeo.indexOf('init s --only aeo --yes'))
+  assert.ok(!aeo.includes('Build, commit, deploy'))
+})
+
+test('robots.txt anuncia el cobro por MPP solo si hay algo con precio', () => {
+  assert.ok(!robotsTxt({ originHost: 'x.com' }).includes('MPP'))
+  assert.ok(robotsTxt({ originHost: 'x.com' }).startsWith('# Agents welcome.\n'))
+  assert.ok(robotsTxt({ originHost: 'x.com', rutasPagas: ['/r/menu'] }).includes('charges per request over MPP'))
+  assert.ok(robotsTxt({ originHost: 'x.com', cobra: true }).includes('charges per request over MPP'))
+  assert.ok(robotsTxt({ originHost: 'x.com', conPagos: false, cobra: true }).startsWith('# Answer engines welcome.'))
+  const sinNada = construirKit({ slug: 's', nombre: 'S', originHost: 's.com', base, ofertas: [{ titulo: 'Gratis', priceUsd: 0, url: `${base}/r/x` }] })
+  assert.ok(!sinNada.files.find((f) => f.path === 'public/robots.txt')!.content.includes('MPP'))
+  const conApi = construirKit({ slug: 's', nombre: 'S', originHost: 's.com', base, ofertas: [], patrones: [{ method: 'GET', path: '/api/x/:id' }] })
+  assert.ok(conApi.files.find((f) => f.path === 'public/robots.txt')!.content.includes('MPP'))
+})
+
+test('el kit avisa de rutas de API con precio fuera de los prefijos por defecto', () => {
+  const kit = construirKit({
+    slug: 's',
+    nombre: 'S',
+    originHost: 's.com',
+    base,
+    ofertas: [],
+    host: 'next',
+    patrones: [
+      { method: 'GET', path: '/api/x' },
+      { method: 'GET', path: '/weather/:city' },
+    ],
+  })
+  const m = kit.manual.find((x) => x.startsWith('Priced API routes outside'))
+  assert.ok(m?.includes('GET /weather/:city') && m.includes(`apiPrefixes: ['/api/', '/v1/', '/weather/']`))
+  assert.ok(!m?.includes('GET /api/x'))
+  const limpio = construirKit({ slug: 's', nombre: 'S', originHost: 's.com', base, ofertas: [], host: 'next', patrones: [{ method: 'GET', path: '/v1/x' }] })
+  assert.ok(!limpio.manual.some((x) => x.startsWith('Priced API routes outside')))
+})
+
+test('rutas de un solo segmento o reservadas: no se sugiere un prefijo que no serviría', () => {
+  const kit = construirKit({
+    slug: 's',
+    nombre: 'S',
+    originHost: 's.com',
+    base,
+    ofertas: [],
+    host: 'next',
+    patrones: [
+      { method: 'GET', path: '/about' },
+      { method: 'GET', path: '/login/x' },
+      { method: 'GET', path: '/weather/:city' },
+    ],
+  })
+  const sugerencia = kit.manual.find((x) => x.startsWith('Priced API routes outside'))!
+  assert.ok(sugerencia.includes(`apiPrefixes: ['/api/', '/v1/', '/weather/']`) && !sugerencia.includes('/about'))
+  const nunca = kit.manual.find((x) => x.startsWith('Priced routes that charge only at the gateway URL'))!
+  assert.ok(nunca.includes('GET /about') && nunca.includes('GET /login/x') && !nunca.includes('weather'))
+})

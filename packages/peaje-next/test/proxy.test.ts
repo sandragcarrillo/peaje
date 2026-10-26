@@ -37,3 +37,43 @@ test('lo que no es de Peaje sigue al middleware del sitio, y el bucle se corta',
 test('slug obligatorio', () => {
   assert.throws(() => peajeProxy({ slug: '' }))
 })
+
+test('la cookie del sitio no viaja al gateway; authorization sí', async () => {
+  const mw = peajeProxy({ slug, gateway })
+  const res = await mw(req('/llms.txt', { cookie: 'session=abc', authorization: 'Payment xyz' }), ev)
+  const lista = (res?.headers.get('x-middleware-override-headers') ?? '').split(',')
+  assert.ok(!lista.includes('cookie'))
+  assert.equal(res?.headers.get('x-middleware-request-cookie'), null)
+  assert.equal(res?.headers.get('x-middleware-request-authorization'), 'Payment xyz')
+})
+
+test('el manifiesto no agrega rutas fijas ni reenvía API fuera de apiPrefixes', async () => {
+  const { createServer } = await import('node:http')
+  const manifiesto = {
+    rutas: ['/llms.txt', '/login'],
+    prefijos: ['/r/', '/'],
+    patrones: [
+      { method: 'GET', path: '/api/forecast' },
+      { method: 'GET', path: '/login' },
+      { method: 'GET', path: '/weather/:city' },
+    ],
+  }
+  const server = createServer((_req, res) => {
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify(manifiesto))
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const { port } = server.address() as { port: number }
+  const gw = `http://127.0.0.1:${port}`
+  try {
+    const mw = peajeProxy({ slug, gateway: gw, secret: 'a'.repeat(64) })
+    assert.equal((await mw(req('/login'), ev))?.headers.get('x-middleware-rewrite') ?? null, null, '/login no se reenvía')
+    assert.equal((await mw(req('/blog/hola'), ev))?.headers.get('x-middleware-rewrite') ?? null, null)
+    assert.equal((await mw(req('/weather/bogota'), ev))?.headers.get('x-middleware-rewrite') ?? null, null)
+    assert.equal((await mw(req('/api/forecast'), ev))?.headers.get('x-middleware-rewrite'), `${gw}/${slug}/api/forecast`)
+    const propio = peajeProxy({ slug, gateway: gw, secret: 'a'.repeat(64), apiPrefixes: ['/weather/'] })
+    assert.equal((await propio(req('/weather/bogota'), ev))?.headers.get('x-middleware-rewrite'), `${gw}/${slug}/weather/bogota`)
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()))
+  }
+})

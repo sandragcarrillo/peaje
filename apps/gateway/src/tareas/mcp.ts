@@ -1,10 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import type { Tenant } from '@peaje/db'
+import { COSTOS_CREDITOS, type Tenant } from '@peaje/db'
 import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
-import { buscarTareas, tareaPublica, urlValida } from './router.js'
+import { buscarTareasDelDueno, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
 import { planConAvance } from './plan.js'
 
@@ -17,7 +17,7 @@ function texto(obj: unknown) {
   return { content: [{ type: 'text' as const, text: typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2) }] }
 }
 
-function construir(tenant: Tenant): McpServer {
+export function construir(tenant: Tenant): McpServer {
   const dominio = dominioVerificable(tenant.originUrl) ?? tenant.originUrl
   const server = new McpServer(
     { name: `peaje-${tenant.slug}`, version: '1.0.0' },
@@ -112,10 +112,17 @@ function construir(tenant: Tenant): McpServer {
     },
   )
 
+  // Con Pro cuesta lo mismo que pedírselo al agente de Peaje en el chat (créditos del mes).
   server.registerTool(
     'peaje_refresh_tasks',
-    { description: 'Ask Peaje to look for new tasks now (failing checks, pages answer engines would cite, routes agents asked for). At most once every 10 minutes.', inputSchema: {} },
-    async () => texto(await buscarTareas(tenant)),
+    {
+      description: `Ask Peaje to look for new tasks now (failing checks, pages answer engines would cite, routes agents asked for). At most once every 10 minutes. On the Pro plan it uses ${COSTOS_CREDITOS.informe} of the owner's monthly credits, the same as asking in the Peaje chat.`,
+      inputSchema: {},
+    },
+    async () => {
+      const r = await buscarTareasDelDueno(tenant, 'en', 'owner-mcp')
+      return 'error' in r && r.error === 'not-enough-credits' ? { ...texto(r), isError: true } : texto(r)
+    },
   )
 
   return server

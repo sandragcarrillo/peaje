@@ -207,6 +207,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               try {
                 const r = await medirAhora(slug)
                 if (r.error === 'too-soon') setMsj(t.citEspera(Math.ceil((r.retryInSeconds ?? 0) / 3600)))
+                else if (r.error === 'not-enough-credits') setMsj(r.message ?? null)
               } finally {
                 setMidiendo(false)
               }

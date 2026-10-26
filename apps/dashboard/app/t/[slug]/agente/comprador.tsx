@@ -23,6 +23,7 @@ export function CompradorPanel({ slug, run }: { slug: string; run: MysteryRun | 
       try {
         const r = await probarComprador(slug)
         if (r.error === 'too-soon') setMsj(t.compEspera(Math.ceil((r.retryInSeconds ?? 0) / 3600)))
+        else if (r.error === 'not-enough-credits') setMsj(r.message ?? null)
       } catch (e) {
         setMsj(e instanceof Error ? e.message : String(e))
       }

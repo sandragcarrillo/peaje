@@ -30,7 +30,7 @@ export const dinero = {
     // Mi wallet
     miWallet: 'Mi wallet',
     sinWalletNegocio: 'Este sitio no tiene wallet configurada.',
-    modoPruebaEtiqueta: 'MODO PRUEBA',
+    modoPruebaEtiqueta: 'Modo prueba',
     modoPrueba: 'Los agentes pagan con dinero de prueba. Sirve para comprobar que el cobro funciona; todavía no se puede cambiar por pesos ni dólares.',
     walletCustodiada: 'La wallet que Peaje creó para este negocio. Los pagos nuevos llegan a tu dirección de cobro.',
     walletExterna: 'Tu dirección de cobro es externa: los pagos llegan a una cuenta que manejas tú.',
@@ -81,7 +81,7 @@ export const dinero = {
     // Mi wallet
     miWallet: 'My wallet',
     sinWalletNegocio: 'This site has no wallet set up.',
-    modoPruebaEtiqueta: 'TEST MODE',
+    modoPruebaEtiqueta: 'Test mode',
     modoPrueba: 'Agents pay with test money. It proves charging works; it cannot be turned into dollars yet.',
     walletCustodiada: 'The wallet Peaje created for this business. New payments land in your payout address.',
     walletExterna: 'Your payout address is external: payments land in an account you control.',

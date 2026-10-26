@@ -1,17 +1,19 @@
-import { getDict } from '@/lib/i18n'
-import { prevision, type OraScore } from '@/lib/ora'
+import { textoDe, textoOk } from '@/app/radar/textos'
+import { getDict, getLocale } from '@/lib/i18n'
+import { prevision, type OraCheck, type OraScore } from '@/lib/ora'
 
 /**
  * Las dos columnas del score: lo que un agente ya encuentra en el sitio y lo
  * que el kit de Peaje desbloquea, con los puntos que suma cada cosa. Las usan
- * el score del dashboard y el radar público.
+ * Inicio del negocio (plegadas). Los nombres salen en palabras del dueño, en
+ * su idioma (los mismos textos del Radar), no los ids en inglés de Ora.
  */
 export async function ScoreColumnas({ score }: { score: OraScore }) {
-  const d = await getDict()
-  const bien: { id: string; name: string }[] = []
+  const [d, locale] = await Promise.all([getDict(), getLocale()])
+  const bien: OraCheck[] = []
   for (const layer of score.layers) {
     for (const check of layer.checks) {
-      if (check.status === 'pass') bien.push({ id: check.id, name: check.name })
+      if (check.status === 'pass' && !bien.some((b) => b.id === check.id)) bien.push(check)
     }
   }
   const arreglables = [...prevision(score).arreglables].sort(
@@ -27,14 +29,13 @@ export async function ScoreColumnas({ score }: { score: OraScore }) {
             {d.panel.scoreChecksOk(bien.length)}
           </span>
         </div>
-        <div className="scroll-thin flex max-h-96 flex-col divide-y divide-border/60 overflow-y-auto pr-1 font-mono text-xs">
+        <div className="scroll-thin flex max-h-96 flex-col divide-y divide-border/60 overflow-y-auto pr-1 text-sm">
           {bien.map((c) => (
-            <div key={c.id} className="flex items-center justify-between gap-2 py-2.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span aria-hidden className="h-1.5 w-1.5 shrink-0 bg-faint" />
-                <span className="truncate font-bold">{c.name}</span>
+            <div key={c.id} className="flex items-start justify-between gap-2 py-2.5">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-faint" />
+                <span>{textoOk(c, locale)}</span>
               </div>
-              <span className="shrink-0 bg-panel-2 px-1.5 py-0.5 font-bold">PASS</span>
             </div>
           ))}
         </div>
@@ -50,20 +51,18 @@ export async function ScoreColumnas({ score }: { score: OraScore }) {
         {arreglables.length === 0 ? (
           <p className="font-mono text-sm text-accent">{d.panel.scoreTodoPasa}</p>
         ) : (
-          <div className="scroll-thin flex max-h-96 flex-col divide-y divide-border/60 overflow-y-auto pr-1 font-mono text-xs">
+          <div className="scroll-thin flex max-h-96 flex-col divide-y divide-border/60 overflow-y-auto pr-1 text-sm">
             {arreglables.map((a) => (
-              <div key={a.check.id} className="flex items-center justify-between gap-2 py-2.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 bg-accent" />
-                  <span className="truncate">{a.check.name}</span>
+              <div key={a.check.id} className="flex items-start justify-between gap-2 py-2.5">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-accent" />
+                  <span>{textoDe(a.check, locale).titulo}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="font-bold text-accent">
+                  <span className="font-mono text-xs font-bold text-accent">
                     +{(a.check.estScoreGain ?? a.check.maxScore).toFixed(1)}
                   </span>
-                  <span className="border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted">
-                    {a.viaGateway ? 'gateway' : a.bloque}
-                  </span>
+                  {a.viaGateway ? <span className="font-mono text-[10px] text-muted">{d.radar.loPonePeaje}</span> : null}
                 </div>
               </div>
             ))}

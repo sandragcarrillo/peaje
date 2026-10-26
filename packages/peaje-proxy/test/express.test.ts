@@ -92,9 +92,9 @@ test('express: con express.json() antes, el body se reenvía serializado', async
 })
 
 test('express: respuesta gzip del gateway llega legible', async () => {
-  const res = await fetch(`${url}/gzip`)
+  const res = await fetch(`${url}/api/gzip`)
   assert.equal(res.status, 402)
-  assert.equal(((await res.json()) as Eco).path, `/${SLUG}/gzip`)
+  assert.equal(((await res.json()) as Eco).path, `/${SLUG}/api/gzip`)
 })
 
 test('express: HEAD a discovery no manda body', async () => {

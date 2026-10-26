@@ -85,9 +85,12 @@ test('sin secreto: las rutas de API no se reenvían y se avisa una sola vez', as
     assert.equal(await peaje(req('/api/forecast')), null)
     await peaje(req('/api/forecast'))
     await new Promise((r) => setTimeout(r, 20))
-    assert.equal(avisos.length, 1)
-    assert.match(avisos[0]!, /PEAJE_ORIGIN_SECRET is not set: GET \/api\/forecast, POST \/api\/batch\/\*, GET \/gzip/)
-    assert.ok(!avisos[0]!.includes('GET /*'), 'el patrón ancho no cuenta')
+    assert.equal(avisos.length, 2, 'uno por el secreto y uno por la ruta fuera de apiPrefixes, una sola vez')
+    const secreto = avisos.find((a) => a.includes('PEAJE_ORIGIN_SECRET'))!
+    assert.match(secreto, /PEAJE_ORIGIN_SECRET is not set: GET \/api\/forecast, POST \/api\/batch\/\*, GET \/api\/gzip\./)
+    assert.ok(!secreto.includes('GET /*'), 'el patrón ancho no cuenta')
+    const fuera = avisos.find((a) => a.includes('apiPrefixes'))!
+    assert.match(fuera, /outside apiPrefixes \(\/api\/, \/v1\/\).*GET \/weather\/:city\./)
   } finally {
     console.warn = original
   }
@@ -95,9 +98,9 @@ test('sin secreto: las rutas de API no se reenvían y se avisa una sola vez', as
 
 test('respuesta comprimida: el proxy saca content-encoding porque fetch ya descomprimió', async () => {
   const peaje = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO })
-  const res = await peaje(req('/gzip'))
+  const res = await peaje(req('/api/gzip'))
   assert.equal(res?.headers.get('content-encoding'), null)
-  assert.equal(((await res!.json()) as Eco).path, `/${SLUG}/gzip`)
+  assert.equal(((await res!.json()) as Eco).path, `/${SLUG}/api/gzip`)
 })
 
 test('gateway caído: discovery igual se reenvía con la lista de respaldo', async () => {
@@ -112,4 +115,21 @@ test('slug obligatorio y gateway por defecto', () => {
   delete process.env.PEAJE_GATEWAY_URL
   assert.equal(baseDe({ slug: 'x' }), `${GATEWAY_POR_DEFECTO}/x`)
   if (previo !== undefined) process.env.PEAJE_GATEWAY_URL = previo
+})
+
+test('el manifiesto no agrega rutas fijas, y las API fuera de apiPrefixes no se reenvían salvo que el dueño las declare', async () => {
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO })
+  assert.equal(await peaje(req('/login')), null, '/login viene en el manifiesto y se ignora')
+  assert.equal(await peaje(req('/weather/bogota')), null)
+  const conPrefijo = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO, apiPrefixes: ['/api/', '/weather/'] })
+  const res = await conPrefijo(req('/weather/bogota'))
+  assert.equal(((await res!.json()) as Eco).path, `/${SLUG}/weather/bogota`)
+})
+
+test('las cookies del sitio no viajan al gateway; authorization (la credencial MPP) sí', async () => {
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO })
+  const res = await peaje(req('/api/forecast', { headers: { cookie: 'session=abc', authorization: 'Payment xyz' } }))
+  const eco = (await res!.json()) as Eco
+  assert.equal(eco.cookie, null)
+  assert.equal(eco.authorization, 'Payment xyz')
 })

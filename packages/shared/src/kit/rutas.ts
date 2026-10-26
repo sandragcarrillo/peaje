@@ -49,6 +49,45 @@ export const RUTAS_DINAMICAS = [
 ] as const
 
 /**
+ * `/api/` y `/v1/`: los prefijos de las rutas con precio que los negocios
+ * tienen publicadas hoy (consulta agregada a `routes`, oct 2026). Otro
+ * prefijo se declara en código con `apiPrefixes`.
+ */
+export const PREFIJOS_API_POR_DEFECTO: readonly string[] = ['/api/', '/v1/']
+
+/**
+ * Paths de una app que ningún manifiesto puede reenviar, aunque caigan bajo un
+ * prefijo declarado (`/api/auth` es el de NextAuth). La raíz cuenta exacta;
+ * los demás, ellos y todo lo que cuelga.
+ */
+export const PATHS_RESERVADOS: readonly string[] = [
+  '/',
+  '/login',
+  '/logout',
+  '/signin',
+  '/signout',
+  '/signup',
+  '/sign-in',
+  '/sign-out',
+  '/sign-up',
+  '/register',
+  '/auth',
+  '/oauth',
+  '/session',
+  '/account',
+  '/admin',
+  '/dashboard',
+  '/_next',
+  '/_vercel',
+  '/api/auth',
+  '/static',
+  '/assets',
+  '/favicon.ico',
+  '/robots.txt',
+  '/sitemap.xml',
+]
+
+/**
  * `/llms.txt` lleva guarda: el gateway lee el llms.txt original del negocio
  * para fusionarlo, y sin la guarda el proxy lo devolvería al gateway en bucle.
  * El gateway también corta el bucle del lado suyo (si la request ya trae este
@@ -235,28 +274,56 @@ export function manifiestoProxy(base: string, version: string, patrones: Patron[
 }
 
 /**
- * El Worker lee la lista de rutas del manifiesto del gateway y la cachea en
- * el edge: cuando Peaje agrega una ruta, el sitio la reenvía en minutos sin
- * que nadie redespliegue nada. La lista embebida es el respaldo si el
- * manifiesto no responde. Es el único host donde esto es posible: Next,
- * Vercel, nginx y Caddy fijan las reglas en tiempo de build o de reload.
+ * El Worker lee del manifiesto del gateway las rutas de API con precio y las
+ * cachea en el edge: cuando el dueño publica una, el sitio la cobra en
+ * minutos sin redeploy. Las rutas fijas y los prefijos van embebidos y el
+ * manifiesto no los amplía; las de API solo pasan bajo `API_PREFIXES` y
+ * fuera de los paths reservados, igual que en `@peaje/next` y `@peaje/proxy`.
  */
 function cloudflare(base: string, c: Comentarios): string {
   const lista = RUTAS_PROXY.map((r) => `  '${r.path}',`).join('\n')
-  return `// Cloudflare Worker — ${c.titulo}
+  return `// Cloudflare Worker. ${c.titulo}
 // ${c.sub}
 const PEAJE = '${base}'
 const MANIFIESTO = PEAJE + '/kit/manifest.json'
 const MANIFIESTO_TTL_S = 300
 
-// Fallback list, used only while the manifest cannot be fetched.
+// The paths this Worker forwards. The manifest never adds to this list.
 const RUTAS = [
 ${lista}
 ]
 // ${c.rutaPaga}
 const PREFIJOS = [${RUTAS_DINAMICAS.map((r) => `'${r.prefijo}'`).join(', ')}]
+// Priced API routes from the manifest are forwarded only under these prefixes.
+// Edit the list if your API lives somewhere else.
+const API_PREFIXES = [${PREFIJOS_API_POR_DEFECTO.map((p) => `'${p}'`).join(', ')}]
+// Never forwarded, whatever the manifest says.
+const RESERVADOS = [${PATHS_RESERVADOS.map((p) => `'${p}'`).join(', ')}]
 
-let cache = { at: 0, rutas: RUTAS, prefijos: PREFIJOS, patrones: [] }
+let cache = { at: 0, patrones: [] }
+
+function reservado(pathname) {
+  const p = pathname.toLowerCase()
+  return RESERVADOS.some((r) => (r === '/' ? p === '/' : p === r || p.startsWith(r + '/')))
+}
+
+// A manifest route is forwarded only when it starts with one of API_PREFIXES,
+// written literally, and its literal part is not a reserved path.
+function permitido(patron) {
+  const segs = patron.split('/').filter(Boolean)
+  const literal = (s) => s !== '*' && !s.startsWith(':')
+  const bajo = API_PREFIXES.some((pre) => {
+    const ps = pre.split('/').filter(Boolean)
+    return segs.length > ps.length && ps.every((s, i) => literal(segs[i]) && segs[i].toLowerCase() === s)
+  })
+  if (!bajo) return false
+  const lit = []
+  for (const s of segs) {
+    if (!literal(s)) break
+    lit.push(s)
+  }
+  return !reservado('/' + lit.join('/'))
+}
 
 // Priced API routes from the manifest: ':param' matches one segment, a trailing '*' the rest.
 function coincide(patron, pathname) {
@@ -277,8 +344,8 @@ async function listas(ctx) {
   const refresco = fetch(MANIFIESTO, { cf: { cacheTtl: MANIFIESTO_TTL_S, cacheEverything: true } })
     .then((r) => (r.ok ? r.json() : null))
     .then((m) => {
-      if (m && Array.isArray(m.rutas) && Array.isArray(m.prefijos)) {
-        cache = { at: Date.now(), rutas: m.rutas, prefijos: m.prefijos, patrones: Array.isArray(m.patrones) ? m.patrones : [] }
+      if (m && Array.isArray(m.patrones)) {
+        cache = { at: Date.now(), patrones: m.patrones.filter((p) => p && typeof p.method === 'string' && typeof p.path === 'string') }
       } else {
         cache = { ...cache, at: Date.now() }
       }
@@ -300,15 +367,19 @@ export default {
     // goes to your origin; without the secret, priced API routes are not forwarded.
     const secreto = env && env.PEAJE_ORIGIN_SECRET
     if (secreto && request.headers.get('x-peaje-origin') === secreto) return fetch(request)
-    const { rutas, prefijos, patrones } = await listas(ctx)
     const esFetchDePeaje = request.headers.get('${PEAJE_FETCH_HEADER}') !== null
     const proxear =
-      (!esFetchDePeaje && rutas.includes(url.pathname)) ||
-      prefijos.some((p) => url.pathname.startsWith(p)) ||
-      (Boolean(secreto) && patrones.some((p) => p.method.toUpperCase() === request.method && coincide(p.path, url.pathname)))
+      (!esFetchDePeaje && RUTAS.includes(url.pathname)) ||
+      PREFIJOS.some((p) => url.pathname.startsWith(p)) ||
+      (Boolean(secreto) &&
+        !reservado(url.pathname) &&
+        API_PREFIXES.some((pre) => url.pathname.toLowerCase().startsWith(pre)) &&
+        (await listas(ctx)).patrones.some((p) => p.method.toUpperCase() === request.method && permitido(p.path) && coincide(p.path, url.pathname)))
     if (!proxear) return fetch(request)
     const destino = new URL(PEAJE + url.pathname + url.search)
     const headers = new Headers(request.headers)
+    // Your visitors' cookies stay on your domain: the gateway never reads them.
+    headers.delete('cookie')
     // The gateway rebuilds the 402 challenge URL from these: without them the
     // challenge names the gateway host and strict x402 clients abort.
     headers.set('x-forwarded-host', url.host)
@@ -341,7 +412,7 @@ ${comunes}
 ${comunes}
     }`,
   ).join('\n\n')
-  return `# nginx — ${c.titulo}
+  return `# nginx. ${c.titulo}
 # ${c.sub}
 server {
     # ... your current config ...
@@ -357,7 +428,7 @@ function caddy(base: string, c: Comentarios): string {
   const fijas = RUTAS_PROXY.filter((r) => r.path !== '/llms.txt').map((r) => r.path)
   const rutas = [...fijas, ...RUTAS_DINAMICAS.map((r) => `${r.prefijo}*`)].join(' ')
   const upstream = new URL(base).host
-  return `# Caddyfile — ${c.titulo}
+  return `# Caddyfile. ${c.titulo}
 # ${c.sub}
 yoursite.com {
     # ... your current config ...

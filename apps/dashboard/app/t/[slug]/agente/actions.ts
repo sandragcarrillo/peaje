@@ -19,7 +19,7 @@ export async function crearClaveAgente(slug: string): Promise<string> {
 
 export async function buscarTareasAhora(slug: string) {
   await requireTenant(slug)
-  const r = await buscarTareas(slug)
+  const r = await buscarTareas(slug, await getLocale())
   revalidatePath(`/t/${slug}/agente`)
   return r
 }
@@ -99,7 +99,7 @@ export async function borrarPregunta(slug: string, id: string) {
 
 export async function medirAhora(slug: string) {
   await requireTenant(slug)
-  const r = await medirCitacion(slug)
+  const r = await medirCitacion(slug, await getLocale())
   revalidatePath(`/t/${slug}/agente`)
   return r
 }
@@ -108,9 +108,9 @@ export async function medirAhora(slug: string) {
 export async function probarComprador(slug: string) {
   await requireTenant(slug)
   const { correrComprador } = await import('@/lib/gateway')
-  const r = await correrComprador(slug)
+  const r = await correrComprador(slug, await getLocale())
   revalidatePath(`/t/${slug}/agente`)
-  return { error: r.error, retryInSeconds: r.retryInSeconds }
+  return { error: r.error, retryInSeconds: r.retryInSeconds, message: r.message }
 }
 // ---- fin M7 ----
 

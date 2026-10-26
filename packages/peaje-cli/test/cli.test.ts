@@ -85,16 +85,20 @@ test('fixture 1: Next app router con rewrites() array y <head>', async () => {
   assert.ok(layout.includes(`import { PeajeHead } from '@peaje/next/head'`))
   // El import va después del import multilínea, no en medio.
   assert.ok(layout.indexOf(`from 'next/font/google'`) < layout.indexOf(`@peaje/next/head`))
-  assert.match(layout, /<head>\n\s+<PeajeHead slug="demo" \/>\n\s+<meta name="theme-color"/)
+  // Con originHost el layout queda estático: sin él PeajeHead lee headers() y todo se vuelve dinámico.
+  assert.match(layout, /<head>\n\s+<PeajeHead slug="demo" originHost="picsum.photos" \/>\n\s+<meta name="theme-color"/)
 
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/next'], '^0.2.1')
+  assert.equal(pkg.dependencies['@peaje/next'], '^0.3.0')
   assert.ok(resultado.next.some((n) => n.startsWith('pnpm add @peaje/next')))
 
-  // robots nuevo, snippets bajo peaje/, copia estática movida al backup
+  // robots nuevo, copia estática movida al backup. Con withPeaje y PeajeHead aplicados,
+  // los snippets de referencia sobran y no se escriben.
   assert.ok(existsSync(join(dir, 'public/robots.txt')))
-  assert.ok(existsSync(join(dir, 'peaje/next.config.ts')))
-  assert.ok(existsSync(join(dir, 'peaje/head.html')))
+  assert.ok(!existsSync(join(dir, 'peaje/next.config.ts')))
+  assert.ok(!existsSync(join(dir, 'peaje/head.html')))
+  assert.equal(resultado.dryRun, false)
+  assert.equal(resultado.wouldWrite, undefined)
   assert.ok(!existsSync(join(dir, 'public/openapi.json')))
   assert.ok(existsSync(join(dir, '.peaje-backup/T/public/openapi.json')))
   assert.deepEqual(resultado.moved, ['public/openapi.json -> .peaje-backup/T/public/openapi.json'])
@@ -118,7 +122,9 @@ test('fixture 2: config envuelta en withSentryConfig queda manual; layout sin <h
   assert.ok(resultado.manual.some((m) => m.includes('next.config.mjs') && m.includes('withPeaje')))
 
   const layout = readFileSync(join(dir, 'app/layout.tsx'), 'utf8')
-  assert.match(layout, /<html lang="en">\n(\s+)<head>\n\1  <PeajeHead slug="demo" \/>\n\1<\/head>\n\1<body className="dark">/)
+  assert.match(layout, /<html lang="en">\n(\s+)<head>\n\1  <PeajeHead slug="demo" originHost="picsum.photos" \/>\n\1<\/head>\n\1<body className="dark">/)
+  assert.ok(existsSync(join(dir, 'peaje/next.config.ts')), 'con la config sin envolver, el snippet sigue siendo la referencia')
+  assert.ok(!existsSync(join(dir, 'peaje/head.html')))
   assert.ok(layout.startsWith(`import './globals.css'\nimport { PeajeHead } from '@peaje/next/head'\n`))
 
   const robots2 = readFileSync(join(dir, 'public/robots.txt'), 'utf8')
@@ -159,7 +165,7 @@ test('fixture 4: Vite + vercel.json: middleware.js de Vercel con @peaje/proxy, s
   assert.ok(!resultado.manual.some((m) => m.includes('Merge peaje/vercel.txt')), 'el middleware ya cubre lo del vercel.json')
   assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.1')
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.2.0')
   assert.equal(pkg.dependencies['@vercel/functions'], undefined, 'el middleware no necesita @vercel/functions')
   assert.equal(pkg.devDependencies.vite, '^6.0.0', 'lo que había queda')
   assert.ok(resultado.next[0]?.startsWith('bun add @peaje/proxy   #'))
@@ -186,7 +192,7 @@ test('fixture 6: Express con entrada inequívoca: require + app.use justo despu�
   assert.ok(server.startsWith(`'use strict'\nconst { peajeExpress } = require('@peaje/proxy/express')\nconst express = require('express')`))
   assert.match(server, /const app = express\(\)\napp\.use\(peajeExpress\(\{ slug: "demo" \}\)\)\napp\.use\(express\.json\(\)\)/, 'antes del body parser')
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.1.1')
+  assert.equal(pkg.dependencies['@peaje/proxy'], '^0.2.0')
   assert.ok(resultado.next[0]?.startsWith('npm install @peaje/proxy '))
   assert.ok(resultado.manual.some((m) => m.startsWith('Set PEAJE_ORIGIN_SECRET')))
   assert.ok(!resultado.manual.some((m) => m.startsWith('Pick the ONE proxy file')), 'sin host conocido igual no hay archivo que elegir')
@@ -271,11 +277,15 @@ test('fixture 5: monorepo con dos apps aborta pidiendo --dir y lista candidatos'
   assert.ok(resultado.next.some((n) => n.startsWith('pnpm add')), 'el lockfile se busca hacia arriba')
 })
 
-test('plan (dry-run) no escribe nada y lista lo mismo', async () => {
+test('plan (dry-run) no escribe nada y lo planeado sale en wouldWrite y wouldMove', async () => {
   const dir = copia('next-app')
   const { resultado } = await init({ ...base, slug: 'demo', dir, dryRun: true })
-  assert.ok(resultado.written.includes('next.config.ts'))
-  assert.ok(resultado.moved.length === 1)
+  assert.equal(resultado.dryRun, true)
+  assert.deepEqual(resultado.written, [], 'nada se escribió')
+  assert.deepEqual(resultado.moved, [])
+  assert.ok(resultado.wouldWrite?.includes('next.config.ts'))
+  assert.ok(resultado.wouldMove?.length === 1)
+  assert.ok(Array.isArray(resultado.skipped))
   assert.ok(!readFileSync(join(dir, 'next.config.ts'), 'utf8').includes('withPeaje'))
   assert.ok(existsSync(join(dir, 'public/openapi.json')))
   assert.ok(!existsSync(join(dir, 'peaje')))
@@ -405,4 +415,60 @@ test('agregarDependencia inserta una sola línea sin reordenar el resto', () => 
   assert.ok(out.includes('    "@peaje/next": "^0.2.1",\n    "next": "15.3.0"'))
   assert.equal(JSON.parse(out).dependencies['@peaje/next'], '^0.2.1')
   assert.equal(agregarDependencia(out, '@peaje/next', '^0.2.1'), null)
+})
+
+test('colisiones: páginas propias que Peaje tapa, con route groups, pages router y handlers movidos', async () => {
+  const dir = copia('next-app')
+  const escribir = (rel: string, txt = 'export default function P() { return null }\n') => {
+    mkdirSync(join(dir, rel, '..'), { recursive: true })
+    writeFileSync(join(dir, rel), txt)
+  }
+  escribir('app/docs/page.tsx')
+  escribir('app/(marketing)/developers/page.mdx', '# Developers\n')
+  escribir('app/r/page.tsx') // sirve /r, que Peaje no toca
+  escribir('app/r/[id]/page.tsx')
+  escribir('app/mcp/route.ts', 'export async function GET() { return new Response("mine") }\n')
+  escribir('pages/pricing.md.tsx')
+  escribir('app/blog/page.tsx')
+  const { resultado } = await init({ ...base, slug: 'demo', dir, dryRun: true })
+  const por = Object.fromEntries(resultado.collisions.map((c) => [c.file, c]))
+  assert.equal(por['app/docs/page.tsx']?.path, '/docs')
+  assert.equal(
+    por['app/docs/page.tsx']?.message,
+    "app/docs/page.tsx already serves /docs. Peaje's rewrite takes precedence and replaces it with the Peaje developer portal. Move your page or tell the owner before deploying.",
+  )
+  assert.equal(por['app/(marketing)/developers/page.mdx']?.path, '/developers')
+  assert.equal(por['app/r/[id]/page.tsx']?.path, '/r/*')
+  assert.equal(por['app/r/page.tsx'], undefined)
+  assert.equal(por['pages/pricing.md.tsx']?.path, '/pricing.md')
+  assert.equal(por['app/mcp/route.ts']?.kind, 'route')
+  assert.match(por['app/mcp/route.ts']!.message, /init moves it to \.peaje-backup\//)
+  assert.ok(!resultado.collisions.some((c) => c.file.startsWith('app/blog')))
+  assert.ok(resultado.collisions.every((c) => !c.message.includes('—')))
+  // Con --only aeo no hay reglas que tapen nada.
+  const aeo = await init({ ...base, slug: 'demo', dir, dryRun: true, solo: 'aeo' })
+  assert.deepEqual(aeo.resultado.collisions, [])
+})
+
+test('PeajeHead que ya estaba sin originHost lo recibe; con originHost queda igual', () => {
+  const src = `export default function L({ children }) {\n  return (\n    <html>\n      <head>\n        <PeajeHead slug="demo" />\n      </head>\n      <body>{children}</body>\n    </html>\n  )\n}\n`
+  const r = insertarPeajeHead(src, 'demo', 'cafeandino.com')
+  assert.ok(r.ok && r.src.includes('<PeajeHead slug="demo" originHost="cafeandino.com" />'))
+  if (r.ok) assert.deepEqual(insertarPeajeHead(r.src, 'demo', 'cafeandino.com'), { ok: false, motivo: 'already' })
+  assert.deepEqual(insertarPeajeHead(src, 'demo'), { ok: false, motivo: 'already' }, 'sin host conocido no se toca')
+  const raro = insertarPeajeHead(`<html><head></head><body /></html>`, 'demo', 'x.com" onload="y')
+  assert.ok(raro.ok && raro.src.includes('<PeajeHead slug="demo" />'), 'un host con comillas no entra al JSX')
+})
+
+test('con Organization en el head del kit, peaje/head.html se escribe y se pide copiar solo ese nodo', async () => {
+  const dir = copia('next-app')
+  const conOrg: DescargarKit = async (gateway, slug, host, solo) => {
+    const kit = await descargarKit(gateway, slug, host, solo)
+    const org = JSON.stringify({ '@context': 'https://schema.org', '@graph': [{ '@type': 'Organization', name: 'Demo' }, { '@type': 'WebAPI', name: 'Demo' }] }, null, 2)
+    return { ...kit, files: kit.files.map((f) => (f.path === 'peaje/head.html' ? { ...f, content: `<script type="application/ld+json">\n${org}\n</script>` } : f)) }
+  }
+  const { resultado } = await init({ ...base, slug: 'demo', dir, descargarKit: conOrg })
+  assert.ok(existsSync(join(dir, 'peaje/head.html')))
+  assert.ok(!existsSync(join(dir, 'peaje/next.config.ts')))
+  assert.ok(resultado.manual.some((m) => m.includes('Copy only the Organization object from peaje/head.html') && m.includes('app/layout.tsx')))
 })

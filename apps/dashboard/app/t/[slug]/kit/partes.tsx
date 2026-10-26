@@ -91,12 +91,12 @@ export function ToggleBlock({
   )
 }
 
-export function BotonScore({ slug, label }: { slug: string; label: string }) {
+export function BotonScore({ slug, label, secundario = false }: { slug: string; label: string; secundario?: boolean }) {
   const { kit: d } = useDict()
   const [estado, setEstado] = useState<'idle' | 'corriendo' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className={`flex flex-col gap-1 ${secundario ? 'items-start' : 'items-end'}`}>
       <button
         disabled={estado === 'corriendo'}
         onClick={async () => {
@@ -111,7 +111,7 @@ export function BotonScore({ slug, label }: { slug: string; label: string }) {
             setEstado('idle')
           }
         }}
-        className="btn btn-primario btn-chico shrink-0"
+        className={`btn ${secundario ? 'btn-secundario' : 'btn-primario'} btn-chico shrink-0`}
       >
         {estado === 'corriendo' ? d.escaneando : label}
       </button>

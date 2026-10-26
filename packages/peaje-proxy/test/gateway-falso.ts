@@ -1,7 +1,7 @@
 /**
  * Gateway de mentira: sirve el manifiesto y contesta 402 a todo lo demás bajo
  * `/{slug}/`, con un JSON que cuenta qué le llegó (método, path, query, body y
- * los headers que importan). `/{slug}/gzip` responde comprimido para probar
+ * los headers que importan). `/{slug}/api/gzip` responde comprimido para probar
  * que el proxy no reenvía un content-encoding que ya no es cierto.
  */
 import { createServer, type Server } from 'node:http'
@@ -14,12 +14,15 @@ export const SECRETO = 'a'.repeat(64)
 export const MANIFIESTO = {
   version: 'test',
   base: '',
-  rutas: ['/llms.txt', '/openapi.json', '/mcp'],
+  // `/login` de más: desde 0.2.0 las fijas salen del paquete y el manifiesto no las amplía.
+  rutas: ['/llms.txt', '/openapi.json', '/mcp', '/login'],
   prefijos: ['/r/'],
   patrones: [
     { method: 'GET', path: '/api/forecast' },
     { method: 'POST', path: '/api/batch/*' },
-    { method: 'GET', path: '/gzip' },
+    { method: 'GET', path: '/api/gzip' },
+    // Fuera de /api/ y /v1/: desde 0.2.0 no se reenvía aunque el manifiesto la traiga.
+    { method: 'GET', path: '/weather/:city' },
     // Demasiado ancho: el proxy nunca lo reenvía desde el sitio.
     { method: 'GET', path: '/*' },
   ],
@@ -34,6 +37,8 @@ export type Eco = {
   forwardedProto: string | null
   peajeHost: string | null
   origin: string | null
+  cookie: string | null
+  authorization: string | null
 }
 
 export async function levantarGateway(): Promise<{ url: string; cerrar: () => Promise<void>; pedidos: string[] }> {
@@ -58,12 +63,14 @@ export async function levantarGateway(): Promise<{ url: string; cerrar: () => Pr
         forwardedProto: (req.headers['x-forwarded-proto'] as string | undefined) ?? null,
         peajeHost: (req.headers['x-peaje-forwarded-host'] as string | undefined) ?? null,
         origin: (req.headers['x-peaje-origin'] as string | undefined) ?? null,
+        cookie: (req.headers.cookie as string | undefined) ?? null,
+        authorization: (req.headers.authorization as string | undefined) ?? null,
       }
       const json = Buffer.from(JSON.stringify(eco))
       res.statusCode = 402
       res.setHeader('content-type', 'application/json')
       res.setHeader('www-authenticate', 'Payment realm="test"')
-      if (u.pathname === `/${SLUG}/gzip`) {
+      if (u.pathname === `/${SLUG}/api/gzip`) {
         res.setHeader('content-encoding', 'gzip')
         res.end(gzipSync(json))
         return

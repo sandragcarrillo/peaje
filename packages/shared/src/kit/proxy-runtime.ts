@@ -1,4 +1,12 @@
-import { PEAJE_FETCH_HEADER, type ManifiestoProxy, type Patron } from './rutas'
+import {
+  PATHS_RESERVADOS,
+  PEAJE_FETCH_HEADER,
+  PREFIJOS_API_POR_DEFECTO,
+  RUTAS_DINAMICAS,
+  RUTAS_PROXY,
+  type ManifiestoProxy,
+  type Patron,
+} from './rutas'
 
 /**
  * Núcleo del proxy en tiempo de ejecución, sin framework: decide si una
@@ -7,7 +15,15 @@ import { PEAJE_FETCH_HEADER, type ManifiestoProxy, type Patron } from './rutas'
  * Lo usan `@peaje/next/proxy` (middleware de Next) y cualquier servidor con
  * `Request`/`Response` estándar (Hono, Express con un adaptador, Astro,
  * SvelteKit). Lee `/kit/manifest.json` del gateway y lo cachea; cuando el
- * dueño publica una ruta nueva, el sitio la reenvía en un minuto sin redeploy.
+ * dueño publica una ruta de API nueva, el sitio la reenvía en un minuto sin
+ * redeploy.
+ *
+ * Lo que el manifiesto NO puede hacer: agregar rutas fijas o prefijos (salen
+ * solo de la lista que viene con el paquete), reenviar rutas de API fuera de
+ * los prefijos que el dueño declaró en código (`prefijosApi`, por defecto
+ * `/api/` y `/v1/`) ni tocar los paths reservados de una app (raíz, login,
+ * auth, `/_next`). Un gateway comprometido o con un bug no puede tapar
+ * páginas del sitio.
  *
  * Bucle y paywall: una ruta de API con precio vive en el mismo sitio al que
  * el gateway reenvía después del pago. El gateway manda `x-peaje-origin` con
@@ -47,14 +63,74 @@ export type OpcionesProxyRuntime = {
   ttlMs?: number
   /** Para tests: reemplaza el fetch global. */
   fetchImpl?: typeof fetch
-  /** Respaldo mientras el manifiesto no responde (la lista fija del kit). */
-  respaldo?: Pick<ManifiestoProxy, 'rutas' | 'prefijos' | 'patrones'>
+  /**
+   * Las rutas fijas (`/llms.txt`, `/mcp`...) y los prefijos de links (`/r/`).
+   * Por defecto la lista que viene con el paquete. El manifiesto nunca la
+   * amplía: lo que traiga de más se ignora.
+   */
+  fijas?: { rutas: readonly string[]; prefijos: readonly string[] }
   /**
    * PEAJE_ORIGIN_SECRET del negocio. Sin él solo se reenvían los archivos de
    * discovery y los links `/r/`: las rutas de API con precio necesitan saber
    * distinguir al gateway de un agente que se hace pasar por él.
    */
   secreto?: string | null
+  /**
+   * Prefijos bajo los que viven las rutas de API con precio del negocio
+   * (`apiPrefixes` en los paquetes publicados). Una ruta del manifiesto fuera
+   * de ellos no se reenvía desde el dominio; sigue cobrando en la URL del
+   * gateway. Por defecto `PREFIJOS_API_POR_DEFECTO`.
+   */
+  prefijosApi?: readonly string[]
+}
+
+/**
+ * Headers que no viajan del sitio al gateway. Las cookies del dominio del
+ * negocio (la sesión de quien navega) no le sirven al gateway y no tienen por
+ * qué salir del sitio; `authorization` sí viaja: ahí va la credencial MPP.
+ */
+export const HEADERS_NO_REENVIADOS: readonly string[] = ['cookie']
+
+/** Path canónico en minúsculas contra la lista de reservados. */
+export function esReservado(path: string): boolean {
+  const canon = pathCanonico(path).toLowerCase()
+  return PATHS_RESERVADOS.some((r) => (r === '/' ? canon === '/' : canon === r || canon.startsWith(`${r}/`)))
+}
+
+/** Los prefijos declarados como `/x/`, canónicos y en minúsculas, sin la raíz ni los reservados. */
+export function prefijosApiValidos(prefijos: readonly string[] = PREFIJOS_API_POR_DEFECTO): string[] {
+  const out: string[] = []
+  for (const crudo of prefijos) {
+    const segs = segmentosCanonicos(String(crudo ?? '')).map((s) => s.toLowerCase())
+    if (segs.length === 0) continue
+    const path = `/${segs.join('/')}`
+    if (esReservado(path)) continue
+    if (!out.includes(`${path}/`)) out.push(`${path}/`)
+  }
+  return out
+}
+
+/**
+ * Una ruta del manifiesto que el sitio puede reenviar: concreta (no `/*` ni
+ * `/:x` a la raíz), que empieza con todos los segmentos de un prefijo
+ * declarado escritos literales y sigue con al menos uno más, y cuyo tramo
+ * literal no es un path reservado (`/api/auth/*` no pasa).
+ */
+export function patronPermitido(patron: string, prefijos: readonly string[]): boolean {
+  if (!patronReenviable(patron)) return false
+  const segs = patron.split('/').filter(Boolean)
+  const literal = (s: string) => s !== '*' && !s.startsWith(':')
+  const bajoPrefijo = prefijos.some((pre) => {
+    const ps = pre.split('/').filter(Boolean)
+    return segs.length > ps.length && ps.every((s, i) => literal(segs[i]!) && segs[i]!.toLowerCase() === s)
+  })
+  if (!bajoPrefijo) return false
+  const literales: string[] = []
+  for (const s of segs) {
+    if (!literal(s)) break
+    literales.push(s)
+  }
+  return !esReservado(`/${literales.join('/')}`)
 }
 
 /**
@@ -122,12 +198,11 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
   const base = opciones.base.replace(/\/+$/, '')
   const ttl = opciones.ttlMs ?? 60_000
   const fetchImpl = opciones.fetchImpl ?? fetch
-  let cache: { at: number; rutas: string[]; prefijos: string[]; patrones: Patron[] } = {
-    at: 0,
-    rutas: opciones.respaldo?.rutas ?? [],
-    prefijos: opciones.respaldo?.prefijos ?? [],
-    patrones: opciones.respaldo?.patrones ?? [],
-  }
+  // Las fijas salen del paquete, nunca del manifiesto.
+  const rutas = [...(opciones.fijas?.rutas ?? RUTAS_PROXY.map((r) => r.path))]
+  const prefijos = [...(opciones.fijas?.prefijos ?? RUTAS_DINAMICAS.map((r) => r.prefijo))]
+  const prefijosApi = prefijosApiValidos(opciones.prefijosApi ?? PREFIJOS_API_POR_DEFECTO)
+  let cache: { at: number; patrones: Patron[] } = { at: 0, patrones: [] }
   let refrescando: Promise<void> | null = null
 
   async function refrescar(): Promise<void> {
@@ -135,12 +210,12 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
       const res = await fetchImpl(`${base}/kit/manifest.json`, { signal: AbortSignal.timeout(5_000) })
       if (!res.ok) throw new Error(String(res.status))
       const m = (await res.json()) as Partial<ManifiestoProxy>
-      cache = {
-        at: Date.now(),
-        rutas: Array.isArray(m.rutas) ? m.rutas : cache.rutas,
-        prefijos: Array.isArray(m.prefijos) ? m.prefijos : cache.prefijos,
-        patrones: Array.isArray(m.patrones) ? m.patrones : cache.patrones,
-      }
+      // Del manifiesto solo se leen las rutas de API (`rutas` y `prefijos` se
+      // ignoran), y solo las que tienen forma válida.
+      const patrones = Array.isArray(m.patrones)
+        ? m.patrones.filter((p): p is Patron => typeof p?.method === 'string' && typeof p?.path === 'string')
+        : cache.patrones
+      cache = { at: Date.now(), patrones }
     } catch {
       // Sin manifiesto seguimos con lo que había; se reintenta al vencer el TTL.
       cache = { ...cache, at: Date.now() }
@@ -149,21 +224,27 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
     }
   }
 
-  async function listas() {
+  async function patrones(): Promise<Patron[]> {
     const vencido = Date.now() - cache.at >= ttl
     if (vencido) {
       refrescando ??= refrescar()
       // La primera vez esperamos; después el refresco corre al costado.
       if (cache.at === 0) await refrescando
     }
-    return cache
+    return cache.patrones
   }
 
   return {
+    /** Los prefijos de API efectivos, normalizados (para los avisos). */
+    prefijosApi,
     /** Rutas de API con precio que este sitio no puede cobrar por falta de secreto. */
     async sinSecreto(): Promise<Patron[]> {
       if (opciones.secreto) return []
-      return (await listas()).patrones.filter((p) => patronReenviable(p.path))
+      return (await patrones()).filter((p) => patronPermitido(p.path, prefijosApi))
+    },
+    /** Rutas de API con precio que no se reenvían por caer fuera de `prefijosApi` o en un path reservado. */
+    async fueraDePrefijos(): Promise<Patron[]> {
+      return (await patrones()).filter((p) => patronReenviable(p.path) && !patronPermitido(p.path, prefijosApi))
     },
     /** Fuerza la carga del manifiesto (útil al arrancar o en tests). */
     cargar: () => (refrescando ??= refrescar()),
@@ -176,16 +257,21 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
       // El gateway entregando una request ya pagada: pasa al handler del sitio.
       const prueba = input.headers.get(PEAJE_ORIGIN_HEADER)
       if (secreto && prueba && iguales(prueba, secreto)) return null
-      const { rutas, prefijos, patrones } = await listas()
       const path = input.pathname
       const canon = pathCanonico(path).toLowerCase()
       const esFetchDePeaje = input.headers.get(PEAJE_FETCH_HEADER) !== null
       const fija = (rutas.includes(path) || rutas.some((r) => r.toLowerCase() === canon)) && !(canon === '/llms.txt' && esFetchDePeaje)
       const prefijo = prefijos.some((p) => path.startsWith(p) || canon.startsWith(p.toLowerCase()))
-      const method = input.method.toUpperCase()
-      const patron =
-        secreto !== null &&
-        patrones.some((p) => p.method.toUpperCase() === method && patronReenviable(p.path) && coincidePatron(p.path, path))
+      let patron = false
+      // Rutas de API: solo con secreto, solo bajo un prefijo declarado (la
+      // request, no solo el patrón: `/api/*` no alcanza a `/api` pelado) y
+      // nunca en un path reservado.
+      if (!fija && !prefijo && secreto !== null && !esReservado(path) && prefijosApi.some((pre) => canon.startsWith(pre))) {
+        const method = input.method.toUpperCase()
+        patron = (await patrones()).some(
+          (p) => p.method.toUpperCase() === method && patronPermitido(p.path, prefijosApi) && coincidePatron(p.path, path),
+        )
+      }
       if (!fija && !prefijo && !patron) return null
       return { destino: `${base}${path}${input.search ?? ''}` }
     },

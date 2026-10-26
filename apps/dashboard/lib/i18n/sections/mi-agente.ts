@@ -14,6 +14,8 @@ export const miAgente = {
     claudeCode: 'Claude Code',
     cursor: 'Cursor (.cursor/mcp.json)',
     terminal: 'Sin MCP, desde la terminal',
+    terminalNota: 'El CLI lee la clave de la variable PEAJE_AGENT_KEY: antes, export PEAJE_AGENT_KEY=<tu clave>.',
+    claveVariable: 'Tu clave, como variable de entorno',
     placeholderClave: '<tu clave>',
     tareas: 'Tareas',
     buscar: 'Buscar tareas ahora',
@@ -282,7 +284,8 @@ export const miAgente = {
     // ---- Paddle: suscripción con tarjeta ----
     planCobroTarjeta:
       'Se paga con tarjeta cada mes y se renueva sola hasta que la canceles. Paddle procesa el pago como Merchant of Record y te manda el recibo por correo.',
-    planSuscribirme: (nombre: string, usd: number) => `Suscribirme a ${nombre} · US$${usd} al mes`,
+    planSuscribirme: (nombre: string, usd: number) => `Suscribirme a ${nombre} · US${usd} al mes`,
+    planSuscribirmeCorto: (nombre: string) => `Suscribirme a ${nombre}`,
     planAbriendo: 'Abriendo el pago…',
     planCheckoutListo: 'Pago recibido. Tu plan se activa en unos segundos y Paddle te manda el recibo por correo.',
     planCheckoutError: 'No pudimos abrir el pago. Prueba otra vez en un momento.',
@@ -348,6 +351,8 @@ export const miAgente = {
     claudeCode: 'Claude Code',
     cursor: 'Cursor (.cursor/mcp.json)',
     terminal: 'Without MCP, from the terminal',
+    terminalNota: 'The CLI reads the key from the PEAJE_AGENT_KEY variable: first, export PEAJE_AGENT_KEY=<your key>.',
+    claveVariable: 'Your key, as an environment variable',
     placeholderClave: '<your key>',
     tareas: 'Tasks',
     buscar: 'Look for tasks now',
@@ -616,7 +621,8 @@ export const miAgente = {
     // ---- Paddle: card subscription ----
     planCobroTarjeta:
       'Paid by card every month, and it renews automatically until you cancel. Paddle processes the payment as Merchant of Record and emails you the receipt.',
-    planSuscribirme: (nombre: string, usd: number) => `Subscribe to ${nombre} · US$${usd} a month`,
+    planSuscribirme: (nombre: string, usd: number) => `Subscribe to ${nombre} · US${usd} a month`,
+    planSuscribirmeCorto: (nombre: string) => `Subscribe to ${nombre}`,
     planAbriendo: 'Opening checkout…',
     planCheckoutListo: 'Payment received. Your plan turns on in a few seconds and Paddle emails you the receipt.',
     planCheckoutError: 'We could not open checkout. Try again in a moment.',

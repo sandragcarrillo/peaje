@@ -15,7 +15,7 @@
  * request no pasa por la función, Vercel la reescribe al gateway (método,
  * body y query intactos). Con un middleware propio: `peaje({ slug }, tuyo)`.
  */
-import { PEAJE_HOST_HEADER } from '@peaje/shared'
+import { HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER } from '@peaje/shared'
 import { crearPeaje, type OpcionesPeaje } from './index'
 
 export type { OpcionesPeaje } from './index'
@@ -47,6 +47,9 @@ export function peajeVercel(opciones: OpcionesPeaje, siguiente?: MiddlewareVerce
       // El gateway arma la URL del 402 con estos headers: sin ellos el
       // challenge nombra al gateway y los clientes x402 estrictos abortan.
       const headers = new Headers(request.headers)
+      // Las cookies del sitio no salen hacia el gateway: el override de headers
+      // deja fuera todo lo que no está en la lista.
+      for (const h of HEADERS_NO_REENVIADOS) headers.delete(h)
       headers.set('x-forwarded-host', url.host)
       // Railway (donde corre el gateway) pisa X-Forwarded-Host: el host del negocio va también acá.
       headers.set(PEAJE_HOST_HEADER, url.host)

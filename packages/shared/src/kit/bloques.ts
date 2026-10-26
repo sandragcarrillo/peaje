@@ -210,18 +210,27 @@ export type OpcionesRobots = {
   conPagos?: boolean
   /** Rutas que devuelven 402: no tiene sentido que un bot de búsqueda las indexe. */
   rutasPagas?: string[]
+  /**
+   * El sitio cobra algo aunque `rutasPagas` venga vacío (rutas de API con
+   * patrón, que no son una URL para listar). Por defecto: hay `rutasPagas`.
+   */
+  cobra?: boolean
   /** Bloquear los bots de entrenamiento sin tocar los de búsqueda. */
   sinEntrenamiento?: boolean
 }
 
-export function robotsTxt({ originHost, rutasPagas = [], sinEntrenamiento = false, conPagos = true }: OpcionesRobots): string {
+export function robotsTxt({ originHost, rutasPagas = [], sinEntrenamiento = false, conPagos = true, cobra }: OpcionesRobots): string {
   const pagas = conPagos ? rutasPagas : []
+  // Sin nada con precio no se anuncia el cobro: el robots diría algo falso.
+  const anunciaCobro = conPagos && (cobra ?? pagas.length > 0)
   const bloqueBusqueda = BOTS_BUSQUEDA.map((b) => `User-agent: ${b}`).join('\n')
   const disallowPagas = pagas.map((p) => `Disallow: ${p}`).join('\n')
   const partes = [
-    conPagos
+    anunciaCobro
       ? `# Agents welcome. This site charges per request over MPP (HTTP 402).`
-      : `# Answer engines welcome.`,
+      : conPagos
+        ? `# Agents welcome.`
+        : `# Answer engines welcome.`,
     `# Answer engines: allowed by name so a stricter default never locks them out.`,
     `${bloqueBusqueda}\nAllow: /${disallowPagas ? `\n# Paid endpoints answer 402: nothing to index there.\n${disallowPagas}` : ''}`,
   ]

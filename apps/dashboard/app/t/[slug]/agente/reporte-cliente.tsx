@@ -23,7 +23,7 @@ export function BuscarOportunidades({ slug }: { slug: string }) {
             setMsj(null)
             try {
               const r = await buscarTareasAhora(slug)
-              setMsj('error' in r ? t.opBuscarEspera(r.retryInSeconds) : t.opBuscarResultado(r.creadas, r.actualizadas))
+              setMsj('error' in r ? (r.error === 'not-enough-credits' ? r.message : t.opBuscarEspera(r.retryInSeconds)) : t.opBuscarResultado(r.creadas, r.actualizadas))
               router.refresh()
             } catch (e) {
               setMsj(e instanceof Error ? e.message : String(e))

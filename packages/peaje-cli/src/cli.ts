@@ -70,6 +70,12 @@ function imprimirPlan(det: Deteccion, host: Host | 'unknown', plan: Plan, encabe
   console.log(`${encabezado}: ${det.stack}${router}, host ${host}, in ${mostrarRuta(det.dir)}`)
   if (det.candidatos.length === 1) console.log(`  (only package with a framework in this workspace)`)
   console.log('')
+  const colisiones = plan.colisiones ?? []
+  if (colisiones.length > 0) {
+    console.log('Warning: pages of this site that Peaje replaces on your domain:')
+    for (const c of colisiones) console.log(`  ! ${c.message}`)
+    console.log('')
+  }
   const cambios = plan.acciones.filter((a) => a.tipo !== 'skip')
   if (cambios.length > 0) {
     console.log('Files:')

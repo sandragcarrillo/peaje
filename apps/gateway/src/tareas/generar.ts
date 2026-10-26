@@ -35,11 +35,12 @@ function promptFix(tenant: Tenant, c: Chequeo, soloAeo: boolean): string {
     '',
     '## What to do',
     '',
-    `1. In the root of this site's repo, run \`${CLI} init ${tenant.slug}${soloAeo ? ' --only aeo' : ''} --yes\`. It detects the stack and applies only what is missing.`,
-    '2. Apply anything it lists under "Still manual".',
-    '3. Deploy.',
-    `4. Run \`${CLI} verify ${tenant.slug} --wait 600\` until it passes.`,
-    '5. Mark this task done. Peaje runs the same check and closes it.',
+    `1. In the root of this site's repo, run \`${CLI} plan ${tenant.slug}${soloAeo ? ' --only aeo' : ''}\`. It writes nothing and lists every file it would create, edit or move, plus any page of the site that Peaje would replace.`,
+    `2. Show that list to the owner and wait for a yes. With the yes, run \`${CLI} init ${tenant.slug}${soloAeo ? ' --only aeo' : ''} --yes\` and review the change with \`git diff\`.`,
+    '3. Apply anything it lists under "Still manual".',
+    '4. Ask the owner before committing or deploying.',
+    `5. After the deploy, run \`${CLI} verify ${tenant.slug} --wait 600\` until it passes.`,
+    '6. Mark this task done. Peaje runs the same check and closes it.',
   ].join('\n')
 }
 
