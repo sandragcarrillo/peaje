@@ -4,9 +4,6 @@ import type { Tenant } from '@peaje/db'
 import { CHAIN_LABELS, NETWORK_IDS, PEAJE_FETCH_HEADER, PEAJE_HOST_HEADER } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
-import { agentCard } from './agents/erc8004.js'
-import { agentsRouter } from './agents/router.js'
-import { iniciarScheduler } from './agents/scheduler.js'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
 import { iniciarTrabajos } from './tareas/trabajos.js'
 import { usdcStatus } from './chainlink.js'
@@ -163,7 +160,6 @@ app.get('/:slug/openapi.json', async (c) => {
 // El ledger interno vive en el router interno: comparte su middleware de
 // auth (antes estaba acá afuera y quedaba expuesto sin token).
 app.route('/_internal', interno)
-app.route('/_internal', agentsRouter)
 app.route('/_internal', rutasRouter)
 // ---- M7: comprador misterioso ----
 app.route('/_internal', compradorRouter)
@@ -450,19 +446,6 @@ function cabecerasAcp(c: Context): Record<string, string> {
 }
 
 /**
- * Agent card de un agente comprador (ERC-8004). Es el `agentURI` del registro:
- * pública a propósito, la leen el registro y cualquier agente que quiera saber
- * quién es el que le está comprando.
- */
-app.get('/:slug/agents/:id/card.json', async (c) => {
-  const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
-  const agent = await store.getAgent(c.req.param('id'))
-  if (!agent || agent.tenantId !== tenant.id) return c.json({ error: 'Agente no encontrado' }, 404)
-  return c.json(agentCard(tenant, agent))
-})
-
-/**
  * MCP por tenant: las rutas con precio del tenant expuestas como tools pagas
  * sobre Streamable HTTP. Un agente MCP las descubre, paga por JSON-RPC y
  * recibe el recurso, sin conocer la API HTTP.
@@ -595,6 +578,5 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
   const rieles = Object.entries(env.settlementV3).filter(([, dir]) => dir).map(([red]) => red)
   if (rieles.length && !relayerAddress) console.error('[gateway] hay PeajeSettlementV3 configurado pero falta RELAYER_PRIVATE_KEY: esos rieles no ofrecen nada')
   else console.log(`[gateway] PeajeSettlementV3: ${rieles.join(', ') || 'ninguno'} · relayer ${relayerAddress ?? '-'}`)
-  iniciarScheduler()
   iniciarTrabajos()
 })
