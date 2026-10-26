@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { money, RAILS_LABEL } from '@/lib/config'
+import { money } from '@/lib/config'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -44,9 +44,9 @@ export default async function Negocios() {
       </section>
 
       {/* Barra de métricas agregadas */}
-      <section className="grid grid-cols-2 divide-x divide-border border border-border bg-bg lg:grid-cols-4">
+      <section className="grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <div className="flex flex-col p-5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <span className="etiqueta text-muted">
             {d.acceso.negociosRegistrados}
           </span>
           <span className="mt-2 text-3xl font-bold tabular-nums">
@@ -58,27 +58,18 @@ export default async function Negocios() {
           </span>
         </div>
         <div className="flex flex-col p-5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <span className="etiqueta text-muted">
             {d.acceso.negociosCobrado}
           </span>
           <span className="mt-2 text-3xl font-bold text-accent tabular-nums">
             {money(totalCobrado)}
           </span>
-          <span className="mt-1 font-mono text-[10px] text-muted">MPP · 402</span>
         </div>
         <div className="flex flex-col p-5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <span className="etiqueta text-muted">
             {d.acceso.negociosLinks}
           </span>
           <span className="mt-2 text-3xl font-bold tabular-nums">{totalLinks}</span>
-          <span className="mt-1 font-mono text-[10px] text-muted">402</span>
-        </div>
-        <div className="flex flex-col p-5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-            {d.acceso.negociosPayouts}
-          </span>
-          <span className="mt-2 text-3xl font-bold tabular-nums">98%</span>
-          <span className="mt-1 font-mono text-[10px] text-muted">{RAILS_LABEL}</span>
         </div>
       </section>
 
@@ -101,7 +92,7 @@ export default async function Negocios() {
 
               <div className="mt-4 grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                 <div className="p-4">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <span className="etiqueta text-muted">
                     {d.acceso.negociosDisponible}
                   </span>
                   <p className="mt-1.5 text-2xl font-bold tabular-nums">
@@ -109,13 +100,13 @@ export default async function Negocios() {
                   </p>
                 </div>
                 <div className="p-4">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <span className="etiqueta text-muted">
                     {d.acceso.negociosRequests}
                   </span>
                   <p className="mt-1.5 text-2xl font-bold tabular-nums">{balance.requestCount}</p>
                 </div>
                 <div className="p-4">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <span className="etiqueta text-muted">
                     {d.acceso.negociosLinks}
                   </span>
                   <p className="mt-1.5 text-2xl font-bold tabular-nums">{links}</p>
