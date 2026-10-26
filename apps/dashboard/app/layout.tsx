@@ -86,10 +86,10 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                     Enlaces al centro desde lg, como en boringmarketing.com; debajo
                     de lg solo queda la píldora del Radar a la derecha. En el
                     teléfono el CTA largo no entra junto al Radar y el idioma: ahí
-                    se esconde y queda el del hero de cada página.
+                    se esconde y queda el del hero de cada página. Sin CTA en la nav:
+                    el de cada página basta (decisión de San, 26 oct 2026).
                   */}
-                  <nav aria-label={d.nav.linkProducto} className="etiqueta hidden items-center gap-6 lg:flex">
-                    <Link href="/#producto" className="text-muted hover:text-text">{d.nav.linkProducto}</Link>
+                  <nav aria-label={d.nav.linkComo} className="etiqueta hidden items-center gap-6 lg:flex">
                     <Link href="/#como-funciona" className="text-muted hover:text-text">{d.nav.linkComo}</Link>
                     <Link href="/precios" className="text-muted hover:text-text">{d.nav.linkPrecios}</Link>
                     <RadarPill texto={d.nav.linkRadar} />
@@ -105,9 +105,6 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                       <ThemeToggle />
                     </span>
                     <LanguageToggle locale={locale} />
-                    <Link href="/nuevo" className="btn btn-primario btn-chico hidden text-[13px] sm:inline-flex">
-                      {d.nav.usarAgente}
-                    </Link>
                   </div>
                 </>
               )}

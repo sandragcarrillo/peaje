@@ -62,9 +62,9 @@ export const radar = {
     // 02
     s02: 'Lo que falta',
     ordenNota: 'Primero lo fácil y, dentro de eso, lo que más sube tu puntaje.',
-    tuAgenteCuenta: (n: number, total: number) =>
-      n === total ? (total === 1 ? 'Tu agente la arregla.' : `Tu agente arregla las ${total}.`) : `Tu agente arregla ${n} de estas ${total}.`,
-    tuAgente: 'Lo arregla tu agente',
+    kitCuenta: (n: number, total: number) =>
+      n === total ? (total === 1 ? 'El kit gratis la arregla.' : `El kit gratis arregla las ${total}.`) : `El kit gratis arregla ${n} de estas ${total}.`,
+    loArreglaKit: 'Lo arregla el kit (gratis)',
     esfuerzo: { facil: 'Fácil', medio: 'Pide más trabajo', dificil: 'Toma más tiempo' },
     masTiempo: 'También suben tu puntaje, con más trabajo',
     notaDificil:
@@ -84,11 +84,12 @@ export const radar = {
     // 04
     s04: 'Arreglémoslo',
     queIncluye:
-      'Gratis ves el diagnóstico. Con Peaje tienes tu propio agente en Telegram: te dice qué falta, te pasa los arreglos listos, te muestra cómo vas mejorando y te cuenta cuántos agentes te visitaron, cada día, cada semana o cada mes, como prefieras.',
-    cierreTitulo: 'Ese es el diagnóstico. Ahora tu agente lo arregla contigo.',
+      'Lo de arriba lo arregla el kit de Peaje, gratis: lo instalas con un comando y tu sitio queda listo para que los agentes de IA lo entiendan, lo usen y te compren.',
+    ctaKit: 'Instalar el kit gratis',
+    cierreTitulo: 'Y para que la IA te recomiende, tu agente.',
     cierreTexto:
-      'Agrega el agente de Peaje a tu Telegram. Te dice qué falla, te pregunta lo que necesita y te entrega los cambios listos para tu sitio, incluido el kit de Peaje para que los agentes también puedan pagarte. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.',
-    cta: (usd: number) => `Tu agente lo arregla contigo: US$${usd}`,
+      'El agente de Peaje vive en tu Telegram. Mide si ChatGPT, Claude y Perplexity te citan cuando preguntan por lo que ofreces, te dice qué publicar, te escribe las páginas y te cuenta cada semana cuánto vas mejorando. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.',
+    cta: (usd: number) => `Activar mi agente: US$${usd}`,
     ctaNota: 'Creas tu cuenta con tu correo y pagas en el paso siguiente. Cancelas cuando quieras desde tu panel, sin llamadas.',
     informe: 'Mándame el informe',
     informeEnviar: 'Mandar',
@@ -154,9 +155,9 @@ export const radar = {
 
     s02: 'What is missing',
     ordenNota: 'Easy things first and, within those, what raises your score the most.',
-    tuAgenteCuenta: (n: number, total: number) =>
-      n === total ? (total === 1 ? 'Your agent fixes it.' : `Your agent fixes all ${total}.`) : `Your agent fixes ${n} of these ${total}.`,
-    tuAgente: 'Your agent fixes it',
+    kitCuenta: (n: number, total: number) =>
+      n === total ? (total === 1 ? 'The free kit fixes it.' : `The free kit fixes all ${total}.`) : `The free kit fixes ${n} of these ${total}.`,
+    loArreglaKit: 'The kit fixes it (free)',
     esfuerzo: { facil: 'Easy', medio: 'Takes more work', dificil: 'Takes longer' },
     masTiempo: 'These raise your score too, with more work',
     notaDificil:
@@ -174,11 +175,12 @@ export const radar = {
 
     s04: "Let's fix it",
     queIncluye:
-      'The diagnosis is free. With Peaje you get your own agent on Telegram: it tells you what is missing, hands you the fixes ready to go, shows you how you are improving and tells you how many agents visited you, daily, weekly or monthly, as you prefer.',
-    cierreTitulo: 'That is the diagnosis. Now your agent fixes it with you.',
+      'The free Peaje kit fixes everything above: you install it with one command and your site is ready for AI agents to understand it, use it and buy from you.',
+    ctaKit: 'Install the free kit',
+    cierreTitulo: 'And to get AI to recommend you, your agent.',
     cierreTexto:
-      'Add the Peaje agent to your Telegram. It tells you what fails, asks for what it needs and hands you the changes ready for your site, including the Peaje kit so agents can also pay you. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.',
-    cta: (usd: number) => `Your agent fixes it with you: US$${usd}`,
+      'The Peaje agent lives in your Telegram. It tracks whether ChatGPT, Claude and Perplexity cite you when people ask about what you offer, tells you what to publish, writes the pages and tells you every week how much you are improving. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.',
+    cta: (usd: number) => `Turn on my agent: US$${usd}`,
     ctaNota: 'You create your account with your email and pay in the next step. Cancel anytime from your dashboard, no calls.',
     informe: 'Email me the report',
     informeEnviar: 'Send',

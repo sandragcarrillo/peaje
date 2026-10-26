@@ -11,7 +11,7 @@ const CONOCIDOS = new Set(['pass', 'fail', 'warning', 'na', 'not_applicable'])
 export type Fila = { check: CheckCrudo; puntos: number; bloque: string | null; viaGateway: boolean }
 
 /** Un arreglo del radar: cuánto trabajo pide y si lo entrega el agente de Peaje. */
-export type Paso = Fila & { esfuerzo: Esfuerzo; loArreglaTuAgente: boolean }
+export type Paso = Fila & { esfuerzo: Esfuerzo; loArreglaElKit: boolean }
 
 export type Lectura = {
   /** Checks que pasan (X de la frase). */
@@ -25,7 +25,7 @@ export type Lectura = {
   /** Todo lo que falta, lo fácil primero y, dentro de cada nivel, lo que más suma. */
   pasos: Paso[]
   /** Lo que falta y entrega el agente de Peaje, en el mismo orden. */
-  deTuAgente: Paso[]
+  delKit: Paso[]
   /** Cuándo midió Ora (ISO), si lo dice. */
   medido: string | null
   /** Lo que Ora no pudo medir: ni a favor ni en contra. */
@@ -48,7 +48,7 @@ function porEsfuerzo(a: Paso, b: Paso): number {
   return (
     RANGO_ESFUERZO[a.esfuerzo] - RANGO_ESFUERZO[b.esfuerzo] ||
     b.puntos - a.puntos ||
-    Number(b.loArreglaTuAgente) - Number(a.loArreglaTuAgente)
+    Number(b.loArreglaElKit) - Number(a.loArreglaElKit)
   )
 }
 
@@ -88,8 +88,8 @@ export function leer(score: OraScore): Lectura {
     .sort((a, b) => b.puntos - a.puntos)
 
   const pasos: Paso[] = [
-    ...arreglables.map((f) => ({ ...f, esfuerzo: esfuerzoDe(f.check.id), loArreglaTuAgente: true })),
-    ...otras.map((f) => ({ ...f, esfuerzo: esfuerzoDe(f.check.id), loArreglaTuAgente: false })),
+    ...arreglables.map((f) => ({ ...f, esfuerzo: esfuerzoDe(f.check.id), loArreglaElKit: true })),
+    ...otras.map((f) => ({ ...f, esfuerzo: esfuerzoDe(f.check.id), loArreglaElKit: false })),
   ].sort(porEsfuerzo)
 
   return {
@@ -98,7 +98,7 @@ export function leer(score: OraScore): Lectura {
     arreglables,
     otras,
     pasos,
-    deTuAgente: pasos.filter((p) => p.loArreglaTuAgente),
+    delKit: pasos.filter((p) => p.loArreglaElKit),
     medido: s.scannedAt ?? null,
     sinMedir,
     parcial: sinMedir.length > 0 || (s.analysisStatus !== undefined && s.analysisStatus !== 'complete'),
@@ -118,7 +118,7 @@ export function leer(score: OraScore): Lectura {
 export function principales(l: Lectura): Paso[] {
   const noDificiles = l.pasos.filter((p) => p.esfuerzo !== 'dificil')
   const primeros = new Set((noDificiles.length > 0 ? noDificiles : l.pasos).slice(0, 3).map((p) => p.check.id))
-  return l.pasos.filter((p) => p.loArreglaTuAgente || primeros.has(p.check.id))
+  return l.pasos.filter((p) => p.loArreglaElKit || primeros.has(p.check.id))
 }
 
 /**

@@ -67,17 +67,18 @@ export const landing = {
     comoTitulo: 'Cómo funciona',
     pasos: [
       {
-        titulo: 'Mira cómo te ve la IA hoy',
-        texto: 'Pega tu sitio y en menos de un minuto ves qué falta. Gratis, solo con tu email.',
-      },
-      {
-        titulo: 'Habla con tu agente en Telegram',
+        titulo: 'Mira dónde estás hoy',
         texto:
-          'Te dice qué falta, te pasa los arreglos listos y te cuenta cuántos agentes te visitaron, cada día, cada semana o cada mes, como prefieras.',
+          'Pega la URL de tu sitio y en menos de un minuto ves qué te falta para que los agentes de IA te encuentren. Gratis, solo con tu email.',
       },
       {
-        titulo: 'Cobra cuando un agente use tu producto (opcional)',
-        texto: 'Quien maneje tu sitio lo instala con un comando, y tu agente le dice cómo.',
+        titulo: 'Deja tu sitio listo para los agentes',
+        texto: 'Instala nuestro kit con un comando y tu web queda lista para que los agentes la entiendan, la usen y te compren.',
+      },
+      {
+        titulo: 'Haz que te recomienden',
+        texto:
+          'Tu agente de Peaje, en Telegram, te pasa los arreglos listos para que ChatGPT, Claude y Perplexity te recomienden, y te cuenta cada semana cuánto vas mejorando.',
       },
     ],
 
@@ -194,17 +195,18 @@ export const landing = {
     comoTitulo: 'How it works',
     pasos: [
       {
-        titulo: 'See how AI sees you today',
-        texto: 'Paste your site and in under a minute you see what is missing. Free, just your email.',
-      },
-      {
-        titulo: 'Talk to your agent on Telegram',
+        titulo: 'See where you stand today',
         texto:
-          'It tells you what is missing, hands you the fixes ready to go and tells you how many agents visited you, daily, weekly or monthly, as you prefer.',
+          'Paste your site URL and in under a minute you see what you are missing for AI agents to find you. Free, just your email.',
       },
       {
-        titulo: 'Get paid when an agent uses your product (optional)',
-        texto: 'Whoever runs your site installs it with one command, and your agent tells them how.',
+        titulo: 'Get your site ready for agents',
+        texto: 'Install our kit with one command and your site is ready for agents to understand it, use it and buy from you.',
+      },
+      {
+        titulo: 'Get recommended',
+        texto:
+          'Your Peaje agent, on Telegram, hands you the fixes ready to go so ChatGPT, Claude and Perplexity recommend you, and tells you every week how much you are improving.',
       },
     ],
 

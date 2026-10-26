@@ -270,8 +270,8 @@ export const miAgente = {
     planPrecio: (usd: number) => `US$${usd} al mes`,
     planLimites: (preguntas: number, creditos: number) =>
       `${creditos} créditos al mes para el trabajo del agente y ${preguntas} preguntas medidas en asistentes de IA. Hablar con tu agente es gratis.`,
-    planFounderCupos: (n: number) => `Solo para los primeros 50 negocios. Quedan ${n}.`,
-    planFounderAgotado: 'Los 50 cupos founder ya se tomaron.',
+    planFounderCupos: (n: number) => (n === 1 ? 'Queda 1 cupo de fundador.' : `Quedan ${n} cupos de fundador.`),
+    planFounderNota: (total: number) => `Precio de fundador para los primeros ${total} negocios. Lo mantienes mientras tu suscripción siga activa.`,
     planYaFounder: 'Ya eres founder: mantienes este precio mientras no dejes vencer tu plan.',
     planCadaPago: 'Cada pago suma 30 días. Este link lo paga una wallet o un agente, en pathUSD por Tempo.',
     planLinkTitulo: 'Link de pago',
@@ -607,8 +607,8 @@ export const miAgente = {
     planPrecio: (usd: number) => `US$${usd} a month`,
     planLimites: (preguntas: number, creditos: number) =>
       `${creditos} credits a month for the agent's work and ${preguntas} questions tracked in AI assistants. Talking to your agent is free.`,
-    planFounderCupos: (n: number) => `Only for the first 50 businesses. ${n} left.`,
-    planFounderAgotado: 'The 50 founder spots are taken.',
+    planFounderCupos: (n: number) => (n === 1 ? '1 founder spot left.' : `${n} founder spots left.`),
+    planFounderNota: (total: number) => `Founder price for the first ${total} businesses. You keep it while your subscription stays active.`,
     planYaFounder: 'You are a founder: you keep this price as long as your plan does not lapse.',
     planCadaPago: 'Each payment adds 30 days. A wallet or an agent pays this link, in pathUSD on Tempo.',
     planLinkTitulo: 'Payment link',

@@ -107,7 +107,8 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                   </Link>
                 </nav>
 
-                <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">{nav.wallet}</p>
+                <div className="-mt-2 flex items-center justify-between">
                   <span className="font-mono text-xs text-muted">{shortWallet(data.address)}</span>
                   <button type="button" onClick={copiar} className="btn btn-secundario btn-chico">
                     {copiado ? d.dinero.copiada : d.dinero.copiar}

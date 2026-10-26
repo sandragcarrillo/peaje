@@ -153,11 +153,12 @@ function LoQueHace({ arranque, preguntas }: { arranque: Arranque | null; pregunt
 
 function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; fecha: Fecha; creditos: number }) {
   const { miAgente: t } = useDict()
-  const planes: Plan[] = billing.founder.available ? ['founder', 'pro'] : ['pro']
+  // Una sola oferta a la vez: founder mientras queden cupos; Pro recién cuando se acaban.
+  const planes: Plan[] = billing.founder.available ? ['founder'] : ['pro']
   const { estado, abrir, disponible } = useCheckout(slug, paddle)
   const hayAlguno = planes.some(disponible)
   // Sin respuesta del gateway no se muestra founder: no se sabe si quedan cupos.
-  const tarjetas = (billing.respaldo ? ['pro'] : ['founder', 'pro']) as Plan[]
+  const tarjetas: Plan[] = billing.respaldo ? ['pro'] : planes
 
   return (
     <div className="space-y-4">
@@ -165,17 +166,21 @@ function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; bi
       <div className={`grid gap-3 md:grid-cols-2 ${tarjetas.length > 1 ? 'lg:grid-cols-3' : ''}`}>
         {tarjetas.map((plan, i) => {
           const p = billing.prices[plan]
-          const cerrado = plan === 'founder' && !billing.founder.available
           const puede = planes.includes(plan) && disponible(plan)
           return (
-            <div key={plan} className={`flex flex-col justify-between gap-4 border border-border p-4 ${cerrado ? 'opacity-60' : ''}`}>
+            <div key={plan} className={`flex flex-col justify-between gap-4 border border-border p-4 `}>
               <div className="space-y-2">
                 <p className="font-mono text-[11px] text-muted">{t.planNombres[plan]}</p>
                 <p className="text-lg font-semibold">{t.planPrecio(p.usd)}</p>
                 <p className="text-sm">{t.planLimites(p.limits.preguntas, creditos)}</p>
                 {plan === 'founder' ? (
                   <p className="text-xs text-muted">
-                    {billing.founder.alreadyFounder ? t.planYaFounder : cerrado ? t.planFounderAgotado : t.planFounderCupos(billing.founder.slotsLeft)}
+                    {/* Cuántos quedan solo cuando son pocos: con muchos libres se lee como que nadie lo usa. */}
+                    {billing.founder.alreadyFounder
+                      ? t.planYaFounder
+                      : billing.founder.slotsLeft <= 10
+                        ? t.planFounderCupos(billing.founder.slotsLeft)
+                        : t.planFounderNota(billing.founder.total)}
                   </p>
                 ) : null}
               </div>

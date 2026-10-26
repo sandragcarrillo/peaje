@@ -224,20 +224,20 @@ function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
             <span className="flex min-w-0 items-start gap-2.5">
               <span
                 aria-hidden
-                className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${p.loArreglaTuAgente ? 'bg-accent' : 'bg-faint'}`}
+                className={`mt-1.5 h-1.5 w-1.5 shrink-0 ${p.loArreglaElKit ? 'bg-accent' : 'bg-faint'}`}
               />
               <span className="min-w-0 space-y-1">
                 <span className="block">{titulo}</span>
                 {detalle ? <span className="block text-xs text-muted">{detalle}</span> : null}
                 <span className="flex flex-wrap gap-1.5 pt-0.5">
                   <Etiqueta tono="muted">{t.esfuerzo[p.esfuerzo]}</Etiqueta>
-                  {p.loArreglaTuAgente ? <Etiqueta tono="accent">{t.tuAgente}</Etiqueta> : null}
+                  {p.loArreglaElKit ? <Etiqueta tono="accent">{t.loArreglaKit}</Etiqueta> : null}
                 </span>
               </span>
             </span>
             {p.puntos > 0 ? (
               <span
-                className={`shrink-0 font-mono text-xs font-bold ${p.loArreglaTuAgente ? 'text-accent' : 'text-muted'}`}
+                className={`shrink-0 font-mono text-xs font-bold ${p.loArreglaElKit ? 'text-accent' : 'text-muted'}`}
               >
                 {t.puntos(p.puntos)}
               </span>
@@ -266,7 +266,7 @@ function Resultado({
   const enlace = `${BASE}/radar?d=${encodeURIComponent(dominio)}`
   const lista = principales(l)
   const despues = masTiempo(l, lista)
-  const deTuAgente = lista.filter((p) => p.loArreglaTuAgente).length
+  const delKit = lista.filter((p) => p.loArreglaElKit).length
   const medicion = fechaDe(l.medido, locale)
 
   return (
@@ -336,7 +336,7 @@ function Resultado({
           <div className="space-y-2">
             <p className="text-sm text-muted">
               {t.ordenNota}
-              {deTuAgente > 0 ? ` ${t.tuAgenteCuenta(deTuAgente, lista.length)}` : ''}
+              {delKit > 0 ? ` ${t.kitCuenta(delKit, lista.length)}` : ''}
             </p>
             <Pasos t={t} locale={locale} pasos={lista} />
           </div>
@@ -389,7 +389,13 @@ function Resultado({
 
       {/* 04 */}
       <Seccion n="04" titulo={t.s04}>
-        <p className="max-w-2xl text-sm text-muted">{t.queIncluye}</p>
+        {/* Dos caminos: el kit (gratis) arregla lo de arriba; el agente (Pro) es lo que hace que la IA te recomiende. */}
+        <div className="space-y-3">
+          <p className="max-w-2xl text-sm">{t.queIncluye}</p>
+          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}`} className="btn btn-secundario">
+            {t.ctaKit}
+          </Link>
+        </div>
         <div className="space-y-3 border-t border-border pt-5">
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>
