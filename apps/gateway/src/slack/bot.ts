@@ -6,6 +6,8 @@ import { resolverAccion } from '../tareas/acciones.js'
 import { aMrkdwn, descifrar, partir, respaldo, slack, urlInstalar } from './api.js'
 // ---- M9 ----
 import { esActivo, mensajeSinPro } from '../billing/acceso.js'
+// ---- primer mensaje del agente ----
+import { armarPrimerMensaje, esCadencia, programarCadencia, reservarPrimerMensaje, textoBotonKit } from '../tareas/primer-mensaje.js'
 
 /**
  * El agente de Peaje en Slack: el mismo de "Mi agente" y de Telegram (mismas
@@ -164,7 +166,8 @@ async function decir(h: Hilo, texto: string, botones: Bloque[] = []) {
   await enviarAlHilo(h, texto, botones)
 }
 
-async function responder(h: Hilo, teamId: string, tenant: Tenant, texto: string, idioma: Idioma): Promise<void> {
+/** `boton`: el texto sale de un botón del agente (sugerencia u opción), no lo escribió nadie. */
+async function responder(h: Hilo, teamId: string, tenant: Tenant, texto: string, idioma: Idioma, boton = false): Promise<void> {
   // ---- M9: el agente en Slack es Pro, como en Telegram ----
   if (!esActivo(tenant)) return decir(h, mensajeSinPro(tenant, idioma))
   const provisorio = (await slack('chat.postMessage', { channel: h.channel, text: T[idioma].pensando, ...enHilo(h) }, h.token))?.ts
@@ -178,7 +181,7 @@ async function responder(h: Hilo, teamId: string, tenant: Tenant, texto: string,
   }
   try {
     // destino: los reportes programados y los trabajos largos vuelven a este canal.
-    const m = await conversar(tenant, texto, { idioma, canal: 'slack', alEstado, destino: { canal: 'slack', id: destinoSlack(teamId, h.channel) } })
+    const m = await conversar(tenant, texto, { idioma, canal: 'slack', alEstado, destino: { canal: 'slack', id: destinoSlack(teamId, h.channel) }, boton })
     await cola
     const varios = (await store.listSlackChannel(teamId, h.channel)).length > 1
     await enviarAlHilo(h, varios ? `**${tenant.name}**\n${m.text}` : m.text, bloquesBotones(tenant.id, m, idioma), provisorio)
@@ -237,6 +240,8 @@ export async function procesarEvento(sobre: SobreEventos): Promise<void> {
     if (tenant) {
       const idioma = idiomaDe(codigo.language)
       if (!esActivo(tenant)) return decir(h, mensajeSinPro(tenant, idioma))
+      // Antes de ligar: si el canal ya estaba con este negocio, el primer mensaje no se repite.
+      const yaLigado = (await store.listSlackChannel(teamId, e.channel)).some((l) => l.tenantId === tenant.id)
       await store.linkSlack({ teamId, channelId: e.channel, tenantId: tenant.id, language: idioma, linkedBy: e.user })
       const otros = (await store.listSlackChannel(teamId, e.channel)).filter((l) => l.tenantId !== tenant.id)
       const nombres = (await Promise.all(otros.map((l) => store.getTenantById(l.tenantId)))).map((t) => t?.name).filter((n): n is string => !!n)
@@ -245,7 +250,8 @@ export async function procesarEvento(sobre: SobreEventos): Promise<void> {
         block_id: 'peaje_sugerencias',
         elements: T[idioma].sugerencias.map((s, i) => boton(s, `peaje_sugerencia_${i}`, JSON.stringify({ t: tenant.id, i }))),
       }
-      return decir(h, nombres.length ? `${T[idioma].ligado(tenant.name)}\n\n${T[idioma].varios(tenant.name, nombres)}` : T[idioma].ligado(tenant.name), [sugerencias])
+      await decir(h, nombres.length ? `${T[idioma].ligado(tenant.name)}\n\n${T[idioma].varios(tenant.name, nombres)}` : T[idioma].ligado(tenant.name), [sugerencias])
+      return primerMensaje(h, teamId, e.channel, tenant, idioma, yaLigado)
     }
   }
 
@@ -330,6 +336,21 @@ export async function procesarInteraccion(p: PayloadInteraccion): Promise<void> 
     return decir(h, T[idiomaDe(l.language)].cambiado(t?.name ?? ''))
   }
 
+  // Cadencia del primer mensaje: programa el resumen de visitas en este canal y saca los botones.
+  if (a.action_id.startsWith('peaje_cadencia_')) {
+    const v = valor<{ t: string; c: string }>(a)
+    const l = v ? ligado(v.t) : undefined
+    if (!v || !l || !esCadencia(v.c)) return
+    const idioma = idiomaDe(l.language)
+    const tenant = await store.getTenantById(l.tenantId)
+    if (!tenant) return
+    if (!esActivo(tenant)) return decir(h, mensajeSinPro(tenant, idioma))
+    const linea = await programarCadencia(tenant, v.c, { canal: 'slack', id: destinoSlack(teamId, channelId) }, idioma)
+    const blocks = Array.isArray(p.message?.blocks) ? p.message.blocks.filter((b) => b.block_id !== 'peaje_cadencia') : null
+    if (blocks && ts) await slack('chat.update', { channel: channelId, ts, text: p.message?.text ?? linea, blocks }, token)
+    return decir(h, linea)
+  }
+
   if (a.action_id.startsWith('peaje_sugerencia_') || a.action_id.startsWith('peaje_opcion_')) {
     const v = valor<{ t: string; m?: string; i: number }>(a)
     const l = v ? ligado(v.t) : undefined
@@ -342,7 +363,7 @@ export async function procesarInteraccion(p: PayloadInteraccion): Promise<void> 
     else texto = v.m ? (await store.getMessage(tenant.id, v.m))?.options[v.i] : undefined
     if (!texto) return
     await slack('chat.postMessage', { channel: channelId, text: `<@${userId}>: ${texto}`, ...enHilo(h) }, token)
-    return responder(h, teamId, tenant, texto, idioma)
+    return responder(h, teamId, tenant, texto, idioma, true)
   }
 
   if (a.action_id.startsWith('peaje_aprobar_') || a.action_id.startsWith('peaje_descartar_')) {
@@ -366,6 +387,31 @@ export async function procesarInteraccion(p: PayloadInteraccion): Promise<void> 
     } catch (error) {
       await decir(h, error instanceof Error ? error.message : T[idioma].error)
     }
+  }
+}
+
+/**
+ * El primer mensaje del agente al conectar el canal, el mismo de Telegram
+ * (tareas/primer-mensaje.ts): solo con Pro, una vez por negocio y canal, sin
+ * créditos ni mensaje del dueño. Si algo falla, el canal ya quedó conectado.
+ */
+async function primerMensaje(h: Hilo, teamId: string, channelId: string, tenant: Tenant, idioma: Idioma, yaLigado: boolean): Promise<void> {
+  if (!esActivo(tenant) || yaLigado) return
+  try {
+    const m = await armarPrimerMensaje(tenant, idioma)
+    const destino = destinoSlack(teamId, channelId)
+    if (!(await reservarPrimerMensaje(tenant.id, 'slack', destino, yaLigado))) return
+    const bloques: Bloque[] = []
+    // action_id peaje_link_: Slack abre el enlace y procesarInteraccion lo ignora.
+    if (m.kitUrl && /^https:\/\//.test(m.kitUrl)) bloques.push({ type: 'actions', block_id: 'peaje_kit', elements: [{ ...boton(textoBotonKit(idioma), 'peaje_link_kit', m.kitUrl), url: m.kitUrl }] })
+    bloques.push({
+      type: 'actions',
+      block_id: 'peaje_cadencia',
+      elements: m.opciones.map((o) => boton(o.texto, `peaje_cadencia_${o.clave}`, JSON.stringify({ t: tenant.id, c: o.clave }))),
+    })
+    await enviarAlHilo(h, m.texto, bloques)
+  } catch (error) {
+    console.warn('[slack] no salió el primer mensaje', tenant.slug, error instanceof Error ? error.message : error)
   }
 }
 

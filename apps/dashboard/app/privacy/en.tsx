@@ -93,12 +93,11 @@ export function PrivacidadEn() {
           the site owner, see these logs.
         </p>
 
-        <H3>3.5 Agent payments and withdrawals</H3>
+        <H3>3.5 Agent payments</H3>
         <p>
           If you charge agents, we keep a record of each payment: the path, the amount, the fee, the network, the{' '}
-          <T>agent&apos;s wallet address</T> and the transaction reference. For each withdrawal we keep the amount, the
-          destination wallet and the reference. These transactions are also recorded on public blockchain networks
-          that anyone can look up.
+          <T>agent&apos;s wallet address</T>, the payout address it was sent to and the transaction reference. These
+          transactions are also recorded on public blockchain networks that anyone can look up.
         </p>
 
         <H3>3.6 Conversation with the agent</H3>
@@ -146,7 +145,7 @@ export function PrivacidadEn() {
             showing you the radar and the visits, and running the Pro agent.
           </li>
           <li>
-            <T>Recording the payments</T> your site receives from agents and processing your withdrawals.
+            <T>Recording the payments</T> your site receives from agents.
           </li>
           <li>
             <T>Managing your subscription</T> and applying each plan&apos;s limits.
@@ -298,7 +297,8 @@ export function PrivacidadEn() {
             time.
           </li>
           <li>
-            <T>Payment, withdrawal and billing records</T>: for the period Colombian law requires.
+            <T>Payment and billing records</T> (and the withdrawals made before payments went straight to your
+            wallet): for the period Colombian law requires.
           </li>
         </Lista>
         <p>

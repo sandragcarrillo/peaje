@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
 import { CONTACTO } from '@/lib/legal'
-import { cargarPaddle, escucharPaddle, temaActual } from '@/lib/paddle-js'
+import { cargarPaddle, escucharPaddle, irAPagoListo, temaActual } from '@/lib/paddle-js'
 
 const TXN = /^txn_[a-z0-9]+$/i
 
@@ -34,7 +34,10 @@ export function PagoPaddle({ token, environment }: { token: string | null; envir
   useEffect(() => {
     escucharPaddle((ev) => {
       if (ev.name === 'checkout.loaded') setEstado('abierto')
-      else if (ev.name === 'checkout.completed') setEstado('completado')
+      else if (ev.name === 'checkout.completed') {
+        setEstado('completado')
+        irAPagoListo(ev)
+      }
       else if (ev.name === 'checkout.closed') setEstado((e) => (e === 'completado' ? e : 'cerrado'))
       else if (ev.name === 'checkout.error') setEstado('error')
     })

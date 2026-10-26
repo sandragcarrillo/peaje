@@ -1,16 +1,11 @@
 import 'server-only'
-import type { Agent, AgentRun, Withdrawal } from '@peaje/db'
+import type { Agent, AgentRun, PlanPago } from '@peaje/db'
+import { CUPOS_FOUNDER, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 const base = process.env.GATEWAY_INTERNAL_URL ?? 'http://localhost:8787'
 const secret = process.env.INTERNAL_API_SECRET ?? ''
 
-type WithdrawalResponse = {
-  withdrawal: Withdrawal
-  explorerUrl: string | null
-  error?: string
-}
-
-/** Llama la API interna del gateway (la única pieza con la clave de la treasury). */
+/** Llama la API interna del gateway (la única pieza con las llaves de la treasury y del relayer). */
 async function internal<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}/_internal${path}`, {
     ...init,
@@ -28,20 +23,6 @@ async function internal<T>(path: string, init?: RequestInit): Promise<T> {
     throw err
   }
   return data
-}
-
-export function requestWithdrawal(
-  slug: string,
-  body: { amount?: string; toWallet?: string; network?: string },
-) {
-  return internal<WithdrawalResponse>(`/${slug}/withdraw`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  })
-}
-
-export function getWithdrawal(slug: string, id: string) {
-  return internal<WithdrawalResponse>(`/${slug}/withdrawals/${id}`)
 }
 
 // ---- agentes compradores ----
@@ -79,19 +60,6 @@ export function createAgent(
     method: 'POST',
     body: JSON.stringify(body),
   })
-}
-
-export function fundAgent(
-  slug: string,
-  id: string,
-  amount: string,
-  network?: string,
-  fromSlug?: string,
-) {
-  return internal<{ agent: AgenteConSaldo; tx: string; explorerUrl: string }>(
-    `/${slug}/agents/${id}/fund`,
-    { method: 'POST', body: JSON.stringify({ amount, network, fromSlug }) },
-  )
 }
 
 export function runAgent(slug: string, id: string, body?: { mission?: string; url?: string }) {
@@ -363,19 +331,38 @@ export function borrarReporte(slug: string, filtro: { id: string } | { channel: 
 
 export type EstadoBilling = {
   access: import('@peaje/db').AccesoPro
-  prices: Record<'founder' | 'pro', { usd: number; charged: string; limits: { preguntas: number; mensajes: number } }>
+  prices: Record<'founder' | 'pro', { usd: number; charged: string; limits: { preguntas: number; creditos: number; mensajes?: number } }>
   founder: { slotsLeft: number; total: number; available: boolean; alreadyFounder: boolean }
-  balanceAvailable: string
   payments: import('@peaje/db').BillingPayment[]
-  /** El cobro en USDC (402 y saldo) está prendido en el gateway (BILLING_CRYPTO_ENABLED). Por defecto no. */
+  /** El cobro por 402 está prendido en el gateway (BILLING_CRYPTO_ENABLED). Por defecto no. */
   crypto?: boolean
   /** Links del 402 en USDC. Null con el cobro en USDC apagado. */
   checkout: { founder: string | null; pro: string | null }
   upgradeUrl: string
+  /** Armado en el dashboard porque el gateway no contestó: no se sabe si quedan cupos founder. */
+  respaldo?: boolean
 }
 
 export function leerBilling(slug: string) {
   return internal<EstadoBilling>(`/${slug}/billing`)
+}
+
+/**
+ * Si el gateway no contesta, el plan igual se muestra con los precios fijos del
+ * código. Solo Pro: sin el gateway no se sabe si quedan cupos founder.
+ */
+export function billingDeRespaldo(slug: string, access: import('@peaje/db').AccesoPro): EstadoBilling {
+  const precio = (plan: PlanPago) => ({ usd: PRECIOS_USD[plan], charged: String(PRECIOS_USD[plan]), limits: LIMITES[plan] })
+  return {
+    access,
+    prices: { founder: precio('founder'), pro: precio('pro') },
+    founder: { slotsLeft: 0, total: CUPOS_FOUNDER, available: false, alreadyFounder: false },
+    payments: [],
+    crypto: false,
+    checkout: { founder: null, pro: null },
+    upgradeUrl: `/t/${slug}/agente#plan`,
+    respaldo: true,
+  }
 }
 
 /** Sesión nueva del portal de clientes de Paddle (un solo uso; no se guarda). */
@@ -383,9 +370,6 @@ export function abrirPortalPaddle(slug: string) {
   return internal<{ url: string }>(`/${slug}/billing/portal`, { method: 'POST' })
 }
 
-export function pagarPlanConSaldo(slug: string, plan: 'founder' | 'pro') {
-  return internal<{ ok: true; plan: string; planUntil: string }>(`/${slug}/billing/pay-with-balance`, { method: 'POST', body: JSON.stringify({ plan }) })
-}
 // ---- fin M9 ----
 
 /** Pide al gateway que escriba la descripción del sitio para agentes, leyéndolo. No bloquea a quien llama. */

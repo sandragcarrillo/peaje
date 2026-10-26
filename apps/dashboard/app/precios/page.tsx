@@ -2,10 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ENLACE } from '../components/legal'
 import { getDict } from '@/lib/i18n'
-import { CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 /**
- * Precios. Montos, cupos, prueba y límites salen de packages/db/src/planes.ts;
+ * Precios. Montos, cupos, prueba, límites y créditos salen de packages/db/src/planes.ts;
  * la comisión del 2% es la misma que dice la landing (sección `precio`).
  * Paddle pide precio y funciones visibles en el sitio para aprobar el dominio.
  */
@@ -73,12 +73,12 @@ export default async function Precios() {
           destacado
         >
           <p className="mt-4 border-t border-border pt-3 font-mono text-xs text-muted">
-            {P.limites(LIMITES.founder.preguntas, LIMITES.founder.mensajes)}
+            {P.limites(LIMITES.founder.preguntas, LIMITES.founder.creditos)}
           </p>
         </Plan>
         <Plan nombre={P.proNombre} precio={`US$${PRECIOS_USD.pro}`} unidad={P.alMes} texto={P.proTexto(CUPOS_FOUNDER)}>
           <p className="mt-4 border-t border-border pt-3 font-mono text-xs text-muted">
-            {P.limites(LIMITES.pro.preguntas, LIMITES.pro.mensajes)}
+            {P.limites(LIMITES.pro.preguntas, LIMITES.pro.creditos)}
           </p>
         </Plan>
       </div>
@@ -93,6 +93,21 @@ export default async function Precios() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="mt-12 border-t border-border pt-6">
+        <h2 className="text-xl font-semibold">{P.creditosTitulo}</h2>
+        <p className="mt-3 max-w-2xl text-[15px] text-muted">{P.creditosIntro(LIMITES.pro.creditos)}</p>
+        <dl className="mt-4 max-w-xl divide-y divide-border border-y border-border text-sm">
+          {P.creditosCostos(COSTOS_CREDITOS).map((c) => (
+            <div key={c.que} className="flex items-baseline justify-between gap-4 py-2">
+              <dt>{c.que}</dt>
+              <dd className="font-mono text-xs tabular-nums text-muted">{P.creditos(c.cuanto)}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-4 max-w-2xl text-sm text-muted">{P.creditosGratis}</p>
+        <p className="mt-2 max-w-2xl text-sm text-muted">{P.creditosRenuevan}</p>
       </section>
 
       <div className="mt-12 grid gap-4 sm:grid-cols-2">
@@ -115,6 +130,18 @@ export default async function Precios() {
           </p>
         </section>
       </div>
+
+      <section className="mt-12 border-t border-border pt-6">
+        <h2 className="text-xl font-semibold">{P.faqTitulo}</h2>
+        <dl className="mt-2 divide-y divide-border">
+          {P.faq({ pct: COMISION_PCT, dias: DIAS_REEMBOLSO }).map((f) => (
+            <div key={f.p} className="py-4">
+              <dt className="text-base font-semibold">{f.p}</dt>
+              <dd className="mt-1.5 max-w-2xl text-sm text-muted">{f.r}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       <div className="mt-12 flex flex-wrap gap-3">
         <Link href="/radar" className="btn btn-primario">

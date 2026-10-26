@@ -19,7 +19,7 @@ export async function correrScore(slug: string): Promise<{ ok: boolean; error?: 
   }
   const result = await freshScan(domain)
   if (!result) return { ok: false, error: d.errorScan }
-  revalidatePath(`/t/${slug}/kit`)
+  revalidatePath(`/t/${slug}`, 'layout')
   return { ok: true }
 }
 

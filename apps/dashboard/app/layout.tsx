@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Hanken_Grotesk, Space_Mono } from 'next/font/google'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { LanguageToggle } from '@/components/language-toggle'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -25,12 +26,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
-  const [tenant, locale, d] = await Promise.all([currentTenant(), getLocale(), getDict()])
+  const [tenant, locale, d, h] = await Promise.all([currentTenant(), getLocale(), getDict(), headers()])
+  // El nonce de la CSP (proxy.ts): el script del tema es inline y sin él no corre.
+  const nonce = h.get('x-nonce') ?? undefined
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
         <script
+          nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: tema antes de hidratar, sin parpadeo
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem('peaje_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`,

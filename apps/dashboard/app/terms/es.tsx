@@ -59,7 +59,7 @@ export function TerminosEs() {
         <p>
           Peaje es software: deja tu sitio listo para que los agentes de IA lo encuentren, lo lean y, si quieres, le
           paguen por pedido. Cómo funcionan esos cobros está en la sección 8.
-          {/* TODO(San): antes de afirmar que Peaje no es procesador de pagos ni transmisor de dinero, revisarlo con un abogado: hoy Peaje opera wallets custodiales para los negocios (Privy) y liquida pagos por su contrato. */}
+          {/* TODO(San): antes de afirmar que Peaje no es procesador de pagos ni transmisor de dinero, revisarlo con un abogado: desde los pagos directos la wallet de cobro es del dueño y el contrato reparte el pago en la misma transacción, pero el relayer de Peaje somete cada pago y elige a qué negocio va. */}
         </p>
       </Seccion>
 
@@ -170,9 +170,10 @@ export function TerminosEs() {
             Son <T>opcionales</T>. Puedes usar Peaje sin cobrar nada.
           </li>
           <li>
-            Son <T>independientes de la suscripción Pro</T>. Se liquidan en la red de pago que elijas, Peaje registra
-            cada pago y lo acredita a la wallet de tu negocio, desde donde lo retiras.
-            {/* TODO(San): confirmar cómo describir la wallet del negocio que se crea con Privy al registrarse (de quién es, quién la controla, cómo se retira). */}
+            Son <T>independientes de la suscripción Pro</T>. Se liquidan en la red de pago que elijas: cada pago llega
+            a tu dirección de cobro en la misma transacción y Peaje se queda con su comisión del 2%. Peaje no te guarda
+            saldo, así que no hay nada que retirar.
+            {/* TODO(San): confirmar con el abogado cómo describir la wallet de cobro que se crea con Privy al registrarse (es del usuario, Peaje no la mueve) y el reparto directo de PeajeSettlementV3. */}
           </li>
           <li>
             <T>Paddle nunca los procesa</T>. Paddle solo vende la suscripción Pro (sección 10).
@@ -232,14 +233,22 @@ export function TerminosEs() {
           </li>
           <li>
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} al mes</T>, solo para los primeros {CUPOS_FOUNDER}{' '}
-            negocios que se suscriben. Incluye {LIMITES.founder.preguntas} preguntas medidas en asistentes de IA y{' '}
-            {LIMITES.founder.mensajes} mensajes al agente por mes. Quien entra como founder mantiene ese precio mientras su suscripción siga activa; si la cancela y vuelve, paga el precio Pro.
+            negocios que se suscriben. Incluye {LIMITES.founder.creditos} créditos al mes para el trabajo del agente y{' '}
+            {LIMITES.founder.preguntas} preguntas medidas en asistentes de IA por mes. Quien entra como founder mantiene ese precio mientras su suscripción siga activa; si la cancela y vuelve, paga el precio Pro.
           </li>
           <li>
             <T>Pro</T>: <T>US${PRECIOS_USD.pro} al mes</T> cuando se toman los cupos founder. Incluye{' '}
-            {LIMITES.pro.preguntas} preguntas medidas y {LIMITES.pro.mensajes} mensajes al agente por mes.
+            {LIMITES.pro.creditos} créditos al mes y {LIMITES.pro.preguntas} preguntas medidas por mes.
           </li>
         </Lista>
+        <p>
+          <T>Créditos</T>. Hablar con el agente no gasta créditos. Los créditos se gastan en el trabajo que el agente
+          hace por ti: consultas en tus datos, arreglos, borradores de página, series de páginas, reportes que le pides
+          y pruebas del comprador misterioso. Lo que cuesta cada uno está en <L href="/precios">precios</L>. Los
+          reportes programados y las respuestas a preguntas que no tienen que ver con tu negocio no gastan créditos. Los
+          créditos se renuevan el 1 de cada mes, los que no usas no pasan al mes siguiente y no se venden créditos
+          extra. Si se acaban, el agente sigue respondiéndote, pero no hace trabajo nuevo hasta el 1 del mes siguiente.
+        </p>
         <p>
           La suscripción es por sitio. Los límites se cuentan por mes. El precio vigente y los impuestos de tu país
           aparecen en el formulario de pago antes de confirmar la compra. Podemos ajustar precios y límites con aviso

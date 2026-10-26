@@ -3,11 +3,6 @@ export const panel = {
     eyebrowNegocio: 'NEGOCIO',
     consola: 'CONSOLA',
     navPortal: 'PORTAL DEV',
-    colUltimaVez: 'Última vez',
-    colGasto: 'Gasto total',
-    ordenGasto: 'Orden: mayor gasto',
-    finLedger: (n: number) => `Fin del ledger — ${n} de ${n} agentes reportados`,
-    hace: (v: string) => `hace ${v}`,
     scoreEyebrow: 'CONSOLA // AGENT-READINESS',
     scoreAuditoria: 'AUDITORÍA',
     scoreConKit: (n: number) => `hasta ~${n} con el kit completo`,
@@ -17,9 +12,9 @@ export const panel = {
     scoreCol2: 'Lo que el kit desbloquea',
     scoreChecksOk: (n: number) => `${n} checks pasan`,
     scoreChecksPend: (n: number) => `${n} por atacar`,
-    subDisponible: 'Listo para retirar',
+    subCobro: 'Cada pago llega acá',
     subRequests: 'Todo el tiempo',
-    subRevenue: 'Vía MPP · 402',
+    subRevenue: 'Neto, ya en tu wallet',
     histLabel: 'Histórico',
     hoyLabel: 'Hoy',
     filtro402: 'Filtro: pagos 402 liquidados',
@@ -48,10 +43,9 @@ export const panel = {
     navScore: 'Score',
     navRutas: 'Agregar rutas',
     navKit: 'Haz que te encuentren',
-    navClientes: 'Clientes',
     navVisitas: 'Visitas de agentes',
     navAgente: 'Mi agente',
-    navRetirar: 'Retirar',
+    navIngresos: 'Ingresos',
     navWallet: 'Mi wallet',
 
     // dashboard
@@ -63,9 +57,10 @@ export const panel = {
     paso2Descripcion: 'Agrega links o importa tu sitemap. Los agentes pagan por request.',
     paso3Titulo: 'Haz que te encuentren',
     paso3Descripcion: 'Aplica el kit en tu web y verifica la integración.',
-    metricaDisponible: 'Disponible',
+    metricaCobro: 'Dirección de cobro',
+    metricaCobroFalta: 'Falta',
     metricaRequests: 'Requests pagados',
-    metricaRevenue: 'Revenue total',
+    metricaRevenue: 'Recibido',
     ultimosPagos: 'Últimos pagos',
     nadiePaga: 'Todavía nadie paga.',
     agregaPrimerLink: 'Agrega tu primer link con precio',
@@ -92,31 +87,10 @@ export const panel = {
     graficaBarra: (fecha: string, monto: string, pagos: number) =>
       `${fecha}: $${monto} (${pagos} pagos)`,
 
-    // wallet de retiro
-    cambiarWalletRetiro: 'Cambiar wallet de retiro',
-    walletRetiroTitulo: 'Wallet de retiro',
-    walletRetiroDescripcion:
-      'A dónde te enviamos el dinero cuando retiras. Puedes cambiarla cuando quieras.',
+    // dirección de cobro
     guardar: 'Guardar',
     errorGuardarWallet: 'No se pudo guardar',
 
-    // clientes
-    clientesTitulo: 'Tus clientes agente',
-    clientesDescripcion:
-      'Quiénes son los agentes que pagan por tu contenido. Identidad y reputación del registro ERC-8004, vía The Graph.',
-    clientesVacio: 'Todavía no hay pagos con wallet identificada.',
-    metricaAgentesUnicos: 'Agentes únicos',
-    metricaConIdentidad: 'Con identidad on-chain',
-    valorConIdentidad: (agentes: number, porcentaje: number) =>
-      `${agentes} (${porcentaje}% del revenue)`,
-    metricaEnfoque: 'Enfoque dominante',
-    sinDatos: 'sin datos',
-    reputacion: (promedio: number, votos: number) => `reputación ${promedio}/100 (${votos})`,
-    sinIdentidad: 'sin identidad',
-    conteoRequests: (requests: number) => `${requests} request${requests === 1 ? '' : 's'}`,
-    pagaPor: 'paga por',
-    unionRedes: ' y ',
-    vistoPorUltimaVez: 'visto',
 
     // score
     scoreTitulo: 'Score',
@@ -164,12 +138,6 @@ export const panel = {
     errorPrecioMayorCero: 'El precio tiene que ser mayor a 0',
     errorWalletInvalida: 'Esa no parece una wallet válida',
     errorWalletAjena: 'Esa wallet la maneja Peaje para otra cuenta. Usa la tuya o una wallet externa.',
-    errorNegocioSinWallet: 'Este sitio no tiene wallet.',
-    errorDestinoInvalido: 'La address de destino no es válida.',
-    errorRedInvalida: 'Red inválida.',
-    errorMontoInvalido: 'Monto inválido.',
-    errorMismoDestino: 'Ese es el destino de tu propia wallet.',
-    errorEnvio: 'No se pudo enviar. Revisa el saldo (el gas sale del mismo token) y reintenta.',
     errorUrlInvalida: 'La URL no es válida. Incluye https://',
     errorSoloHttp: 'Solo http(s)',
     errorPrecioInvalido: 'Precio inválido (0 = gratis)',
@@ -214,11 +182,6 @@ export const panel = {
     eyebrowNegocio: 'BUSINESS',
     consola: 'CONSOLE',
     navPortal: 'DEV PORTAL',
-    colUltimaVez: 'Last seen',
-    colGasto: 'Lifetime spend',
-    ordenGasto: 'Sort: lifetime spend',
-    finLedger: (n: number) => `End of ledger — ${n} of ${n} agents reported`,
-    hace: (v: string) => `${v} ago`,
     scoreEyebrow: 'CONSOLE // AGENT-READINESS',
     scoreAuditoria: 'AUDIT RUN',
     scoreConKit: (n: number) => `up to ~${n} with the full kit`,
@@ -228,9 +191,9 @@ export const panel = {
     scoreCol2: 'What the kit unlocks',
     scoreChecksOk: (n: number) => `${n} checks pass`,
     scoreChecksPend: (n: number) => `${n} to attack`,
-    subDisponible: 'Ready to withdraw',
+    subCobro: 'Every payment lands here',
     subRequests: 'All time',
-    subRevenue: 'Via MPP · 402',
+    subRevenue: 'Net, already in your wallet',
     histLabel: 'Historical',
     hoyLabel: 'Today',
     filtro402: 'Filter: HTTP 402 settled',
@@ -259,10 +222,9 @@ export const panel = {
     navScore: 'Score',
     navRutas: 'Add routes',
     navKit: 'Get discovered',
-    navClientes: 'Customers',
     navVisitas: 'Agent visits',
     navAgente: 'My agent',
-    navRetirar: 'Withdraw',
+    navIngresos: 'Revenue',
     navWallet: 'My wallet',
 
     // dashboard
@@ -274,9 +236,10 @@ export const panel = {
     paso2Descripcion: 'Add links or import your sitemap. Agents pay per request.',
     paso3Titulo: 'Get discovered',
     paso3Descripcion: 'Apply the kit on your site and verify the integration.',
-    metricaDisponible: 'Available',
+    metricaCobro: 'Payout address',
+    metricaCobroFalta: 'Missing',
     metricaRequests: 'Paid requests',
-    metricaRevenue: 'Total revenue',
+    metricaRevenue: 'Received',
     ultimosPagos: 'Latest payments',
     nadiePaga: 'Nobody is paying yet.',
     agregaPrimerLink: 'Add your first priced link',
@@ -303,31 +266,10 @@ export const panel = {
     graficaBarra: (fecha: string, monto: string, pagos: number) =>
       `${fecha}: $${monto} (${pagos} payments)`,
 
-    // wallet de retiro
-    cambiarWalletRetiro: 'Change withdrawal wallet',
-    walletRetiroTitulo: 'Withdrawal wallet',
-    walletRetiroDescripcion:
-      'Where we send your money when you withdraw. You can change it whenever you want.',
+    // payout address
     guardar: 'Save',
     errorGuardarWallet: 'Could not save',
 
-    // clientes
-    clientesTitulo: 'Your agent customers',
-    clientesDescripcion:
-      'Which agents pay for your content. Identity and reputation from the ERC-8004 registry, via The Graph.',
-    clientesVacio: 'No payments from an identified wallet yet.',
-    metricaAgentesUnicos: 'Unique agents',
-    metricaConIdentidad: 'With on-chain identity',
-    valorConIdentidad: (agentes: number, porcentaje: number) =>
-      `${agentes} (${porcentaje}% of revenue)`,
-    metricaEnfoque: 'Dominant focus',
-    sinDatos: 'no data',
-    reputacion: (promedio: number, votos: number) => `reputation ${promedio}/100 (${votos})`,
-    sinIdentidad: 'no identity',
-    conteoRequests: (requests: number) => `${requests} request${requests === 1 ? '' : 's'}`,
-    pagaPor: 'pays via',
-    unionRedes: ' and ',
-    vistoPorUltimaVez: 'last seen',
 
     // score
     scoreTitulo: 'Score',
@@ -375,12 +317,6 @@ export const panel = {
     errorPrecioMayorCero: 'The price has to be greater than 0',
     errorWalletInvalida: 'That does not look like a valid wallet',
     errorWalletAjena: 'Peaje manages that wallet for another account. Use yours or an external wallet.',
-    errorNegocioSinWallet: 'This site has no wallet.',
-    errorDestinoInvalido: 'The destination address is not valid.',
-    errorRedInvalida: 'Invalid network.',
-    errorMontoInvalido: 'Invalid amount.',
-    errorMismoDestino: 'That is your own wallet address.',
-    errorEnvio: 'Could not send. Check the balance (gas comes out of the same token) and retry.',
     errorUrlInvalida: 'The URL is not valid. Include https://',
     errorSoloHttp: 'Only http(s)',
     errorPrecioInvalido: 'Invalid price (0 = free)',

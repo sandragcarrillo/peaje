@@ -165,8 +165,9 @@ export function TerminosEn() {
           </li>
           <li>
             They are <T>separate from the Pro subscription</T>. They settle on the payment network you choose;
-            Peaje records each payment and credits it to your business wallet, from where you withdraw it.
-            {/* TODO(San): confirm how to describe the business wallet created with Privy at signup (who owns it, who controls it, how withdrawals work). */}
+            each payment goes straight to your payout address in the same transaction, and Peaje keeps its 2% fee.
+            Peaje does not hold a balance for you, so there is nothing to withdraw.
+            {/* TODO(San): confirm with the lawyer how to describe the payout wallet created with Privy at signup (owned by the user, Peaje cannot move it) and the direct split in PeajeSettlementV3. */}
           </li>
           <li>
             <T>Paddle never processes them</T>. Paddle only sells the Pro subscription (section 10).
@@ -226,14 +227,22 @@ export function TerminosEn() {
           </li>
           <li>
             <T>Pro founder</T>: <T>US${PRECIOS_USD.founder} a month</T>, only for the first {CUPOS_FOUNDER} businesses
-            that subscribe. It includes {LIMITES.founder.preguntas} questions tracked in AI assistants and{' '}
-            {LIMITES.founder.mensajes} messages to the agent a month. Founders keep that price while their subscription stays active; if they cancel and come back, they pay the Pro price.
+            that subscribe. It includes {LIMITES.founder.creditos} credits a month for the agent&apos;s work and{' '}
+            {LIMITES.founder.preguntas} questions tracked in AI assistants a month. Founders keep that price while their subscription stays active; if they cancel and come back, they pay the Pro price.
           </li>
           <li>
             <T>Pro</T>: <T>US${PRECIOS_USD.pro} a month</T> once the founder spots are taken. It includes{' '}
-            {LIMITES.pro.preguntas} tracked questions and {LIMITES.pro.mensajes} messages to the agent a month.
+            {LIMITES.pro.creditos} credits a month and {LIMITES.pro.preguntas} tracked questions a month.
           </li>
         </Lista>
+        <p>
+          <T>Credits</T>. Talking to the agent uses no credits. Credits are spent on the work the agent does for you:
+          lookups in your data, fixes, page drafts, series of pages, reports you ask for and mystery shopper tests. What
+          each one costs is on the <L href="/precios">pricing page</L>. Scheduled reports and answers to questions that
+          have nothing to do with your business use no credits. Credits renew on the 1st of each month, unused credits
+          do not carry over and extra credits are not sold. If you run out, the agent keeps answering you, but it does
+          no new work until the 1st of next month.
+        </p>
         <p>
           The subscription is per site. Limits are counted per month. The current price and your country&apos;s taxes
           appear in the checkout before you confirm the purchase. We may adjust prices and limits with prior notice; a

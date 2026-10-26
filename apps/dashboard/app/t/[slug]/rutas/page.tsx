@@ -5,7 +5,6 @@ import { store } from '@/lib/store'
 import { FooterStrip, PageHeader } from '@/components/chrome'
 import { LinksPanel } from '../links'
 import { RutasApiPanel } from '../rutas-api'
-import { saldoTotal } from '@/lib/saldos'
 
 export default async function Rutas({ params }: PageProps<'/t/[slug]/rutas'>) {
   const { slug } = await params
@@ -13,7 +12,7 @@ export default async function Rutas({ params }: PageProps<'/t/[slug]/rutas'>) {
   const [resources, routes, balance, d] = await Promise.all([
     store.listResources(tenant.id).catch(() => []),
     store.listRoutes(tenant.id).catch(() => []),
-    saldoTotal(tenant),
+    store.balance(tenant.id),
     getDict(),
   ])
   const base = `${gatewayUrl}/${tenant.slug}`

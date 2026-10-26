@@ -54,6 +54,10 @@ import type { AgentJob, NewAgentJob, VoiceProfile } from './types'
 import type { SlackCode, SlackInstall, SlackLink } from './types'
 // ---- reportes programados ----
 import type { ReportKind, ReportSchedule, ReportScheduleInput } from './types'
+// ---- pagos directos ----
+import type { NewSettlementStray, SettlementStray } from './types'
+// ---- créditos del agente ----
+import type { CreditCharge } from './types'
 
 /**
  * Store en memoria. Corre el gateway y el dashboard sin Supabase, con la misma
@@ -66,6 +70,7 @@ export class MemoryStore implements Store {
   #routes = new Map<string, Route[]>()
   #payments: Payment[] = []
   #withdrawals: Withdrawal[] = []
+  #strays: SettlementStray[] = []
   #seq = 0
 
   #id(prefix: string) {
@@ -342,6 +347,17 @@ export class MemoryStore implements Store {
     this.#messages = this.#messages.filter((m) => m.tenantId !== tenantId)
   }
 
+  // ---- créditos del agente ----
+  #creditos: (CreditCharge & { createdAt: string })[] = []
+
+  async addCreditCharge(c: CreditCharge): Promise<void> {
+    this.#creditos.push({ ...c, createdAt: new Date().toISOString() })
+  }
+
+  async creditsUsedSince(tenantId: string, since: string): Promise<number> {
+    return this.#creditos.filter((c) => c.tenantId === tenantId && c.createdAt >= since).reduce((n, c) => n + c.credits, 0)
+  }
+
   // ---- trabajos largos del agente ----
   #jobs: AgentJob[] = []
 
@@ -487,6 +503,15 @@ export class MemoryStore implements Store {
 
   async unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void> {
     this.#tgLinks = this.#tgLinks.filter((l) => !((filter.chatId === undefined || l.chatId === filter.chatId) && (filter.tenantId === undefined || l.tenantId === filter.tenantId)))
+  }
+
+  #intros = new Set<string>()
+
+  async claimAgentIntro(tenantId: string, channel: string, target: string): Promise<boolean> {
+    const clave = `${tenantId}|${channel}|${target}`
+    if (this.#intros.has(clave)) return false
+    this.#intros.add(clave)
+    return true
   }
 
   // ---- Slack ----
@@ -740,6 +765,7 @@ export class MemoryStore implements Store {
     const row: Payment = {
       platformFee: '0',
       networkFee: '0',
+      payoutAddress: null,
       ...payment,
       id: this.#id('pay'),
       refundTx: null,
@@ -749,6 +775,43 @@ export class MemoryStore implements Store {
     return row
   }
 
+  // ---- pagos directos: pagos adelantados ----
+  async recordStray(input: NewSettlementStray) {
+    const clave = (x: { contract: string; token: string; payer: string; nonce: string }) =>
+      [x.contract, x.token, x.payer, x.nonce].map((v) => v.toLowerCase()).join('|')
+    const previo = this.#strays.find((x) => clave(x) === clave(input))
+    if (previo) return { stray: previo, nuevo: false }
+    // Mismo formato que Supabase: direcciones y nonce en minúscula.
+    const stray: SettlementStray = {
+      ...input,
+      contract: input.contract.toLowerCase(),
+      token: input.token.toLowerCase(),
+      payer: input.payer.toLowerCase(),
+      nonce: input.nonce.toLowerCase(),
+      id: this.#id('stray'),
+      status: 'pending',
+      settleTx: null,
+      detectedAt: new Date().toISOString(),
+      resolvedAt: null,
+    }
+    this.#strays.push(stray)
+    return { stray, nuevo: true }
+  }
+
+  async listStrays(status?: SettlementStray['status']) {
+    return this.#strays.filter((x) => !status || x.status === status).toReversed()
+  }
+
+  async resolveStray(id: string, settleTx: string) {
+    const stray = this.#strays.find((x) => x.id === id)
+    if (!stray) return null
+    stray.status = 'settled'
+    stray.settleTx = settleTx
+    stray.resolvedAt = new Date().toISOString()
+    return stray
+  }
+  // ---- fin pagos directos ----
+
   async setPaymentWallet(paymentId: string, wallet: string) {
     const row = this.#payments.find((p) => p.id === paymentId)
     if (row) row.agentWallet = wallet
@@ -757,6 +820,12 @@ export class MemoryStore implements Store {
   async markPaymentRefunded(paymentId: string, txRef: string) {
     const row = this.#payments.find((p) => p.id === paymentId)
     if (row) row.refundTx = txRef
+  }
+
+  async refundedSince(since: string, tenantId?: string) {
+    return this.#payments
+      .filter((p) => p.refundTx && p.createdAt >= since && (!tenantId || p.tenantId === tenantId))
+      .reduce((n, p) => n + Number(p.amount) + Number(p.platformFee) + Number(p.networkFee), 0)
   }
 
   async listPayments(tenantId: string, limit = 50) {
@@ -1080,6 +1149,20 @@ export class MemoryStore implements Store {
     const b = this.#billing.find((x) => x.id === id)
     if (b && !b.refundedAt) b.refundedAt = at
   }
+
+  // ---- bienvenida ----
+  #welcomeSentAt = new Map<string, string>()
+
+  async claimWelcomeEmail(tenantId: string, at: string): Promise<boolean> {
+    if (!this.#tenants.has(tenantId) || this.#welcomeSentAt.has(tenantId)) return false
+    this.#welcomeSentAt.set(tenantId, at)
+    return true
+  }
+
+  async releaseWelcomeEmail(tenantId: string, at: string): Promise<void> {
+    if (this.#welcomeSentAt.get(tenantId) === at) this.#welcomeSentAt.delete(tenantId)
+  }
+  // ---- fin bienvenida ----
   // ---- fin Paddle ----
 
   // ---- radar público: leads ----

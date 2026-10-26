@@ -8,7 +8,7 @@ import { CHAINS } from '@/lib/config'
 /**
  * Sidebar calcado del diseño de Stitch: tarjeta de identidad con bloque de
  * iniciales, nav mono donde cada ítem muestra su dato real a la derecha
- * (score, rutas, saldo), acción directa NUEVA RUTA, y pie de sistema.
+ * (score, rutas, ingresos), acción directa NUEVA RUTA, y pie de sistema.
  * Sin iconos de Material (no cargamos esa fuente); los valores son reales,
  * nunca los de utilería del mock.
  */
@@ -20,7 +20,7 @@ export function Sidebar({
 }: {
   slug: string
   name: string
-  valores: { score: string; rutas: string; retirar: string }
+  valores: { score: string; rutas: string; ingresos: string }
   portalUrl: string
 }) {
   const pathname = usePathname()
@@ -39,9 +39,8 @@ export function Sidebar({
     { href: '/score', label: d.panel.navScore, valor: valores.score },
     { href: '/rutas', label: d.panel.navRutas, valor: valores.rutas },
     { href: '/kit', label: d.panel.navKit },
-    { href: '/clientes', label: d.panel.navClientes },
     { href: '/agentes-visitas', label: d.panel.navVisitas },
-    { href: '/retirar', label: d.panel.navRetirar, valor: valores.retirar, acento: true },
+    { href: '/ingresos', label: d.panel.navIngresos, valor: valores.ingresos, acento: true },
   ]
 
   return (

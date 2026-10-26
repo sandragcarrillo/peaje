@@ -99,12 +99,12 @@ export function PrivacidadEs() {
           dueño del sitio.
         </p>
 
-        <H3>3.5 Pagos de agentes y retiros</H3>
+        <H3>3.5 Pagos de agentes</H3>
         <p>
           Si cobras a agentes, guardamos un registro de cada pago: la ruta, el monto, la comisión, la red, la{' '}
-          <T>dirección de wallet del agente</T> y la referencia de la transacción. De cada retiro guardamos el monto, la
-          wallet de destino y la referencia. Estas transacciones quedan además registradas en redes públicas de
-          blockchain, que cualquiera puede consultar.
+          <T>dirección de wallet del agente</T>, la dirección de cobro a la que llegó y la referencia de la
+          transacción. Estas transacciones quedan además registradas en redes públicas de blockchain, que cualquiera
+          puede consultar.
         </p>
 
         <H3>3.6 Conversación con el agente</H3>
@@ -152,7 +152,7 @@ export function PrivacidadEs() {
             las visitas, y operar el agente Pro.
           </li>
           <li>
-            <T>Registrar los pagos</T> que tu sitio recibe de agentes y procesar tus retiros.
+            <T>Registrar los pagos</T> que tu sitio recibe de agentes.
           </li>
           <li>
             <T>Administrar tu suscripción</T> y aplicar los límites de cada plan.
@@ -306,7 +306,8 @@ export function PrivacidadEs() {
             <T>Radar</T>: hasta que pidas que te saquemos. Si aceptaste consejos, puedes retirar ese permiso cuando quieras.
           </li>
           <li>
-            <T>Registros de pagos, retiros y facturación</T>: por el término que exija la ley colombiana.
+            <T>Registros de pagos y facturación</T> (y de los retiros hechos antes de que los pagos llegaran directo a
+            tu wallet): por el término que exija la ley colombiana.
           </li>
         </Lista>
         <p>

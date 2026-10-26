@@ -14,6 +14,7 @@ import { agenteReportes } from './sections/agente-reportes'
 import { legal } from './sections/legal'
 import { precios } from './sections/precios'
 import { pago } from './sections/pago'
+import { walletPropia } from './sections/wallet-propia'
 
 /**
  * i18n mínima y tipada, sin librería ni rutas por idioma.
@@ -35,7 +36,7 @@ export const LOCALE_LABELS: Record<Locale, string> = { en: 'EN', es: 'ES' }
 /** Cada sección declara los dos idiomas; el tipo sale del español. */
 type Seccion<T> = { es: T; en: T }
 
-const SECCIONES = { nav, landing, acceso, mercado, agentes, panel, dinero, kit, visitas, miAgente, radar, radarCorreo, agenteReportes, legal, precios, pago }
+const SECCIONES = { nav, landing, acceso, mercado, agentes, panel, dinero, kit, visitas, miAgente, radar, radarCorreo, agenteReportes, legal, precios, pago, walletPropia }
 
 export type Dict = {
   [K in keyof typeof SECCIONES]: (typeof SECCIONES)[K] extends Seccion<infer T> ? T : never

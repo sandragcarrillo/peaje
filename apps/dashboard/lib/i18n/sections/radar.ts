@@ -15,7 +15,11 @@ export const radar = {
     consentimiento: 'Mándame consejos para que los agentes de IA me encuentren. Puedes darte de baja cuando quieras.',
     boton: 'Medir mi sitio gratis',
     enviando: 'Un momento…',
-    letraChica: 'Solo tu correo y tu dominio: sin cuenta y sin tarjeta. Tu resultado se abre aquí cuando esté listo.',
+    // Lo que de verdad sale por correo (app/radar/correo-actions.ts y el gateway, radar.ts): el
+    // reporte del dominio con el enlace al resultado, después de cada medición o con "Mándame el
+    // informe". No hay secuencia de seguimiento; los consejos solo con la casilla marcada.
+    letraChica:
+      'Solo tu correo y tu dominio: sin cuenta y sin tarjeta. Tu resultado se abre aquí y también te llega por correo, con su enlace, para que no lo pierdas. Fuera de eso, solo te escribimos si marcas la casilla de consejos, y nunca te llamamos para venderte.',
     faltaCorreo: 'Escribe tu correo.',
     faltaSitio: 'Escribe tu sitio, por ejemplo tusitio.com.',
     pideCorreo: (dominio: string) => `Para medir ${dominio} déjanos tu correo. Te mandamos el resultado.`,
@@ -59,11 +63,11 @@ export const radar = {
     instruccionesCopiadas: 'Instrucciones copiadas',
     nadaPrimero: 'Tu sitio ya pasa todo lo que Peaje cubre. No hay un primer arreglo que proponerte.',
     promptArreglo: (dominio: string, titulo: string, archivo: string, que: string, radarUrl: string) =>
-      `En el repo de mi sitio (${dominio}) quiero arreglar una cosa para que los agentes de IA lo entiendan mejor: ${titulo} (${archivo}).${
-        que ? ` Lo que dice el medidor: ${que}` : ''
-      } Haz solo ese cambio, sin tocar lo demás, y dime qué archivos cambiaste. Cuando esté publicado, vuelvo a medir en ${radarUrl}.`,
+      `En el repo de mi sitio (${dominio}) quiero arreglar una cosa para que los agentes de IA lo entiendan mejor: ${titulo}${archivo ? ` (${archivo})` : ''}. Lo encontró el radar de Peaje, que usa el medidor Ora (ora.ai); el resultado está en ${radarUrl}.${
+        que ? ` Lo que dice el medidor, tal cual: "${que}"` : ''
+      } Antes de editar, muéstrame el cambio y espera mi confirmación. Haz solo ese cambio, sin tocar lo demás, dime qué archivos cambiaste y no hagas commit ni deploy: eso lo hago yo. Cuando esté publicado, vuelvo a medir.`,
     promptArregloGateway: (dominio: string, titulo: string, signupUrl: string) =>
-      `En el repo de mi sitio (${dominio}) quiero arreglar esto para los agentes de IA: ${titulo}. Esta parte la pone Peaje desde su servidor, así que primero creo la cuenta gratis en ${signupUrl} y te paso el identificador del negocio (slug). Con ese slug, en Next.js corre \`npx @peaje/cli@1 init <slug> --yes\`; en otro stack sigue las instrucciones que da \`npx @peaje/cli@1 plan <slug>\`.`,
+      `En el repo de mi sitio (${dominio}) quiero arreglar esto para los agentes de IA: ${titulo}. Esta parte la sirve Peaje (usepeaje.com, código en https://github.com/sandragcarrillo/peaje) desde su servidor, así que primero creo mi cuenta en ${signupUrl} y te paso el identificador del negocio (slug). No hagas nada hasta que te lo pase. Con el slug, corre \`npx @peaje/cli@1 plan <slug>\`: muestra los archivos que cambiaría, sin escribir nada, en cualquier stack. Enséñame esa lista y espera mi confirmación. Con mi sí, corre \`npx @peaje/cli@1 init <slug> --yes\` y dime qué quedó para hacer a mano. No hagas commit ni deploy: eso lo hago yo.`,
 
     // 03
     s03: 'Lo que falta',
@@ -114,7 +118,8 @@ export const radar = {
     consentimiento: 'Send me tips so AI agents can find me. You can unsubscribe anytime.',
     boton: 'Measure my site for free',
     enviando: 'One moment…',
-    letraChica: 'Just your email and your domain: no account and no card. Your result opens here when it is ready.',
+    letraChica:
+      'Just your email and your domain: no account and no card. Your result opens here and also lands in your inbox, with its link, so you do not lose it. Beyond that, we only email you if you tick the tips box, and we never call you to sell.',
     faltaCorreo: 'Enter your email.',
     faltaSitio: 'Enter your site, for example yoursite.com.',
     pideCorreo: (dominio: string) => `To measure ${dominio}, leave us your email. We send you the result.`,
@@ -154,11 +159,11 @@ export const radar = {
     instruccionesCopiadas: 'Instructions copied',
     nadaPrimero: 'Your site already passes everything Peaje covers. There is no first fix to suggest.',
     promptArreglo: (dominio: string, titulo: string, archivo: string, que: string, radarUrl: string) =>
-      `In my site's repo (${dominio}) I want to fix one thing so AI agents understand it better: ${titulo} (${archivo}).${
-        que ? ` What the scanner says: ${que}` : ''
-      } Make only that change, leave everything else alone, and tell me which files you changed. Once it is live, I will measure again at ${radarUrl}.`,
+      `In my site's repo (${dominio}) I want to fix one thing so AI agents understand it better: ${titulo}${archivo ? ` (${archivo})` : ''}. The Peaje radar found it, using the Ora scanner (ora.ai); the result is at ${radarUrl}.${
+        que ? ` What the scanner says, verbatim: "${que}"` : ''
+      } Before editing, show me the change and wait for my confirmation. Make only that change, leave everything else alone, tell me which files you changed, and do not commit or deploy: I do that. Once it is live, I will measure again.`,
     promptArregloGateway: (dominio: string, titulo: string, signupUrl: string) =>
-      `In my site's repo (${dominio}) I want to fix this for AI agents: ${titulo}. Peaje provides this part from its own server, so first I create the free account at ${signupUrl} and give you the business id (slug). With that slug, on Next.js run \`npx @peaje/cli@1 init <slug> --yes\`; on another stack follow what \`npx @peaje/cli@1 plan <slug>\` prints.`,
+      `In my site's repo (${dominio}) I want to fix this for AI agents: ${titulo}. Peaje (usepeaje.com, code at https://github.com/sandragcarrillo/peaje) serves this part from its own server, so first I create my account at ${signupUrl} and give you the business id (slug). Do nothing until I give it to you. With the slug, run \`npx @peaje/cli@1 plan <slug>\`: it lists the files it would change, without writing anything, on any stack. Show me that list and wait for my confirmation. Once I say yes, run \`npx @peaje/cli@1 init <slug> --yes\` and tell me what is left to do by hand. Do not commit or deploy: I do that.`,
 
     s03: 'What is missing',
     loArreglaPeaje: (n: number) => `Peaje fixes this (${n})`,

@@ -5,7 +5,6 @@ import { cachedScore, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Sidebar } from './sidebar'
-import { saldoTotal } from '@/lib/saldos'
 
 /**
  * Frame de consola del negocio, calcado del diseño de Stitch (Business
@@ -38,7 +37,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
 
   const domain = scannableDomain(tenant.originUrl)
   const [balance, resources, score] = await Promise.all([
-    saldoTotal(tenant),
+    store.balance(tenant.id),
     store.listResources(tenant.id).catch(() => []),
     domain ? cachedScore(domain) : Promise.resolve(null),
   ])
@@ -52,7 +51,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
           valores={{
             score: score ? String(score.score) : '—',
             rutas: String(resources.length),
-            retirar: `$${Number(balance.available).toFixed(2)}`,
+            ingresos: `$${Number(balance.revenue).toFixed(2)}`,
           }}
           portalUrl={`${gatewayUrl}/${tenant.slug}/developers`}
         />

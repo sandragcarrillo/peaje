@@ -20,8 +20,8 @@ Desde el 24 oct 2026 Peaje Pro se vende con tarjeta por Paddle Billing. Paddle e
 | `PADDLE_WEBHOOK_SECRET` | gateway (Railway) | secreto del destino de notificaciones sandbox (`pdl_ntfset_...`) | secreto del destino live |
 | `PADDLE_API_KEY` | gateway (Railway) | `pdl_sdbx_apikey_...` con permiso `customer_portal_session.write` | `pdl_live_apikey_...` con el mismo permiso |
 | `PADDLE_ENV` | gateway (Railway) | `sandbox` | `production` (si falta, se deduce del prefijo de la clave) |
-| `PADDLE_PRICE_FOUNDER` | gateway **y** dashboard | `pri_01m5rck0vjxwwgy1m9t4xe463j` | id del precio founder live |
-| `PADDLE_PRICE_PRO` | gateway **y** dashboard | `pri_01m5rck0zrxc39khzcmtsw59ca` | id del precio pro live |
+| `PADDLE_PRICE_FOUNDER` | gateway **y** dashboard | `pri_...` | id del precio founder (live o sandbox según PADDLE_ENV) |
+| `PADDLE_PRICE_PRO` | gateway **y** dashboard | `pri_...` | id del precio pro (live o sandbox según PADDLE_ENV) |
 | `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | dashboard (Vercel) | client-side token `test_...` | client-side token `live_...` |
 | `NEXT_PUBLIC_PADDLE_ENV` | dashboard (Vercel) | `sandbox` | `production` |
 | `PADDLE_WEBHOOK_TOLERANCE_S` | gateway, opcional | 5 por defecto (lo que recomienda Paddle) | igual |
@@ -29,7 +29,7 @@ Desde el 24 oct 2026 Peaje Pro se vende con tarjeta por Paddle Billing. Paddle e
 
 Las `NEXT_PUBLIC_*` se inlinean en el build: después de cambiarlas en Vercel hay que redeployar. Token, precios y ambiente tienen que ser del mismo ambiente: un `pri_` de sandbox no existe en live.
 
-Sandbox (creado el 24 oct 2026 por API): producto Peaje Pro `pro_01m5rck0qv2rwhgx0rt8zzke65`, founder `pri_01m5rck0vjxwwgy1m9t4xe463j` (US$30/mes), pro `pri_01m5rck0zrxc39khzcmtsw59ca` (US$69/mes), sin prueba, cantidad 1. **Ojo:** es la misma cuenta sandbox de Puente (tiene Puente Pro y el destino de RevenueCat). Los eventos de Puente que lleguen al webhook de Peaje se ignoran por precio.
+Sandbox de Peaje (cuenta propia, creada el 25 oct 2026, separada de Puente): producto Peaje Pro `pro_01m5v51hr0ed18scxsyty1wpd0`, founder `pri_01m5v51hye2cgxq012tsztc4kt` (US$30/mes), pro `pri_01m5v51j33r8bxnsn29vpmgdsg` (US$69/mes), sin prueba gratis. Destino de avisos `ntfset_01m5v51jdm4kvc04my1hchxtak` hacia https://api.usepeaje.com/paddle/webhook. Enlace de pago por defecto https://usepeaje.com/checkout. El catálogo viejo en la cuenta compartida con Puente (`pro_01m5rck…`) ya no se usa.
 
 ## Migración
 

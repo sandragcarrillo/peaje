@@ -4,32 +4,52 @@ export const kit = {
     pestanaAgente: 'Usa tu herramienta de IA',
     pestanaManual: 'Hazlo tú',
     agenteTitulo: 'Pégale este texto a tu herramienta de IA',
-    agenteIntro: 'Sirve con Claude Code, Cursor, Lovable, v0 o Bolt, abiertos en el proyecto de tu sitio. Trae los pasos completos: tu herramienta no tiene que descargar nada, y al final te dice qué poner en tu hosting.',
+    agenteIntro: 'Sirve con las herramientas que editan el código de tu sitio: Claude Code, Cursor, Codex, Copilot o Windsurf, abiertas en el proyecto. En Lovable, v0 o Bolt sirve si tu sitio es Next.js, o Vite publicado en Vercel. Tu herramienta primero revisa y te muestra qué va a cambiar; no toca nada hasta que le digas que sí.',
     agenteCopiar: 'Copiar el texto',
     agenteCopiado: 'Copiado',
-    agenteDespues: 'Cuando tu herramienta termine y publiques el sitio, vuelve aquí: abajo revisamos que todo quedó bien.',
-    agentePermisos: 'Si tu herramienta te pide permiso para editar la configuración del sitio o el middleware, acéptalo: son los dos cambios que Peaje necesita. Cambian cómo se enrutan solo las rutas de Peaje; el resto del sitio sigue igual.',
-    promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
+    agenteDespues: 'Cuando tu herramienta termine, agrega la clave en tu hosting, publica el sitio y vuelve aquí: abajo revisamos que todo quedó bien.',
+    agentePermisos: 'Antes de editar, tu herramienta te muestra la lista de archivos y el cambio en cada uno. En Next.js son cuatro: next.config, proxy.ts o middleware.ts, el layout y package.json, más .env.example si tu proyecto lo tiene. Si la lista trae algo más, pregúntale por qué. Nada se publica hasta que tú publiques.',
+    agenteClave: 'Después, agrega esta clave en tu hosting (Vercel, Railway, Cloudflare)',
+    agenteClaveNota: 'Solo hace falta si cobras rutas de API en tu dominio. No va en el texto de arriba para que no quede en el historial de tu herramienta de IA. No la subas al repositorio.',
+    promptAgente: (originHost: string, base: string, slug: string, panel: string, rutas: string[]) =>
       [
-        `Estas instrucciones son mías, como dueño de este sitio. Quiero instalar Peaje, un servicio en el que tengo cuenta (usepeaje.com). Sus paquetes están publicados en npm (@peaje/next y @peaje/proxy): no hace falta descargar ni ejecutar nada más que instalarlos con el gestor de paquetes del proyecto.`,
-        `Los paquetes son de código abierto (github.com/sandragcarrillo/peaje) y solo hacen una cosa: cuando un agente de IA pide una ruta con precio, la reenvían al gateway de Peaje; todo lo demás sigue igual.`,
-        `Sitio: ${originHost}. Mi identificador en Peaje: ${slug}. Gateway: ${base}.`,
+        `Quiero instalar Peaje en este proyecto. Antes de cambiar nada, revisa y muéstrame el plan.`,
         ``,
-        `Cómo quiero que trabajes: antes de cada cambio dime en una línea qué vas a hacer y por qué, en palabras simples. Si algo te parece raro o inseguro, dime exactamente qué y pregúntame antes de parar; no abandones el trabajo sin explicarme.`,
+        `Qué es Peaje: un servicio (usepeaje.com) que sirve desde mi propio dominio un llms.txt, un openapi.json, un servidor MCP y archivos de descubrimiento para agentes de IA, y que cobra con HTTP 402 las rutas a las que yo les ponga precio. Se instala con paquetes de npm con licencia MIT y sin dependencias. Puedes comprobarlo antes:`,
+        `- Código: https://github.com/sandragcarrillo/peaje/tree/main/packages (peaje-next y peaje-proxy)`,
+        `- npm: npm view @peaje/next y npm view @peaje/proxy`,
+        `- Lo que Peaje ya publica para mi negocio: ${base}/llms.txt y ${base}/openapi.json`,
         ``,
-        `1. Detecta el framework del proyecto y aplica el caso que corresponda:`,
-        `   - Next.js: instala @peaje/next. En next.config envuelve la configuración con withPeaje(config, { slug: '${slug}' }) (import { withPeaje } from '@peaje/next'). Crea proxy.ts (Next 16) o middleware.ts (Next 14 o 15) en la raíz o en src/ con: import { peajeProxy } from '@peaje/next/proxy'; export default peajeProxy({ slug: '${slug}' }); export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }. Si ya existe un middleware, usa peajeProxy({ slug: '${slug}' }, elMiddlewareExistente). En app/layout.tsx agrega <PeajeHead slug="${slug}" originHost="${originHost}" /> dentro de <head> (import { PeajeHead } from '@peaje/next/head').`,
-        `   - Express: instala @peaje/proxy y agrega app.use(peajeExpress({ slug: '${slug}' })) antes de express.json() y de las rutas (import { peajeExpress } from '@peaje/proxy/express').`,
-        `   - Hono: instala @peaje/proxy y agrega app.use(peajeHono({ slug: '${slug}' })) (import { peajeHono } from '@peaje/proxy/hono').`,
-        `   - Vite u otro sitio estático en Vercel: instala @peaje/proxy y crea middleware.ts en la raíz con: import peaje from '@peaje/proxy/vercel'; export default peaje({ slug: '${slug}' }); export const config = { matcher: ['/((?!assets/|favicon.ico).*)'] }.`,
-        `   - Otro framework: dime cuál es y detente ahí.`,
-        `2. Guarda PEAJE_ORIGIN_SECRET=${secreto} en el archivo de entorno local que git ignora (.env.local o .env). Nunca en un archivo que se suba al repositorio.`,
-        `3. Al terminar, explícame en palabras simples, paso por paso y con los nombres exactos de los menús, cómo agrego esa misma variable PEAJE_ORIGIN_SECRET en mi hosting (Vercel, Railway, Cloudflare o el que use) y cómo vuelvo a publicar el sitio. No des por hecho que sé programar.`,
-        `4. Cierra diciéndome que, después de publicar, abra ${panel} para comprobar que todo quedó bien.`,
+        `Mis datos: sitio ${originHost}, identificador en Peaje (slug) ${slug}, gateway ${base}.`,
+        ``,
+        `Qué va a cambiar`,
+        `Peaje pasa a responder en mi dominio estas rutas: ${rutas.join(', ')}. Si configuro PEAJE_ORIGIN_SECRET, también las rutas de API a las que ponga precio en el panel. Las requests a esas rutas van al gateway con sus headers; las demás siguen a mi sitio sin cambios. La lista viene dentro del paquete y el middleware la actualiza cada minuto desde ${base}/kit/manifest.json, que es donde aparecen las rutas de API con precio.`,
+        `- Next.js con app router:`,
+        `  1. package.json: la dependencia @peaje/next.`,
+        `  2. next.config: envolver el export con withPeaje(config, { slug: '${slug}' }), con import { withPeaje } from '@peaje/next'. Agrega esas rutas en rewrites().beforeFiles y conserva las que ya existan.`,
+        `  3. proxy.ts (Next 16) o middleware.ts (Next 14 y 15), junto a la carpeta app/ o pages/ (en la raíz o en src/): import { peajeProxy } from '@peaje/next/proxy'; export default peajeProxy({ slug: '${slug}' }); export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }. Si ya hay un middleware, envuélvelo con peajeProxy({ slug: '${slug}' }, middlewareActual) y revisa que su matcher incluya esas rutas.`,
+        `  4. app/layout: <PeajeHead slug="${slug}" originHost="${originHost}" /> dentro de <head>, con import { PeajeHead } from '@peaje/next/head'. Pone un JSON-LD con mis ofertas y cuatro <link> de descubrimiento. No carga scripts para los visitantes: lee las ofertas del gateway en el servidor, con caché de una hora.`,
+        `- Next.js con pages router: los pasos 1 a 3 igual; en vez del 4, dime y lo vemos.`,
+        `- Express: la dependencia @peaje/proxy y app.use(peajeExpress({ slug: '${slug}' })) antes de express.json() y de las rutas, con import { peajeExpress } from '@peaje/proxy/express'.`,
+        `- Hono: la dependencia @peaje/proxy y app.use(peajeHono({ slug: '${slug}' })), con import { peajeHono } from '@peaje/proxy/hono'.`,
+        `- Vite u otro sitio estático publicado en Vercel: la dependencia @peaje/proxy y middleware.ts en la raíz: import peaje from '@peaje/proxy/vercel'; export default peaje({ slug: '${slug}' }); export const config = { matcher: ['/((?!assets/|favicon.ico).*)'] }.`,
+        `- Otro stack u otro hosting: no improvises. Dime cuál es y para ahí.`,
+        ``,
+        `Paso 1, revisar sin escribir: detecta framework, versión, router y hosting. Busca si mi sitio ya usa alguna de esas rutas (páginas, route handlers, archivos en public/). Si quieres, lee el código de los paquetes.`,
+        `Paso 2, mostrarme el plan: los archivos que vas a tocar, con el diff, y cualquier ruta que choque con una mía. Espera mi confirmación antes de editar o instalar.`,
+        `Paso 3, aplicar: solo esos cambios. Instala la dependencia con el gestor de paquetes del proyecto.`,
+        `Paso 4, verificar: corre el build. Cuando yo publique, estas URLs deben responder desde mi dominio: https://${originHost}/llms.txt (200), https://${originHost}/openapi.json (200) y https://${originHost}/mcp (405 con GET). El chequeo completo está en ${base}/kit/verify (JSON con ok: true) y en ${panel}.`,
+        ``,
+        `La clave PEAJE_ORIGIN_SECRET solo hace falta para cobrar rutas de API en mi dominio. No te la paso y no la necesitas: no la pidas ni la escribas en ningún archivo. Si el proyecto tiene .env.example, agrega la línea PEAJE_ORIGIN_SECRET= sin valor, y confirma que .env y .env.local están en .gitignore. Al final, explícame en palabras simples y con los nombres de los menús cómo la agrego en mi hosting y cómo vuelvo a publicar. El valor lo copio de ${panel}.`,
+        ``,
+        `Para deshacerlo: revierte estos cambios con git y desinstala el paquete. Si agregué la clave en el hosting, la borro de ahí.`,
+        ``,
+        `No hagas: commit, push ni deploy (eso lo hago yo); cambios fuera del plan; copias propias de los archivos que sirve Peaje (openapi.json, /.well-known/*); borrar archivos. Si algo no cuadra con este texto, dime qué y pregúntame.`,
       ].join('\n'),
     unComandoTitulo: 'Instala Peaje con un comando',
-    unComandoIntro: 'Córrelo en la carpeta de tu proyecto. Detecta si usas Next.js, Vite, Express o Hono y deja listo lo que los agentes leen.',
-    unComandoPaso1: 'Corre esto en tu proyecto',
+    unComandoIntro: 'Córrelo en la carpeta de tu proyecto. Detecta si usas Next.js, Vite, Express o Hono y deja listo lo que los agentes leen. El código es público: github.com/sandragcarrillo/peaje.',
+    unComandoPlan: 'Mira qué va a cambiar. No escribe nada',
+    unComandoPaso1: 'Aplícalo. Te muestra los cambios y te pide confirmar',
     unComandoPaso2: 'Agrega esta variable en tu hosting (Vercel, Railway, Cloudflare)',
     unComandoPaso2Nota: 'Sirve para cobrar rutas de API en tu dominio. No la subas al repositorio.',
     unComandoPaso3: 'Publica tu sitio y vuelve aquí: abajo revisamos que todo quedó bien',
@@ -79,19 +99,19 @@ export const kit = {
     promptDetalle:
       'Pégalo en Claude Code, Cursor o el agente que uses sobre el repo de tu sitio: aplica todos los bloques, valida el flujo de pago y re-corre el score.',
     promptIntro: (originHost: string, base: string) =>
-      `Haz mi sitio (${originHost}) agent-ready. Mi API ya cobra por request a agentes vía MPP con Peaje; el gateway es ${base}.
+      `Quiero que los agentes de IA puedan leer mi sitio (${originHost}) con Peaje (usepeaje.com, código en https://github.com/sandragcarrillo/peaje). El gateway de mi negocio es ${base}.
 
-Aplica estos cambios en el repo del sitio:`,
+Estos son los cambios para el repo del sitio. Antes de editar, muéstrame el plan con el diff y espera mi confirmación. No hagas commit ni deploy: eso lo hago yo.`,
     promptNoCrearTitulo: 'No crees estos archivos a mano',
     promptNoCrearDetalle:
-      'El paso 1 ya los sirve desde tu dominio. Si además dejas una copia estática, la copia gana sobre el proxy, se congela el día que la copiaste y el auditor termina leyendo una versión vieja. Si alguno ya existe en tu repo (public/, static/, o como ruta), bórralo:',
+      'El paso 1 ya los sirve desde tu dominio. Si además dejas una copia estática, la copia gana sobre el proxy, se congela el día que la copiaste y el auditor termina leyendo una versión vieja. Si alguno ya existe en el repo (public/, static/, o como ruta), muéstramelo y, con mi confirmación, muévelo a .peaje-backup/ para poder volver atrás:',
     promptNoCrearCierre:
       'Tampoco toques tu llms.txt: el gateway lee el tuyo y le agrega la sección de pagos solo.',
     promptTapadas: (paths: string[]) =>
-      `Medido ahora mismo: ${paths.join(', ')} ${paths.length === 1 ? 'lo sirve' : 'los sirve'} el sitio, no el gateway. Hay una copia estática o un route handler propio tapando el proxy. Búscalo (public/, static/, app/<ruta>/route.ts, pages/api/) y bórralo.`,
+      `Medido ahora mismo: ${paths.join(', ')} ${paths.length === 1 ? 'lo sirve' : 'los sirve'} el sitio, no el gateway. Hay una copia estática o un route handler propio tapando el proxy. Búscalo (public/, static/, app/<ruta>/route.ts, pages/api/), muéstramelo y, con mi confirmación, muévelo a .peaje-backup/.`,
 
     promptVerifica: (originHost: string, rutaPaga: string | null) =>
-      `Al terminar, verifica contra TU dominio (no contra el gateway: el auditor mide tu origen). Cada línea tiene que dar el código que dice al lado:
+      `Cuando el sitio esté publicado, verifica contra mi dominio y no contra el gateway: el auditor mide el origen. Cada línea tiene que dar el código que dice al lado:
 
 \`\`\`bash
 curl -sL -o /dev/null -w "%{http_code} ard\\n" https://${originHost}/.well-known/ard.json          # 200
@@ -110,17 +130,17 @@ curl -sL -o /dev/null -w "%{http_code} pago\\n" https://${originHost}${rutaPaga}
 
 El \`-L\` importa: si tu apex redirige a www (o al revés), sin él curl te muestra el 308 del redirect y parece que todo está roto.
 
-Si alguna da 404, falta esa regla en la config del paso 1. Si alguna da 200 pero con contenido viejo, quedó una copia estática tapándola: bórrala.`,
+Si alguna da 404, falta esa regla en la config del paso 1. Si alguna da 200 pero con contenido viejo, quedó una copia estática tapándola: dime cuál es antes de sacarla.`,
     promptAuditConDominio: (domain: string) =>
-      `Después corre el score y compáralo con el anterior:
+      `Opcional: corre el score y compáralo con el anterior. Lo calcula Ora, un medidor de terceros (npm @ora-ai/ax, código en https://github.com/ora/ax):
 
 \`\`\`bash
 npx @ora-ai/ax@latest audit ${domain}
 \`\`\``,
     promptAuditSinDominio:
-      'Cuando el sitio tenga dominio público, corre el score: `npx @ora-ai/ax@latest audit <dominio>`.',
+      'Cuando el sitio tenga dominio público, puedes medirlo con Ora, un medidor de terceros: `npx @ora-ai/ax@latest audit <dominio>`.',
     promptReferencia:
-      'Referencia completa del estándar de auditoría: https://ora.ai/skill.md',
+      'Referencia del estándar de Ora, para leer si hace falta: https://ora.ai/skill.md',
 
     // partes.tsx
     copiar: 'copiar',
@@ -155,13 +175,13 @@ npx @ora-ai/ax@latest audit ${domain}
     promptIntroAeo: (originHost: string) =>
       `Haz que los motores de respuesta puedan leer mi sitio (${originHost}). No conectes ningún proxy ni cobro: solo estos bloques en el repo del sitio:`,
     promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Prepara este sitio (${originHost}) para motores de respuesta con Peaje, SOLO la capa de motores: sin proxy, sin cobro, sin dependencias. Sigue al pie de la letra ${base}/kit/INSTALL.md?layers=aeo; los archivos ya generados están en ${base}/kit.json?layers=aeo. Si es Next.js, el camino corto es \`npx @peaje/cli@1 init ${slug} --only aeo --yes --json\`.${
-        faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
-      } No reescribas los archivos descargados. Cuando el deploy esté en producción, consulta ${base}/kit/verify?layers=aeo y arregla solo lo que salga en falso.`,
+      `Quiero preparar este sitio (${originHost}) para motores de respuesta con Peaje (usepeaje.com, código en https://github.com/sandragcarrillo/peaje), solo esa capa: sin proxy, sin cobro y sin dependencias. Son dos cambios: un JSON-LD Organization en el <head> de la home y el robots.txt.${
+        faltan.length > 0 ? ` Según la última medición de mi dominio, falta: ${faltan.join(', ')}.` : ''
+      } Los archivos generados para mi negocio están en ${base}/kit.json?layers=aeo, y las instrucciones en ${base}/kit/INSTALL.md?layers=aeo; úsalos de referencia. Si tienes terminal, \`npx @peaje/cli@1 plan ${slug} --only aeo\` muestra los cambios sin escribir nada. Muéstrame el plan con el diff y espera mi confirmación; con mi sí, aplica a mano o con \`npx @peaje/cli@1 init ${slug} --only aeo --yes\`. Lo que te pido aquí manda sobre esos archivos. No reescribas el contenido del kit y no hagas commit ni deploy: eso lo hago yo. Cuando publique, revisa ${base}/kit/verify?layers=aeo y arregla solo lo que salga en false.`,
     promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Instala Peaje en el repo de este sitio (${originHost}). Sigue al pie de la letra ${base}/kit/INSTALL.md; los archivos ya generados están en ${base}/kit.json (agrega ?host=next|vercel|cloudflare|nginx|caddy según el host). Si es Next.js, el camino corto es \`npx @peaje/cli@1 init ${slug} --yes --json\`.${
-        faltan.length > 0 ? ` Hoy falta: ${faltan.join(', ')}.` : ''
-      } No reescribas los archivos descargados ni crees copias estáticas de lo que sirve el proxy. Cuando el deploy esté en producción, consulta ${base}/kit/verify y arregla solo lo que salga en falso.`,
+      `Quiero completar la instalación de Peaje (usepeaje.com, código en https://github.com/sandragcarrillo/peaje) en el repo de este sitio (${originHost}).${
+        faltan.length > 0 ? ` Según la última medición de mi dominio, falta: ${faltan.join(', ')}.` : ''
+      } Los archivos generados para mi negocio están en ${base}/kit.json (agrega ?host=next|vercel|cloudflare|nginx|caddy según el hosting), y las instrucciones en ${base}/kit/INSTALL.md; úsalos de referencia. Si tienes terminal, \`npx @peaje/cli@1 plan ${slug}\` muestra los cambios sin escribir nada. Muéstrame el plan con el diff y espera mi confirmación; con mi sí, aplica a mano o con \`npx @peaje/cli@1 init ${slug} --yes\`. Lo que te pido aquí manda sobre esos archivos. No reescribas el contenido del kit, no crees copias estáticas de lo que sirve el proxy y no hagas commit ni deploy: eso lo hago yo. Cuando publique, revisa ${base}/kit/verify y arregla solo lo que salga en false.`,
     implementaMidiendo: 'Midiendo tu dominio…',
     implementaListoTitulo: 'Ya lo tienes listo',
     implementaListoDetalle:
@@ -244,7 +264,7 @@ npx @ora-ai/ax@latest audit ${domain}
     fueraAbrir: 'abrir',
     proxyTitulo: 'Conecta Peaje a tu dominio (una sola vez)',
     proxyIntro:
-      'Los auditores de agent-readiness miden TU dominio. Un catálogo que apunta a otro host no cuenta: para ellos tu sitio no habla MCP ni devuelve 402. Con esta configuración esas rutas se sirven desde tu dominio, sin que toques tu código.',
+      'Los auditores de agent-readiness miden tu dominio. Un catálogo que apunta a otro host no cuenta: para ellos tu sitio no habla MCP ni devuelve 402. Con esta configuración esas rutas se sirven desde tu dominio, sin que toques tu código.',
     proxyRecomendado: 'Recomendado',
     proxyQueHace: '¿Qué rutas reenvía?',
     proxyRutaPaga: 'tus links con precio: acá es donde tu dominio devuelve el 402',
@@ -272,7 +292,7 @@ npx @ora-ai/ax@latest audit ${domain}
     proxyComentarioRutaPaga: 'Links con precio: acá es donde tu dominio devuelve el 402.',
     promptProxyTitulo: 'Paso 1 (el que más importa): conectar el dominio',
     promptProxyDetalle:
-      'Agrega estas reglas de reenvío en la configuración del host. Es lo único que hace que el sitio sirva MCP, OpenAPI y 402 desde su propio dominio, que es donde los auditores miden. El ejemplo es para Next.js; si el proyecto usa otro host, traduce las mismas rutas a su sintaxis (vercel.json, Cloudflare Worker, nginx o Caddy). Si ya existe una configuración, fusiona el bloque en vez de reemplazar el archivo.\n\nSi el proyecto tiene middleware (i18n, auth, A/B testing), revisa su `matcher`: corre ANTES de los rewrites y puede tragarse estas rutas. Excluye `mcp`, `r/`, `discovery/`, `checkout_sessions`, `agentic_commerce/` y `docs` del matcher. Los paths con punto (`llms.txt`, `openapi.json`, `/.well-known/*`) suelen estar excluidos ya.',
+      'Agrega estas reglas de reenvío en la configuración del host. Es lo único que hace que el sitio sirva MCP, OpenAPI y 402 desde su propio dominio, que es donde los auditores miden. El ejemplo es para Next.js; si el proyecto usa otro host, traduce las mismas rutas a su sintaxis (vercel.json, Cloudflare Worker, nginx o Caddy). Si ya existe una configuración, fusiona el bloque en vez de reemplazar el archivo.\n\nSi el proyecto tiene middleware (i18n, auth, A/B testing), revisa su `matcher`: corre antes de los rewrites y puede tragarse estas rutas. Excluye `mcp`, `r/`, `discovery/`, `checkout_sessions`, `agentic_commerce/` y `docs` del matcher. Los paths con punto (`llms.txt`, `openapi.json`, `/.well-known/*`) suelen estar excluidos ya.',
     promptProxyNota:
       'Los bloques que siguen son el respaldo para cuando no se puede tocar la configuración del host: cubren menos, porque los checks de MCP y de pagos exigen estar en el origen.',
   },
@@ -281,32 +301,52 @@ npx @ora-ai/ax@latest audit ${domain}
     pestanaAgente: 'Use your AI coding tool',
     pestanaManual: 'Do it yourself',
     agenteTitulo: 'Paste this into your AI coding tool',
-    agenteIntro: 'Works with Claude Code, Cursor, Lovable, v0 or Bolt, open in your site project. It carries the full steps: your tool downloads nothing, and it ends by telling you what to set in your hosting.',
+    agenteIntro: 'Works with tools that edit your site code: Claude Code, Cursor, Codex, Copilot or Windsurf, open in the project. In Lovable, v0 or Bolt it works if your site is Next.js, or Vite deployed on Vercel. Your tool first reviews and shows you what will change; it touches nothing until you say yes.',
     agenteCopiar: 'Copy the text',
     agenteCopiado: 'Copied',
-    agenteDespues: 'When your tool is done and the site is deployed, come back here: below we check everything is in place.',
-    agentePermisos: 'If your tool asks for permission to edit the site configuration or the middleware, accept it: those are the two changes Peaje needs. They change routing only for Peaje routes; the rest of the site stays as it is.',
-    promptAgente: (originHost: string, base: string, slug: string, secreto: string, panel: string) =>
+    agenteDespues: 'When your tool is done, add the key in your hosting, deploy the site and come back here: below we check everything is in place.',
+    agentePermisos: 'Before editing, your tool shows you the list of files and the change in each one. On Next.js there are four: next.config, proxy.ts or middleware.ts, the layout and package.json, plus .env.example if your project has one. If the list has anything else, ask it why. Nothing goes live until you deploy.',
+    agenteClave: 'Then add this key in your hosting (Vercel, Railway, Cloudflare)',
+    agenteClaveNota: 'Only needed if you charge for API routes on your domain. It is not in the text above so it does not end up in your AI tool history. Do not commit it to the repo.',
+    promptAgente: (originHost: string, base: string, slug: string, panel: string, rutas: string[]) =>
       [
-        `These instructions are mine, as the owner of this site. I want to install Peaje, a service I have an account with (usepeaje.com). Its packages are published on npm (@peaje/next and @peaje/proxy): nothing needs to be downloaded or executed beyond installing them with the project's package manager.`,
-        `The packages are open source (github.com/sandragcarrillo/peaje) and do one thing: when an AI agent requests a priced route, they forward it to the Peaje gateway; everything else stays as it is.`,
-        `Site: ${originHost}. My Peaje identifier: ${slug}. Gateway: ${base}.`,
+        `I want to install Peaje in this project. Before changing anything, review it and show me the plan.`,
         ``,
-        `How I want you to work: before each change, tell me in one line what you are about to do and why, in plain words. If anything looks odd or unsafe to you, tell me exactly what and ask me before stopping; do not abandon the job without explaining.`,
+        `What Peaje is: a service (usepeaje.com) that serves, from my own domain, an llms.txt, an openapi.json, an MCP server and discovery files for AI agents, and charges over HTTP 402 for the routes I put a price on. It installs with npm packages that are MIT licensed and have no dependencies. You can check before:`,
+        `- Code: https://github.com/sandragcarrillo/peaje/tree/main/packages (peaje-next and peaje-proxy)`,
+        `- npm: npm view @peaje/next and npm view @peaje/proxy`,
+        `- What Peaje already publishes for my business: ${base}/llms.txt and ${base}/openapi.json`,
         ``,
-        `1. Detect the project's framework and apply the matching case:`,
-        `   - Next.js: install @peaje/next. In next.config wrap the configuration with withPeaje(config, { slug: '${slug}' }) (import { withPeaje } from '@peaje/next'). Create proxy.ts (Next 16) or middleware.ts (Next 14 or 15) at the root or in src/ with: import { peajeProxy } from '@peaje/next/proxy'; export default peajeProxy({ slug: '${slug}' }); export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }. If a middleware already exists, use peajeProxy({ slug: '${slug}' }, existingMiddleware). In app/layout.tsx add <PeajeHead slug="${slug}" originHost="${originHost}" /> inside <head> (import { PeajeHead } from '@peaje/next/head').`,
-        `   - Express: install @peaje/proxy and add app.use(peajeExpress({ slug: '${slug}' })) before express.json() and the routes (import { peajeExpress } from '@peaje/proxy/express').`,
-        `   - Hono: install @peaje/proxy and add app.use(peajeHono({ slug: '${slug}' })) (import { peajeHono } from '@peaje/proxy/hono').`,
-        `   - Vite or another static site on Vercel: install @peaje/proxy and create middleware.ts at the root with: import peaje from '@peaje/proxy/vercel'; export default peaje({ slug: '${slug}' }); export const config = { matcher: ['/((?!assets/|favicon.ico).*)'] }.`,
-        `   - Another framework: tell me which one and stop there.`,
-        `2. Save PEAJE_ORIGIN_SECRET=${secreto} in the local env file that git ignores (.env.local or .env). Never in a file that gets committed.`,
-        `3. When you are done, explain to me in plain words, step by step and with the exact menu names, how to add that same PEAJE_ORIGIN_SECRET variable in my hosting (Vercel, Railway, Cloudflare or whichever I use) and how to redeploy the site. Do not assume I can code.`,
-        `4. Finish by telling me to open ${panel} after deploying, to confirm everything is in place.`,
+        `My details: site ${originHost}, Peaje identifier (slug) ${slug}, gateway ${base}.`,
+        ``,
+        `What will change`,
+        `Peaje starts answering these routes on my domain: ${rutas.join(', ')}. If I set PEAJE_ORIGIN_SECRET, also the API routes I price in the dashboard. Requests to those routes go to the gateway with their headers; everything else reaches my site unchanged. The list ships inside the package and the middleware refreshes it every minute from ${base}/kit/manifest.json, which is where the priced API routes show up.`,
+        `- Next.js with the app router:`,
+        `  1. package.json: the @peaje/next dependency.`,
+        `  2. next.config: wrap the export with withPeaje(config, { slug: '${slug}' }), with import { withPeaje } from '@peaje/next'. It adds those routes to rewrites().beforeFiles and keeps the ones already there.`,
+        `  3. proxy.ts (Next 16) or middleware.ts (Next 14 and 15), next to the app/ or pages/ folder (at the root or in src/): import { peajeProxy } from '@peaje/next/proxy'; export default peajeProxy({ slug: '${slug}' }); export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] }. If a middleware already exists, wrap it with peajeProxy({ slug: '${slug}' }, currentMiddleware) and check that its matcher includes those routes.`,
+        `  4. app/layout: <PeajeHead slug="${slug}" originHost="${originHost}" /> inside <head>, with import { PeajeHead } from '@peaje/next/head'. It renders a JSON-LD block with my offers and four discovery <link> tags. It loads no scripts for visitors: it reads the offers from the gateway on the server, cached for one hour.`,
+        `- Next.js with the pages router: steps 1 to 3 the same; instead of step 4, tell me and we will decide.`,
+        `- Express: the @peaje/proxy dependency and app.use(peajeExpress({ slug: '${slug}' })) before express.json() and the routes, with import { peajeExpress } from '@peaje/proxy/express'.`,
+        `- Hono: the @peaje/proxy dependency and app.use(peajeHono({ slug: '${slug}' })), with import { peajeHono } from '@peaje/proxy/hono'.`,
+        `- Vite or another static site deployed on Vercel: the @peaje/proxy dependency and middleware.ts at the root: import peaje from '@peaje/proxy/vercel'; export default peaje({ slug: '${slug}' }); export const config = { matcher: ['/((?!assets/|favicon.ico).*)'] }.`,
+        `- Any other stack or hosting: do not improvise. Tell me which one it is and stop there.`,
+        ``,
+        `Step 1, review without writing: detect the framework, version, router and hosting. Check whether my site already uses any of those routes (pages, route handlers, files in public/). Read the package code if you want.`,
+        `Step 2, show me the plan: the files you will touch, with the diff, and any route that collides with one of mine. Wait for my confirmation before editing or installing.`,
+        `Step 3, apply: only those changes. Install the dependency with the project's package manager.`,
+        `Step 4, verify: run the build. Once I deploy, these URLs must answer from my domain: https://${originHost}/llms.txt (200), https://${originHost}/openapi.json (200) and https://${originHost}/mcp (405 on GET). The full check is at ${base}/kit/verify (JSON with ok: true) and at ${panel}.`,
+        ``,
+        `The PEAJE_ORIGIN_SECRET key is only needed to charge for API routes on my domain. I am not giving it to you and you do not need it: do not ask for it or write it into any file. If the project has a .env.example, add the line PEAJE_ORIGIN_SECRET= with no value, and confirm that .env and .env.local are in .gitignore. At the end, explain in plain words, with the menu names, how I add it in my hosting and how I redeploy. I copy the value from ${panel}.`,
+        ``,
+        `To undo it: revert these changes with git and uninstall the package. If I added the key in the hosting, I delete it there.`,
+        ``,
+        `Do not: commit, push or deploy (I do that); make changes outside the plan; create your own copies of the files Peaje serves (openapi.json, /.well-known/*); delete files. If anything does not match this text, tell me what and ask me.`,
       ].join('\n'),
     unComandoTitulo: 'Install Peaje with one command',
-    unComandoIntro: 'Run it in your project folder. It detects Next.js, Vite, Express or Hono and sets up what agents read.',
-    unComandoPaso1: 'Run this in your project',
+    unComandoIntro: 'Run it in your project folder. It detects Next.js, Vite, Express or Hono and sets up what agents read. The code is public: github.com/sandragcarrillo/peaje.',
+    unComandoPlan: 'See what will change. It writes nothing',
+    unComandoPaso1: 'Apply it. It shows you the changes and asks you to confirm',
     unComandoPaso2: 'Add this variable in your hosting (Vercel, Railway, Cloudflare)',
     unComandoPaso2Nota: 'It lets priced API routes charge on your domain. Do not commit it to the repo.',
     unComandoPaso3: 'Deploy your site and come back: below we check everything is in place',
@@ -357,19 +397,19 @@ npx @ora-ai/ax@latest audit ${domain}
     promptDetalle:
       'Paste it into Claude Code, Cursor or whichever agent you run on your site repo: it applies every block, validates the payment flow and re-runs the score.',
     promptIntro: (originHost: string, base: string) =>
-      `Make my site (${originHost}) agent-ready. My API already charges agents per request via MPP with Peaje; the gateway is ${base}.
+      `I want AI agents to be able to read my site (${originHost}) with Peaje (usepeaje.com, code at https://github.com/sandragcarrillo/peaje). My business gateway is ${base}.
 
-Apply these changes in the site repo:`,
+These are the changes for the site repo. Before editing, show me the plan with the diff and wait for my confirmation. Do not commit or deploy: I do that.`,
     promptNoCrearTitulo: 'Do not create these files by hand',
     promptNoCrearDetalle:
-      'Step 1 already serves them from your domain. A static copy alongside it wins over the proxy, freezes on the day you copied it, and the auditor ends up reading a stale version. If any of these already exist in your repo (public/, static/, or as a route), delete them:',
+      'Step 1 already serves them from your domain. A static copy alongside it wins over the proxy, freezes on the day you copied it, and the auditor ends up reading a stale version. If any of these already exist in the repo (public/, static/, or as a route), show it to me and, once I confirm, move it to .peaje-backup/ so it can be restored:',
     promptNoCrearCierre:
       'Leave your llms.txt alone too: the gateway reads yours and appends the payments section by itself.',
     promptTapadas: (paths: string[]) =>
-      `Measured right now: ${paths.join(', ')} ${paths.length === 1 ? 'is' : 'are'} served by the site, not the gateway. A static copy or a route handler of your own is shadowing the proxy. Find it (public/, static/, app/<path>/route.ts, pages/api/) and delete it.`,
+      `Measured right now: ${paths.join(', ')} ${paths.length === 1 ? 'is' : 'are'} served by the site, not the gateway. A static copy or a route handler of your own is shadowing the proxy. Find it (public/, static/, app/<path>/route.ts, pages/api/), show it to me and, once I confirm, move it to .peaje-backup/.`,
 
     promptVerifica: (originHost: string, rutaPaga: string | null) =>
-      `When you are done, verify against YOUR domain (not the gateway: the auditor measures your origin). Each line must return the code next to it:
+      `Once the site is deployed, verify against my domain and not the gateway: the auditor measures the origin. Each line must return the code next to it:
 
 \`\`\`bash
 curl -sL -o /dev/null -w "%{http_code} ard\\n" https://${originHost}/.well-known/ard.json          # 200
@@ -388,16 +428,16 @@ curl -sL -o /dev/null -w "%{http_code} paid\\n" https://${originHost}${rutaPaga}
 
 The \`-L\` matters: if your apex redirects to www (or the other way around), without it curl shows you the 308 from the redirect and everything looks broken.
 
-A 404 means that rule is missing from the step 1 config. A 200 with stale content means a static copy is shadowing the proxy: delete it.`,
+A 404 means that rule is missing from the step 1 config. A 200 with stale content means a static copy is shadowing the proxy: tell me which one before removing it.`,
     promptAuditConDominio: (domain: string) =>
-      `Then run the score and compare it against the previous one:
+      `Optional: run the score and compare it against the previous one. It comes from Ora, a third-party scanner (npm @ora-ai/ax, code at https://github.com/ora/ax):
 
 \`\`\`bash
 npx @ora-ai/ax@latest audit ${domain}
 \`\`\``,
     promptAuditSinDominio:
-      'Once the site has a public domain, run the score: `npx @ora-ai/ax@latest audit <domain>`.',
-    promptReferencia: 'Full reference for the audit standard: https://ora.ai/skill.md',
+      'Once the site has a public domain, you can measure it with Ora, a third-party scanner: `npx @ora-ai/ax@latest audit <domain>`.',
+    promptReferencia: 'Reference for the Ora standard, to read if needed: https://ora.ai/skill.md',
 
     // partes.tsx
     copiar: 'copy',
@@ -431,13 +471,13 @@ npx @ora-ai/ax@latest audit ${domain}
     promptIntroAeo: (originHost: string) =>
       `Make my site (${originHost}) readable by answer engines. Do not connect any proxy or charging: only these blocks in the site repo:`,
     promptCortoAeo: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Prepare this site (${originHost}) for answer engines with Peaje, ONLY the answer-engine layer: no proxy, no charging, no dependencies. Follow ${base}/kit/INSTALL.md?layers=aeo to the letter; the generated files are at ${base}/kit.json?layers=aeo. On Next.js the short path is \`npx @peaje/cli@1 init ${slug} --only aeo --yes --json\`.${
-        faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
-      } Do not rewrite the downloaded files. Once the deploy is live, read ${base}/kit/verify?layers=aeo and fix only what comes back false.`,
+      `I want to prepare this site (${originHost}) for answer engines with Peaje (usepeaje.com, code at https://github.com/sandragcarrillo/peaje), only that layer: no proxy, no charging and no dependencies. It is two changes: an Organization JSON-LD in the homepage <head> and the robots.txt.${
+        faltan.length > 0 ? ` According to the latest measurement of my domain, missing: ${faltan.join(', ')}.` : ''
+      } The files generated for my business are at ${base}/kit.json?layers=aeo, and the instructions at ${base}/kit/INSTALL.md?layers=aeo; use them as reference. If you have a terminal, \`npx @peaje/cli@1 plan ${slug} --only aeo\` shows the changes without writing anything. Show me the plan with the diff and wait for my confirmation; once I say yes, apply it by hand or with \`npx @peaje/cli@1 init ${slug} --only aeo --yes\`. What I ask here takes precedence over those files. Do not rewrite the kit contents and do not commit or deploy: I do that. Once I deploy, read ${base}/kit/verify?layers=aeo and fix only what comes back false.`,
     promptCorto: (originHost: string, base: string, slug: string, faltan: string[]) =>
-      `Install Peaje in this site's repo (${originHost}). Follow ${base}/kit/INSTALL.md to the letter; the generated files are at ${base}/kit.json (add ?host=next|vercel|cloudflare|nginx|caddy for the host). On Next.js the short path is \`npx @peaje/cli@1 init ${slug} --yes --json\`.${
-        faltan.length > 0 ? ` Missing today: ${faltan.join(', ')}.` : ''
-      } Do not rewrite the downloaded files and do not create static copies of what the proxy serves. Once the deploy is live, read ${base}/kit/verify and fix only what comes back false.`,
+      `I want to finish installing Peaje (usepeaje.com, code at https://github.com/sandragcarrillo/peaje) in this site's repo (${originHost}).${
+        faltan.length > 0 ? ` According to the latest measurement of my domain, missing: ${faltan.join(', ')}.` : ''
+      } The files generated for my business are at ${base}/kit.json (add ?host=next|vercel|cloudflare|nginx|caddy for the hosting), and the instructions at ${base}/kit/INSTALL.md; use them as reference. If you have a terminal, \`npx @peaje/cli@1 plan ${slug}\` shows the changes without writing anything. Show me the plan with the diff and wait for my confirmation; once I say yes, apply it by hand or with \`npx @peaje/cli@1 init ${slug} --yes\`. What I ask here takes precedence over those files. Do not rewrite the kit contents, do not create static copies of what the proxy serves, and do not commit or deploy: I do that. Once I deploy, read ${base}/kit/verify and fix only what comes back false.`,
     implementaMidiendo: 'Measuring your domain…',
     implementaListoTitulo: 'You already have this ready',
     implementaListoDetalle:
@@ -520,7 +560,7 @@ npx @ora-ai/ax@latest audit ${domain}
     fueraAbrir: 'open',
     proxyTitulo: 'Connect Peaje to your domain (once)',
     proxyIntro:
-      'Agent-readiness auditors measure YOUR domain. A catalog pointing at another host does not count: as far as they can tell, your site speaks no MCP and returns no 402. With this config those routes are served from your domain, without touching your code.',
+      'Agent-readiness auditors measure your domain. A catalog pointing at another host does not count: as far as they can tell, your site speaks no MCP and returns no 402. With this config those routes are served from your domain, without touching your code.',
     proxyRecomendado: 'Recommended',
     proxyQueHace: 'Which routes does it forward?',
     proxyRutaPaga: 'your priced links: this is where your domain returns the 402',
@@ -548,7 +588,7 @@ npx @ora-ai/ax@latest audit ${domain}
     proxyComentarioRutaPaga: 'Priced links: this is where your domain returns the 402.',
     promptProxyTitulo: 'Step 1 (the one that matters most): connect the domain',
     promptProxyDetalle:
-      'Add these forwarding rules to the host config. It is the only thing that makes the site serve MCP, OpenAPI and 402 from its own domain, which is where auditors measure. The example is for Next.js; if the project uses another host, translate the same routes to its syntax (vercel.json, Cloudflare Worker, nginx or Caddy). If a config already exists, merge the block instead of replacing the file.\n\nIf the project has middleware (i18n, auth, A/B testing), check its `matcher`: it runs BEFORE rewrites and can swallow these routes. Exclude `mcp`, `r/`, `discovery/`, `checkout_sessions` and `agentic_commerce/` from the matcher. Paths with a dot (`llms.txt`, `openapi.json`, `/.well-known/*`) are usually excluded already.',
+      'Add these forwarding rules to the host config. It is the only thing that makes the site serve MCP, OpenAPI and 402 from its own domain, which is where auditors measure. The example is for Next.js; if the project uses another host, translate the same routes to its syntax (vercel.json, Cloudflare Worker, nginx or Caddy). If a config already exists, merge the block instead of replacing the file.\n\nIf the project has middleware (i18n, auth, A/B testing), check its `matcher`: it runs before rewrites and can swallow these routes. Exclude `mcp`, `r/`, `discovery/`, `checkout_sessions` and `agentic_commerce/` from the matcher. Paths with a dot (`llms.txt`, `openapi.json`, `/.well-known/*`) are usually excluded already.',
     promptProxyNota:
       'If the host config truly cannot be touched, the site cannot pass the MCP or payment checks at all: those require answering from the origin. The blocks below are not a substitute for step 1, they are the parts no proxy can inject for you.',
   },

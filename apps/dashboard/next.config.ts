@@ -1,9 +1,20 @@
 import type { NextConfig } from "next";
 import { withPeaje } from "@peaje/next";
 
+// Headers de seguridad fijos para todo el sitio (la checklist de producción de
+// Privy pide anti-clickjacking). La CSP va aparte, con nonce, en proxy.ts.
+const seguridad = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
 const nextConfig = {
   agentRules: false,
-  /* config options here */
+  async headers() {
+    return [{ source: "/:path*", headers: seguridad }];
+  },
 } satisfies NextConfig;
 
 // usepeaje.com corre sobre Peaje: llms.txt, openapi.json, el MCP y los

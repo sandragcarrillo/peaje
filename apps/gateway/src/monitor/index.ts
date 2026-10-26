@@ -52,7 +52,11 @@ async function corridaConAlerta(slug: string) {
   const tareas = await sincronizarFixes(tenant).catch(() => null)
   await reverificarHechas(tenant).catch(() => 0)
   // ---- M6: seguimientos vencidos (re-medición a 2 y 6 semanas) ----
-  const seguimientos = await procesarSeguimientos(tenant).catch((e) => ({ procesados: 0, veredictos: [], error: e instanceof Error ? e.message : String(e) }))
+  // Preguntan a los asistentes de IA, que es Pro: sin plan activo quedan
+  // pendientes y se procesan si el negocio vuelve a Pro.
+  const seguimientos = esActivo(tenant)
+    ? await procesarSeguimientos(tenant).catch((e) => ({ procesados: 0, veredictos: [], error: e instanceof Error ? e.message : String(e) }))
+    : { procesados: 0, veredictos: [], omitido: 'sin Pro' }
   // ---- fin M6 ----
   const alertables = eventosAlertables(corrida.eventos)
   let alerted: string[] = []

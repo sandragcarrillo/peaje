@@ -7,8 +7,8 @@ export const agenteReportes = {
   es: {
     volver: 'Volver a Mi agente',
     eyebrow: 'Reporte',
-    bloqueado: 'Este reporte es parte del agente Pro.',
-    bloqueadoCta: 'Ver planes',
+    bloqueado: 'Este reporte se activa con Pro. Lo contratas en Mi agente, en Tu suscripción.',
+    bloqueadoCta: 'Ver el plan Pro',
 
     // ---- oportunidades ----
     opTitulo: 'Oportunidades de contenido',
@@ -75,8 +75,8 @@ export const agenteReportes = {
   en: {
     volver: 'Back to My agent',
     eyebrow: 'Report',
-    bloqueado: 'This report is part of the Pro agent.',
-    bloqueadoCta: 'See plans',
+    bloqueado: 'This report turns on with Pro. You subscribe in My agent, under Your subscription.',
+    bloqueadoCta: 'See the Pro plan',
 
     opTitulo: 'Content opportunities',
     opSub:

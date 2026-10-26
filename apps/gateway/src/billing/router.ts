@@ -2,7 +2,6 @@ import {
   CUPOS_FOUNDER,
   LIMITES,
   PRECIOS_USD,
-  SaldoInsuficiente,
   accesoPro,
   esPlanPago,
   extenderPlan,
@@ -10,31 +9,30 @@ import {
   type PlanPago,
   type Tenant,
 } from '@peaje/db'
-import { isSettlementNetwork } from '@peaje/shared'
 import { Hono } from 'hono'
 import { Receipt } from 'mppx'
 import { contextoCobro, nuevoContexto } from '../contexto.js'
 import { env } from '../env.js'
 import { mppx } from '../mpp.js'
-import { saldosPorRed } from '../saldos.js'
 import { store } from '../store.js'
-import { payoutFromTenant } from '../treasury.js'
 import { urlCheckout, urlPlan } from './acceso.js'
 import { cryptoActivo, founderDisponible } from './founder.js'
 import { crearSesionPortal, webhookPaddle } from './paddle.js'
+import { saldoCreditos, usoPublico } from '../tareas/creditos.js'
 
 /**
  * Cobro del agente Pro (M9):
  *   POST /paddle/webhook                           eventos de Paddle Billing (tarjeta; ver paddle.ts)
- *   GET  /_internal/:slug/billing                  plan vigente, precios, cupos founder, historial
+ *   GET  /_internal/:slug/billing                  plan vigente, créditos del mes, precios, cupos founder, historial
  *   POST /_internal/:slug/billing/portal           link al portal de clientes de Paddle
  *
  * Detrás de BILLING_CRYPTO_ENABLED (apagado por defecto desde el 24 oct 2026):
  *   GET  /_billing/:slug/:plan                     402 en USDC por el mes (founder|pro); pagado, extiende 30 días
- *   POST /_internal/:slug/billing/pay-with-balance {plan}  paga con el saldo cobrado del negocio
  *
- * El pago de la suscripción es de Peaje, no del negocio: va a la treasury con
- * `merchant` nulo y no pasa por creditReceipt (no entra al ledger del negocio).
+ * El pago de la suscripción es de Peaje, no del negocio: es un cobro propio
+ * (solo Tempo, entero a la treasury; los rieles de contrato no aceptan al fee
+ * recipient como merchant) y no pasa por creditReceipt (no entra al ledger
+ * del negocio). Pagar con saldo ya no existe: Peaje no guarda saldos.
  * Queda en billing_payments con la referencia del receipt.
  */
 export const billingRouter = new Hono()
@@ -60,7 +58,7 @@ const sinCupoFounder = (tenant: Tenant) => ({
   checkout: urlCheckout(tenant.slug, 'pro'),
 })
 
-/** Con el cobro en USDC apagado, el 402 de la suscripción y el pago con saldo no existen. */
+/** Con el cobro en USDC apagado, el 402 de la suscripción no existe. */
 const cryptoApagado = (slug: string) => ({
   error: 'card-only',
   message: 'Peaje Pro is paid by card. Subscribe from your dashboard.',
@@ -117,8 +115,8 @@ function paginaDePago(tenant: Tenant, plan: PlanPago, precio: string, url: strin
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Peaje ${nombre}</title>
 <style>body{font-family:system-ui,sans-serif;background:#171613;color:#f3efe6;max-width:34rem;margin:12vh auto;padding:0 1.25rem;line-height:1.5}code{display:block;background:#23211d;padding:.75rem;overflow-x:auto;font-size:.85rem}a{color:#a9d8e0}p{color:#c9c4b8}h1{font-size:1.4rem}</style></head><body>
 <h1>Peaje ${nombre} for ${esc(tenant.name)}: US$${Number(precio).toFixed(2)} for 30 days</h1>
-<p>This link is paid by a wallet or an AI agent, not by a browser. Today it is paid in USDC.</p>
-<p><strong>Easiest:</strong> pay with your Peaje balance from your dashboard.<br><a href="${esc(panel)}">Open my plan in Peaje</a></p>
+<p>This link is paid by a wallet or an AI agent, not by a browser. Today it is paid in pathUSD on Tempo.</p>
+<p><strong>Easiest:</strong> pay by card from your dashboard.<br><a href="${esc(panel)}">Open my plan in Peaje</a></p>
 <p><strong>From a terminal</strong>, with a wallet that speaks x402 or MPP:</p>
 <code>npx mppx ${esc(url)}</code>
 <p>Card payments are coming soon.</p>
@@ -142,8 +140,8 @@ billingRouter.get('/_billing/:slug/:plan', async (c) => {
   const esNavegador =
     (c.req.header('accept') ?? '').includes('text/html') && !c.req.header('authorization') && !c.req.header('payment-signature')
   if (esNavegador) return c.html(paginaDePago(tenant, plan, precio, c.req.url))
-  // merchant nulo: en los rieles con contrato el pago queda a nombre de Peaje, no del negocio.
-  const cobro = nuevoContexto(null, precio)
+  // Cobro propio de Peaje: sin merchant, solo la oferta de Tempo a la treasury.
+  const cobro = nuevoContexto(null, precio, { propio: true })
   cobro.x402Header = c.req.header('payment-signature') ?? null
   const result = await contextoCobro.run(cobro, () =>
     mppx.charge({
@@ -176,19 +174,16 @@ billingRouter.get('/_internal/:slug/billing', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
   const crypto = cryptoActivo()
-  const [founder, pagos, saldos] = await Promise.all([
-    founderDisponible(tenant),
-    store.listBillingPayments(tenant.id, 20),
-    crypto ? saldosPorRed(tenant).catch(() => []) : Promise.resolve([]),
-  ])
+  const [founder, pagos, saldo] = await Promise.all([founderDisponible(tenant), store.listBillingPayments(tenant.id, 20), saldoCreditos(tenant)])
   return c.json({
     access: accesoPro(tenant),
+    // Créditos del agente este mes: { credits, used, remaining, renewsAt, costs }.
+    usage: usoPublico(saldo),
     prices: {
       founder: { usd: PRECIOS_USD.founder, charged: precioCobro('founder'), limits: LIMITES.founder },
       pro: { usd: PRECIOS_USD.pro, charged: precioCobro('pro'), limits: LIMITES.pro },
     },
     founder: { slotsLeft: founder.cupos, total: CUPOS_FOUNDER, available: founder.ok, alreadyFounder: founder.yaFounder },
-    balanceAvailable: saldos.reduce((s, b) => s + Number(b.available), 0).toFixed(6),
     payments: pagos,
     // Links del 402 en USDC: solo con BILLING_CRYPTO_ENABLED.
     crypto,
@@ -214,74 +209,5 @@ billingRouter.post('/_internal/:slug/billing/portal', async (c) => {
   } catch (error) {
     console.error('[billing] no se pudo abrir el portal de Paddle', error)
     return c.json({ error: 'We could not open the Paddle portal. Try again in a minute.' }, 502)
-  }
-})
-
-/** Un pago con saldo a la vez por negocio: un doble clic no cobra dos meses. */
-const enCurso = new Set<string>()
-
-/**
- * Paga el mes con el saldo cobrado. El débito es un retiro hacia la treasury:
- * baja el disponible igual que un retiro normal. En Tempo y los rieles de
- * Circle el saldo ya está en la treasury, así que es solo el asiento (sin tx).
- * En las redes con PeajeSettlement el saldo vive en el contrato a nombre del
- * negocio: ahí sí sale una tx del contrato a la treasury.
- */
-billingRouter.post('/_internal/:slug/billing/pay-with-balance', async (c) => {
-  if (!cryptoActivo()) return c.json(cryptoApagado(c.req.param('slug')), 404)
-  const tenant = await store.getTenantBySlug(c.req.param('slug'))
-  if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
-  const { plan } = (await c.req.json().catch(() => ({}))) as { plan?: string }
-  if (!esPlanPago(plan)) return c.json({ error: 'Plan must be founder or pro' }, 400)
-  if (plan === 'founder' && !(await founderDisponible(tenant)).ok) return c.json(sinCupoFounder(tenant), 409)
-  if (enCurso.has(tenant.id)) return c.json({ error: 'A payment is already in progress' }, 409)
-  enCurso.add(tenant.id)
-  try {
-    const precio = precioCobro(plan)
-    const monto = Number(precio)
-    const saldos = await saldosPorRed(tenant)
-    // Primero donde no hace falta tx (el saldo ya está en la treasury).
-    const candidatas = saldos
-      .filter((b) => Number(b.available) + 1e-9 >= monto)
-      .sort((a, b) => Number(isSettlementNetwork(a.network)) - Number(isSettlementNetwork(b.network)))
-    const red = candidatas[0]
-    if (!red) {
-      const total = saldos.reduce((s, b) => s + Number(b.available), 0)
-      return c.json(
-        {
-          error: 'insufficient-balance',
-          message: `Your Peaje balance is US$${total.toFixed(2)} and no single network has US$${monto.toFixed(2)}. Pay with the checkout link instead.`,
-          checkout: urlCheckout(tenant.slug, plan),
-        },
-        400,
-      )
-    }
-
-    let retiro
-    try {
-      retiro = await store.createWithdrawal(
-        { tenantId: tenant.id, amount: monto.toFixed(6), toWallet: env.treasuryAddress, network: red.network },
-        { checkAvailable: !isSettlementNetwork(red.network) },
-      )
-    } catch (error) {
-      if (error instanceof SaldoInsuficiente) return c.json({ error: 'insufficient-balance', message: 'Your balance changed. Try again or use the checkout link.', checkout: urlCheckout(tenant.slug, plan) }, 409)
-      throw error
-    }
-    if (isSettlementNetwork(red.network)) {
-      try {
-        const hash = await payoutFromTenant(tenant, red.network, env.treasuryAddress, monto.toFixed(6))
-        await store.updateWithdrawal(retiro.id, { txRef: hash })
-      } catch (error) {
-        await store.updateWithdrawal(retiro.id, { status: 'failed' })
-        console.error('[billing] no se pudo mover el saldo del contrato', error)
-        return c.json({ error: 'We could not move your balance. Try again or use the checkout link.' }, 502)
-      }
-    } else {
-      await store.updateWithdrawal(retiro.id, { status: 'confirmed' })
-    }
-    const r = await activar(tenant, plan, precio, 'balance', `withdrawal:${retiro.id}`)
-    return c.json({ ...confirmacion(r), network: red.network, withdrawalId: retiro.id })
-  } finally {
-    enCurso.delete(tenant.id)
   }
 })

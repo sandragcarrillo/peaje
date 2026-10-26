@@ -93,7 +93,10 @@ export const landing = {
       `Revisar tu sitio es gratis. Si cobras a los agentes, Peaje se queda con el ${pct}% de cada pago. Por ahora los pagos funcionan en redes de prueba: la demo es una simulación y no mueve dinero real.`,
     verPrecios: 'Ver todos los detalles del precio',
 
-    // FAQ provisoria: reemplazar por la del Editor si San la pega
+    // FAQ provisoria: reemplazar por la del Editor si San la pega.
+    // Los 7 días (DIAS_REEMBOLSO en packages/db/src/planes.ts) y los 500 créditos
+    // (LIMITES.pro.creditos, provisorio) van escritos a mano porque
+    // app/page.tsx solo le pasa la comisión a faq(). Si cambian, cambiarlos acá (es y en).
     faqTitulo: 'Preguntas',
     faq: (pct: number) => [
       {
@@ -113,8 +116,20 @@ export const landing = {
         r: `Es opcional. x402 es una forma de cobrar por internet en la que tu sitio le pide un pago al agente antes de entregarle lo que pidió. MPP es otro estándar para lo mismo: el agente paga y recibe la respuesta en el mismo pedido. Hoy los dos funcionan en redes de prueba, así que todavía no mueven dinero real. Cuando haya pagos reales, Peaje se queda con el ${pct}% de cada uno.`,
       },
       {
+        p: '¿Me cobran algo más?',
+        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes. Si decides cobrarles a los agentes de IA por tu contenido, Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.`,
+      },
+      {
+        p: '¿Y si no me sirve?',
+        r: 'En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó. En el mejor caso, ChatGPT, Claude, Perplexity y Gemini empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.',
+      },
+      {
         p: '¿Puedo cancelar?',
-        r: `Sí. Cancelas cuando quieras desde tu panel, sin llamadas. Sigues con tu agente hasta el final del mes que ya pagaste y no se vuelve a cobrar.`,
+        r: `Sí. Cancelas cuando quieras desde tu panel, sin llamadas. Sigues con tu agente hasta el final del mes que ya pagaste, no se vuelve a cobrar y lo que tu agente ya te entregó sigue en tu panel. Si es tu primer pago y lo pides dentro de 7 días, te lo devolvemos completo.`,
+      },
+      {
+        p: '¿Qué pasa si se me acaban los créditos?',
+        r: 'Cada mes tu plan trae 500 créditos para el trabajo del agente, como arreglos, páginas y reportes que le pides. Hablar con tu agente es gratis. Si se acaban, tu agente sigue hablando contigo, pero no hace trabajo nuevo hasta el 1 del mes siguiente. Lo que ya te entregó sigue en tu panel y no se cobra nada extra.',
       },
       {
         p: '¿Qué datos usan?',
@@ -224,8 +239,20 @@ export const landing = {
         r: `It is optional. x402 is a way to charge on the web where your site asks the agent for a payment before handing over what it asked for. MPP is another standard for the same thing: the agent pays and gets the answer in the same request. Today both run on test networks, so they move no real money yet. Once payments are real, Peaje keeps ${pct}% of each one.`,
       },
       {
+        p: 'Do you charge anything else?',
+        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm. If you choose to charge AI agents for your content, Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge them, there is no fee.`,
+      },
+      {
+        p: 'What if it does not work for me?',
+        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you. Best case, ChatGPT, Claude, Perplexity and Gemini start citing your site for your business questions, and you see it in your agent's tracking.`,
+      },
+      {
         p: 'Can I cancel?',
-        r: `Yes. Cancel anytime from your dashboard, no calls. You keep your agent until the end of the month you already paid for and you are not charged again.`,
+        r: `Yes. Cancel anytime from your dashboard, no calls. You keep your agent until the end of the month you already paid for, you are not charged again and what your agent already handed you stays in your dashboard. If it is your first payment and you ask within 7 days, we refund it in full.`,
+      },
+      {
+        p: 'What happens if I run out of credits?',
+        r: `Each month your plan comes with 500 credits for the agent's work, like fixes, pages and the reports you ask for. Talking to your agent is free. If you run out, your agent keeps talking with you, but it does no new work until the 1st of next month. What it already handed you stays in your dashboard and nothing extra is charged.`,
       },
       {
         p: 'What data do you use?',

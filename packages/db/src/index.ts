@@ -3,6 +3,8 @@ export { MemoryStore } from './memory'
 export { SupabaseStore } from './supabase'
 // ---- M9 ----
 export * from './planes'
+// ---- app de Privy propia ----
+export * from './wallet-dueno'
 
 import { MemoryStore } from './memory'
 import { SupabaseStore } from './supabase'

@@ -8,7 +8,6 @@ import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { GraficaRevenue } from './grafica'
 import { SetupChecklist } from './setup'
-import { saldoTotal } from '@/lib/saldos'
 
 /** Panel del negocio, calcado del mock "Business Dashboard" de Stitch. */
 export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
@@ -17,7 +16,7 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
 
   const domain = scannableDomain(tenant.originUrl)
   const [balance, payments, porDia, resources, score, verificacion, d] = await Promise.all([
-    saldoTotal(tenant),
+    store.balance(tenant.id),
     store.listPayments(tenant.id, 10),
     store.dailyRevenue(tenant.id, 7),
     store.listResources(tenant.id).catch(() => []),
@@ -66,9 +65,9 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
   const metricas = [
     {
       n: 1,
-      label: d.panel.metricaDisponible,
-      valor: money(balance.available),
-      pie: [d.panel.subDisponible, RAILS_LABEL] as const,
+      label: d.panel.metricaRevenue,
+      valor: money(balance.revenue),
+      pie: [d.panel.subRevenue, RAILS_LABEL] as const,
       vivo: true,
     },
     {
@@ -80,9 +79,9 @@ export default async function Dashboard({ params }: PageProps<'/t/[slug]'>) {
     },
     {
       n: 3,
-      label: d.panel.metricaRevenue,
-      valor: money(balance.revenue),
-      pie: [d.panel.subRevenue, '402'] as const,
+      label: d.panel.metricaCobro,
+      valor: tenant.payoutWallet ? shortWallet(tenant.payoutWallet) : d.panel.metricaCobroFalta,
+      pie: [d.panel.subCobro, '402'] as const,
       vivo: false,
     },
   ]

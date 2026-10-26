@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PRECIOS_USD, esPlanPago, extenderPlan, type PlanPago, type Tenant } from '@peaje/db'
 import type { Context } from 'hono'
 import { store } from '../store.js'
+import { programarBienvenida } from './bienvenida.js'
 import { founderDisponible } from './founder.js'
 
 /**
@@ -25,6 +26,11 @@ import { founderDisponible } from './founder.js'
  *
  * Idempotente por event_id (tabla paddle_events) y, además, por la
  * transacción en billing_payments.
+ *
+ * Bienvenida: con el primer cobro de una suscripción Peaje manda su propio
+ * correo (bienvenida.ts), una sola vez por negocio (tenants.welcome_sent_at).
+ * Si Resend falla, los eventos subscription.* de los 3 días siguientes lo
+ * reintentan. Nunca cambia la respuesta del webhook.
  */
 
 // ---------------------------------------------------------------- firma
@@ -176,12 +182,37 @@ async function transaccionCompletada(ev: EventoPaddle, precios: PreciosPaddle): 
     const hasta = new Date(Math.max(new Date(fin).getTime(), actual)).toISOString()
     await store.setTenantPlan(tenant.id, plan, hasta)
     console.log('[paddle] plan activado', { tenant: tenant.slug, plan, txn: d.id, hasta })
+    // Bienvenida con el primer cobro de la suscripción, nunca con una renovación.
+    if (d.origin !== 'subscription_recurring' && (await cobrosDeSuscripcion(tenant.id, d.subscription_id)).length === 1) {
+      programarBienvenida({ tenant, plan, custom: custom as Record<string, unknown> | null })
+    }
   }
   await store.setTenantPaddle(tenant.id, {
     paddleSubscriptionId: d.subscription_id,
     ...(d.customer_id ? { paddleCustomerId: d.customer_id } : {}),
   })
   return { handled: 'payment' }
+}
+
+const cobrosDeSuscripcion = async (tenantId: string, sub: string) =>
+  (await store.listBillingPayments(tenantId, 100)).filter((p) => p.method === 'paddle' && p.subscriptionRef === sub)
+
+/** Si el envío de la bienvenida falló, los eventos de la suscripción de estos días la reintentan. */
+export const DIAS_REINTENTO_BIENVENIDA = 3
+
+/**
+ * Reintento de la bienvenida: la suscripción está viva, tiene un solo cobro
+ * (sigue en su primer período), sin reembolso, de hace menos de 3 días. La
+ * reserva de welcome_sent_at decide si de verdad falta.
+ */
+async function reintentarBienvenida(tenant: Tenant, sub: string, status: unknown, plan: PlanPago, custom: CustomData): Promise<void> {
+  if (status !== 'active' && status !== 'trialing') return
+  const cobros = await cobrosDeSuscripcion(tenant.id, sub)
+  const primero = cobros.length === 1 ? cobros[0] : null
+  if (!primero || primero.refundedAt) return
+  if (Date.now() - new Date(primero.createdAt).getTime() > DIAS_REINTENTO_BIENVENIDA * 86_400_000) return
+  // El plan del cobro manda (es el precio que se pagó); el del evento solo si no coincide nada.
+  programarBienvenida({ tenant, plan: esPlanPago(primero.plan) ? primero.plan : plan, custom: custom as Record<string, unknown> | null })
 }
 
 async function suscripcion(ev: EventoPaddle, precios: PreciosPaddle): Promise<ResultadoPaddle> {
@@ -192,7 +223,8 @@ async function suscripcion(ev: EventoPaddle, precios: PreciosPaddle): Promise<Re
     console.warn('[paddle] suscripción sin negocio', { sub: d.id, custom })
     return { ignored: 'no-tenant' }
   }
-  if (!planDePaddle(d.items, custom, precios)) return { ignored: 'unknown-price' }
+  const plan = planDePaddle(d.items, custom, precios)
+  if (!plan) return { ignored: 'unknown-price' }
 
   const otra = tenant.paddleSubscriptionId && tenant.paddleSubscriptionId !== d.id
   if (otra && SUSCRIPCION_VIVA.has(tenant.paddleStatus ?? '')) {
@@ -216,6 +248,8 @@ async function suscripcion(ev: EventoPaddle, precios: PreciosPaddle): Promise<Re
       await store.setTenantPlan(tenant.id, esPlanPago(tenant.plan) ? tenant.plan : 'free', fin)
     }
     console.log('[paddle] suscripción terminada', { tenant: tenant.slug, sub: d.id, status: d.status, fin })
+  } else {
+    await reintentarBienvenida(tenant, d.id, d.status, plan, custom)
   }
   return { handled: `subscription-${d.status}` }
 }

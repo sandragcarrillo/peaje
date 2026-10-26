@@ -37,8 +37,26 @@ export const precios = {
       `Lo mismo que Pro, con descuento de fundador para los primeros ${cupos} negocios que se suscriben. Mantienes este precio mientras tu suscripción siga activa. Si la cancelas y vuelves, pagas el precio Pro.`,
     proNombre: 'Pro',
     proTexto: (cupos: number) => `El precio de Pro cuando se toman los ${cupos} cupos de fundador.`,
-    limites: (preguntas: number, mensajes: number) =>
-      `${preguntas} preguntas medidas en asistentes de IA y ${mensajes} mensajes al agente por mes.`,
+    limites: (preguntas: number, creditos: number) =>
+      `${creditos} créditos al mes para el trabajo del agente y ${preguntas} preguntas medidas en asistentes de IA. Hablar con tu agente es gratis.`,
+
+    // Créditos: número y costos de packages/db/src/planes.ts (LIMITES.*.creditos, COSTOS_CREDITOS).
+    creditosTitulo: 'Cómo funcionan los créditos',
+    creditosIntro: (creditos: number) =>
+      `Cada mes tu plan trae ${creditos} créditos. Hablar con tu agente no gasta créditos: los créditos miden el trabajo que el agente hace por ti.`,
+    creditosCostos: (c: { consulta: number; tarea: number; pagina: number; serie: number; informe: number; comprador: number }) => [
+      { que: 'Una consulta en tus datos', cuanto: c.consulta },
+      { que: 'Un arreglo', cuanto: c.tarea },
+      { que: 'Un borrador de página', cuanto: c.pagina },
+      { que: 'Una serie de páginas', cuanto: c.serie },
+      { que: 'Un reporte que le pides', cuanto: c.informe },
+      { que: 'Una prueba del comprador misterioso', cuanto: c.comprador },
+    ],
+    creditos: (n: number) => (n === 1 ? '1 crédito' : `${n} créditos`),
+    creditosGratis:
+      'No gastan créditos: hablar con tu agente, los reportes programados y las respuestas a preguntas que no tienen que ver con tu negocio.',
+    creditosRenuevan:
+      'Los créditos se renuevan el 1 de cada mes. Los que no usas no pasan al mes siguiente, y no se pueden comprar créditos extra.',
 
     proIncluyeTitulo: 'Qué hace el agente Pro',
     proIncluye: [
@@ -61,6 +79,30 @@ export const precios = {
     cobroEnlaces: 'Lee los términos y la política de reembolso antes de suscribirte.',
     terminos: 'Términos',
     reembolsos: 'Reembolsos',
+
+    // Preguntas sobre el pago. Cada respuesta dice solo lo que hace el código:
+    // al cancelar el plan pasa a free (accesoPro) y las tareas y el plan siguen
+    // visibles. Créditos por mes calendario, hablar es gratis (modelo de San del
+    // 25 oct 2026; la lógica nueva la escribe el gateway).
+    faqTitulo: 'Preguntas sobre el pago',
+    faq: ({ pct, dias }: { pct: number; dias: number }) => [
+      {
+        p: '¿Y si no me sirve?',
+        r: 'En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó, incluidos los borradores de página. El kit, el monitor diario y sus tareas de arreglo siguen gratis. En el mejor caso, ChatGPT, Claude, Perplexity y Gemini empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.',
+      },
+      {
+        p: '¿Me cobran algo más?',
+        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes. El ${pct}% es aparte y solo aplica si decides cobrarles a los agentes de IA por tu contenido: Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.`,
+      },
+      {
+        p: '¿Puedo cancelar?',
+        r: `Sí, cuando quieras, desde tu panel y sin llamadas. Conservas Pro hasta el final del mes que ya pagaste y no se vuelve a cobrar. Después tu sitio pasa al plan gratis y lo que tu agente ya te entregó sigue en tu panel. Si es tu primer pago y lo pides dentro de ${dias} días, te lo devolvemos completo.`,
+      },
+      {
+        p: '¿Qué pasa si se me acaban los créditos?',
+        r: 'Tu agente sigue hablando contigo, pero no hace trabajo nuevo hasta el 1 del mes siguiente, cuando se renuevan. Lo que ya te entregó sigue en tu panel y no se cobra nada extra.',
+      },
+    ],
 
     ctaRadar: 'Revisar mi sitio gratis',
     ctaRegistrar: 'Crear mi cuenta',
@@ -99,8 +141,25 @@ export const precios = {
       `Everything in Pro, at a founder discount for the first ${cupos} businesses that subscribe. You keep this price while your subscription stays active. If you cancel and come back, you pay the Pro price.`,
     proNombre: 'Pro',
     proTexto: (cupos: number) => `The Pro price once the ${cupos} founder spots are taken.`,
-    limites: (preguntas: number, mensajes: number) =>
-      `${preguntas} questions tracked in AI assistants and ${mensajes} messages to the agent a month.`,
+    limites: (preguntas: number, creditos: number) =>
+      `${creditos} credits a month for the agent's work and ${preguntas} questions tracked in AI assistants. Talking to your agent is free.`,
+
+    creditosTitulo: 'How credits work',
+    creditosIntro: (creditos: number) =>
+      `Each month your plan comes with ${creditos} credits. Talking to your agent uses no credits: credits measure the work the agent does for you.`,
+    creditosCostos: (c: { consulta: number; tarea: number; pagina: number; serie: number; informe: number; comprador: number }) => [
+      { que: 'A lookup in your data', cuanto: c.consulta },
+      { que: 'A fix', cuanto: c.tarea },
+      { que: 'A page draft', cuanto: c.pagina },
+      { que: 'A series of pages', cuanto: c.serie },
+      { que: 'A report you ask for', cuanto: c.informe },
+      { que: 'A mystery shopper test', cuanto: c.comprador },
+    ],
+    creditos: (n: number) => (n === 1 ? '1 credit' : `${n} credits`),
+    creditosGratis:
+      'These use no credits: talking to your agent, scheduled reports and answers to questions that have nothing to do with your business.',
+    creditosRenuevan:
+      'Credits renew on the 1st of each month. Unused credits do not carry over, and you cannot buy extra credits.',
 
     proIncluyeTitulo: 'What the Pro agent does',
     proIncluye: [
@@ -123,6 +182,26 @@ export const precios = {
     cobroEnlaces: 'Read the terms and the refund policy before you subscribe.',
     terminos: 'Terms',
     reembolsos: 'Refunds',
+
+    faqTitulo: 'Questions about paying',
+    faq: ({ pct, dias }: { pct: number; dias: number }) => [
+      {
+        p: 'What if it does not work for me?',
+        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you, page drafts included. The kit, the daily monitor and its fix tasks stay free. Best case, ChatGPT, Claude, Perplexity and Gemini start citing your site for your business questions, and you see it in your agent's tracking.`,
+      },
+      {
+        p: 'Do you charge anything else?',
+        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm. The ${pct}% is separate and only applies if you choose to charge AI agents for your content: Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge agents, there is no fee.`,
+      },
+      {
+        p: 'Can I cancel?',
+        r: `Yes, anytime, from your dashboard and with no calls. You keep Pro until the end of the month you already paid for and you are not charged again. After that your site moves to the free plan and what your agent already handed you stays in your dashboard. If it is your first payment and you ask within ${dias} days, we refund it in full.`,
+      },
+      {
+        p: 'What happens if I run out of credits?',
+        r: 'Your agent keeps talking with you, but it does no new work until the 1st of next month, when credits renew. What it already handed you stays in your dashboard and nothing extra is charged.',
+      },
+    ],
 
     ctaRadar: 'Check my site free',
     ctaRegistrar: 'Create my account',

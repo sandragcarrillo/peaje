@@ -2,17 +2,24 @@
 
 import type { AccesoPro, BillingPayment } from '@peaje/db'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import type { EstadoBilling } from '@/lib/gateway'
 import { useDict, useLocale } from '@/lib/i18n/client'
 import { CONTACTO } from '@/lib/legal'
 import { suscripcionViva, type PaddleCliente } from '@/lib/paddle'
-import { cargarPaddle, escucharPaddle, temaActual } from '@/lib/paddle-js'
-import { abrirPortal, pagarConSaldo } from './actions'
+import { cargarPaddle, escucharPaddle, irAPagoListo, temaActual } from '@/lib/paddle-js'
+import { abrirPortal } from './actions'
 
 type Plan = 'founder' | 'pro'
 type Fecha = (iso: string | null) => string
+
+/**
+ * Los números de este sitio para "lo que hace tu agente apenas te suscribes".
+ * Salen del score de Ora en el server (leer() de app/radar/datos). Sin score,
+ * llega null y los pasos se muestran sin números. `estimado` es null cuando
+ * los arreglos no suben el puntaje.
+ */
+export type Arranque = { actual: number; max: number; arreglos: number; estimado: number | null }
 
 /**
  * El plan del agente Pro. Pro se paga con tarjeta por Paddle (Merchant of
@@ -23,7 +30,25 @@ type Fecha = (iso: string | null) => string
  * plegado. El cobro en USDC solo aparece si el gateway lo tiene prendido
  * (BILLING_CRYPTO_ENABLED, apagado por defecto).
  */
-export function Suscripcion({ slug, acceso, billing, paddle }: { slug: string; acceso: AccesoPro; billing: EstadoBilling | null; paddle: PaddleCliente }) {
+/**
+ * `creditos` llega del server (CREDITOS_MENSUALES de planes.ts): este es un
+ * componente cliente y no importa valores de @peaje/db.
+ */
+export function Suscripcion({
+  slug,
+  acceso,
+  billing,
+  paddle,
+  creditos,
+  arranque,
+}: {
+  slug: string
+  acceso: AccesoPro
+  billing: EstadoBilling | null
+  paddle: PaddleCliente
+  creditos: number
+  arranque: Arranque | null
+}) {
   const { miAgente: t } = useDict()
   const locale = useLocale()
   const fecha: Fecha = (iso) => (iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }) : '')
@@ -65,7 +90,7 @@ export function Suscripcion({ slug, acceso, billing, paddle }: { slug: string; a
     )
   }
 
-  const opciones = billing ? <Opciones slug={slug} billing={billing} paddle={paddle} fecha={fecha} /> : <p className="text-sm text-muted">{t.planSinDatos}</p>
+  const opciones = billing ? <Opciones slug={slug} billing={billing} paddle={paddle} fecha={fecha} creditos={creditos} /> : <p className="text-sm text-muted">{t.planSinDatos}</p>
 
   if (acceso.activo) {
     return (
@@ -89,6 +114,7 @@ export function Suscripcion({ slug, acceso, billing, paddle }: { slug: string; a
         <p className="text-lg font-semibold">{estado}</p>
         <p className="text-sm text-muted">{t.planGratisNota}</p>
       </div>
+      <LoQueHace arranque={arranque} preguntas={billing?.prices.pro.limits.preguntas ?? null} />
       {avisos}
       {opciones}
       {gestionar}
@@ -97,21 +123,50 @@ export function Suscripcion({ slug, acceso, billing, paddle }: { slug: string; a
   )
 }
 
-function Opciones({ slug, billing, paddle, fecha }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; fecha: Fecha }) {
+/** Los pasos del primer trabajo del agente, con los números de este sitio cuando hay score. Nunca inventa números. */
+function LoQueHace({ arranque, preguntas }: { arranque: Arranque | null; preguntas: number | null }) {
+  const { miAgente: t } = useDict()
+  const pasos = [
+    arranque ? t.arranquePuntaje(arranque.actual, arranque.max) : t.arranquePuntajeSin,
+    !arranque
+      ? t.arranqueArreglosSin
+      : arranque.arreglos > 0
+        ? t.arranqueArreglos(arranque.arreglos, arranque.estimado, arranque.max)
+        : t.arranqueArreglosNinguno,
+    preguntas ? t.arranquePreguntas(preguntas) : t.arranquePreguntasSin,
+    t.arranqueTelegram,
+  ]
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold">{t.arranqueTitulo}</p>
+      <ol className="divide-y divide-border border border-border">
+        {pasos.map((p, i) => (
+          <li key={i} className="flex gap-3 px-4 py-2.5 text-sm">
+            <span className="pt-0.5 font-mono text-xs text-muted tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+            <span>{p}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; fecha: Fecha; creditos: number }) {
   const { miAgente: t } = useDict()
   const planes: Plan[] = billing.founder.available ? ['founder', 'pro'] : ['pro']
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        {(['founder', 'pro'] as Plan[]).map((plan) => {
+        {/* Sin respuesta del gateway no se muestra founder: no se sabe si quedan cupos. */}
+        {((billing.respaldo ? ['pro'] : ['founder', 'pro']) as Plan[]).map((plan) => {
           const p = billing.prices[plan]
           const cerrado = plan === 'founder' && !billing.founder.available
           return (
             <div key={plan} className={`space-y-2 border border-border p-4 ${cerrado ? 'opacity-60' : ''}`}>
-              <p className="font-mono text-[11px] uppercase text-muted">{t.planNombres[plan]}</p>
+              <p className="font-mono text-[11px] text-muted">{t.planNombres[plan]}</p>
               <p className="text-lg font-semibold">{t.planPrecio(p.usd)}</p>
-              <p className="text-sm">{t.planLimites(p.limits.preguntas, p.limits.mensajes)}</p>
+              <p className="text-sm">{t.planLimites(p.limits.preguntas, creditos)}</p>
               {plan === 'founder' ? (
                 <p className="text-xs text-muted">
                   {billing.founder.alreadyFounder ? t.planYaFounder : cerrado ? t.planFounderAgotado : t.planFounderCupos(billing.founder.slotsLeft)}
@@ -124,7 +179,7 @@ function Opciones({ slug, billing, paddle, fecha }: { slug: string; billing: Est
 
       <Checkout slug={slug} billing={billing} paddle={paddle} planes={planes} />
 
-      {billing.crypto ? <PagoCripto slug={slug} billing={billing} planes={planes} fecha={fecha} /> : null}
+      {billing.crypto ? <PagoCripto billing={billing} planes={planes} /> : null}
     </div>
   )
 }
@@ -135,9 +190,7 @@ type EstadoCheckout = 'inactivo' | 'abriendo' | 'abierto' | 'completado' | 'erro
 function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: EstadoBilling; paddle: PaddleCliente; planes: Plan[] }) {
   const { miAgente: t } = useDict()
   const locale = useLocale()
-  const router = useRouter()
   const [estado, setEstado] = useState<EstadoCheckout>('inactivo')
-  const relojes = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useEffect(() => {
     escucharPaddle((ev) => {
@@ -147,8 +200,9 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
           break
         case 'checkout.completed':
           setEstado('completado')
-          // El plan lo activa el webhook (transaction.completed), unos segundos después.
-          relojes.current.push(setTimeout(() => router.refresh(), 4000), setTimeout(() => router.refresh(), 12000))
+          // El plan lo activa el webhook (transaction.completed), unos segundos
+          // después: /pago/listo muestra el pago y espera esa activación.
+          irAPagoListo(ev, slug)
           break
         case 'checkout.closed':
           setEstado((e) => (e === 'completado' ? e : 'inactivo'))
@@ -161,12 +215,10 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
           break
       }
     })
-    const r = relojes.current
     return () => {
       escucharPaddle(null)
-      r.forEach(clearTimeout)
     }
-  }, [router])
+  }, [slug])
 
   const disponible = (plan: Plan) => !!paddle.clientToken && !!paddle.prices[plan]
   const hayAlguno = planes.some(disponible)
@@ -182,7 +234,8 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
         items: [{ priceId, quantity: 1 }],
         ...(paddle.email ? { customer: { email: paddle.email } } : {}),
         // El gateway mapea el pago a este negocio con esto; el plan lo decide el precio cobrado.
-        customData: { tenantId: paddle.tenantId, slug, plan },
+        // locale: el idioma del correo de bienvenida que manda el gateway.
+        customData: { tenantId: paddle.tenantId, slug, plan, locale },
         settings: { displayMode: 'overlay', variant: 'one-page', theme: temaActual(), locale },
       })
     } catch (e) {
@@ -194,6 +247,7 @@ function Checkout({ slug, billing, paddle, planes }: { slug: string; billing: Es
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted">{t.planCobroTarjeta}</p>
+      {hayAlguno ? <p className="text-sm">{t.planCancelas}</p> : null}
       {hayAlguno ? (
         <div className="flex flex-wrap gap-3">
           {planes.filter(disponible).map((plan, i) => (
@@ -251,7 +305,7 @@ function Pagos({ pagos, fecha }: { pagos: BillingPayment[]; fecha: Fecha }) {
   const { miAgente: t } = useDict()
   return (
     <div className="space-y-2">
-      <p className="font-mono text-[11px] uppercase text-muted">{t.planPagos}</p>
+      <p className="font-mono text-[11px] text-muted">{t.planPagos}</p>
       <ul className="divide-y divide-border border border-border">
         {pagos.map((p) => (
           <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-sm">
@@ -269,39 +323,14 @@ function Pagos({ pagos, fecha }: { pagos: BillingPayment[]; fecha: Fecha }) {
   )
 }
 
-/** Pago en USDC (saldo de Peaje o el 402). Solo con BILLING_CRYPTO_ENABLED en el gateway. */
-function PagoCripto({ slug, billing, planes, fecha }: { slug: string; billing: EstadoBilling; planes: Plan[]; fecha: Fecha }) {
+/** Pago con el link del 402 (cripto). Solo con BILLING_CRYPTO_ENABLED en el gateway. Pagar con saldo ya no existe: Peaje no guarda saldos. */
+function PagoCripto({ billing, planes }: { billing: EstadoBilling; planes: Plan[] }) {
   const { miAgente: t } = useDict()
-  const [msj, setMsj] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, start] = useTransition()
-
-  const pagar = (plan: Plan) =>
-    start(async () => {
-      setMsj(null)
-      setError(null)
-      const r = await pagarConSaldo(slug, plan)
-      if (r.error) setError(r.error)
-      else setMsj(t.planPagado(fecha(r.planUntil)))
-    })
-
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted">{t.planCadaPago}</p>
       <div className="space-y-2">
-        <p className="text-sm text-muted">{t.planSaldo(Number(billing.balanceAvailable).toFixed(2))}</p>
-        <div className="flex flex-wrap gap-3">
-          {planes.map((plan) => (
-            <button key={plan} disabled={pending} onClick={() => pagar(plan)} className="btn btn-secundario">
-              {pending ? t.planPagando : `${t.planPagarSaldo} · ${t.planNombres[plan]} US$${billing.prices[plan].charged}`}
-            </button>
-          ))}
-        </div>
-        {msj ? <p className="text-sm">{msj}</p> : null}
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      </div>
-      <div className="space-y-2">
-        <p className="font-mono text-[11px] uppercase text-muted">{t.planLinkTitulo}</p>
+        <p className="font-mono text-[11px] text-muted">{t.planLinkTitulo}</p>
         {planes.map((plan) => {
           const url = billing.checkout[plan]
           return url ? <Enlace key={plan} etiqueta={t.planNombres[plan] ?? plan} url={url} /> : null
@@ -331,12 +360,16 @@ function Enlace({ etiqueta, url }: { etiqueta: string; url: string }) {
   )
 }
 
-/** Lo que ven chat, Telegram, citación y comprador misterioso sin Pro. */
-export function Bloqueado() {
+export type SeccionPro = 'chat' | 'telegram' | 'slack' | 'citacion' | 'comprador' | 'plan'
+
+/** Lo que ven las secciones Pro sin Pro: qué hay ahí y cómo se activa, con el botón al plan. */
+export function Bloqueado({ que }: { que: SeccionPro }) {
   const { miAgente: t } = useDict()
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-border p-4">
-      <p className="text-sm text-muted">{t.bloqueado}</p>
+      <p className="max-w-xl text-sm text-muted">
+        {t.bloqueadoQue[que]} {t.bloqueado}
+      </p>
       <a href="#plan" className="btn btn-primario">
         {t.bloqueadoCta}
       </a>

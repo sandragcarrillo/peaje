@@ -131,12 +131,46 @@ export type Payment = {
   platformFee: string
   /** Costo de red pagado por el agente encima del precio (solo redes con contrato). */
   networkFee: string
+  // ---- pagos directos ----
+  /**
+   * Dirección a la que llegó el neto en la misma transacción del pago
+   * (PeajeSettlementV3 o split de Tempo). null en pagos anteriores al cambio.
+   */
+  payoutAddress: string | null
   createdAt: string
 }
 
-/** Alta de pago: las comisiones son opcionales (0 en rieles sin contrato). */
-export type NewPayment = Omit<Payment, 'id' | 'createdAt' | 'refundTx' | 'platformFee' | 'networkFee'> &
-  Partial<Pick<Payment, 'platformFee' | 'networkFee'>>
+/** Alta de pago: las comisiones y la dirección de cobro son opcionales. */
+export type NewPayment = Omit<Payment, 'id' | 'createdAt' | 'refundTx' | 'platformFee' | 'networkFee' | 'payoutAddress'> &
+  Partial<Pick<Payment, 'platformFee' | 'networkFee' | 'payoutAddress'>>
+
+// ---- pagos directos: pagos adelantados (front-run) ----
+/**
+ * Una autorización EIP-3009 que alguien mandó directo al token antes que el
+ * relayer: los fondos quedaron en PeajeSettlementV3 sin repartir. El Safe la
+ * reparte con `settleStray(token, merchant, payer, value, nonce, networkFee)`
+ * usando estos datos. Montos en unidades base del token.
+ */
+export type SettlementStray = {
+  id: string
+  network: string
+  contract: string
+  token: string
+  payer: string
+  nonce: string
+  value: string
+  networkFee: string
+  merchant: string
+  tenantId: string | null
+  path: string | null
+  status: 'pending' | 'settled'
+  settleTx: string | null
+  detectedAt: string
+  resolvedAt: string | null
+}
+
+export type NewSettlementStray = Omit<SettlementStray, 'id' | 'status' | 'settleTx' | 'detectedAt' | 'resolvedAt'>
+// ---- fin pagos directos ----
 
 export type Withdrawal = {
   id: string
@@ -394,6 +428,9 @@ export type AgentMessage = {
 export type AgentMessageLink = { label: string; url: string; kind?: 'report' | 'task' | 'page' }
 
 export type NewAgentMessage = Pick<AgentMessage, 'tenantId' | 'role' | 'text'> & { actions?: AgentAction[]; options?: string[]; links?: AgentMessageLink[]; channel?: string }
+
+/** Un movimiento de créditos del agente: un cargo (positivo) o una devolución (negativo). */
+export type CreditCharge = { tenantId: string; credits: number; reason: string }
 
 // ---- trabajos largos del agente (borradores, series de páginas) ----
 
@@ -745,8 +782,13 @@ export interface Store {
   getMessage(tenantId: string, id: string): Promise<AgentMessage | null>
   setMessageActions(tenantId: string, id: string, actions: AgentAction[]): Promise<void>
   clearMessages(tenantId: string): Promise<void>
-  /** Mensajes del dueño desde una fecha: el tope mensual del chat. */
+  /** Mensajes del dueño desde una fecha. Ya no limita el chat (ver créditos); queda para métricas. */
   countUserMessagesSince(tenantId: string, since: string): Promise<number>
+  // ---- créditos del agente ----
+  /** Anota un cargo de créditos (o una devolución, con créditos negativos). */
+  addCreditCharge(c: CreditCharge): Promise<void>
+  /** Créditos usados desde una fecha: la suma de cargos menos devoluciones. */
+  creditsUsedSince(tenantId: string, since: string): Promise<number>
   // ---- trabajos largos del agente ----
   createJob(input: NewAgentJob): Promise<AgentJob>
   getJob(id: string): Promise<AgentJob | null>
@@ -783,6 +825,12 @@ export interface Store {
   setActiveTelegram(chatId: number, tenantId: string): Promise<void>
   listTelegramLinks(tenantId: string): Promise<TelegramLink[]>
   unlinkTelegram(filter: { chatId?: number; tenantId?: string }): Promise<void>
+  /**
+   * Reserva el primer mensaje del agente en un destino (el chat de Telegram,
+   * `<team>:<canal>` de Slack). True solo la primera vez por negocio, canal y
+   * destino; desconectar el chat no la borra.
+   */
+  claimAgentIntro(tenantId: string, channel: string, target: string): Promise<boolean>
   // ---- Slack ----
   createSlackCode(tenantId: string, code: string, expiresAt: string, language: string): Promise<void>
   /** El código si existe y no venció (no lo consume). */
@@ -859,6 +907,12 @@ export interface Store {
   recordPayment(payment: NewPayment): Promise<Payment>
   setPaymentWallet(paymentId: string, wallet: string): Promise<void>
   markPaymentRefunded(paymentId: string, txRef: string): Promise<void>
+  /**
+   * Total devuelto a agentes (monto + fee + costo de red de los pagos con
+   * refundTx) creados desde `since`, de un negocio o de todos. Lo usan los
+   * topes de reembolso de Tempo: el reembolso sale segundos después del pago.
+   */
+  refundedSince(since: string, tenantId?: string): Promise<number>
   listPayments(tenantId: string, limit?: number): Promise<Payment[]>
   balance(tenantId: string): Promise<Balance>
   /** Balance separado por red. Solo redes con actividad o soportadas. */
@@ -878,6 +932,16 @@ export interface Store {
   /** Retiros pending con tx enviada, de todos los tenants: los reconcilia el gateway contra la chain. */
   listPendingWithdrawals(limit?: number): Promise<Withdrawal[]>
   getWithdrawal(id: string): Promise<Withdrawal | null>
+
+  // ---- pagos directos: pagos adelantados ----
+  /**
+   * Registra un pago adelantado. Único por (contract, token, payer, nonce):
+   * `nuevo` es false si ya estaba registrado (no se duplica ni se pisa).
+   */
+  recordStray(input: NewSettlementStray): Promise<{ stray: SettlementStray; nuevo: boolean }>
+  listStrays(status?: SettlementStray['status']): Promise<SettlementStray[]>
+  /** El Safe ya corrió settleStray: queda con su tx y deja de estar pendiente. */
+  resolveStray(id: string, settleTx: string): Promise<SettlementStray | null>
 
   // agentes compradores
   createAgent(input: NewAgent): Promise<Agent>
@@ -961,6 +1025,16 @@ export interface Store {
   /** Marca el evento como procesado. Repetirlo no falla. */
   recordPaddleEvent(e: { eventId: string; eventType: string; occurredAt: string | null }): Promise<void>
   markBillingPaymentRefunded(id: string, at: string): Promise<void>
+  // ---- bienvenida (20261026000000) ----
+  /**
+   * Reserva el correo de bienvenida de Pro: marca welcome_sent_at = at solo si
+   * estaba en null. true = este llamado lo ganó y debe mandarlo; false = ya se
+   * mandó (o lo está mandando otro evento).
+   */
+  claimWelcomeEmail(tenantId: string, at: string): Promise<boolean>
+  /** Suelta la reserva si el envío falló (solo si sigue siendo la de `at`), para que otro evento reintente. */
+  releaseWelcomeEmail(tenantId: string, at: string): Promise<void>
+  // ---- fin bienvenida ----
   // ---- fin Paddle ----
 
   // ---- radar público: leads ----

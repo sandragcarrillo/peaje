@@ -1,10 +1,8 @@
 'use client'
 
 import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
-import { gatewayUrl } from '@/lib/config'
 import { Eyebrow } from '@/components/chrome'
 import { useDict } from '@/lib/i18n/client'
 import { registrarNegocio, type AltaResultado } from './actions'
@@ -38,9 +36,9 @@ export default function NuevoNegocio() {
   const [irAPlan, setIrAPlan] = useState(false)
   const router = useRouter()
 
-  // El radar manda acá con el dominio ya medido: se precarga el campo. Con
-  // `plan=1` (botón "Tu agente lo arregla contigo"), al terminar el alta se
-  // sigue directo a la sección del plan, donde está el checkout de Paddle.
+  // El radar manda acá con el dominio ya medido: se precarga el campo. Al
+  // terminar el alta se ve el puntaje del sitio; con `plan=1` (botón "Tu
+  // agente lo arregla contigo"), a la sección del plan, donde está el checkout.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const url = params.get('url')
@@ -49,7 +47,7 @@ export default function NuevoNegocio() {
   }, [])
 
   useEffect(() => {
-    if (resultado?.ok && irAPlan) router.replace(`/t/${resultado.slug}/agente#plan`)
+    if (resultado?.ok) router.replace(irAPlan ? `/t/${resultado.slug}/agente#plan` : `/t/${resultado.slug}/listo`)
   }, [resultado, irAPlan, router])
 
   const d = useDict()
@@ -128,28 +126,26 @@ export default function NuevoNegocio() {
   }
 
   if (resultado?.ok) {
-    if (irAPlan) {
-      return (
-        <div className="flex min-h-[65vh] items-center justify-center">
-          <p className="text-sm text-muted">{d.acceso.irAlPlan}</p>
-        </div>
-      )
-    }
-    return <Listo slug={resultado.slug} payoutWallet={resultado.payoutWallet} />
+    return (
+      <div className="flex min-h-[65vh] items-center justify-center">
+        <p className="text-sm text-muted">{irAPlan ? d.acceso.irAlPlan : d.acceso.irAlPuntaje}</p>
+      </div>
+    )
   }
 
   if (step === 'code') {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
         <div className="w-full max-w-sm border border-border bg-panel p-8">
-          <Eyebrow>PEAJE</Eyebrow>
+          <Eyebrow>Peaje</Eyebrow>
           <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
             {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
           </p>
+          <p className="mt-2 text-sm text-muted">{d.acceso.codigoRevisaSpam}</p>
           <form onSubmit={verificarYCrear} className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-xs tracking-wide text-muted uppercase">
+              <span className="text-xs text-muted">
                 {d.acceso.campoCodigo}
               </span>
               <input
@@ -184,7 +180,7 @@ export default function NuevoNegocio() {
         <form onSubmit={enviarCodigo} className="mt-8 space-y-6">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            <span className="font-mono text-xs text-muted">
               {d.acceso.campoNombre} <span className="text-accent">*</span>
             </span>
             <input
@@ -197,7 +193,7 @@ export default function NuevoNegocio() {
           </label>
 
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            <span className="font-mono text-xs text-muted">
               {d.acceso.campoUrl} <span className="text-accent">*</span>
             </span>
             <input
@@ -211,7 +207,7 @@ export default function NuevoNegocio() {
           </label>
 
           <label className="block" hidden={authenticated}>
-            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+            <span className="font-mono text-xs text-muted">
               {d.acceso.campoTuEmail} <span className="text-accent">*</span>
             </span>
             <input
@@ -247,70 +243,6 @@ export default function NuevoNegocio() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  )
-}
-
-function acortarWallet(address: string) {
-  return `${address.slice(0, 6)}…${address.slice(-6)}`
-}
-
-function Listo({ slug, payoutWallet }: { slug: string; payoutWallet: string }) {
-  const d = useDict()
-  const base = `${gatewayUrl}/${slug}`
-  const [copiado, setCopiado] = useState(false)
-
-  async function copiarWallet() {
-    await navigator.clipboard.writeText(payoutWallet)
-    setCopiado(true)
-    setTimeout(() => setCopiado(false), 1500)
-  }
-
-  return (
-    <div className="flex min-h-[65vh] items-center justify-center">
-      <div className="w-full max-w-md">
-        <h1 className="text-2xl font-medium">{d.acceso.listoTitulo}</h1>
-
-        <div className="mt-6 space-y-4">
-          <div className="border border-accent/50 bg-panel p-5">
-            <p className="text-xs tracking-wide text-accent uppercase">{d.acceso.tuSaldo}</p>
-            <p className="mt-3 text-3xl font-medium tabular-nums">$0.00</p>
-
-            <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-              <span className="text-xs text-muted">
-                {d.acceso.etiquetaCuenta}:{' '}
-                <span className="font-mono">{acortarWallet(payoutWallet)}</span>
-              </span>
-              <button
-                type="button"
-                onClick={copiarWallet}
-                className="btn btn-secundario btn-chico"
-              >
-                {copiado ? d.acceso.copiado : d.acceso.copiar}
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs text-muted">{d.acceso.recibirasPagos}</p>
-          </div>
-
-          <div className="border border-border bg-panel p-5">
-            <p className="text-xs tracking-wide text-muted uppercase">{d.acceso.etiquetaEndpoint}</p>
-            <code className="mt-3 block break-all font-mono text-sm text-text">
-              {base}/&lt;{d.acceso.placeholderRuta}&gt;
-            </code>
-            <p className="mt-3 text-xs text-muted">{d.acceso.agentesConsumen}</p>
-          </div>
-        </div>
-
-        <p className="mt-4 text-xs text-muted">{d.acceso.sinRutasTodavia}</p>
-
-        <Link
-          href={`/t/${slug}/score`}
-          className="btn btn-primario mt-6"
-        >
-          {d.acceso.empezarConScore} →
-        </Link>
       </div>
     </div>
   )

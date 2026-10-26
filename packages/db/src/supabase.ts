@@ -44,6 +44,10 @@ import type {
 // ---- M6 ----
 import type { FollowupSnapshot, TaskFollowup } from './types'
 import { aggregateVisits, type VisitRow } from './visits'
+// ---- pagos directos ----
+import type { NewSettlementStray, SettlementStray } from './types'
+// ---- créditos del agente ----
+import type { CreditCharge } from './types'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
@@ -249,7 +253,29 @@ function paymentFrom(row: Row): Payment {
     refundTx: row.refund_tx ?? null,
     platformFee: String(row.platform_fee ?? '0'),
     networkFee: String(row.network_fee ?? '0'),
+    payoutAddress: row.payout_address ?? null,
     createdAt: row.created_at,
+  }
+}
+
+// ---- pagos directos ----
+function strayFrom(row: Row): SettlementStray {
+  return {
+    id: row.id,
+    network: row.network,
+    contract: row.contract,
+    token: row.token,
+    payer: row.payer,
+    nonce: row.nonce,
+    value: String(row.value),
+    networkFee: String(row.network_fee ?? '0'),
+    merchant: row.merchant,
+    tenantId: row.tenant_id ?? null,
+    path: row.path ?? null,
+    status: row.status,
+    settleTx: row.settle_tx ?? null,
+    detectedAt: String(row.detected_at),
+    resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
   }
 }
 
@@ -699,6 +725,19 @@ export class SupabaseStore implements Store {
     this.#fail('clearMessages', error)
   }
 
+  // ---- créditos del agente (migración 20261026100000) ----
+  async addCreditCharge(c: CreditCharge): Promise<void> {
+    const { error } = await this.#db.from('agent_credit_charges').insert({ tenant_id: c.tenantId, credits: c.credits, reason: c.reason.slice(0, 200) })
+    this.#fail('addCreditCharge', error)
+  }
+
+  async creditsUsedSince(tenantId: string, since: string): Promise<number> {
+    // Sin agregados en PostgREST: se suman acá. Son unas decenas de filas por mes.
+    const { data, error } = await this.#db.from('agent_credit_charges').select('credits').eq('tenant_id', tenantId).gte('created_at', since).limit(5_000)
+    this.#fail('creditsUsedSince', error)
+    return (data ?? []).reduce((n, r) => n + Number((r as Row).credits ?? 0), 0)
+  }
+
   // ---- trabajos largos del agente ----
   async createJob(input: NewAgentJob): Promise<AgentJob> {
     const { data, error } = await this.#db
@@ -832,6 +871,16 @@ export class SupabaseStore implements Store {
     if (filter.tenantId !== undefined) q = q.eq('tenant_id', filter.tenantId)
     const { error } = await q
     this.#fail('unlinkTelegram', error)
+  }
+
+  async claimAgentIntro(tenantId: string, channel: string, target: string): Promise<boolean> {
+    // La llave primaria decide: con dos /start a la vez, solo uno ve su fila de vuelta.
+    const { data, error } = await this.#db
+      .from('agent_intros')
+      .upsert({ tenant_id: tenantId, channel, target }, { onConflict: 'tenant_id,channel,target', ignoreDuplicates: true })
+      .select('tenant_id')
+    this.#fail('claimAgentIntro', error)
+    return (data?.length ?? 0) > 0
   }
 
   // ---- Slack ----
@@ -1220,6 +1269,20 @@ export class SupabaseStore implements Store {
   }
 
   async recordPayment(payment: NewPayment): Promise<Payment> {
+    try {
+      return await this.#recordPayment(payment)
+    } catch (error) {
+      // Sin la migración 20261025100000 la columna no existe: el pago ya se
+      // cobró on-chain, así que se graba igual sin la dirección.
+      if (payment.payoutAddress && error instanceof Error && error.message.includes('payout_address')) {
+        console.warn('[db] payments.payout_address no existe todavía: falta aplicar 20261025100000_pagos_directos.sql')
+        return this.#recordPayment({ ...payment, payoutAddress: null })
+      }
+      throw error
+    }
+  }
+
+  async #recordPayment(payment: NewPayment): Promise<Payment> {
     // (network, receipt_ref) es único: si el Receipt ya se acreditó, devolvemos el existente.
     const { data, error } = await this.#db
       .from('payments')
@@ -1235,6 +1298,8 @@ export class SupabaseStore implements Store {
           network: payment.network,
           platform_fee: payment.platformFee ?? '0',
           network_fee: payment.networkFee ?? '0',
+          // Solo si hay dato (ver recordPayment).
+          ...(payment.payoutAddress ? { payout_address: payment.payoutAddress } : {}),
         },
         // Si el Receipt ya se acreditó no se toca: antes el upsert pisaba
         // tenant y monto, y una credencial reusada movía el pago a otro negocio.
@@ -1254,6 +1319,59 @@ export class SupabaseStore implements Store {
     return paymentFrom(previo as Row)
   }
 
+  // ---- pagos directos: pagos adelantados (migración 20261025100000) ----
+  async recordStray(input: NewSettlementStray) {
+    const fila = {
+      network: input.network,
+      contract: input.contract.toLowerCase(),
+      token: input.token.toLowerCase(),
+      payer: input.payer.toLowerCase(),
+      nonce: input.nonce.toLowerCase(),
+      value: input.value,
+      network_fee: input.networkFee,
+      merchant: input.merchant,
+      tenant_id: input.tenantId,
+      path: input.path,
+    }
+    const { data, error } = await this.#db
+      .from('settlement_strays')
+      .upsert(fila, { onConflict: 'contract,token,payer,nonce', ignoreDuplicates: true })
+      .select()
+      .maybeSingle()
+    this.#fail('recordStray', error)
+    if (data) return { stray: strayFrom(data as Row), nuevo: true }
+    const { data: previo, error: e2 } = await this.#db
+      .from('settlement_strays')
+      .select()
+      .eq('contract', fila.contract)
+      .eq('token', fila.token)
+      .eq('payer', fila.payer)
+      .eq('nonce', fila.nonce)
+      .single()
+    this.#fail('recordStray(previo)', e2)
+    return { stray: strayFrom(previo as Row), nuevo: false }
+  }
+
+  async listStrays(status?: SettlementStray['status']) {
+    let q = this.#db.from('settlement_strays').select().order('detected_at', { ascending: false }).limit(200)
+    if (status) q = q.eq('status', status)
+    const { data, error } = await q
+    this.#fail('listStrays', error)
+    return ((data ?? []) as Row[]).map(strayFrom)
+  }
+
+  async resolveStray(id: string, settleTx: string) {
+    const { data, error } = await this.#db
+      .from('settlement_strays')
+      .update({ status: 'settled', settle_tx: settleTx, resolved_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .maybeSingle()
+    this.#fail('resolveStray', error)
+    return data ? strayFrom(data as Row) : null
+  }
+  // ---- fin pagos directos ----
+
   async setPaymentWallet(paymentId: string, wallet: string) {
     const { error } = await this.#db
       .from('payments')
@@ -1268,6 +1386,14 @@ export class SupabaseStore implements Store {
       .update({ refund_tx: txRef })
       .eq('id', paymentId)
     this.#fail('markPaymentRefunded', error)
+  }
+
+  async refundedSince(since: string, tenantId?: string): Promise<number> {
+    let q = this.#db.from('payments').select('amount, platform_fee, network_fee').not('refund_tx', 'is', null).gte('created_at', since)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
+    const { data, error } = await q
+    this.#fail('refundedSince', error)
+    return ((data ?? []) as Row[]).reduce((n, r) => n + Number(r.amount) + Number(r.platform_fee ?? 0) + Number(r.network_fee ?? 0), 0)
   }
 
   async listPayments(tenantId: string, limit = 50): Promise<Payment[]> {
@@ -1772,6 +1898,20 @@ export class SupabaseStore implements Store {
     const { error } = await this.#db.from('billing_payments').update({ refunded_at: at }).eq('id', id).is('refunded_at', null)
     this.#fail('markBillingPaymentRefunded', error)
   }
+
+  // ---- bienvenida (20261026000000) ----
+  async claimWelcomeEmail(tenantId: string, at: string): Promise<boolean> {
+    // Update condicional: con dos eventos a la vez, solo uno ve su fila de vuelta.
+    const { data, error } = await this.#db.from('tenants').update({ welcome_sent_at: at }).eq('id', tenantId).is('welcome_sent_at', null).select('id')
+    this.#fail('claimWelcomeEmail', error)
+    return (data?.length ?? 0) > 0
+  }
+
+  async releaseWelcomeEmail(tenantId: string, at: string): Promise<void> {
+    const { error } = await this.#db.from('tenants').update({ welcome_sent_at: null }).eq('id', tenantId).eq('welcome_sent_at', at)
+    this.#fail('releaseWelcomeEmail', error)
+  }
+  // ---- fin bienvenida ----
   // ---- fin Paddle ----
 
   // ---- radar público: leads ----

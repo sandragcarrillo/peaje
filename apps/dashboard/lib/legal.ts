@@ -23,8 +23,8 @@ export const CIUDAD_EN = 'Bogotá, Colombia'
 export const CONTACTO = 'hello@usepeaje.com'
 
 /** Fecha de la versión vigente. Cambiarla cada vez que cambie una de las páginas. */
-export const ACTUALIZADA_ES = '24 de octubre de 2026'
-export const ACTUALIZADA_EN = 'October 24, 2026'
+export const ACTUALIZADA_ES = '25 de octubre de 2026'
+export const ACTUALIZADA_EN = 'October 25, 2026'
 
 /** Términos de compra de Paddle, que aplican a cada pedido. */
 export const PADDLE_TERMINOS = 'https://www.paddle.com/legal/checkout-buyer-terms'

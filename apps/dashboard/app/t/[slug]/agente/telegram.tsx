@@ -7,25 +7,16 @@ import { useDict } from '@/lib/i18n/client'
 import { conectarTelegram, quitarTelegram } from './actions'
 import { ReportesChats } from './programados'
 
-export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado: EstadoTelegram | null; reportes?: EstadoReportes | null }) {
-  const { miAgente: t } = useDict()
+/**
+ * Conectar Telegram en un clic: la pestaña se abre en el gesto del usuario (si
+ * no, el navegador la bloquea) y se le pone el enlace de un solo uso cuando
+ * llega. Si igual la bloquea, `enlace` queda para mostrar un botón de respaldo.
+ * Lo usan este panel y /pago/listo.
+ */
+export function useConectarTelegram(slug: string) {
   const [enlace, setEnlace] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
-  const router = useRouter()
-  // Al volver de Telegram, la página relee el estado y muestra "Conectado".
-  useEffect(() => {
-    const alVolver = () => document.visibilityState === 'visible' && router.refresh()
-    document.addEventListener('visibilitychange', alVolver)
-    return () => document.removeEventListener('visibilitychange', alVolver)
-  }, [router])
-  if (!estado) return null
-
-  /**
-   * Un solo clic: la pestaña se abre en el gesto del usuario (si no, el
-   * navegador la bloquea) y se le pone el enlace cuando llega. Si igual la
-   * bloquea, queda el botón con el enlace como respaldo.
-   */
   const conectar = () => {
     const ventana = window.open('', '_blank')
     start(async () => {
@@ -40,6 +31,21 @@ export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado
       }
     })
   }
+  return { conectar, enlace, error, setError, pending, start }
+}
+
+export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado: EstadoTelegram | null; reportes?: EstadoReportes | null }) {
+  const { miAgente: t } = useDict()
+  const { conectar, enlace, error, setError, pending, start } = useConectarTelegram(slug)
+  const router = useRouter()
+  // Al volver de Telegram, la página relee el estado y muestra "Conectado".
+  useEffect(() => {
+    const alVolver = () => document.visibilityState === 'visible' && router.refresh()
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
+  }, [router])
+  if (!estado) return null
+
   const correr = (fn: () => Promise<void>) =>
     start(async () => {
       setError(null)

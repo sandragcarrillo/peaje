@@ -26,6 +26,10 @@ import type { AgentJobDestino, AgentMessageLink } from '@peaje/db'
 import { REPORTES, tarjetaReporte, tarjetaTarea } from './tarjetas.js'
 import { avisoDeTrabajo, encolarTrabajo } from './trabajos.js'
 import { guardarPerfilDeVoz, perfilDeVoz, type CambioDeVoz } from '../ciclo/voz.js'
+// ---- créditos y filtro de tema ----
+import { COSTOS_CREDITOS, type AccionCreditos } from '@peaje/db'
+import { anotarCreditos, avisoCreditos, lineaSinCreditos, saldoCreditos, usoPublico, type Saldo } from './creditos.js'
+import { clasificarTema } from './tema.js'
 
 const MAX_CUSTOM = 5
 
@@ -40,9 +44,12 @@ const MAX_CUSTOM = 5
 // El chat corre en Sonnet: responde casi igual y cuesta bastante menos por
 // mensaje. Opus queda para lo que se piensa una vez: plan, borradores, misiones.
 const AGENT_MODEL = process.env.AGENT_MODEL ?? 'claude-sonnet-5'
-// El tope de mensajes del dueño por mes calendario sale del plan (M9): 150 en founder y en pro.
+// Conversar es gratis; lo que el agente hace se paga con los créditos del mes (ver creditos.ts).
 const HISTORIAL = 20
 const MAX_VUELTAS = 8
+const MAX_TOKENS = 8_000
+// Charla que el filtro de tema dice que no necesita datos: la primera vuelta va corta.
+const TOPE_CHARLA = 600
 
 type Herramienta = Anthropic.Messages.Tool & { correr: (input: Record<string, unknown>, ctx: Ctx) => Promise<unknown> }
 type Ctx = {
@@ -340,7 +347,8 @@ HERRAMIENTAS.push(
         return { id: previa.id, title: previa.title, status: previa.status, note: 'A task for this question already exists and is past "open"; the draft was not changed. Its card is under your message.' }
       }
       // Tarda un minuto: corre en segundo plano y avisa en este chat con la tarjeta de la página.
-      const job = await encolarTrabajo(tenant, 'draft_page', { question: pregunta, why: typeof i.why === 'string' ? i.why : undefined }, destinoDeTrabajo(ctx))
+      // `creditos`: si el trabajo falla, trabajos.ts los devuelve.
+      const job = await encolarTrabajo(tenant, 'draft_page', { question: pregunta, why: typeof i.why === 'string' ? i.why : undefined, creditos: COSTOS_CREDITOS.pagina }, destinoDeTrabajo(ctx))
       return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('draft_page', idioma) }
     },
   },
@@ -470,6 +478,10 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.',
     // Reportes programados
     'For anything the owner wants on a schedule ("every Monday at 8 send me...", "each morning tell me..."), use schedule_report: agent visits summary is kind agent_visits, anything else is kind custom with their request as the prompt.',
+    // Filtro de tema: lo que no es del negocio se contesta en una línea, sin herramientas.
+    'If the message is not about this business, its site, AI assistants recommending it, AI agents visiting or paying it, or Peaje itself, answer in one short line that it is not something you do, offer to get back to their site, and call no tools.',
+    // Créditos: el texto es fijo (los costos son constantes), así el prompt sigue en caché.
+    `What you do uses the owner's monthly credits; talking is free. A reply that looks up their data costs ${COSTOS_CREDITOS.consulta} (once per reply), a new task ${COSTOS_CREDITOS.tarea}, a full page ${COSTOS_CREDITOS.pagina}, a page series ${COSTOS_CREDITOS.serie}, building the plan, a citation check or a search for new tasks ${COSTOS_CREDITOS.informe}, the mystery shopper ${COSTOS_CREDITOS.comprador}. When a tool answers not-enough-credits, do not call it again and do not explain credits: a line under your reply tells the owner. Keep answering what you can without it. For questions about credits or what things cost, use get_credits (free).`,
     `Reply in ${idioma === 'es' ? 'Spanish (neutral Latin American, tú)' : 'English'} unless the owner writes in another language.`,
   ].join('\n')
 }
@@ -661,7 +673,7 @@ HERRAMIENTAS.push(
     async correr(i, ctx) {
       const tema = String(i.topic ?? '').trim()
       if (tema.length < 3) return { error: 'topic is too short' }
-      const job = await encolarTrabajo(ctx.tenant, 'page_series', { topic: tema.slice(0, 200) }, destinoDeTrabajo(ctx))
+      const job = await encolarTrabajo(ctx.tenant, 'page_series', { topic: tema.slice(0, 200), creditos: COSTOS_CREDITOS.serie }, destinoDeTrabajo(ctx))
       return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('page_series', ctx.idioma) }
     },
   },
@@ -704,11 +716,92 @@ Object.assign(ESTADOS, {
 })
 // ---- fin tarjetas, trabajos y voz ----
 
+// ---- créditos ----
+HERRAMIENTAS.push({
+  name: 'get_credits',
+  description: "The owner's credits this month: total, used, remaining, the date they renew (UTC) and what each thing costs. Free.",
+  input_schema: { type: 'object', properties: {} },
+  async correr(_i, { tenant }) {
+    return usoPublico(await saldoCreditos(tenant))
+  },
+})
+ESTADOS.get_credits = { es: 'Mirando tus créditos…', en: 'Checking your credits…' }
+
+/**
+ * Qué cobra cada herramienta. 'gratis' no cobra nunca. Una entrega cobra su
+ * precio solo si de verdad entregó (`entrego` mira la salida). Lo que no está
+ * acá es una consulta de datos: `consulta` una vez por respuesta, y nada si la
+ * respuesta ya paga una entrega.
+ */
+type Cobro = 'gratis' | { accion: AccionCreditos; entrego: (salida: unknown) => boolean }
+const sinError = (s: unknown) => !!s && typeof s === 'object' && !('error' in s)
+const empezo = (s: unknown) => (s as { started?: unknown } | null)?.started === true
+export const COBRO: Record<string, Cobro> = {
+  offer_choices: 'gratis',
+  get_credits: 'gratis',
+  schedule_report: 'gratis',
+  propose_route_change: 'gratis',
+  update_voice_profile: 'gratis',
+  create_task: { accion: 'tarea', entrego: (s) => (s as { created?: unknown } | null)?.created === true },
+  draft_page: { accion: 'pagina', entrego: empezo },
+  draft_page_series: { accion: 'serie', entrego: empezo },
+  build_plan: { accion: 'informe', entrego: sinError },
+  run_citation_check: { accion: 'informe', entrego: sinError },
+  refresh_tasks: { accion: 'informe', entrego: sinError },
+  run_mystery_shopper: { accion: 'comprador', entrego: sinError },
+}
+
+/** Lo que va pagando una respuesta mientras corre. `consultasGratis`: un reporte programado no paga sus consultas. */
+type Cuenta = { saldo: Saldo; entregas: { accion: AccionCreditos; herramienta: string }[]; consulto: boolean; consultasGratis: boolean; sinCredito: number | null }
+
+export function cargoDeRespuesta(c: Pick<Cuenta, 'entregas' | 'consulto' | 'consultasGratis'>): number {
+  const entregas = c.entregas.reduce((n, e) => n + COSTOS_CREDITOS[e.accion], 0)
+  if (entregas > 0) return entregas
+  return c.consulto && !c.consultasGratis ? COSTOS_CREDITOS.consulta : 0
+}
+
+/** Lo que pagaría la respuesta si esta herramienta hace lo suyo, y lo que cuesta ella sola. Null si es gratis. */
+function siUsa(c: Cuenta, herramienta: string): { total: number; precio: number } | null {
+  const cobro = COBRO[herramienta]
+  if (cobro === 'gratis') return null
+  if (cobro) return { total: cargoDeRespuesta({ ...c, entregas: [...c.entregas, { accion: cobro.accion, herramienta }] }), precio: COSTOS_CREDITOS[cobro.accion] }
+  if (c.consultasGratis) return null
+  return { total: cargoDeRespuesta({ ...c, consulto: true }), precio: COSTOS_CREDITOS.consulta }
+}
+
+function anotarUso(c: Cuenta, herramienta: string, salida: unknown): void {
+  const cobro = COBRO[herramienta]
+  if (cobro === 'gratis') return
+  if (cobro) {
+    if (cobro.entrego(salida)) c.entregas.push({ accion: cobro.accion, herramienta })
+    return
+  }
+  c.consulto = true
+}
+// ---- fin créditos ----
+
 /** Solo para scripts de prueba: corre una herramienta sin pasar por el modelo. */
 export function probarHerramienta(nombre: string, input: Record<string, unknown>, ctx: { tenant: Tenant; idioma: 'es' | 'en'; destino?: { canal: string; id: string }; programado?: boolean }) {
   const h = HERRAMIENTAS.find((x) => x.name === nombre)
   if (!h) throw new Error(`unknown tool ${nombre}`)
   return h.correr(input, { acciones: [], opciones: [], anexos: [], links: [], ...ctx })
+}
+
+/**
+ * Los botones de cadencia del primer mensaje: programan el resumen de visitas
+ * con la misma herramienta que usa el agente (misma validación, misma zona por
+ * defecto, pisa el que ya hubiera en ese chat). Sin modelo y sin créditos.
+ */
+export async function programarVisitas(
+  tenant: Tenant,
+  agenda: { frequency: 'daily' | 'weekly' | 'monthly'; hour: number; weekday?: number; day_of_month?: number },
+  destino: { canal: string; id: string },
+  idioma: 'es' | 'en',
+): Promise<{ saved?: { timezone: string; next_run_local: string }; error?: string }> {
+  return (await probarHerramienta('schedule_report', { action: 'set', kind: 'agent_visits', ...agenda }, { tenant, idioma, destino })) as {
+    saved?: { timezone: string; next_run_local: string }
+    error?: string
+  }
 }
 // ---- fin reportes programados ----
 
@@ -736,49 +829,51 @@ export async function conversar(
     destino?: { canal: string; id: string }
     /** True cuando lo corre un reporte programado (kind custom). */
     programado?: boolean
+    /** True cuando el texto sale de un botón del agente (opción o sugerencia): no pasa por el filtro de tema. */
+    boton?: boolean
   },
 ): Promise<AgentMessage> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
-  // ---- M9: el chat es Pro; el tope mensual sale del plan ----
-  const acceso = accesoPro(tenant)
-  if (!acceso.activo) throw new Error(mensajeSinPro(tenant, opciones.idioma))
-  const TOPE_MENSUAL = acceso.limites.mensajes
+  // ---- M9: el chat es Pro ----
+  if (!accesoPro(tenant).activo) throw new Error(mensajeSinPro(tenant, opciones.idioma))
   if (!dentroDelLimite(tenant.id)) throw new Error(opciones.idioma === 'es' ? 'Muchos mensajes en esta hora. Prueba en un rato.' : 'Too many messages this hour. Try again later.')
-  const inicioMes = new Date()
-  inicioMes.setUTCDate(1)
-  inicioMes.setUTCHours(0, 0, 0, 0)
-  if ((await store.countUserMessagesSince(tenant.id, inicioMes.toISOString())) >= TOPE_MENSUAL) {
-    throw new Error(
-      opciones.idioma === 'es'
-        ? `Llegaste a los ${TOPE_MENSUAL} mensajes de este mes. El agente sigue trabajando solo (medición, tareas, correo) y el chat vuelve el 1 del mes.`
-        : `You reached the ${TOPE_MENSUAL} messages for this month. The agent keeps working on its own (tracking, tasks, email) and the chat comes back on the 1st.`,
-    )
-  }
   const canal = opciones.canal ?? 'dashboard'
   const previos = await store.listMessages(tenant.id, HISTORIAL)
+
+  // Filtro de tema: solo lo que escribe el dueño. Lo que no es del negocio se
+  // contesta en una línea con el modelo barato, gratis y sin el modelo grande.
+  const tema = opciones.programado || opciones.boton ? null : await clasificarTema(tenant, texto, previos, opciones.idioma)
   await store.addMessage({ tenantId: tenant.id, role: 'user', text: texto.slice(0, 4_000), channel: canal })
+  if (tema?.tipo === 'fuera') return store.addMessage({ tenantId: tenant.id, role: 'assistant', text: tema.respuesta, channel: canal })
 
   const mensajes: Anthropic.Messages.MessageParam[] = [
     ...previos.map((m) => ({ role: m.role, content: m.text || '(empty)' }) as Anthropic.Messages.MessageParam),
     { role: 'user', content: texto.slice(0, 4_000) },
   ]
   const ctx: Ctx = { tenant, idioma: opciones.idioma, acciones: [], opciones: [], anexos: [], links: [], destino: opciones.destino, programado: opciones.programado }
+  // Créditos: el saldo al empezar y lo que va pagando esta respuesta. Un reporte programado no paga sus consultas.
+  const cuenta: Cuenta = { saldo: await saldoCreditos(tenant), entregas: [], consulto: false, consultasGratis: !!opciones.programado, sinCredito: null }
   const tienePlan = (await store.getPlan(tenant.id)) !== null
   anthropic ??= new Anthropic()
-
-  // El texto de todas las vueltas: el modelo suele escribir la pregunta y
-  // después llamar offer_choices; quedarse con la última vuelta la perdía.
-  const partes: string[] = []
-  for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
-    const res = await anthropic.messages.create({
+  const pedir = (max_tokens: number) =>
+    anthropic!.messages.create({
       model: AGENT_MODEL,
-      max_tokens: 8_000,
+      max_tokens,
       // Caché de prompt: instrucciones y herramientas son iguales en cada vuelta
       // y cada mensaje; se cobran a una fracción después de la primera.
       system: [{ type: 'text', text: sistema(tenant, opciones.idioma, tienePlan, previos.length === 0), cache_control: { type: 'ephemeral' } }],
       tools: HERRAMIENTAS.map(({ correr: _c, ...t }, i, todas) => (i === todas.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t)),
       messages: mensajes,
     })
+
+  // El texto de todas las vueltas: el modelo suele escribir la pregunta y
+  // después llamar offer_choices; quedarse con la última vuelta la perdía.
+  const partes: string[] = []
+  for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
+    // Charla sin datos: la primera vuelta va corta. Si se queda sin espacio, se repite entera.
+    const corta = vuelta === 0 && tema?.tipo === 'charla'
+    let res = await pedir(corta ? TOPE_CHARLA : MAX_TOKENS)
+    if (corta && res.stop_reason === 'max_tokens') res = await pedir(MAX_TOKENS)
     mensajes.push({ role: 'assistant', content: res.content })
     const usos = res.content.filter((b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use')
     const texto = res.content
@@ -794,11 +889,24 @@ export async function conversar(
     if (res.stop_reason !== 'tool_use' || usos.length === 0) break
     const resultados: Anthropic.Messages.ToolResultBlockParam[] = []
     for (const u of usos) {
+      // Sin saldo para lo que cuesta esta herramienta: no corre, y el dueño ve una línea abajo.
+      const costo = siUsa(cuenta, u.name)
+      if (costo && costo.total > cuenta.saldo.quedan) {
+        cuenta.sinCredito = Math.max(cuenta.sinCredito ?? 0, costo.precio)
+        resultados.push({
+          type: 'tool_result',
+          tool_use_id: u.id,
+          is_error: true,
+          content: JSON.stringify({ error: 'not-enough-credits', note: 'The owner does not have enough credits this month for this. Do not call it again. A line under your reply tells them when credits renew; answer the rest without it.' }),
+        })
+        continue
+      }
       const estado = ESTADOS[u.name]
       if (estado) opciones.alEstado?.(estado[opciones.idioma])
       const h = HERRAMIENTAS.find((x) => x.name === u.name)
       try {
         const salida = h ? await h.correr((u.input ?? {}) as Record<string, unknown>, ctx) : { error: `unknown tool ${u.name}` }
+        if (h) anotarUso(cuenta, u.name, salida)
         resultados.push({ type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(salida).slice(0, 20_000) })
       } catch (error) {
         resultados.push({ type: 'tool_result', tool_use_id: u.id, is_error: true, content: error instanceof Error ? error.message : String(error) })
@@ -810,9 +918,18 @@ export async function conversar(
   // Estilo de la casa: sin rayas largas aunque el modelo las use.
   let respuesta = partes.join('\n\n')
   respuesta = respuesta.replace(/\s+—\s+/g, ': ').replace(/—/g, ', ')
+  // Créditos: lo que paga esta respuesta, y una línea si algo no alcanzó o si ya va por el 80 %.
+  const cargo = cargoDeRespuesta(cuenta)
+  const despues: Saldo = { ...cuenta.saldo, usados: cuenta.saldo.usados + cargo, quedan: Math.max(0, cuenta.saldo.quedan - cargo) }
+  const linea = cuenta.sinCredito
+    ? lineaSinCreditos({ costo: cuenta.sinCredito, quedan: despues.quedan, renueva: despues.renueva }, opciones.idioma)
+    : cargo > 0
+      ? avisoCreditos(despues, opciones.idioma)
+      : null
+  if (linea) respuesta = [respuesta, linea].filter(Boolean).join('\n\n')
   // El texto de la tarea va tal cual, después de la respuesta: el modelo no lo reescribe.
   if (ctx.anexos.length) respuesta = [respuesta, ...ctx.anexos].filter(Boolean).join('\n\n---\n\n')
-  return store.addMessage({
+  const guardado = await store.addMessage({
     tenantId: tenant.id,
     role: 'assistant',
     text: respuesta || (opciones.idioma === 'es' ? 'No pude terminar la respuesta. Prueba de nuevo.' : 'I could not finish the answer. Try again.'),
@@ -821,4 +938,7 @@ export async function conversar(
     links: ctx.links.filter((l, i, a) => a.findIndex((x) => x.url === l.url) === i).slice(0, 8),
     channel: canal,
   })
+  // Se cobra al final, con la respuesta ya guardada: una que falla antes no paga.
+  if (cargo > 0) await anotarCreditos(tenant.id, cargo, cuenta.entregas.length ? cuenta.entregas.map((e) => e.herramienta).join('+') : 'consulta')
+  return guardado
 }

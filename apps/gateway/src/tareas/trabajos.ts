@@ -3,6 +3,7 @@ import { store } from '../store.js'
 import { tareaConBorrador } from '../ciclo/borrador.js'
 import { crearSerie } from '../ciclo/serie.js'
 import { tarjetaOportunidades, tarjetaTarea } from './tarjetas.js'
+import { anotarCreditos } from './creditos.js'
 
 /**
  * Trabajos largos del agente: escribir una página, una serie de páginas. El
@@ -128,8 +129,15 @@ async function correr(job: AgentJob): Promise<void> {
     const motivo = error instanceof Error ? error.message : String(error)
     console.warn(`[trabajos] ${job.kind} ${job.id} falló:`, motivo)
     terminado = await store.finishJob(job.id, { status: 'failed', error: motivo.slice(0, 500) }).catch(() => ({ ...job, status: 'failed' as const, error: motivo }))
+    await devolverCreditos(job)
   }
   await alTerminar(terminado)
+}
+
+/** Un trabajo que falla devuelve los créditos que pagó la respuesta que lo pidió (`input.creditos`). */
+async function devolverCreditos(job: AgentJob): Promise<void> {
+  const n = Number(job.input?.creditos ?? 0)
+  if (Number.isFinite(n) && n > 0) await anotarCreditos(job.tenantId, -n, `devolución:${job.kind}`)
 }
 
 /** Vuelve a la cola lo que un reinicio dejó en 'running'; a la segunda, lo da por fallado. */
@@ -142,7 +150,9 @@ async function rescatarColgados(): Promise<void> {
         await store.requeueJob(j.id)
         console.log(`[trabajos] ${j.kind} ${j.id} vuelve a la cola`)
       } else {
-        await alTerminar(await store.finishJob(j.id, { status: 'failed', error: 'interrupted twice by a restart' }))
+        const fallado = await store.finishJob(j.id, { status: 'failed', error: 'interrupted twice by a restart' })
+        await devolverCreditos(j)
+        await alTerminar(fallado)
       }
     }
   } catch (error) {

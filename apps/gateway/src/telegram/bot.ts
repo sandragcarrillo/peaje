@@ -6,6 +6,8 @@ import { resolverAccion } from '../tareas/acciones.js'
 import { aHtml, nombreBot, partir, tg } from './api.js'
 // ---- M9 ----
 import { esActivo, mensajeSinPro } from '../billing/acceso.js'
+// ---- primer mensaje del agente ----
+import { armarPrimerMensaje, esCadencia, programarCadencia, reservarPrimerMensaje, textoBotonKit } from '../tareas/primer-mensaje.js'
 
 /**
  * El agente de Peaje en Telegram: el mismo de "Mi agente" (mismas
@@ -88,14 +90,15 @@ export async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: '
   }
 }
 
-async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 'es' | 'en') {
+/** `boton`: el texto sale de un botón del agente (sugerencia u opción), no lo escribió el dueño. */
+async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 'es' | 'en', boton = false) {
   // ---- M9: el agente en Telegram es Pro ----
   if (!esActivo(tenant)) return void (await tg('sendMessage', { chat_id: chatId, text: mensajeSinPro(tenant, idioma) }))
   // "Escribiendo…" mientras el agente trabaja: Telegram lo muestra 5 s por llamada.
   await tg('sendChatAction', { chat_id: chatId, action: 'typing' })
   const latido = setInterval(() => void tg('sendChatAction', { chat_id: chatId, action: 'typing' }), 4_500)
   try {
-    const m = await conversar(tenant, texto, { idioma, canal: 'telegram', destino: { canal: 'telegram', id: String(chatId) } })
+    const m = await conversar(tenant, texto, { idioma, canal: 'telegram', destino: { canal: 'telegram', id: String(chatId) }, boton })
     // Con varios negocios en el chat, cada respuesta dice de cuál es.
     const varios = (await store.listTelegramChat(chatId)).length > 1
     await enviarRespuesta(chatId, m, idioma, varios ? tenant.name : undefined)
@@ -123,14 +126,17 @@ export async function procesarUpdate(u: Update): Promise<void> {
     const tenant = tenantId ? await store.getTenantById(tenantId) : null
     if (!tenant) return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].codigoMalo }))
     const idiomaNuevo = idiomaDe(m.from?.language_code)
+    // Antes de ligar: si este chat ya estaba con este negocio, el primer mensaje no se repite.
+    const yaLigado = (await store.listTelegramChat(chatId)).some((l) => l.tenantId === tenant.id)
     await store.linkTelegram({ chatId, tenantId: tenant.id, username: m.from?.username ?? m.chat.username ?? null, language: idiomaNuevo })
     const otros = (await store.listTelegramChat(chatId)).filter((l) => l.tenantId !== tenant.id)
     const nombresOtros = (await Promise.all(otros.map((l) => store.getTenantById(l.tenantId)))).map((t) => t?.name).filter((n): n is string => !!n)
-    return void (await tg('sendMessage', {
+    await tg('sendMessage', {
       chat_id: chatId,
       text: nombresOtros.length ? `${T[idiomaNuevo].ligado(tenant.name)}\n\n${T[idiomaNuevo].varios(tenant.name, nombresOtros)}` : T[idiomaNuevo].ligado(tenant.name),
       reply_markup: { inline_keyboard: T[idiomaNuevo].sugerencias.map((s, i) => [{ text: s, callback_data: `s:${i}` }]) },
-    }))
+    })
+    return primerMensaje(chatId, tenant, idiomaNuevo, yaLigado)
   }
   if (!link) return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].sinLigar }))
   if (texto === '/stop') {
@@ -183,9 +189,21 @@ async function procesarBoton(c: Callback): Promise<void> {
     }
     return
   }
+  // Cadencia del primer mensaje: "c:<clave>:<negocio>". Va al negocio del mensaje, aunque ya no sea el activo.
+  if (data.startsWith('c:')) {
+    const [, clave, tenantId] = data.split(':')
+    const l = (await store.listTelegramChat(chatId)).find((x) => x.tenantId === tenantId)
+    const t = l ? await store.getTenantById(l.tenantId) : null
+    if (!l || !t || !esCadencia(clave)) return
+    const idiomaDelNegocio = l.language === 'es' ? 'es' : 'en'
+    if (!esActivo(t)) return void (await tg('sendMessage', { chat_id: chatId, text: mensajeSinPro(t, idiomaDelNegocio) }))
+    const texto = await programarCadencia(t, clave, { canal: 'telegram', id: String(chatId) }, idiomaDelNegocio)
+    await tg('sendMessage', { chat_id: chatId, text: texto })
+    return
+  }
   if (data.startsWith('s:')) {
     const s = T[idioma].sugerencias[Number(data.slice(2))]
-    if (s) await responder(chatId, tenant, s, idioma)
+    if (s) await responder(chatId, tenant, s, idioma, true)
     return
   }
   const recientes = (await store.listMessages(tenant.id, 20)).filter((m) => m.role === 'assistant')
@@ -194,7 +212,7 @@ async function procesarBoton(c: Callback): Promise<void> {
     const opcion = ultimo?.options[Number(data.slice(2))]
     if (opcion) {
       await tg('sendMessage', { chat_id: chatId, text: `› ${opcion}` })
-      await responder(chatId, tenant, opcion, idioma)
+      await responder(chatId, tenant, opcion, idioma, true)
     }
     return
   }
@@ -209,6 +227,33 @@ async function procesarBoton(c: Callback): Promise<void> {
     } catch (error) {
       await tg('sendMessage', { chat_id: chatId, text: error instanceof Error ? error.message : T[idioma].error })
     }
+  }
+}
+
+/**
+ * El agente habla primero al ligar el chat: puntaje, qué arreglar, cómo
+ * presentarse ante la IA y cada cuánto mandar el resumen (ver
+ * tareas/primer-mensaje.ts). Solo con Pro, una vez por negocio y chat. No pasa
+ * por el agente: no guarda un mensaje del dueño ni gasta créditos. Si algo
+ * falla, el /start ya quedó hecho.
+ */
+async function primerMensaje(chatId: number, tenant: Tenant, idioma: 'es' | 'en', yaLigado: boolean): Promise<void> {
+  if (!esActivo(tenant) || yaLigado) return
+  try {
+    await tg('sendChatAction', { chat_id: chatId, action: 'typing' })
+    const m = await armarPrimerMensaje(tenant, idioma)
+    if (!(await reservarPrimerMensaje(tenant.id, 'telegram', String(chatId), yaLigado))) return
+    const filas: ({ text: string; callback_data: string } | { text: string; url: string })[][] = [
+      ...(m.kitUrl && /^https:\/\//.test(m.kitUrl) ? [[{ text: textoBotonKit(idioma), url: m.kitUrl }]] : []),
+      ...m.opciones.map((o) => [{ text: o.texto, callback_data: `c:${o.clave}:${tenant.id}` }]),
+    ]
+    const partes = partir(m.texto)
+    for (let i = 0; i < partes.length; i++) {
+      const ultima = i === partes.length - 1
+      await tg('sendMessage', { chat_id: chatId, text: aHtml(partes[i]!), parse_mode: 'HTML', ...(ultima ? { reply_markup: { inline_keyboard: filas } } : {}) })
+    }
+  } catch (error) {
+    console.warn('[telegram] no salió el primer mensaje', tenant.slug, error instanceof Error ? error.message : error)
   }
 }
 

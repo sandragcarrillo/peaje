@@ -9,7 +9,7 @@ import { empezarDeNuevo, resolverAccion } from './actions'
 import { novedadesChat } from './chat-novedades'
 
 /** Chat con el agente Pro del negocio. El historial vive en la base (lo comparte Telegram). */
-export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] }) {
+export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; inicial: AgentMessage[]; primerMensaje?: string | null }) {
   const { miAgente: t, agenteReportes: r } = useDict()
   const [mensajes, setMensajes] = useState(inicial)
   const [texto, setTexto] = useState('')
@@ -79,6 +79,20 @@ export function Chat({ slug, inicial }: { slug: string; inicial: AgentMessage[] 
       }
     })
   }
+
+  // ?m= (por ejemplo desde /pago/listo, "arma mi plan"): se manda una sola vez y
+  // se saca de la URL para que recargar no lo repita.
+  const mandado = useRef(false)
+  useEffect(() => {
+    if (!primerMensaje || mandado.current) return
+    mandado.current = true
+    const url = new URL(window.location.href)
+    url.searchParams.delete('m')
+    window.history.replaceState(window.history.state, '', url)
+    enviar(primerMensaje)
+    // Solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="border border-border">

@@ -16,7 +16,7 @@ import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from 
 import { BloqueProxy } from './proxy'
 import { UltimaVerificacion } from './ultima-verificacion'
 import { Copiable, Pestanas, PromptAgente } from './comando'
-import { generarProxy, secretoOrigen, type Entidad } from '@peaje/shared'
+import { generarProxy, RUTAS_DINAMICAS, RUTAS_PROXY, secretoOrigen, type Entidad } from '@peaje/shared'
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
@@ -55,6 +55,12 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
       })),
     )
     .catch(() => [])
+
+  // Las rutas que el proxy pasa a servir en el dominio del negocio, de la
+  // misma lista que usan @peaje/next y @peaje/proxy: el prompt las nombra para
+  // que el coding agent revise si el sitio ya usa alguna (un /docs propio, por
+  // ejemplo, queda tapado por el del gateway).
+  const rutasPeaje = [...RUTAS_PROXY.map((r) => r.path), ...RUTAS_DINAMICAS.map((r) => `${r.prefijo}*`)]
 
   const configProxy = generarProxy('next', base, {
     titulo: d.proxyComentarioTitulo,
@@ -104,8 +110,15 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
                 <h2 className="font-medium">{d.agenteTitulo}</h2>
                 <p className="mt-1 max-w-2xl text-sm text-muted">{d.agenteIntro}</p>
               </div>
-              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, secreto, `${dashboardUrl}/t/${tenant.slug}/kit`)} secreto={secreto} />
+              {/* El secreto no va en el prompt: el coding agent no lo necesita y así no
+                  queda en su historial. El dueño lo copia aparte, tapado, para su hosting. */}
+              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, `${dashboardUrl}/t/${tenant.slug}/kit`, rutasPeaje)} />
               <p className="text-sm text-muted">{d.agentePermisos}</p>
+              <div className="space-y-2">
+                <p className="text-sm">{d.agenteClave}</p>
+                <Copiable texto={`PEAJE_ORIGIN_SECRET=${secreto}`} secreto={secreto} />
+                <p className="text-xs text-muted">{d.agenteClaveNota}</p>
+              </div>
               <p className="text-sm text-muted">{d.agenteDespues}</p>
             </section>
           }
@@ -116,15 +129,19 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
                 <p className="mt-1 max-w-2xl text-sm text-muted">{d.unComandoIntro}</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm">1. {d.unComandoPaso1}</p>
+                <p className="text-sm">1. {d.unComandoPlan}</p>
+                <Copiable texto={`npx @peaje/cli@1 plan ${tenant.slug}`} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm">2. {d.unComandoPaso1}</p>
                 <Copiable texto={`npx @peaje/cli@1 init ${tenant.slug}`} />
               </div>
               <div className="space-y-2">
-                <p className="text-sm">2. {d.unComandoPaso2}</p>
+                <p className="text-sm">3. {d.unComandoPaso2}</p>
                 <Copiable texto={`PEAJE_ORIGIN_SECRET=${secreto}`} secreto={secreto} />
                 <p className="text-xs text-muted">{d.unComandoPaso2Nota}</p>
               </div>
-              <p className="text-sm">3. {d.unComandoPaso3}</p>
+              <p className="text-sm">4. {d.unComandoPaso3}</p>
             </section>
           }
         />

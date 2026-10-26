@@ -13,7 +13,7 @@ export type OraCheck = {
   estScoreGain?: number | null
 }
 
-export type OraLayer = { id: string; name: string; checks: OraCheck[] }
+export type OraLayer = { id: string; name: string; score?: number; maxScore?: number; checks: OraCheck[] }
 
 export type OraScore = {
   domain: string

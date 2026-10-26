@@ -125,14 +125,15 @@ export default function Acceder() {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
         <div className="w-full max-w-sm border border-border bg-panel p-8">
-          <Eyebrow>PEAJE</Eyebrow>
-        <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
+          <Eyebrow>Peaje</Eyebrow>
+          <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
             {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
           </p>
+          <p className="mt-2 text-sm text-muted">{d.acceso.codigoRevisaSpam}</p>
           <form onSubmit={verificar} className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-xs tracking-wide text-muted uppercase">
+              <span className="text-xs text-muted">
                 {d.acceso.campoCodigo}
               </span>
               <input
@@ -165,12 +166,12 @@ export default function Acceder() {
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
       <div className="w-full max-w-sm border border-border bg-panel p-8">
-        <Eyebrow>PEAJE</Eyebrow>
+        <Eyebrow>Peaje</Eyebrow>
         <h1 className="mt-2 text-2xl font-semibold">{d.acceso.tituloEntrar}</h1>
         <p className="mt-2 text-sm text-muted">{d.acceso.subtituloEntrar}</p>
         <form onSubmit={enviarCodigo} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs tracking-wide text-muted uppercase">{d.acceso.campoEmail}</span>
+            <span className="text-xs text-muted">{d.acceso.campoEmail}</span>
             <input
               type="email"
               value={email}

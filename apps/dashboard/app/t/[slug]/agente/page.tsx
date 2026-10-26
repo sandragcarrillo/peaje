@@ -16,18 +16,20 @@ import { CitacionPanel } from './citacion'
 // ---- M7 ----
 import { CompradorPanel } from './comprador'
 // ---- M9: plan y cobro del agente Pro ----
-import { accesoPro } from '@peaje/db'
-import { leerBilling } from '@/lib/gateway'
-import { Bloqueado, Suscripcion } from './suscripcion'
+import { accesoPro, CREDITOS_MENSUALES } from '@peaje/db'
+import { billingDeRespaldo, leerBilling } from '@/lib/gateway'
+import { Bloqueado, Suscripcion, type Arranque } from './suscripcion'
 import { paddleDelNegocio } from '@/lib/paddle'
+import { cachedScore, scannableDomain } from '@/lib/ora'
+import { leer } from '@/app/radar/datos'
 
 /**
  * Mi agente: el agente Pro de este negocio. Propone tareas; el coding agent
  * del dueño las aplica por MCP o CLI; Peaje las verifica en vivo. Reemplaza
  * al "Mis agentes" global (compradores), que queda solo para uso interno.
  */
-export default async function MiAgente({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
+export default async function MiAgente({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ m?: string }> }) {
+  const [{ slug }, { m: primerMensaje }] = await Promise.all([params, searchParams])
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const t = d.miAgente
   const [tareas, plan, mensajes] = await Promise.all([
@@ -49,8 +51,11 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
   const mcpUrl = `${gatewayUrl}/_owner/mcp`
   // ---- M9: qué tiene Pro (se calcula acá; el gateway da precios, cupos y pagos) ----
   const acceso = accesoPro(tenant)
-  const billing = await leerBilling(tenant.slug).catch(() => null)
+  const billing = await leerBilling(tenant.slug).catch(() => billingDeRespaldo(tenant.slug, acceso))
   const pro = acceso.activo
+  // Sin Pro, la pantalla de pago muestra lo que hace el agente con los números
+  // reales de este sitio (los mismos que /t/[slug]/listo). Sin score, sin números.
+  const arranque = pro ? null : await arranqueDe(tenant.originUrl)
 
   const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress')
   const esperando = tareas.filter((x) => x.status === 'done')
@@ -63,41 +68,42 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
       {/* ---- M9: plan ---- */}
       <section className="space-y-3">
         <SectionBar label={t.planSeccion} />
-        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} paddle={paddleDelNegocio(tenant)} />
+        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
       </section>
 
-      <section className="space-y-3">
+      <section id="chat" className="scroll-mt-28 space-y-3">
         <SectionBar label={t.chatTitulo} />
-        {pro ? <Chat slug={tenant.slug} inicial={mensajes} /> : <Bloqueado />}
+        {pro ? <Chat slug={tenant.slug} inicial={mensajes} primerMensaje={typeof primerMensaje === 'string' ? primerMensaje.slice(0, 500) : null} /> : <Bloqueado que="chat" />}
       </section>
 
-      <section className="space-y-3">
+      <section id="telegram" className="scroll-mt-28 space-y-3">
         <SectionBar label={t.tgTitulo} />
-        {pro ? <TelegramPanel slug={tenant.slug} estado={telegram} reportes={reportes} /> : <Bloqueado />}
+        {pro ? <TelegramPanel slug={tenant.slug} estado={telegram} reportes={reportes} /> : <Bloqueado que="telegram" />}
       </section>
 
       {/* ---- Slack ---- (solo cuando el gateway tiene la app de Slack configurada) */}
       {slack?.configured ? (
         <section className="space-y-3">
           <SectionBar label={t.slTitulo} />
-          {pro ? <SlackPanel slug={tenant.slug} estado={slack} /> : <Bloqueado />}
+          {pro ? <SlackPanel slug={tenant.slug} estado={slack} /> : <Bloqueado que="slack" />}
         </section>
       ) : null}
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />
-        {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} /> : <Bloqueado />}
+        {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} /> : <Bloqueado que="citacion" />}
       </section>
 
       {/* ---- M7: comprador misterioso ---- */}
       <section className="space-y-3">
         <SectionBar label={t.compTitulo} />
-        {pro ? <CompradorPanel slug={tenant.slug} run={comprador} /> : <Bloqueado />}
+        {pro ? <CompradorPanel slug={tenant.slug} run={comprador} /> : <Bloqueado que="comprador" />}
       </section>
 
       <section className="space-y-3">
         <SectionBar label={t.planTitulo} />
-        <Plan plan={plan} />
+        {/* El plan lo arma el chat (Pro). Sin Pro y sin plan guardado, "pídeselo en el chat" mandaba a un chat bloqueado. */}
+        {pro || plan ? <Plan plan={plan} /> : <Bloqueado que="plan" />}
       </section>
 
 
@@ -119,4 +125,14 @@ export default async function MiAgente({ params }: { params: Promise<{ slug: str
       </details>
     </div>
   )
+}
+
+/** Puntaje de hoy, arreglos que cubre Peaje y puntaje estimado con ellos. Null sin dominio público o sin score. */
+async function arranqueDe(originUrl: string): Promise<Arranque | null> {
+  const domain = scannableDomain(originUrl)
+  const score = domain ? await cachedScore(domain).catch(() => null) : null
+  if (!score) return null
+  const l = leer(score)
+  const actual = Math.round(l.actual)
+  return { actual, max: l.max, arreglos: l.arreglables.length, estimado: l.estimado > actual ? l.estimado : null }
 }

@@ -81,3 +81,24 @@ export function leer(score: OraScore): Lectura {
 export function primero(l: Lectura): Fila | null {
   return l.arreglables.find((a) => !a.viaGateway) ?? l.arreglables[0] ?? null
 }
+
+export type Barra = { clave: 'encuentran' | 'usan' | 'compran'; puntos: number; max: number }
+
+/** Las cuatro capas de Ora en las tres preguntas del dueño. Usa el puntaje que Ora da a cada capa. */
+const GRUPO: Record<string, Barra['clave']> = {
+  discovery: 'encuentran',
+  accessibility: 'usan',
+  usability: 'usan',
+  payments: 'compran',
+}
+
+export function barras(score: OraScore): Barra[] {
+  const suma = { encuentran: { p: 0, m: 0 }, usan: { p: 0, m: 0 }, compran: { p: 0, m: 0 } }
+  for (const layer of score.layers ?? []) {
+    const g = GRUPO[layer.id]
+    if (!g) continue
+    suma[g].p += layer.score ?? 0
+    suma[g].m += layer.maxScore ?? 0
+  }
+  return (['encuentran', 'usan', 'compran'] as const).map((clave) => ({ clave, puntos: suma[clave].p, max: suma[clave].m }))
+}

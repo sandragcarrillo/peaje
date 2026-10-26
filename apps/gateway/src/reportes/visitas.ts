@@ -72,7 +72,7 @@ const T = {
 }
 
 /** Una cosa concreta para hacer cuando no hubo visitas, según el chequeo que falla. */
-const ARREGLO: Partial<Record<Motivo, Record<Idioma, string>>> = {
+export const ARREGLO: Partial<Record<Motivo, Record<Idioma, string>>> = {
   'sin-dominio': {
     es: 'agrega el dominio público de tu sitio en Peaje. Sin eso no podemos ver a los agentes que te visitan.',
     en: 'add your site’s public domain in Peaje. Without it we cannot see the agents that visit you.',
@@ -123,7 +123,7 @@ const ARREGLO: Partial<Record<Motivo, Record<Idioma, string>>> = {
   },
 }
 // Lo que más frena visitas primero.
-const PRIORIDAD: Chequeo['id'][] = ['dominio', 'proxy', 'bots', 'robots', 'frescura', 'links', 'json-ld']
+export const PRIORIDAD: Chequeo['id'][] = ['dominio', 'proxy', 'bots', 'robots', 'frescura', 'links', 'json-ld']
 
 async function queHacer(tenant: Tenant, idioma: Idioma): Promise<string> {
   const v = await store.lastVerification(tenant.id).catch(() => null)

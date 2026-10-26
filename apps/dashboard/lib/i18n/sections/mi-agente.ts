@@ -266,15 +266,12 @@ export const miAgente = {
       'Gratis sigue incluyendo el kit, las rutas con precio, las visitas, el monitor diario y sus tareas de arreglo. El chat con el agente, Telegram, el plan, la medición en asistentes de IA, los borradores de página, el comprador misterioso y el correo semanal son Pro.',
     planVerOpciones: 'Ver planes y pagar',
     planPrecio: (usd: number) => `US$${usd} al mes`,
-    planLimites: (preguntas: number, mensajes: number) => `${preguntas} preguntas medidas en asistentes de IA y ${mensajes} mensajes al agente por mes.`,
+    planLimites: (preguntas: number, creditos: number) =>
+      `${creditos} créditos al mes para el trabajo del agente y ${preguntas} preguntas medidas en asistentes de IA. Hablar con tu agente es gratis.`,
     planFounderCupos: (n: number) => `Solo para los primeros 50 negocios. Quedan ${n}.`,
     planFounderAgotado: 'Los 50 cupos founder ya se tomaron.',
     planYaFounder: 'Ya eres founder: mantienes este precio mientras no dejes vencer tu plan.',
-    planCadaPago: 'Cada pago suma 30 días. Hoy se paga en USDC, con tu saldo de Peaje o con el link de pago. El pago con tarjeta llega pronto.',
-    planPagarSaldo: 'Pagar con tu saldo de Peaje',
-    planPagando: 'Pagando…',
-    planSaldo: (s: string) => `Tu saldo de Peaje: US$${s}.`,
-    planPagado: (fecha: string) => `Listo. Tu plan vale hasta el ${fecha}.`,
+    planCadaPago: 'Cada pago suma 30 días. Este link lo paga una wallet o un agente, en pathUSD por Tempo.',
     planLinkTitulo: 'Link de pago',
     planLinkNota: (url: string) => `Este link lo paga una wallet o un agente, no un navegador. Desde una terminal: npx mppx ${url}`,
     planCopiar: 'Copiar',
@@ -306,9 +303,34 @@ export const miAgente = {
     planPortalError: 'No pudimos abrir el portal de Paddle. Prueba en un minuto o entra a paddle.net con el correo de la compra.',
     planVerPagos: 'Ver pagos',
     planReembolsado: 'reembolsado',
+    // Justo arriba del botón de suscribirse. Los seguimientos a 2 y 6 semanas
+    // preguntan a cada motor configurado (gateway: ciclo/seguimiento.ts).
+    planCancelas:
+      'Cancelas cuando quieras. Mientras sigas, tu agente revisa a las 2 y a las 6 semanas si ChatGPT, Claude, Perplexity y Gemini ya citan cada página nueva.',
     // ---- fin Paddle ----
-    bloqueado: 'Esto es parte del agente Pro.',
-    bloqueadoCta: 'Ver planes',
+    // ---- qué hace el agente apenas te suscribes (con los números de este sitio) ----
+    arranqueTitulo: 'Lo que hace tu agente apenas te suscribes',
+    arranquePuntaje: (actual: number, max: number) => `Parte de tu puntaje de hoy: ${actual}/${max}.`,
+    arranquePuntajeSin: 'Mide tu sitio como lo ve la IA y guarda ese puntaje como tu punto de partida.',
+    arranqueArreglos: (n: number, estimado: number | null, max: number) =>
+      `Prepara ${n === 1 ? 'el arreglo' : `los ${n} arreglos`} que Peaje cubre en tu sitio, de más a menos puntos.${estimado !== null ? ` Con ${n === 1 ? 'él' : 'ellos'}, tu puntaje estimado sube a ${estimado}/${max}.` : ''}`,
+    arranqueArreglosNinguno: 'Revisa lo que frena tu sitio. Hoy no tiene arreglos pendientes de los que cubre Peaje.',
+    arranqueArreglosSin: 'Prepara los arreglos que Peaje cubre en tu sitio, de más a menos puntos.',
+    arranquePreguntas: (n: number) => `Mide ${n} preguntas de tu negocio en ChatGPT, Claude, Perplexity y Gemini, y te muestra quién aparece en tu lugar.`,
+    arranquePreguntasSin: 'Mide las preguntas de tu negocio en ChatGPT, Claude, Perplexity y Gemini, y te muestra quién aparece en tu lugar.',
+    arranqueTelegram:
+      'Apenas conectas Telegram, te escribe con tu puntaje, qué arreglar primero (el kit, si todavía no lo instalaste) y cómo posicionar tu sitio. Después te pregunta cada cuánto quieres que te reporte.',
+    // ---- secciones Pro sin Pro: qué hay ahí y cómo se activa ----
+    bloqueado: 'Se activa con Pro. Lo contratas en Tu suscripción, al inicio de esta página.',
+    bloqueadoCta: 'Ver el plan Pro',
+    bloqueadoQue: {
+      chat: 'Aquí hablas con tu agente: le preguntas cómo vas y te responde con los datos de tu sitio.',
+      telegram: 'Aquí conectas Telegram para hablar con tu agente desde el celular y elegir cada cuánto te reporta.',
+      slack: 'Aquí sumas tu agente al Slack de tu equipo.',
+      citacion: 'Aquí ves si ChatGPT, Claude, Perplexity y Gemini te nombran en las preguntas de tu negocio, y a quién nombran en tu lugar.',
+      comprador: 'Aquí un agente comprador de prueba busca lo que vendes y te dice si te elige o a quién elige en tu lugar.',
+      plan: 'Aquí aparece el plan que arma tu agente: los pasos para tu negocio, cada uno con una métrica y una meta.',
+    } as Record<string, string>,
     // ---- fin M9 ----
   },
   en: {
@@ -578,15 +600,12 @@ export const miAgente = {
       'Free still includes the kit, priced routes, visits, the daily monitor and its fix tasks. Chat with the agent, Telegram, the plan, AI assistant tracking, page drafts, the mystery buyer and the weekly email are Pro.',
     planVerOpciones: 'See plans and pay',
     planPrecio: (usd: number) => `US$${usd} a month`,
-    planLimites: (preguntas: number, mensajes: number) => `${preguntas} questions tracked in AI assistants and ${mensajes} messages to the agent a month.`,
+    planLimites: (preguntas: number, creditos: number) =>
+      `${creditos} credits a month for the agent's work and ${preguntas} questions tracked in AI assistants. Talking to your agent is free.`,
     planFounderCupos: (n: number) => `Only for the first 50 businesses. ${n} left.`,
     planFounderAgotado: 'The 50 founder spots are taken.',
     planYaFounder: 'You are a founder: you keep this price as long as your plan does not lapse.',
-    planCadaPago: 'Each payment adds 30 days. Today it is paid in USDC, with your Peaje balance or the payment link. Card payments are coming soon.',
-    planPagarSaldo: 'Pay with your Peaje balance',
-    planPagando: 'Paying…',
-    planSaldo: (s: string) => `Your Peaje balance: US$${s}.`,
-    planPagado: (fecha: string) => `Done. Your plan is good until ${fecha}.`,
+    planCadaPago: 'Each payment adds 30 days. A wallet or an agent pays this link, in pathUSD on Tempo.',
     planLinkTitulo: 'Payment link',
     planLinkNota: (url: string) => `A wallet or an agent pays this link, not a browser. From a terminal: npx mppx ${url}`,
     planCopiar: 'Copy',
@@ -618,9 +637,31 @@ export const miAgente = {
     planPortalError: 'We could not open the Paddle portal. Try again in a minute, or go to paddle.net with the email you paid with.',
     planVerPagos: 'See payments',
     planReembolsado: 'refunded',
+    planCancelas: 'Cancel anytime. While you stay, your agent checks at 2 and 6 weeks whether ChatGPT, Claude, Perplexity and Gemini cite each new page.',
     // ---- end Paddle ----
-    bloqueado: 'This is part of the Pro agent.',
-    bloqueadoCta: 'See plans',
+    // ---- what the agent does as soon as you subscribe (with this site's numbers) ----
+    arranqueTitulo: 'What your agent does as soon as you subscribe',
+    arranquePuntaje: (actual: number, max: number) => `It starts from your score today: ${actual}/${max}.`,
+    arranquePuntajeSin: 'It measures your site the way AI sees it and keeps that score as your starting point.',
+    arranqueArreglos: (n: number, estimado: number | null, max: number) =>
+      `It prepares ${n === 1 ? 'the fix' : `the ${n} fixes`} Peaje covers on your site, from most to fewest points.${estimado !== null ? ` With ${n === 1 ? 'it' : 'them'}, your estimated score goes up to ${estimado}/${max}.` : ''}`,
+    arranqueArreglosNinguno: 'It reviews what holds your site back. Today there are no pending fixes of the ones Peaje covers.',
+    arranqueArreglosSin: 'It prepares the fixes Peaje covers on your site, from most to fewest points.',
+    arranquePreguntas: (n: number) => `It measures ${n} questions about your business in ChatGPT, Claude, Perplexity and Gemini, and shows you who appears instead of you.`,
+    arranquePreguntasSin: 'It measures the questions about your business in ChatGPT, Claude, Perplexity and Gemini, and shows you who appears instead of you.',
+    arranqueTelegram:
+      'As soon as you connect Telegram, it writes to you with your score, what to fix first (the kit, if you have not installed it yet) and how to position your site. Then it asks how often you want it to report.',
+    // ---- Pro sections without Pro: what is there and how to turn it on ----
+    bloqueado: 'It turns on with Pro. You subscribe in Your subscription, at the top of this page.',
+    bloqueadoCta: 'See the Pro plan',
+    bloqueadoQue: {
+      chat: 'Here you talk to your agent: ask how you are doing and it answers with your site data.',
+      telegram: 'Here you connect Telegram to talk to your agent from your phone and choose how often it reports.',
+      slack: "Here you add your agent to your team's Slack.",
+      citacion: 'Here you see whether ChatGPT, Claude, Perplexity and Gemini name you in the questions about your business, and who they name instead.',
+      comprador: 'Here a test buying agent looks for what you sell and tells you whether it picks you or whom it picks instead.',
+      plan: 'Here you see the plan your agent builds: the steps for your business, each with a metric and a target.',
+    } as Record<string, string>,
     // ---- fin M9 ----
   },
 }

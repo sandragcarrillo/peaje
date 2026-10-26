@@ -15,14 +15,59 @@ export type PlanVigente = 'free' | 'trial' | PlanPago
 
 export const PRECIOS_USD: Record<PlanPago, number> = { founder: 30, pro: 69 }
 
-export type Limites = { preguntas: number; mensajes: number }
+/**
+ * Créditos del agente por mes calendario (UTC), iguales en founder, pro y
+ * prueba. 500 y los costos de abajo: decisión de San, 25 oct 2026 (alcanza para
+ * lo mismo que 300 con los costos anteriores). Cambiar el número acá cambia todo.
+ */
+export const CREDITOS_MENSUALES = 500
+
+export type Limites = {
+  preguntas: number
+  creditos: number
+  /** @deprecated Ya no limita nada: el chat se paga con créditos. Queda mientras el dashboard lo muestre. */
+  mensajes: number
+}
 
 export const LIMITES: Record<PlanVigente, Limites> = {
-  free: { preguntas: 0, mensajes: 0 },
-  trial: { preguntas: 20, mensajes: 150 },
+  free: { preguntas: 0, creditos: 0, mensajes: 0 },
+  trial: { preguntas: 20, creditos: CREDITOS_MENSUALES, mensajes: 150 },
   // Founder es Pro con descuento: mismos límites, otro precio (decisión del 24 oct 2026).
-  founder: { preguntas: 20, mensajes: 150 },
-  pro: { preguntas: 20, mensajes: 150 },
+  founder: { preguntas: 20, creditos: CREDITOS_MENSUALES, mensajes: 150 },
+  pro: { preguntas: 20, creditos: CREDITOS_MENSUALES, mensajes: 150 },
+}
+
+/**
+ * Lo que cuesta cada cosa que hace el agente, en créditos. Se cobra al
+ * terminar la respuesta, por lo que hizo de verdad. Una respuesta que entrega
+ * algo (tarea, página, serie, informe) paga eso y nada más; si solo consultó
+ * datos, paga `consulta` una vez por respuesta. Conversar sin herramientas,
+ * los reportes programados, lo que no es del negocio y el primer mensaje de
+ * Telegram no cuestan nada.
+ */
+export const COSTOS_CREDITOS = {
+  /** Una respuesta que consultó datos del negocio (una vez por respuesta, no por herramienta). */
+  consulta: 2,
+  /** Una tarea nueva para el desarrollador o la herramienta de IA del dueño (un arreglo, una ruta, una página por escribir). */
+  tarea: 8,
+  /** Una página completa escrita por el agente. */
+  pagina: 15,
+  /** Una serie de páginas sobre un tema. */
+  serie: 50,
+  /** Un informe hecho a pedido: el plan, una medición de citación. */
+  informe: 30,
+  /** Una corrida del comprador misterioso. */
+  comprador: 30,
+} as const
+
+export type AccionCreditos = keyof typeof COSTOS_CREDITOS
+
+/** El mes de créditos: del 1 a las 00:00 UTC al 1 del mes siguiente. */
+export function periodoCreditos(ahora = new Date()): { desde: string; renueva: string } {
+  return {
+    desde: new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1)).toISOString(),
+    renueva: new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth() + 1, 1)).toISOString(),
+  }
 }
 
 /** Cupo del plan founder: negocios distintos que lo pagaron alguna vez. */
