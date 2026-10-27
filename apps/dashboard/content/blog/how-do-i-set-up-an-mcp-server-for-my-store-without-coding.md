@@ -7,7 +7,7 @@ lang: en
 categoria: Guide
 portada: 1
 portada_titulo: Your store on MCP
-traduccion: como-monto-un-servidor-mcp-para-mi-tienda-sin-saber-programar
+traduccion: como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar
 ---
 
 # How do I set up an MCP server for my store without coding?

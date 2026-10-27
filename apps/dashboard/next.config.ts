@@ -21,6 +21,16 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: seguridad }];
   },
+  // Slugs del blog que cambiaron después de publicarse: el viejo lleva al nuevo.
+  async redirects() {
+    return [
+      {
+        source: "/blog/como-monto-un-servidor-mcp-para-mi-tienda-sin-saber-programar",
+        destination: "/blog/como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar",
+        permanent: true,
+      },
+    ];
+  },
 } satisfies NextConfig;
 
 // usepeaje.com corre sobre Peaje: llms.txt, openapi.json, el MCP y los

@@ -1,8 +1,8 @@
 ---
-title: ¿Cómo monto un servidor MCP para mi tienda sin saber programar?
+title: ¿Cómo creo un servidor MCP para mi tienda sin saber programar?
 description: Qué hace el servidor MCP que genera Peaje, cómo se instala, en qué sitios funciona hoy y cuánto cuesta.
 date: 2026-10-27
-slug: como-monto-un-servidor-mcp-para-mi-tienda-sin-saber-programar
+slug: como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar
 lang: es
 categoria: Guía
 portada: 1
@@ -10,7 +10,7 @@ portada_titulo: Tu tienda en MCP
 traduccion: how-do-i-set-up-an-mcp-server-for-my-store-without-coding
 ---
 
-# ¿Cómo monto un servidor MCP para mi tienda sin saber programar?
+# ¿Cómo creo un servidor MCP para mi tienda sin saber programar?
 
 No tienes que escribir código: Peaje genera el servidor MCP de tu sitio y lo deja respondiendo en tu propio dominio con un comando, `npx @peaje/cli@1 init <slug>`, que se corre en el proyecto de tu sitio. Hoy ese comando funciona en sitios con su propio código (Next.js, Nuxt, Astro, SvelteKit, Remix, React Router, Vite, Express, Hono o un sitio estático), y Shopify y WooCommerce no están en esa lista. Va en el plan gratis, sin tarjeta.
 
@@ -18,7 +18,7 @@ Actualizado: octubre de 2026
 
 El kit gratis incluye el servidor MCP, llms.txt, openapi.json, agent cards y JSON-LD generados para tu sitio, más el registro de visitas de agentes y un monitor diario, sin tarjeta y sin fecha de vencimiento ([precios](https://usepeaje.com/precios)).
 
-## ¿Qué pasos sigo para montarlo?
+## ¿Qué pasos sigo para crearlo?
 
 1. Pega tu dominio en el [radar gratis](https://usepeaje.com/radar) y en menos de un minuto ves qué entiende un agente y qué le falta, solo con tu correo.
 2. [Registra tu sitio](https://usepeaje.com/nuevo), sin tarjeta. Registrarlo no cambia nada en tu sitio, y ahí sale el slug de tu negocio.
