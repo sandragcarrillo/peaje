@@ -28,6 +28,8 @@ export async function generateMetadata({ params }: PageProps<'/blog/[slug]'>): P
       modifiedTime: a.actualizado,
       locale: a.idioma === 'es' ? 'es_ES' : 'en_US',
       siteName: 'Peaje',
+      // El openGraph propio tapa la imagen de app/opengraph-image.png: se repite acá.
+      images: [{ url: '/opengraph-image.png', width: 1200, height: 630, alt: 'Peaje: Get found by AI agents' }],
     },
   }
 }

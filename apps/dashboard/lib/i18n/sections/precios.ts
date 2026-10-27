@@ -1,4 +1,5 @@
 import { asistentesMedidos } from '@peaje/shared/asistentes'
+import { COBROS_VISIBLES } from '@/lib/config'
 
 /**
  * Página /precios. Los montos, cupos y límites salen de @peaje/db (planes.ts),
@@ -27,6 +28,8 @@ export const precios = {
       'Registro de visitas de agentes',
       'Monitor diario y tareas para arreglar lo que falla',
     ],
+    // Nota del plan gratis mientras cobrarles a los agentes está apagado (hasta mainnet).
+    kitNota: 'No pide tarjeta y no vence.',
     kitComision: (pct: number) =>
       `Si cobras a agentes, Peaje se queda con el ${pct}% de cada pago y acredita el resto a la wallet de tu negocio. Esos pagos van aparte de la suscripción Pro: no pasan por Paddle, que solo procesa el pago de Pro con tarjeta.`,
 
@@ -89,7 +92,7 @@ export const precios = {
       },
       {
         p: '¿Me cobran algo más?',
-        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes. El ${pct}% es aparte y solo aplica si decides cobrarles a los agentes de IA por tu contenido: Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.`,
+        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes.${COBROS_VISIBLES ? ` El ${pct}% es aparte y solo aplica si decides cobrarles a los agentes de IA por tu contenido: Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.` : ''}`,
       },
       {
         p: '¿Puedo cancelar?',
@@ -126,6 +129,7 @@ export const precios = {
       'A log of agent visits',
       'A daily monitor and tasks to fix what breaks',
     ],
+    kitNota: 'No card needed, and it does not expire.',
     kitComision: (pct: number) =>
       `If you charge agents, Peaje keeps ${pct}% of each payment and credits the rest to your business wallet. Those payments are separate from the Pro subscription: they do not go through Paddle, which only processes the Pro card payment.`,
 
@@ -183,7 +187,7 @@ export const precios = {
       },
       {
         p: 'Do you charge anything else?',
-        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm. The ${pct}% is separate and only applies if you choose to charge AI agents for your content: Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge agents, there is no fee.`,
+        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm.${COBROS_VISIBLES ? ` The ${pct}% is separate and only applies if you choose to charge AI agents for your content: Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge agents, there is no fee.` : ''}`,
       },
       {
         p: 'Can I cancel?',

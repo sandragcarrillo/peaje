@@ -1,4 +1,5 @@
 import { asistentesMedidos } from '@peaje/shared/asistentes'
+import { COBROS_VISIBLES } from '@/lib/config'
 
 /**
  * Landing pública (copy final de San, 24 oct 2026). Solo Telegram como canal.
@@ -92,7 +93,9 @@ export const landing = {
     precioCupos: (cupos: number) => `Solo para los primeros ${cupos} negocios, y lo mantienes mientras sigas.`,
     precioCancelar: 'Cancelas cuando quieras desde tu panel, sin llamadas.',
     letraChica: (pct: number) =>
-      `Revisar tu sitio es gratis. Si cobras a los agentes, Peaje se queda con el ${pct}% de cada pago. Por ahora los pagos funcionan en redes de prueba: la demo es una simulación y no mueve dinero real.`,
+      COBROS_VISIBLES
+        ? `Revisar tu sitio es gratis. Si cobras a los agentes, Peaje se queda con el ${pct}% de cada pago. Por ahora los pagos funcionan en redes de prueba: la demo es una simulación y no mueve dinero real.`
+        : `Revisar tu sitio y el kit son gratis. Solo pagas el agente, si lo quieres.`,
     verPrecios: 'Ver todos los detalles del precio',
 
     // FAQ provisoria: reemplazar por la del Editor si San la pega.
@@ -113,13 +116,18 @@ export const landing = {
         p: '¿Tengo que saber de código?',
         r: 'No. Tu agente te explica cada arreglo en palabras simples, lo escribe y lo deja como tarea. Si usas Claude Code o Cursor, la toman desde Peaje; si no, se la pasas a quien maneje tu web. Cuando está publicada, Peaje la revisa en tu sitio.',
       },
+      // Cobrarles a los agentes se explica cuando se prenda en mainnet (COBROS_VISIBLES).
+      ...(COBROS_VISIBLES
+        ? [
       {
         p: '¿Cómo cobran los agentes?',
         r: `Es opcional. x402 es una forma de cobrar por internet en la que tu sitio le pide un pago al agente antes de entregarle lo que pidió. MPP es otro estándar para lo mismo: el agente paga y recibe la respuesta en el mismo pedido. Hoy los dos funcionan en redes de prueba, así que todavía no mueven dinero real. Cuando haya pagos reales, Peaje se queda con el ${pct}% de cada uno.`,
       },
+          ]
+        : []),
       {
         p: '¿Me cobran algo más?',
-        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes. Si decides cobrarles a los agentes de IA por tu contenido, Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.`,
+        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes.${COBROS_VISIBLES ? ` Si decides cobrarles a los agentes de IA por tu contenido, Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.` : ''}`,
       },
       {
         p: '¿Y si no me sirve?',
@@ -219,7 +227,9 @@ export const landing = {
     precioCupos: (cupos: number) => `Only for the first ${cupos} businesses, and you keep it for as long as you stay.`,
     precioCancelar: 'Cancel anytime from your dashboard, no calls.',
     letraChica: (pct: number) =>
-      `Checking your site is free. If you charge agents, Peaje keeps ${pct}% of each payment. For now payments run on test networks: the demo is a simulation and moves no real money.`,
+      COBROS_VISIBLES
+        ? `Checking your site is free. If you charge agents, Peaje keeps ${pct}% of each payment. For now payments run on test networks: the demo is a simulation and moves no real money.`
+        : `Checking your site and the kit are free. You only pay for the agent, if you want it.`,
     verPrecios: 'See the full pricing details',
 
     faqTitulo: 'Questions',
@@ -236,13 +246,18 @@ export const landing = {
         p: 'Do I need to know how to code?',
         r: 'No. Your agent explains every fix in plain words, writes it and leaves it as a task. If you use Claude Code or Cursor, they pick it up from Peaje; if not, you pass it to whoever runs your website. Once it is live, Peaje checks it on your site.',
       },
+      // Cobrarles a los agentes se explica cuando se prenda en mainnet (COBROS_VISIBLES).
+      ...(COBROS_VISIBLES
+        ? [
       {
         p: 'How do agents pay?',
         r: `It is optional. x402 is a way to charge on the web where your site asks the agent for a payment before handing over what it asked for. MPP is another standard for the same thing: the agent pays and gets the answer in the same request. Today both run on test networks, so they move no real money yet. Once payments are real, Peaje keeps ${pct}% of each one.`,
       },
+          ]
+        : []),
       {
         p: 'Do you charge anything else?',
-        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm. If you choose to charge AI agents for your content, Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge them, there is no fee.`,
+        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm.${COBROS_VISIBLES ? ` If you choose to charge AI agents for your content, Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge them, there is no fee.` : ''}`,
       },
       {
         p: 'What if it does not work for me?',

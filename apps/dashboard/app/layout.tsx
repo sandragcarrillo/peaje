@@ -13,6 +13,7 @@ import { Logo } from './components/logo'
 import { RadarPill } from './components/radar-pill'
 import './globals.css'
 import { PeajeHead } from '@peaje/next/head'
+import { Analytics } from '@vercel/analytics/next'
 import { salir } from './salir/actions'
 
 // Grotesca para titulares y body, mono para todo el chrome técnico.
@@ -22,7 +23,15 @@ const mono = Space_Mono({ variable: '--font-chrome', weight: ['400', '700'], sub
 
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getDict()
-  return { title: d.nav.metaTitulo, description: d.nav.metaDescripcion }
+  // metadataBase: las imágenes OG (app/opengraph-image.png) salen con URL absoluta, que es lo que leen WhatsApp, X y LinkedIn.
+  return {
+    metadataBase: new URL('https://usepeaje.com'),
+    title: d.nav.metaTitulo,
+    description: d.nav.metaDescripcion,
+    // Sin `url`: las páginas hijas lo heredarían y todas dirían ser la portada.
+    openGraph: { type: 'website', siteName: 'Peaje', title: d.nav.metaTitulo, description: d.nav.metaDescripcion },
+    twitter: { card: 'summary_large_image', title: d.nav.metaTitulo, description: d.nav.metaDescripcion },
+  }
 }
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
@@ -128,6 +137,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
           <p className="etiqueta mx-auto mt-4 max-w-5xl text-center text-muted">Peaje · 2026</p>
         </footer>
         </div>
+        {/* Vercel Web Analytics: visitas y referrers, sin cookies. El script es del mismo origen (lib/csp.ts). */}
+        <Analytics />
       </body>
     </html>
   )

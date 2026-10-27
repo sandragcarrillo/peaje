@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ENLACE } from '../components/legal'
 import { getDict } from '@/lib/i18n'
+import { COBROS_VISIBLES } from '@/lib/config'
 import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PRECIOS_USD } from '@peaje/db'
 
 /**
@@ -85,7 +86,7 @@ export default async function Precios() {
           precio="US$0"
           texto={P.gratisTexto}
           incluye={P.gratisIncluye}
-          nota={P.kitComision(COMISION_PCT)}
+          nota={COBROS_VISIBLES ? P.kitComision(COMISION_PCT) : P.kitNota}
           cta={
             <Link href="/radar" className="btn btn-secundario btn-ancho">
               {P.ctaRadar}
