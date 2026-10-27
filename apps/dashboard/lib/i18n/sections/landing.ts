@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 /**
  * Landing pública (copy final de San, 24 oct 2026). Solo Telegram como canal.
  * Protocolos y redes viven en el portal para desarrolladores, no acá.
@@ -78,7 +80,7 @@ export const landing = {
       {
         titulo: 'Haz que te recomienden',
         texto:
-          'Tu agente de Peaje, en Telegram, te pasa los arreglos listos para que ChatGPT, Claude y Perplexity te recomienden, y te cuenta cada semana cuánto vas mejorando.',
+          `Tu agente de Peaje, en Telegram, te pasa los arreglos listos para que ${asistentesMedidos('es')} te recomienden, y te cuenta cada semana cuánto vas mejorando.`,
       },
     ],
 
@@ -101,7 +103,7 @@ export const landing = {
     faq: (pct: number) => [
       {
         p: '¿Qué es Peaje?',
-        r: 'Un agente que deja tu sitio listo para la IA. Revisa cómo te ven ChatGPT, Claude, Perplexity y Gemini, te dice qué falta y lo arregla contigo en Telegram.',
+        r: `Un agente que deja tu sitio listo para la IA. Revisa cómo te ven ${asistentesMedidos('es')}, te dice qué falta y lo arregla contigo en Telegram.`,
       },
       {
         p: '¿Qué recibo?',
@@ -121,7 +123,7 @@ export const landing = {
       },
       {
         p: '¿Y si no me sirve?',
-        r: 'En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó. En el mejor caso, ChatGPT, Claude, Perplexity y Gemini empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.',
+        r: `En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó. En el mejor caso, ${asistentesMedidos('es')} empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.`,
       },
       {
         p: '¿Puedo cancelar?',
@@ -206,7 +208,7 @@ export const landing = {
       {
         titulo: 'Get recommended',
         texto:
-          'Your Peaje agent, on Telegram, hands you the fixes ready to go so ChatGPT, Claude and Perplexity recommend you, and tells you every week how much you are improving.',
+          `Your Peaje agent, on Telegram, hands you the fixes ready to go so ${asistentesMedidos('en')} recommend you, and tells you every week how much you are improving.`,
       },
     ],
 
@@ -224,7 +226,7 @@ export const landing = {
     faq: (pct: number) => [
       {
         p: 'What is Peaje?',
-        r: 'An agent that gets your site ready for AI. It checks how ChatGPT, Claude, Perplexity and Gemini see you, tells you what is missing and fixes it with you on Telegram.',
+        r: `An agent that gets your site ready for AI. It checks how ${asistentesMedidos('en')} see you, tells you what is missing and fixes it with you on Telegram.`,
       },
       {
         p: 'What do I get?',
@@ -244,7 +246,7 @@ export const landing = {
       },
       {
         p: 'What if it does not work for me?',
-        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you. Best case, ChatGPT, Claude, Perplexity and Gemini start citing your site for your business questions, and you see it in your agent's tracking.`,
+        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you. Best case, ${asistentesMedidos('en')} start citing your site for your business questions, and you see it in your agent's tracking.`,
       },
       {
         p: 'Can I cancel?',

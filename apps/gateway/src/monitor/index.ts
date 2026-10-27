@@ -110,9 +110,9 @@ monitorRouter.post('/weekly', async (c) => {
       await generarTareas(t, { conContenido: true })
       // Citación: una ronda por semana con las preguntas del negocio (si tiene).
       if ((await store.listCitationPrompts(t.id)).length > 0) await correrRonda(t).catch((e) => console.warn('[monitor] citación', t.slug, e instanceof Error ? e.message : e))
-      // ---- M7: comprador misterioso, solo si el objetivo incluye vender a agentes ----
+      // ---- M7: comprador misterioso, solo si el objetivo incluye vender a agentes y los cobros están prendidos (mainnet) ----
       const objetivo = (await store.getPlan(t.id))?.goal
-      if (objetivo === 'agent-sales' || objetivo === 'both') await correrComprador(t).catch((e) => console.warn('[monitor] comprador misterioso', t.slug, e instanceof Error ? e.message : e))
+      if (env.cobrosVisibles && (objetivo === 'agent-sales' || objetivo === 'both')) await correrComprador(t).catch((e) => console.warn('[monitor] comprador misterioso', t.slug, e instanceof Error ? e.message : e))
       // ---- fin M7 ----
       const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)

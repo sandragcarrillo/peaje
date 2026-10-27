@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { AgentMessage, Tenant } from '@peaje/db'
-import { dominioVerificable } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 
 /**
@@ -49,7 +49,7 @@ export async function clasificarTema(tenant: Tenant, texto: string, previos: Age
         max_tokens: 300,
         system: [
           `You route messages that the owner of ${tenant.name} (${dominioVerificable(tenant.originUrl) ?? tenant.originUrl}) sends to their Peaje agent.`,
-          'The agent helps only with: this business and its website; being found and recommended by AI assistants (ChatGPT, Claude, Perplexity, Gemini); AI agents that visit the site or pay for its data or API; the tasks, pages, reports, plan, credits and schedule the agent handles; and Peaje itself (the product, its kit, plans and billing).',
+          'The agent helps only with: this business and its website; being found and recommended by AI assistants (' + asistentesMedidos('en') + ' or any other); AI agents that visit the site or pay for its data or API; the tasks, pages, reports, plan, credits and schedule the agent handles; and Peaje itself (the product, its kit, plans and billing).',
           'Classify only the LAST owner message, using the recent conversation as context:',
           '- business: about any of those topics, or it could be. Short follow-ups and answers to the agent\'s last question ("yes", "sí", "dale", "the second one", "do it", a number, a URL, a name) are always business. When in doubt, business.',
           '- chat: on topic but needs no data at all: a greeting, thanks, "ok", asking who you are or what you can do.',

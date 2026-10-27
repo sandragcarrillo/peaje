@@ -299,3 +299,12 @@ test('router: una foto guardada sale aunque el gateway no tenga motores', async 
   assert.deepEqual(body.engines, ['chatgpt'])
   assert.equal(body.questions.length, 3)
 })
+
+test('los asistentes que nombra la copy (ASISTENTES_MEDIDOS) son motores del gateway, con el mismo nombre', async () => {
+  const { ASISTENTES_MEDIDOS, MOTORES_MEDIDOS, asistentesMedidos } = await import('@peaje/shared')
+  const { MOTORES } = await import('../src/citacion/motores.js')
+  assert.equal(MOTORES_MEDIDOS.length, ASISTENTES_MEDIDOS.length)
+  MOTORES_MEDIDOS.forEach((id, i) => assert.equal(MOTORES.find((m) => m.id === id)?.nombre, ASISTENTES_MEDIDOS[i], id))
+  assert.equal(asistentesMedidos('es'), 'ChatGPT y Claude')
+  assert.equal(asistentesMedidos('en', 'o'), 'ChatGPT or Claude')
+})

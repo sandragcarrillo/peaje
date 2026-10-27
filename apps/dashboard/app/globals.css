@@ -420,3 +420,14 @@ h1, h2 {
   .radar-latido,
   .radar-aparece { animation: none; }
 }
+
+/* Portadas del blog (app/blog/portada.tsx): la textura de puntos de la marca sobre el degradado, más densa donde hay luz. */
+.portada-puntos {
+  background-image: radial-gradient(rgb(255 255 255 / 0.2) 0.8px, transparent 1.25px);
+  background-size: 5px 5px;
+  mask-image: radial-gradient(85% 75% at 74% 22%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(85% 75% at 74% 22%, #000 0%, transparent 72%);
+}
+.portada-titulo {
+  text-shadow: 0 1px 24px rgb(0 0 0 / 0.35);
+}

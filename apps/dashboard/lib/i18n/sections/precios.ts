@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 /**
  * Página /precios. Los montos, cupos y límites salen de @peaje/db (planes.ts),
  * así que los textos los reciben como argumentos y no se desincronizan.
@@ -56,7 +58,7 @@ export const precios = {
 
     proIncluye: [
       'Arma un plan según tu objetivo y conversa contigo en el dashboard y en Telegram',
-      'Mide si ChatGPT, Claude, Perplexity y Gemini citan tu sitio para las preguntas de tu negocio',
+      `Mide si ${asistentesMedidos('es')} citan tu sitio para las preguntas de tu negocio`,
       'Escribe borradores completos de las páginas que responden esas preguntas, con datos de tu sitio',
       'Le pasa cada tarea a tu herramienta de código por MCP o con la CLI, y verifica el sitio en vivo',
       'Vuelve a medir a las 2 y a las 6 semanas para saber si funcionó',
@@ -83,7 +85,7 @@ export const precios = {
     faq: ({ pct, dias }: { pct: number; dias: number }) => [
       {
         p: '¿Y si no me sirve?',
-        r: 'En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó, incluidos los borradores de página. El kit, el monitor diario y sus tareas de arreglo siguen gratis. En el mejor caso, ChatGPT, Claude, Perplexity y Gemini empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.',
+        r: `En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó, incluidos los borradores de página. El kit, el monitor diario y sus tareas de arreglo siguen gratis. En el mejor caso, ${asistentesMedidos('es')} empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.`,
       },
       {
         p: '¿Me cobran algo más?',
@@ -154,7 +156,7 @@ export const precios = {
 
     proIncluye: [
       'Builds a plan around your goal and talks with you on the dashboard and on Telegram',
-      'Measures whether ChatGPT, Claude, Perplexity and Gemini cite your site for your business questions',
+      `Measures whether ${asistentesMedidos('en')} cite your site for your business questions`,
       'Writes full drafts of the pages that answer those questions, using facts from your site',
       'Hands each task to your coding tool over MCP or the CLI, and checks the live site',
       'Measures again at 2 and 6 weeks to see whether it worked',
@@ -177,7 +179,7 @@ export const precios = {
     faq: ({ pct, dias }: { pct: number; dias: number }) => [
       {
         p: 'What if it does not work for me?',
-        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you, page drafts included. The kit, the daily monitor and its fix tasks stay free. Best case, ChatGPT, Claude, Perplexity and Gemini start citing your site for your business questions, and you see it in your agent's tracking.`,
+        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you, page drafts included. The kit, the daily monitor and its fix tasks stay free. Best case, ${asistentesMedidos('en')} start citing your site for your business questions, and you see it in your agent's tracking.`,
       },
       {
         p: 'Do you charge anything else?',

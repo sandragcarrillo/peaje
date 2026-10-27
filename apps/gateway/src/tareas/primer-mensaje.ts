@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { AgentTask, Tenant, Verificacion } from '@peaje/db'
-import { dominioVerificable, type Chequeo, type Motivo } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable, type Chequeo, type Motivo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { DASHBOARD } from '../monitor/reporte.js'
@@ -68,8 +68,8 @@ const T = {
     robotsBot: (p: string) => `Tu robots.txt no deja que ${p} lea tu sitio. Déjalo entrar.`,
     firewall: (p: string) => `La protección de tu sitio (firewall) bloquea a ${p}. Déjalo pasar.`,
     posicion: 'Cómo te conviene presentarte ante la IA:',
-    sinPreguntas: 'Lo próximo que mido: qué responden los asistentes de IA como ChatGPT, Claude o Perplexity cuando tus clientes preguntan por lo que ofreces. Elijo esas preguntas cuando armemos tu plan; escríbeme "arma mi plan" cuando quieras.',
-    sinMedir: (n: number) => `Lo próximo que mido: si los asistentes de IA como ChatGPT, Claude o Perplexity te citan en ${n === 1 ? 'la pregunta' : `las ${n} preguntas`} que sigo por ti.`,
+    sinPreguntas: `Lo próximo que mido: qué responden ${asistentesMedidos('es')} cuando tus clientes preguntan por lo que ofreces. Elijo esas preguntas cuando armemos tu plan; escríbeme "arma mi plan" cuando quieras.`,
+    sinMedir: (n: number) => `Lo próximo que mido: si ${asistentesMedidos('es')} te citan en ${n === 1 ? 'la pregunta' : `las ${n} preguntas`} que sigo por ti.`,
     midiendoCitas: (n: number) => `Sigo midiendo si los asistentes de IA te citan en ${n === 1 ? 'la pregunta' : `las ${n} preguntas`} que sigo por ti, y te aviso qué cambia.`,
     cadencia:
       '¿Cada cuánto quieres que te cuente cómo vas? Te mando qué agentes de IA entraron a tu sitio y qué leyeron, cómo cambió desde la vez anterior y, si no llegó ninguno, qué arreglar primero.',
@@ -97,8 +97,8 @@ const T = {
     robotsBot: (p: string) => `Your robots.txt does not let ${p} read your site. Let it in.`,
     firewall: (p: string) => `Your site's protection (firewall) blocks ${p}. Let it through.`,
     posicion: 'How to present yourself to AI assistants:',
-    sinPreguntas: 'What I measure next: what AI assistants like ChatGPT, Claude or Perplexity answer when your customers ask about what you offer. I pick those questions when we build your plan; write "build my plan" whenever you want.',
-    sinMedir: (n: number) => `What I measure next: whether AI assistants like ChatGPT, Claude or Perplexity cite you for the ${n === 1 ? 'question' : `${n} questions`} I track for you.`,
+    sinPreguntas: `What I measure next: what ${asistentesMedidos('en')} answer when your customers ask about what you offer. I pick those questions when we build your plan; write "build my plan" whenever you want.`,
+    sinMedir: (n: number) => `What I measure next: whether ${asistentesMedidos('en')} cite you for the ${n === 1 ? 'question' : `${n} questions`} I track for you.`,
     midiendoCitas: (n: number) => `I keep measuring whether AI assistants cite you for the ${n === 1 ? 'question' : `${n} questions`} I track for you, and I tell you what changes.`,
     cadencia: 'How often do you want me to tell you how it is going? I send which AI agents came to your site and what they read, how that changed since last time, and if none came, what to fix first.',
     botones: { semanal: 'Mondays, 8 am', diaria: 'Every day, 8 am', mensual: 'The 1st of each month', no: 'Not now' } as Record<Cadencia, string>,
@@ -181,7 +181,7 @@ export async function ideasDePosicion(tenant: Tenant, idioma: Idioma, o: { pregu
         model: MODELO,
         max_tokens: 800,
         system: [
-          'You give the owner of a small business two or three short, concrete suggestions on how to position their website so AI assistants like ChatGPT, Claude or Perplexity describe it well and recommend it.',
+          'You give the owner of a small business two or three short, concrete suggestions on how to position their website so AI assistants like ' + asistentesMedidos('en', 'o') + ' describe it well and recommend it.',
           `Write in ${idioma === 'es' ? 'Spanish (neutral Latin American, tú)' : 'English'}, for an owner who is not technical. Each suggestion is one or two short sentences.`,
           'Cover, in this order, as far as the data allows: how AI assistants should describe the business (one plain sentence they could say); which customer questions to aim to win first (quote one or two of the tracked questions exactly); which kind of page tends to get cited for those questions (use the measured formats if given, in plain words such as a guide, a comparison or a list of the best options).',
           'Use only the facts given. Never write a number, a price or a percentage. Never name a site, a competitor or a customer that is not in the data. Never promise results.',

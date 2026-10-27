@@ -41,6 +41,7 @@ const T = {
     aplicado: 'Aplicado.',
     descartado: 'Descartado.',
     error: 'No pude responder ahora. Prueba de nuevo en un momento.',
+    botonViejo: 'Ese botón ya no sirve. Escríbeme tu respuesta y sigo.',
   },
   en: {
     sinLigar: 'Hi. I am the Peaje agent. To connect me to your business, open "My agent" in the Peaje dashboard and tap "Connect Telegram".',
@@ -59,6 +60,7 @@ const T = {
     aplicado: 'Applied.',
     descartado: 'Dismissed.',
     error: 'I could not answer right now. Try again in a moment.',
+    botonViejo: 'That button no longer works. Type your answer and I will continue.',
   },
 }
 
@@ -77,7 +79,8 @@ function teclado(m: AgentMessage, idioma: 'es' | 'en', conAcciones = true) {
       { text: T[idioma].descartar, callback_data: `a:${a.id.slice(0, 8)}:n` },
     ])
   }
-  m.options.forEach((o, i) => filas.push([{ text: o.slice(0, 60), callback_data: `o:${i}` }]))
+  // Cada opción lleva el id de su mensaje: sin él se buscaba en el último mensaje del negocio, que puede ser otro.
+  m.options.forEach((o, i) => filas.push([{ text: o.slice(0, 60), callback_data: `o:${m.id}:${i}` }]))
   return filas.length ? { inline_keyboard: filas } : undefined
 }
 
@@ -231,12 +234,13 @@ async function procesarBoton(c: Callback): Promise<void> {
   }
   const recientes = (await store.listMessages(tenant.id, 20)).filter((m) => m.role === 'assistant')
   if (data.startsWith('o:')) {
-    const ultimo = recientes[recientes.length - 1]
-    const opcion = ultimo?.options[Number(data.slice(2))]
-    if (opcion) {
-      const eco = await tg<{ message_id: number }>('sendMessage', { chat_id: chatId, text: `› ${opcion}` })
-      await responder(chatId, tenant, opcion, idioma, true, eco?.message_id)
-    }
+    // "o:<mensaje>:<i>"; los botones de antes eran "o:<i>" y apuntan al último mensaje del agente.
+    const [, a, b] = data.split(':')
+    const mensaje = b === undefined ? recientes[recientes.length - 1] : await store.getMessage(tenant.id, a ?? '')
+    const opcion = mensaje?.options[Number(b ?? a)]
+    if (!opcion) return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].botonViejo }))
+    const eco = await tg<{ message_id: number }>('sendMessage', { chat_id: chatId, text: `› ${opcion}` })
+    await responder(chatId, tenant, opcion, idioma, true, eco?.message_id)
     return
   }
   if (data.startsWith('a:')) {

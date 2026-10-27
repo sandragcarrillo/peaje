@@ -1,4 +1,5 @@
 import { PRECIOS_USD, type PlanPago, type Tenant } from '@peaje/db'
+import { asistentesMedidos } from '@peaje/shared'
 import { enviarCorreo, type Adjunto } from '../monitor/email.js'
 import { LOGO_CID, LOGO_PNG_BASE64 } from './logo-correo.js'
 import { store } from '../store.js'
@@ -84,7 +85,7 @@ function copia(idioma: IdiomaBienvenida, plan: PlanPago, negocio: string, urls: 
       founder: plan === 'founder' ? 'Mantienes este precio mientras tu suscripción siga activa.' : null,
       intro: `Desde hoy tu agente trabaja para ${negocio}. Esto es lo que hace:`,
       puede: [
-        'Te dice qué falta para que ChatGPT, Claude, Perplexity y Gemini te encuentren y te recomienden, y mide cada semana si te citan.',
+        `Te dice qué falta para que ${asistentesMedidos('es')} te encuentren y te recomienden, y mide cada semana si te citan.`,
         'Te muestra qué tipo de páginas cita la IA para tus preguntas y escribe las tuyas en la voz de tu marca, una página o una serie completa.',
         'Deja cada arreglo listo como tarea para Claude Code o Cursor, y lo revisa en tu sitio cuando lo publicas.',
         'Te cuenta cuántos agentes de IA visitaron tu sitio, cada día, cada semana o cada mes, como prefieras.',
@@ -113,7 +114,7 @@ function copia(idioma: IdiomaBienvenida, plan: PlanPago, negocio: string, urls: 
     founder: plan === 'founder' ? 'You keep this price while your subscription stays active.' : null,
     intro: `From today your agent works for ${negocio}. Here is what it does:`,
     puede: [
-      'Tells you what is missing for ChatGPT, Claude, Perplexity and Gemini to find and recommend you, and checks every week whether they cite you.',
+      `Tells you what is missing for ${asistentesMedidos('en')} to find and recommend you, and checks every week whether they cite you.`,
       'Shows you which kinds of pages AI cites for your questions and writes yours in your brand’s voice, one page or a whole series.',
       'Turns each fix into a task for Claude Code or Cursor, and checks it on your site once you publish it.',
       'Tells you how many AI agents visited your site, every day, week or month, whichever you prefer.',

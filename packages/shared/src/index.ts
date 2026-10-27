@@ -440,5 +440,8 @@ export function slugify(name: string): string {
     .slice(0, 40)
 }
 
+// ---- asistentes de IA que Peaje mide ----
+export * from './asistentes'
+
 // ---- kit de instalación (proxy, bloques HTML, verificador) ----
 export * from './kit/index'

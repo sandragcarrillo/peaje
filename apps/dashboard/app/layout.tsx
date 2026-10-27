@@ -91,6 +91,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                   <nav aria-label={d.nav.linkComo} className="etiqueta hidden items-center gap-6 lg:flex">
                     <Link href="/#como-funciona" className="text-muted hover:text-text">{d.nav.linkComo}</Link>
                     <Link href="/precios" className="text-muted hover:text-text">{d.nav.linkPrecios}</Link>
+                    <Link href="/blog" className="text-muted hover:text-text">{d.nav.linkBlog}</Link>
                     <RadarPill texto={d.nav.linkRadar} />
                   </nav>
                   <div className="flex items-center gap-2 text-sm sm:gap-3">
@@ -118,6 +119,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             className="etiqueta mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 text-muted"
           >
             <Link href="/precios" className="hover:text-text">{d.legal.piePrecios}</Link>
+            <Link href="/blog" className="hover:text-text">{d.legal.pieBlog}</Link>
             <Link href="/terms" className="hover:text-text">{d.legal.pieTerminos}</Link>
             <Link href="/privacy" className="hover:text-text">{d.legal.piePrivacidad}</Link>
             <Link href="/reembolsos" className="hover:text-text">{d.legal.pieReembolsos}</Link>

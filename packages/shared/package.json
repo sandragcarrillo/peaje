@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./kit/rutas": "./src/kit/rutas.ts"
+    "./kit/rutas": "./src/kit/rutas.ts",
+    "./asistentes": "./src/asistentes.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -12,6 +12,7 @@ export const nav = {
     entrar: 'Entrar',
     linkComo: 'Cómo funciona',
     linkPrecios: 'Precios',
+    linkBlog: 'Blog',
     linkRadar: 'Radar gratis',
     metaTitulo: 'Peaje · que la IA te encuentre, te use y te compre',
     metaDescripcion:
@@ -33,6 +34,7 @@ export const nav = {
     entrar: 'Sign in',
     linkComo: 'How it works',
     linkPrecios: 'Pricing',
+    linkBlog: 'Blog',
     linkRadar: 'Free radar',
     metaTitulo: 'Peaje · get AI to find you, use you and buy from you',
     metaDescripcion:

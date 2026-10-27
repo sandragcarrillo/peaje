@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { PAGE_FORMATS, type PageFormat, type Tenant, type Verificacion } from '@peaje/db'
 import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
-import { dominioVerificable, type Chequeo } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { TEXTO_MOTIVO } from './email.js'
@@ -119,7 +119,7 @@ export async function sugerirContenido(tenant: Tenant, dominio: string): Promise
       model: MODEL,
       max_tokens: 4000,
       system: [
-        'You advise small businesses on answer-engine optimization: pages that ChatGPT, Perplexity and Google AI Overviews cite when a user asks a question the business can answer. Propose 3 to 5 pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
+        'You advise small businesses on answer-engine optimization: pages that AI assistants such as ' + asistentesMedidos('en') + ' cite when a user asks a question the business can answer. Propose 3 to 5 pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
         'Each page has a format: guide, roundup (best options, top N, alternatives), comparison (X vs Y), research (original data or a benchmark), docs, forum, video, news, product or other.',
         'When you are given the formats AI assistants actually cite for this business\'s questions, prefer the questions where those formats win, pick the format that won for that question, and set "modelo" to the URL of one cited example to emulate. Without that evidence, pick the format that fits the question and leave "modelo" empty. Never put a URL in "modelo" that was not in the evidence.',
       ].join('\n'),

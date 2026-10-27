@@ -39,6 +39,12 @@ function required(name: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 8787),
+  /**
+   * Lo que depende de que los agentes paguen de verdad (el comprador
+   * misterioso), apagado hasta mainnet. Mismo nombre que en el dashboard
+   * (Vercel), para prender todo con un solo nombre: NEXT_PUBLIC_COBROS=1.
+   */
+  cobrosVisibles: process.env.NEXT_PUBLIC_COBROS === '1',
   /** Clave para firmar challenges MPP. 32+ bytes. */
   mppSecretKey: required('MPP_SECRET_KEY'),
   /** Wallet de la plataforma que recibe todos los pagos. */

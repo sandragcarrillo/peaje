@@ -12,6 +12,12 @@ const seguridad = [
 
 const nextConfig = {
   agentRules: false,
+  // El blog lee sus .md en cada request (el layout es dinámico): hay que subirlos con la función.
+  outputFileTracingIncludes: {
+    "/blog": ["./content/blog/**/*"],
+    "/blog/[slug]": ["./content/blog/**/*"],
+    "/sitemap.xml": ["./content/blog/**/*"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: seguridad }];
   },

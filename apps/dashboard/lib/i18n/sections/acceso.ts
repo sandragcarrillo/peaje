@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 export const acceso = {
   es: {
     negociosRegistrados: 'Sitios activos',
@@ -85,7 +87,7 @@ export const acceso = {
     pasoKitTexto: 'Pone en tu sitio lo que los agentes de IA leen para entender qué ofreces y cómo usarte.',
     pasoKitBoton: 'Instalar el kit',
     pasoAgente: 'Activa tu agente',
-    pasoAgenteTexto: 'Mide si ChatGPT, Claude, Perplexity y Gemini te recomiendan, y te prepara los arreglos y las páginas.',
+    pasoAgenteTexto: `Mide si ${asistentesMedidos('es')} te recomiendan, y te prepara los arreglos y las páginas.`,
     pasoAgenteBoton: 'Ver el plan',
     pasoTelegram: 'Conecta Telegram',
     pasoTelegramTexto: 'Habla con tu agente desde el celular y elige cada cuánto te reporta.',
@@ -189,7 +191,7 @@ export const acceso = {
     pasoKitTexto: 'It puts on your site what AI agents read to understand what you offer and how to use you.',
     pasoKitBoton: 'Install the kit',
     pasoAgente: 'Turn on your agent',
-    pasoAgenteTexto: 'It tracks whether ChatGPT, Claude, Perplexity and Gemini recommend you, and prepares the fixes and pages.',
+    pasoAgenteTexto: `It tracks whether ${asistentesMedidos('en')} recommend you, and prepares the fixes and pages.`,
     pasoAgenteBoton: 'See the plan',
     pasoTelegram: 'Connect Telegram',
     pasoTelegramTexto: 'Talk to your agent from your phone and choose how often it reports.',

@@ -1,5 +1,5 @@
 import type { AgentTask } from '@peaje/db'
-import { gatewayUrl } from '@/lib/config'
+import { COBROS_VISIBLES, gatewayUrl } from '@/lib/config'
 import { PageHeader, SectionBar } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
@@ -94,11 +94,13 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} /> : <Bloqueado que="citacion" />}
       </section>
 
-      {/* ---- M7: comprador misterioso ---- */}
-      <section className="space-y-3">
-        <SectionBar label={t.compTitulo} />
-        {pro ? <CompradorPanel slug={tenant.slug} run={comprador} /> : <Bloqueado que="comprador" />}
-      </section>
+      {/* ---- M7: comprador misterioso, oculto hasta mainnet (busca en mercados de agentes y prueba el pago) ---- */}
+      {COBROS_VISIBLES ? (
+        <section className="space-y-3">
+          <SectionBar label={t.compTitulo} />
+          {pro ? <CompradorPanel slug={tenant.slug} run={comprador} /> : <Bloqueado que="comprador" />}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <SectionBar label={t.planTitulo} />

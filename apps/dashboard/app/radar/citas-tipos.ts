@@ -2,8 +2,11 @@
  * La foto de citación del radar: tres preguntas de compra hechas a los motores
  * de IA, si el sitio sale citado y a quién citan en su lugar. La arma el
  * gateway (POST /_internal/radar/citas); acá van el tipo, la limpieza de lo
- * que llega y los nombres de los motores. Sin imports: lo usan server y cliente.
+ * que llega y los nombres de los motores. Lo usan server y cliente: el único
+ * import es la lista de asistentes medidos, que no arrastra nada.
  */
+
+import { MOTORES_MEDIDOS } from '@peaje/shared/asistentes'
 
 export type Celda = { cited: boolean; mentioned: boolean; sources: string[] }
 
@@ -28,8 +31,8 @@ export const esErrorCitas = (r: RespuestaCitas): r is ErrorCitas => 'error' in r
 
 const NOMBRES: Record<string, string> = { chatgpt: 'ChatGPT', perplexity: 'Perplexity', claude: 'Claude', gemini: 'Gemini' }
 
-/** Los motores que pregunta el gateway hoy, para el texto de espera. */
-export const MOTORES_POR_DEFECTO = ['chatgpt', 'perplexity', 'claude', 'gemini']
+/** Los motores que pregunta el gateway hoy (los medidos en producción), para el texto de espera. */
+export const MOTORES_POR_DEFECTO: string[] = [...MOTORES_MEDIDOS]
 
 /** Nombre para mostrar; un id que no conocemos sale tal cual, con mayúscula inicial. */
 export function nombreMotor(id: string): string {

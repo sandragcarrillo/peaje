@@ -1,5 +1,6 @@
 import type { AgentJob, AgentTask, Tenant } from '@peaje/db'
 import { store } from '../store.js'
+import { unirNombres } from '@peaje/shared'
 import { motoresDisponibles } from '../citacion/motores.js'
 import { tarjetaTarea } from '../tareas/tarjetas.js'
 import { borradorDe, slugDeTarea, tieneBorrador } from './borrador.js'
@@ -52,12 +53,11 @@ const cerrar = (frase: string) => {
 }
 const citar = (t: string, idioma: Idioma) => (idioma === 'es' ? `«${t}»` : `"${t}"`)
 
-/** Los asistentes que Peaje mide de verdad (los que tienen clave en el gateway), en lista: "ChatGPT, Perplexity o Claude". */
+/** Los asistentes que Peaje mide de verdad (los que tienen clave en el gateway), en lista: "ChatGPT o Claude". */
 function listaMotores(idioma: Idioma): { texto: string; n: number } | null {
   const nombres = motoresDisponibles().map((m) => m.nombre)
   if (!nombres.length) return null
-  const y = idioma === 'es' ? ' o ' : ' or '
-  return { texto: nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')}${y}${nombres.at(-1)}` : nombres[0]!, n: nombres.length }
+  return { texto: unirNombres(nombres, idioma, 'o'), n: nombres.length }
 }
 
 /** Qué pasa después: Peaje mide a las 2 y a las 6 semanas. Solo nombra asistentes que mide. */

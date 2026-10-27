@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
 
 /** "A, B y C", sin cortar. */
@@ -176,7 +178,7 @@ export const radar = {
     s04: 'Arreglémoslo',
     cierreTitulo: 'Tu agente trabaja para que la IA te recomiende.',
     cierreTexto:
-      'El agente de Peaje vive en tu Telegram. Mide si ChatGPT, Claude y Perplexity te citan cuando preguntan por lo que ofreces, te dice qué publicar, te escribe las páginas y te cuenta cada semana cuánto vas mejorando. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.',
+      `El agente de Peaje vive en tu Telegram. Mide si ${asistentesMedidos('es')} te citan cuando preguntan por lo que ofreces, te dice qué publicar, te escribe las páginas y te cuenta cada semana cuánto vas mejorando. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.`,
     cta: (usd: number) => `Activar mi agente: US$${usd}`,
     ctaNota: 'Creas tu cuenta con tu correo y pagas en el paso siguiente. Cancelas cuando quieras desde tu panel, sin llamadas.',
     soloTecnico: '¿Solo quieres lo técnico?',
@@ -344,7 +346,7 @@ export const radar = {
     s04: "Let's fix it",
     cierreTitulo: 'Your agent works on getting AI to recommend you.',
     cierreTexto:
-      'The Peaje agent lives in your Telegram. It tracks whether ChatGPT, Claude and Perplexity cite you when people ask about what you offer, tells you what to publish, writes the pages and tells you every week how much you are improving. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.',
+      `The Peaje agent lives in your Telegram. It tracks whether ${asistentesMedidos('en')} cite you when people ask about what you offer, tells you what to publish, writes the pages and tells you every week how much you are improving. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.`,
     cta: (usd: number) => `Turn on my agent: US$${usd}`,
     ctaNota: 'You create your account with your email and pay in the next step. Cancel anytime from your dashboard, no calls.',
     soloTecnico: 'Just want the technical part?',

@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 /**
  * Los reportes que abre el agente con una tarjeta (app/t/[slug]/agente/
  * oportunidades, citas y tareas/[id]). Los nombres y descripciones de cada
@@ -40,7 +42,7 @@ export const agenteReportes = {
     // ---- citas ----
     ciTitulo: 'A quién cita la IA en tu lugar',
     ciSub:
-      'Lo que contestaron ChatGPT, Claude, Perplexity y los demás a las preguntas que medimos: quién apareció en cada una, en cada motor, y qué tipo de página eligieron.',
+      `Lo que contestaron ${asistentesMedidos('es')} a las preguntas que medimos: quién apareció en cada una, en cada motor, y qué tipo de página eligieron.`,
     ciSinMedir: 'Todavía no hay mediciones. Elige las preguntas en Mi agente y corre la primera.',
     ciMedido: (fecha: string) => `Medido el ${fecha}`,
     ciCuota: (pct: string) => `Te citan en el ${pct} de las respuestas`,
@@ -106,7 +108,7 @@ export const agenteReportes = {
 
     ciTitulo: 'Who AI cites instead of you',
     ciSub:
-      'What ChatGPT, Claude, Perplexity and the others answered to the questions we measure: who showed up in each one, on each engine, and what kind of page they picked.',
+      `What ${asistentesMedidos('en')} answered to the questions we measure: who showed up in each one, on each engine, and what kind of page they picked.`,
     ciSinMedir: 'No measurements yet. Pick the questions in My agent and run the first one.',
     ciMedido: (fecha: string) => `Measured on ${fecha}`,
     ciCuota: (pct: string) => `They cite you in ${pct} of answers`,

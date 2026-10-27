@@ -1,3 +1,5 @@
+import { asistentesMedidos } from '@peaje/shared/asistentes'
+
 /**
  * El pipeline de contenido (app/t/[slug]/agente/contenido): las páginas que
  * prepara el agente Pro, de identificada a publicada, con la evidencia, las
@@ -49,7 +51,7 @@ export const contenido = {
     sinPrioridad: 'Sin medir: todavía no le preguntamos esto a los asistentes de IA.',
     comoSeOrdena: 'Cómo se ordena',
     comoSeOrdenaTexto:
-      'El número es cuántos asistentes de IA (ChatGPT, Claude, Perplexity, Gemini) contestan esa pregunta sin citarte, de los que respondieron en la última medición. Si dos empatan, va primero la que tiene más sitios citados en tu lugar. Las que todavía no medimos no tienen número y van después. Las publicadas y las descartadas van al final.',
+      `El número es cuántos asistentes de IA (${asistentesMedidos('es')}) contestan esa pregunta sin citarte, de los que respondieron en la última medición. Si dos empatan, va primero la que tiene más sitios citados en tu lugar. Las que todavía no medimos no tienen número y van después. Las publicadas y las descartadas van al final.`,
 
     // ---- etapas ----
     etapas: { identificada: 'Identificada', brief: 'Instrucciones', borrador: 'Borrador', revision: 'Revisión', publicada: 'Publicada' } as Record<string, string>,
@@ -181,7 +183,7 @@ export const contenido = {
     sinPrioridad: 'Not measured: we have not asked AI assistants this yet.',
     comoSeOrdena: 'How this is sorted',
     comoSeOrdenaTexto:
-      'The number is how many AI assistants (ChatGPT, Claude, Perplexity, Gemini) answer that question without citing you, out of the ones that answered in the latest measurement. On a tie, the one with more sites cited instead of you goes first. The ones we have not measured yet have no number and come next. Published and dismissed pages go last.',
+      `The number is how many AI assistants (${asistentesMedidos('en')}) answer that question without citing you, out of the ones that answered in the latest measurement. On a tie, the one with more sites cited instead of you goes first. The ones we have not measured yet have no number and come next. Published and dismissed pages go last.`,
 
     etapas: { identificada: 'Identified', brief: 'Brief', borrador: 'Draft', revision: 'Review', publicada: 'Published' } as Record<string, string>,
     estadosEtapa: { hecha: 'done', actual: 'current step', pendiente: 'pending', 'sin-dato': 'no data' } as Record<string, string>,

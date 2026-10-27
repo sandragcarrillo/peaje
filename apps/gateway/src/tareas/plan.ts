@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { PLAN_METRICS, type AgentPlan, type PlanCadence, type PlanCapacity, type PlanGoal, type PlanMetric, type Tenant } from '@peaje/db'
-import { dominioVerificable, type Chequeo } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
@@ -98,7 +98,7 @@ export async function generarPlan(tenant: Tenant, e: EntradaPlan): Promise<Agent
     // El modelo razona antes de responder y eso cuenta contra max_tokens: 3000 cortaba el JSON.
     max_tokens: 12000,
     system: [
-      "You are Peaje's growth agent for a small business. Peaje makes a business visible to answer engines (ChatGPT, Perplexity, Google AI, Claude) and lets AI agents pay for its API routes over HTTP 402.",
+      `You are Peaje's growth agent for a small business. Peaje makes a business visible to answer engines (it measures whether ${asistentesMedidos('en')} cite it) and lets AI agents pay for its API routes over HTTP 402.`,
       'Write a plan of 3 to 6 steps for the goal the owner chose. Order the steps by impact on that goal. Respect what the owner can do: never propose code changes if they cannot touch code, never propose writing content if they cannot publish it.',
       'What moves answer-engine recommendations, with evidence: mentions of the brand on third-party sites (Reddit threads, YouTube, listicles; 84% of citations are third-party), pages whose title is the literal question with a direct answer, a concrete number and a cited source, being indexed by Bing (ChatGPT search leans on it), fresh visible dates, and answer bots not being blocked. llms.txt and JSON-LD barely move citations: do not sell them as a lever for recommendations.',
       'What moves agent sales, with evidence: most unpaid 402s are technical failures, not price; fix the 402 path and the descriptions agents read before touching price.',

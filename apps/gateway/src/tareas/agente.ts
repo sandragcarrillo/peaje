@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { randomUUID } from 'node:crypto'
 import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS, type AgentAction, type AgentMessage, type Tenant } from '@peaje/db'
-import { dominioVerificable, slugify, type Chequeo } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable, slugify, type Chequeo } from '@peaje/shared'
 import { store } from '../store.js'
 import { validarRuta } from '../rutas.js'
 import { MODEL } from '../monitor/reporte.js'
@@ -30,6 +30,7 @@ import { guardarPerfilDeVoz, perfilDeVoz, type CambioDeVoz } from '../ciclo/voz.
 import { COSTOS_CREDITOS, type AccionCreditos } from '@peaje/db'
 import { anotarCreditos, avisoCreditos, lineaSinCreditos, saldoCreditos, usoPublico, type Saldo } from './creditos.js'
 import { clasificarTema } from './tema.js'
+import { env } from '../env.js'
 
 const MAX_CUSTOM = 5
 
@@ -73,13 +74,29 @@ type Ctx = {
 
 const numero = (x: unknown) => (typeof x === 'number' ? x : Number(x))
 
+/** Las opciones como vengan: una lista, o un texto (JSON o una por línea) si el modelo las mandó así. */
+function listaDeOpciones(x: unknown): string[] {
+  let lista: unknown = x
+  if (typeof x === 'string') {
+    try {
+      lista = JSON.parse(x)
+    } catch {
+      lista = x.split('\n')
+    }
+  }
+  return (Array.isArray(lista) ? lista : []).map((c) => String(c).trim()).filter(Boolean).map((c) => c.slice(0, 80)).slice(0, 5)
+}
+
+/** Herramientas que dependen de que los agentes paguen de verdad: apagadas hasta mainnet (env.cobrosVisibles). */
+const SOLO_CON_COBROS = new Set(['run_mystery_shopper', 'get_mystery_results', 'list_routes', 'propose_route_change'])
+
 const HERRAMIENTAS: Herramienta[] = [
   {
     name: 'offer_choices',
     description: 'Show 2 to 5 short tappable answers under your message, so the owner can reply with one tap. Use it whenever you ask a question with a small set of likely answers. Each choice under 8 words, written as the owner would say it.',
     input_schema: { type: 'object', properties: { choices: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 5 } }, required: ['choices'] },
     async correr(i, ctx) {
-      ctx.opciones = (Array.isArray(i.choices) ? i.choices : []).map((c) => String(c).slice(0, 80)).slice(0, 5)
+      ctx.opciones = listaDeOpciones(i.choices)
       return { shown: ctx.opciones.length }
     },
   },
@@ -140,7 +157,8 @@ const HERRAMIENTAS: Herramienta[] = [
       required: ['goal', 'goal_detail', 'capacity', 'cadence'],
     },
     async correr(i, { tenant, idioma }) {
-      const goal = PLAN_GOALS.find((g) => g === i.goal)
+      // Sin cobros (hasta mainnet) el plan es para que la IA los recomiende, aunque el modelo pida vender a agentes.
+      const goal = env.cobrosVisibles ? PLAN_GOALS.find((g) => g === i.goal) : 'recommendations'
       if (!goal) return { error: 'invalid goal' }
       const capacity = PLAN_CAPACITIES.filter((c) => Array.isArray(i.capacity) && i.capacity.includes(c))
       const cadence = PLAN_CADENCES.find((c) => c === i.cadence) ?? 'weekly'
@@ -207,7 +225,7 @@ const HERRAMIENTAS: Herramienta[] = [
   },
   {
     name: 'get_citations',
-    description: 'Whether answer engines (ChatGPT, Perplexity, Gemini, Claude) cite the site for the tracked questions: share overall and by engine, per question, versus the previous round, and which domains appear instead. Also lists the tracked questions and which engines are configured.',
+    description: 'Whether answer engines (' + asistentesMedidos('en') + ') cite the site for the tracked questions: share overall and by engine, per question, versus the previous round, and which domains appear instead. Also lists the tracked questions and which engines are configured.',
     input_schema: { type: 'object', properties: {} },
     async correr(_i, { tenant }) {
       const [prompts, resumen] = await Promise.all([store.listCitationPrompts(tenant.id), resumenCitacion(tenant)])
@@ -443,7 +461,11 @@ HERRAMIENTAS.push(
 function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primeraVez: boolean): string {
   return [
     `You are the Peaje agent for ${tenant.name} (${dominioVerificable(tenant.originUrl) ?? tenant.originUrl}). You talk with the owner of this business, who is usually not technical.`,
-    'Your job: help them get recommended by AI assistants (ChatGPT, Claude, Perplexity, Gemini) when people ask about what they offer, and sell more to AI agents that pay for their data or API. When you name them, say "AI assistants like ChatGPT, Claude or Perplexity", never "ChatGPT and company". Answer with their real data: call tools before claiming anything about the business. Never invent numbers.',
+    'Your job: help them get recommended by AI assistants (' + asistentesMedidos('en') + ') when people ask about what they offer' + (env.cobrosVisibles ? ', and sell more to AI agents that pay for their data or API' : '') + '. Peaje measures citations only in ' + asistentesMedidos('en') + ': when you name AI assistants, say "AI assistants like ' + asistentesMedidos('en', 'o') + '", never another assistant and never "ChatGPT and company". Bot names in visit or site access data are fine when you report that data. Answer with their real data: call tools before claiming anything about the business. Never invent numbers.',
+    // Hasta mainnet los pagos de agentes son de prueba: el agente no los trae a la charla.
+    env.cobrosVisibles
+      ? ''
+      : 'Charging AI agents is still in test mode until Peaje launches it. Do not bring up payments, paid requests, the payment step, prices or priced routes, and do not suggest payment tasks, even when the data shows agent requests without payment. If the owner asks about charging agents, say in one sentence that it is coming soon and go back to getting recommended by AI assistants.',
     '',
     'How you talk:',
     '- Like a warm, sharp person who knows this field, talking to someone who does not. Plain words. Short sentences. One idea at a time.',
@@ -463,7 +485,9 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
       ? 'The owner already has a plan (get_plan). Keep answers tied to it.'
       : [
           'The owner has no plan yet. When they ask for a plan, or ask what to do, run a short friendly onboarding, one question per message, each with offer_choices:',
-          '  1. Start with: before you build their plan, you want to understand three things. Then ask what they want first: that AI assistants like ChatGPT, Claude or Perplexity recommend them, that AI agents pay to use their data or API, or both.',
+          env.cobrosVisibles
+            ? '  1. Start with: before you build their plan, you want to understand three things. Then ask what they want first: that AI assistants like ' + asistentesMedidos('en', 'o') + ' recommend them, that AI agents pay to use their data or API, or both.'
+            : '  1. Start with: before you build their plan, you want to understand three things. Their goal is that AI assistants recommend them (goal "recommendations"); do not ask about it, go straight to the next question.',
           '  2. Then: what people should find them for, in their own words (offer 2 or 3 guesses based on their site, read it with read_site_page, plus "something else").',
           '  3. Then: who can make changes to the site: they publish pages themselves, they have a developer or an AI coding tool, or they only want to adjust settings in Peaje.',
           '  4. Then: how often they want to hear from you: every week, every two weeks, only when they ask.',
@@ -471,7 +495,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
         ].join('\n'),
     '',
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
-    'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ChatGPT, Claude or Perplexity cite it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, use send_task_text instead of copying it yourself.',
+    'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ' + asistentesMedidos('en', 'o') + ' cites it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, use send_task_text instead of copying it yourself.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
     'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
@@ -479,8 +503,8 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat on its own: how long it took, a short summary with the missing facts as questions, its card and the page as a .md file. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
     'Short answer, full report behind a card: when you answer about what to publish or which pages to create, give the top one or two in a sentence and call open_report with "opportunities". When you answer about who AI cites instead of them, name the top one or two sites and call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. Never paste long lists or tables: the card opens the full report.',
     'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
-    // M7: comprador misterioso
-    'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.',
+    // M7: comprador misterioso (apagado hasta mainnet)
+    env.cobrosVisibles ? 'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.' : '',
     // Reportes programados
     'For anything the owner wants on a schedule ("every Monday at 8 send me...", "each morning tell me..."), use schedule_report: agent visits summary is kind agent_visits, anything else is kind custom with their request as the prompt.',
     // Filtro de tema: lo que no es del negocio se contesta en una línea, sin herramientas.
@@ -507,7 +531,7 @@ const ESTADOS: Record<string, { es: string; en: string }> = {
   get_citations: { es: 'Revisando qué dicen de ti los asistentes de IA…', en: 'Checking what AI assistants say about you…' },
   check_site_access: { es: 'Entrando a tu sitio como lo hacen ChatGPT, Perplexity y Google…', en: 'Opening your site the way ChatGPT, Perplexity and Google do…' },
   manage_questions: { es: 'Ajustando las preguntas que medimos…', en: 'Updating the questions we track…' },
-  run_citation_check: { es: 'Preguntándole a ChatGPT, Claude y los demás (1 a 3 minutos)…', en: 'Asking ChatGPT, Claude and the others (1 to 3 minutes)…' },
+  run_citation_check: { es: `Preguntándole a ${asistentesMedidos('es')} (1 a 3 minutos)…`, en: `Asking ${asistentesMedidos('en')} (1 to 3 minutes)…` },
   offer_choices: { es: 'Casi listo…', en: 'Almost there…' },
 }
 // ---- M6 ----
@@ -870,7 +894,9 @@ export async function conversar(
       // Caché de prompt: instrucciones y herramientas son iguales en cada vuelta
       // y cada mensaje; se cobran a una fracción después de la primera.
       system: [{ type: 'text', text: sistema(tenant, opciones.idioma, tienePlan, previos.length === 0), cache_control: { type: 'ephemeral' } }],
-      tools: HERRAMIENTAS.map(({ correr: _c, ...t }, i, todas) => (i === todas.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t)),
+      tools: HERRAMIENTAS.filter((h) => env.cobrosVisibles || !SOLO_CON_COBROS.has(h.name)).map(({ correr: _c, ...t }, i, todas) =>
+        i === todas.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t,
+      ),
       messages: mensajes,
     })
 
@@ -921,10 +947,18 @@ export async function conversar(
       }
     }
     mensajes.push({ role: 'user', content: resultados })
+    // Si la vuelta solo ofreció opciones, la respuesta ya está: otra vuelta solo
+    // agregaba acotaciones como "(aguardando tu respuesta)" y costaba una llamada.
+    if (soloOpciones) break
   }
 
   // Estilo de la casa: sin rayas largas aunque el modelo las use.
   let respuesta = partes.join('\n\n')
+  // Acotaciones del modelo ("(aguardando tu respuesta)"): el prompt las prohíbe, pero a veces salen.
+  respuesta = respuesta
+    .replace(/^[ \t]*[(*_[]+(?:aguardando|esperando|waiting|awaiting)[^()*_[\]\n]{0,60}[)*_\]]+[ \t]*$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
   respuesta = respuesta.replace(/\s+—\s+/g, ': ').replace(/—/g, ', ')
   // Créditos: lo que paga esta respuesta, y una línea si algo no alcanzó o si ya va por el 80 %.
   const cargo = cargoDeRespuesta(cuenta)

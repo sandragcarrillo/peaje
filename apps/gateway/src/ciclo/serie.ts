@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { PAGE_FORMATS, type AgentTask, type PageFormat, type Tenant } from '@peaje/db'
-import { dominioVerificable } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio } from '../monitor/reporte.js'
@@ -86,7 +86,7 @@ export async function planearSerie(tenant: Tenant, tema: string, ctx: { sitio: s
     model: PLAN_MODEL,
     max_tokens: 3_000,
     system: [
-      'You plan a small series of web pages on one topic for a small business, so AI assistants like ChatGPT, Claude or Perplexity cite it for every variant of the question.',
+      'You plan a small series of web pages on one topic for a small business, so AI assistants like ' + asistentesMedidos('en', 'o') + ' cite it for every variant of the question.',
       '- hub: one main page that answers the topic as a whole. Its "pregunta" is the broad question a customer would type.',
       `- spokes: ${MIN_SPOKES} to ${MAX_SPOKES} pages, each answering one concrete, narrower question a customer would type next (a price, a comparison, a how-to, a who-is-it-for). No overlap between them or with the hub.`,
       '- Each page gets a format: guide, roundup, comparison, research, docs, forum, video, news, product or other. Prefer the formats that the citation evidence shows winning for similar questions; otherwise pick the one that fits. Avoid video and forum: the business publishes these on its own site.',

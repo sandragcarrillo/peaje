@@ -1,8 +1,10 @@
+import { ASISTENTES_MEDIDOS, asistentesMedidos, unirNombres } from '@peaje/shared/asistentes'
+
 export const miAgente = {
   es: {
     titulo: 'Mi agente',
     descripcion:
-      'El agente de Peaje revisa cómo te ven ChatGPT, Perplexity y los agentes que compran, y te deja tareas. No toca tu sitio: tu coding agent (Claude Code, Cursor) las lee, las aplica en tu repo, y Peaje verifica el resultado en el sitio en vivo.',
+      `El agente de Peaje revisa cómo te ven ${unirNombres([...ASISTENTES_MEDIDOS, 'los agentes que compran'], 'es')}, y te deja tareas. No toca tu sitio: tu coding agent (Claude Code, Cursor) las lee, las aplica en tu repo, y Peaje verifica el resultado en el sitio en vivo.`,
     conectar: 'Conecta tu coding agent',
     conectarIntro: 'Una sola vez. Después le dices "trabaja las tareas de Peaje" y él hace el resto.',
     claveTitulo: 'Clave del agente',
@@ -54,7 +56,7 @@ export const miAgente = {
     sinPlan: 'Todavía no hay plan. Pídeselo al agente en el chat: "arma mi plan".',
     avanzado: 'Para devs y vibecoders: que tu coding agent aplique las tareas',
     citTitulo: '¿Te recomiendan las IA?',
-    citIntro: 'Peaje elige las preguntas que tus clientes le harían a un asistente de IA (ChatGPT, Claude, Perplexity, Gemini) y revisa cada semana si tu sitio aparece en las respuestas.',
+    citIntro: `Peaje elige las preguntas que tus clientes le harían a un asistente de IA (${asistentesMedidos('es', 'o')}) y revisa cada semana si tu sitio aparece en las respuestas.`,
     citSinMedir: 'Todavía no se midió. Se hace solo cuando armas tu plan en el chat, o ahora con el botón.',
     citCuota: (p: string) => `Te citan en ${p} de las respuestas`,
     citAntes: (p: string) => `(antes ${p})`,
@@ -70,7 +72,7 @@ export const miAgente = {
     citFaltan: (x: string) => `Sin configurar: ${x}. Se agregan con su clave en el gateway.`,
     fmtTitulo: 'Qué páginas cita la IA para tus preguntas',
     fmtIntro: 'El tipo de página que los asistentes eligieron para contestar, sin contar tu sitio. Es el formato que conviene imitar en tus páginas nuevas.',
-    fmtBase: (respuestas: number, rondas: number) => `Sale de ${respuestas} ${respuestas === 1 ? 'respuesta' : 'respuestas'} en ${rondas} ${rondas === 1 ? 'medición' : 'mediciones'}. Gemini no dice qué página citó, así que no entra.`,
+    fmtBase: (respuestas: number, rondas: number) => `Sale de ${respuestas} ${respuestas === 1 ? 'respuesta' : 'respuestas'} en ${rondas} ${rondas === 1 ? 'medición' : 'mediciones'}.`,
     fmtPoco: 'Con tan pocas respuestas es una pista, no un patrón. Se afina con cada medición.',
     fmtSinDatos: 'Todavía no hay páginas citadas para mostrar. Aparecen después de la próxima medición.',
     fmtConteo: (citas: number, fuentes: number) => `${citas} ${citas === 1 ? 'cita' : 'citas'} · ${fuentes} ${fuentes === 1 ? 'sitio' : 'sitios'}`,
@@ -179,12 +181,12 @@ export const miAgente = {
     tarjetaEsperamos: 'Qué esperamos',
     tarjetaComo: 'Cómo hacerlo',
     porQueGenerico: {
-      content: 'La gente le hace esta pregunta a ChatGPT, Claude o Perplexity y hoy tu sitio no tiene una página que la responda.',
+      content: `La gente le hace esta pregunta a ${asistentesMedidos('es', 'o')} y hoy tu sitio no tiene una página que la responda.`,
       fix: 'Esto impide que los asistentes de IA o los agentes lean tu sitio o te paguen.',
       route: 'Agentes pidieron esto en tu sitio y no encontraron nada.',
     } as Record<string, string>,
     esperamos: {
-      content: 'Los asistentes de IA tendrán una página que responde justo esa pregunta, que es lo que más citan. Dos semanas después de publicarla, Peaje revisa si ChatGPT, Claude o Perplexity te citan.',
+      content: `Los asistentes de IA tendrán una página que responde justo esa pregunta, que es lo que más citan. Dos semanas después de publicarla, Peaje revisa si ${asistentesMedidos('es', 'o')} te citan.`,
       fix: 'Apenas lo arregles, Peaje lo comprueba en tu sitio y te avisa si se vuelve a romper.',
       route: 'Los agentes que la pidan la encuentran, y si le pones precio, cada pedido se cobra.',
     } as Record<string, string>,
@@ -204,7 +206,7 @@ export const miAgente = {
     planIntro: 'Tres preguntas y el agente arma un plan con los datos reales de tu negocio. Cada paso trae una métrica que Peaje mide y una meta.',
     pregObjetivo: '¿Qué quieres lograr primero?',
     objetivos: {
-      recommendations: 'Que ChatGPT, Claude y Perplexity me recomienden',
+      recommendations: `Que ${asistentesMedidos('es')} me recomienden`,
       'agent-sales': 'Vender más a agentes que pagan por mis rutas',
       both: 'Las dos cosas',
     } as Record<string, string>,
@@ -309,7 +311,7 @@ export const miAgente = {
     // Justo arriba del botón de suscribirse. Los seguimientos a 2 y 6 semanas
     // preguntan a cada motor configurado (gateway: ciclo/seguimiento.ts).
     planCancelas:
-      'Cancelas cuando quieras. Mientras sigas, tu agente revisa a las 2 y a las 6 semanas si ChatGPT, Claude, Perplexity y Gemini ya citan cada página nueva.',
+      `Cancelas cuando quieras. Mientras sigas, tu agente revisa a las 2 y a las 6 semanas si ${asistentesMedidos('es')} ya citan cada página nueva.`,
     // ---- fin Paddle ----
     // ---- qué hace el agente apenas te suscribes (con los números de este sitio) ----
     arranqueTitulo: 'Lo que hace tu agente apenas te suscribes',
@@ -319,8 +321,8 @@ export const miAgente = {
       `Prepara ${n === 1 ? 'el arreglo' : `los ${n} arreglos`} que Peaje cubre en tu sitio, de más a menos puntos.${estimado !== null ? ` Con ${n === 1 ? 'él' : 'ellos'}, tu puntaje estimado sube a ${estimado}/${max}.` : ''}`,
     arranqueArreglosNinguno: 'Revisa lo que frena tu sitio. Hoy no tiene arreglos pendientes de los que cubre Peaje.',
     arranqueArreglosSin: 'Prepara los arreglos que Peaje cubre en tu sitio, de más a menos puntos.',
-    arranquePreguntas: (n: number) => `Mide ${n} preguntas de tu negocio en ChatGPT, Claude, Perplexity y Gemini, y te muestra quién aparece en tu lugar.`,
-    arranquePreguntasSin: 'Mide las preguntas de tu negocio en ChatGPT, Claude, Perplexity y Gemini, y te muestra quién aparece en tu lugar.',
+    arranquePreguntas: (n: number) => `Mide ${n} preguntas de tu negocio en ${asistentesMedidos('es')}, y te muestra quién aparece en tu lugar.`,
+    arranquePreguntasSin: `Mide las preguntas de tu negocio en ${asistentesMedidos('es')}, y te muestra quién aparece en tu lugar.`,
     arranqueTelegram:
       'Apenas conectas Telegram, te escribe con tu puntaje, qué arreglar primero (el kit, si todavía no lo instalaste) y cómo posicionar tu sitio. Después te pregunta cada cuánto quieres que te reporte.',
     // ---- secciones Pro sin Pro: qué hay ahí y cómo se activa ----
@@ -330,7 +332,7 @@ export const miAgente = {
       chat: 'Aquí hablas con tu agente: le preguntas cómo vas y te responde con los datos de tu sitio.',
       telegram: 'Aquí conectas Telegram para hablar con tu agente desde el celular y elegir cada cuánto te reporta.',
       slack: 'Aquí sumas tu agente al Slack de tu equipo.',
-      citacion: 'Aquí ves si ChatGPT, Claude, Perplexity y Gemini te nombran en las preguntas de tu negocio, y a quién nombran en tu lugar.',
+      citacion: `Aquí ves si ${asistentesMedidos('es')} te nombran en las preguntas de tu negocio, y a quién nombran en tu lugar.`,
       comprador: 'Aquí un agente comprador de prueba busca lo que vendes y te dice si te elige o a quién elige en tu lugar.',
       plan: 'Aquí aparece el plan que arma tu agente: los pasos para tu negocio, cada uno con una métrica y una meta.',
     } as Record<string, string>,
@@ -339,7 +341,7 @@ export const miAgente = {
   en: {
     titulo: 'My agent',
     descripcion:
-      "Peaje's agent watches how ChatGPT, Perplexity and buying agents see you, and leaves you tasks. It never touches your site: your coding agent (Claude Code, Cursor) reads them, applies them in your repo, and Peaje verifies the result on the live site.",
+      `Peaje's agent watches how ${unirNombres([...ASISTENTES_MEDIDOS, 'buying agents'], 'en')} see you, and leaves you tasks. It never touches your site: your coding agent (Claude Code, Cursor) reads them, applies them in your repo, and Peaje verifies the result on the live site.`,
     conectar: 'Connect your coding agent',
     conectarIntro: 'Once. Then tell it "work through the Peaje tasks" and it does the rest.',
     claveTitulo: 'Agent key',
@@ -391,7 +393,7 @@ export const miAgente = {
     sinPlan: 'No plan yet. Ask the agent in the chat: "build my plan".',
     avanzado: 'For devs and vibecoders: let your coding agent apply the tasks',
     citTitulo: 'Do AI assistants recommend you?',
-    citIntro: 'Peaje picks the questions your customers would ask an AI assistant (ChatGPT, Claude, Perplexity, Gemini) and checks every week whether your site shows up in the answers.',
+    citIntro: `Peaje picks the questions your customers would ask an AI assistant (${asistentesMedidos('en', 'o')}) and checks every week whether your site shows up in the answers.`,
     citSinMedir: 'Not measured yet. It happens on its own when you build your plan in the chat, or now with the button.',
     citCuota: (p: string) => `They cite you in ${p} of the answers`,
     citAntes: (p: string) => `(was ${p})`,
@@ -407,7 +409,7 @@ export const miAgente = {
     citFaltan: (x: string) => `Not configured: ${x}. Added with their key on the gateway.`,
     fmtTitulo: 'What pages AI cites for your questions',
     fmtIntro: 'The kind of page the assistants chose to answer with, not counting your site. It is the format to copy in your new pages.',
-    fmtBase: (respuestas: number, rondas: number) => `Based on ${respuestas} ${respuestas === 1 ? 'answer' : 'answers'} across ${rondas} ${rondas === 1 ? 'measurement' : 'measurements'}. Gemini does not say which page it cited, so it is not included.`,
+    fmtBase: (respuestas: number, rondas: number) => `Based on ${respuestas} ${respuestas === 1 ? 'answer' : 'answers'} across ${rondas} ${rondas === 1 ? 'measurement' : 'measurements'}.`,
     fmtPoco: 'With this few answers it is a hint, not a pattern. It sharpens with every measurement.',
     fmtSinDatos: 'No cited pages to show yet. They appear after the next measurement.',
     fmtConteo: (citas: number, fuentes: number) => `${citas} ${citas === 1 ? 'citation' : 'citations'} · ${fuentes} ${fuentes === 1 ? 'site' : 'sites'}`,
@@ -516,12 +518,12 @@ export const miAgente = {
     tarjetaEsperamos: 'What we expect',
     tarjetaComo: 'How to do it',
     porQueGenerico: {
-      content: 'People ask ChatGPT, Claude or Perplexity this question, and your site has no page that answers it today.',
+      content: `People ask ${asistentesMedidos('en', 'o')} this question, and your site has no page that answers it today.`,
       fix: 'This keeps AI assistants or agents from reading your site or paying you.',
       route: 'Agents asked for this on your site and found nothing.',
     } as Record<string, string>,
     esperamos: {
-      content: 'AI assistants get a page that answers exactly that question, which is what they cite most. Two weeks after you publish it, Peaje checks whether ChatGPT, Claude or Perplexity cite you.',
+      content: `AI assistants get a page that answers exactly that question, which is what they cite most. Two weeks after you publish it, Peaje checks whether ${asistentesMedidos('en', 'o')} cites you.`,
       fix: 'As soon as you fix it, Peaje checks it on your site and tells you if it breaks again.',
       route: 'Agents that ask for it find it, and if you price it, every request pays.',
     } as Record<string, string>,
@@ -541,7 +543,7 @@ export const miAgente = {
     planIntro: 'Three questions and the agent builds a plan with your real business data. Each step has a metric Peaje measures and a target.',
     pregObjetivo: 'What do you want first?',
     objetivos: {
-      recommendations: 'ChatGPT, Claude and Perplexity recommend me',
+      recommendations: `${asistentesMedidos('en')} recommend me`,
       'agent-sales': 'Sell more to agents that pay for my routes',
       both: 'Both',
     } as Record<string, string>,
@@ -643,7 +645,7 @@ export const miAgente = {
     planPortalError: 'We could not open the Paddle portal. Try again in a minute, or go to paddle.net with the email you paid with.',
     planVerPagos: 'See payments',
     planReembolsado: 'refunded',
-    planCancelas: 'Cancel anytime. While you stay, your agent checks at 2 and 6 weeks whether ChatGPT, Claude, Perplexity and Gemini cite each new page.',
+    planCancelas: `Cancel anytime. While you stay, your agent checks at 2 and 6 weeks whether ${asistentesMedidos('en')} cite each new page.`,
     // ---- end Paddle ----
     // ---- what the agent does as soon as you subscribe (with this site's numbers) ----
     arranqueTitulo: 'What your agent does as soon as you subscribe',
@@ -653,8 +655,8 @@ export const miAgente = {
       `It prepares ${n === 1 ? 'the fix' : `the ${n} fixes`} Peaje covers on your site, from most to fewest points.${estimado !== null ? ` With ${n === 1 ? 'it' : 'them'}, your estimated score goes up to ${estimado}/${max}.` : ''}`,
     arranqueArreglosNinguno: 'It reviews what holds your site back. Today there are no pending fixes of the ones Peaje covers.',
     arranqueArreglosSin: 'It prepares the fixes Peaje covers on your site, from most to fewest points.',
-    arranquePreguntas: (n: number) => `It measures ${n} questions about your business in ChatGPT, Claude, Perplexity and Gemini, and shows you who appears instead of you.`,
-    arranquePreguntasSin: 'It measures the questions about your business in ChatGPT, Claude, Perplexity and Gemini, and shows you who appears instead of you.',
+    arranquePreguntas: (n: number) => `It measures ${n} questions about your business in ${asistentesMedidos('en')}, and shows you who appears instead of you.`,
+    arranquePreguntasSin: `It measures the questions about your business in ${asistentesMedidos('en')}, and shows you who appears instead of you.`,
     arranqueTelegram:
       'As soon as you connect Telegram, it writes to you with your score, what to fix first (the kit, if you have not installed it yet) and how to position your site. Then it asks how often you want it to report.',
     // ---- Pro sections without Pro: what is there and how to turn it on ----
@@ -664,7 +666,7 @@ export const miAgente = {
       chat: 'Here you talk to your agent: ask how you are doing and it answers with your site data.',
       telegram: 'Here you connect Telegram to talk to your agent from your phone and choose how often it reports.',
       slack: "Here you add your agent to your team's Slack.",
-      citacion: 'Here you see whether ChatGPT, Claude, Perplexity and Gemini name you in the questions about your business, and who they name instead.',
+      citacion: `Here you see whether ${asistentesMedidos('en')} name you in the questions about your business, and who they name instead.`,
       comprador: 'Here a test buying agent looks for what you sell and tells you whether it picks you or whom it picks instead.',
       plan: 'Here you see the plan your agent builds: the steps for your business, each with a metric and a target.',
     } as Record<string, string>,

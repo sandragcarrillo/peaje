@@ -346,7 +346,7 @@ test('Telegram, una página: el aviso pasa a "✅ Listo en …", el resumen resp
   // La tarjeta de la tarea sigue como botón.
   const [tarea] = await store.listTasks(t.id)
   const botones = (resumen.cuerpo.reply_markup as { inline_keyboard: { url?: string }[][] }).inline_keyboard.flat()
-  assert.ok(botones.some((b) => b.url === `https://usepeaje.com/t/${t.slug}/agente/tareas/${tarea!.id}`))
+  assert.ok(botones.some((b) => b.url === `https://usepeaje.com/t/${t.slug}/agente/contenido?id=${tarea!.id}`))
 
   // 3. El .md, una sola vez, respondiendo al pedido, con frontmatter y ya limpio.
   const docs = de(telegram, 'sendDocument')
@@ -392,7 +392,7 @@ test('Telegram: si el archivo no sale, va el link a la tarea; sin aviso que edit
   const resumen = mensajes.find((m) => m.includes('Es la página que responde'))!
   assert.match(resumen, /^✅ Listo en \d+ s\n\nEs la página que responde «¿Hacen envíos el mismo día\?»/)
   const [tarea] = await store.listTasks(t.id)
-  assert.equal(mensajes.at(-1), `No pude adjuntar el archivo aquí. La página completa está en tu dashboard: https://usepeaje.com/t/${t.slug}/agente/tareas/${tarea!.id}`)
+  assert.equal(mensajes.at(-1), `No pude adjuntar el archivo aquí. La página completa está en tu dashboard: https://usepeaje.com/t/${t.slug}/agente/contenido?id=${tarea!.id}`)
 })
 
 test('Telegram, una serie: un resumen del conjunto y todas las páginas en un solo álbum de .md', async () => {
@@ -481,7 +481,7 @@ test('Slack sin files:write: la página llega igual y el archivo se cambia por e
   const [tarea] = await store.listTasks(t.id)
   const respaldo = de(slackApi, 'chat.postMessage').at(-1)!
   assert.equal(respaldo.cuerpo.thread_ts, mencion)
-  assert.equal(respaldo.cuerpo.text, `No pude adjuntar el archivo aquí. La página completa está en tu dashboard: https://usepeaje.com/t/${t.slug}/agente/tareas/${tarea!.id}`)
+  assert.equal(respaldo.cuerpo.text, `No pude adjuntar el archivo aquí. La página completa está en tu dashboard: https://usepeaje.com/t/${t.slug}/agente/contenido?id=${tarea!.id}`)
   assert.equal(de(slackApi, 'files.completeUploadExternal').length, 0)
   const [job] = await store.listJobs(t.id, 1)
   assert.equal(job!.status, 'done')

@@ -2,8 +2,9 @@ import type { Chequeo } from '@peaje/shared'
 import type { NewAgentTask, PageFormat, Tenant } from '@peaje/db'
 import type { Reporte } from '../monitor/reporte.js'
 import { COMO_SE_ARMA } from '../citacion/formatos.js'
-import { dominioVerificable } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable } from '@peaje/shared'
 import { store } from '../store.js'
+import { env } from '../env.js'
 import { NOMBRE_CHEQUEO, TEXTO_MOTIVO } from '../monitor/email.js'
 import { leerSitio, sugerirContenido } from '../monitor/reporte.js'
 import { completarTarea } from './verificar.js'
@@ -57,7 +58,7 @@ function promptContenido(tenant: Tenant, dominio: string, s: Reporte['contenido'
   return [
     `# New page: ${s.pregunta}`,
     '',
-    `Answer engines (ChatGPT, Perplexity, Google AI, Claude) get asked this and ${tenant.name} has no page that answers it. Create one.`,
+    `AI assistants like ${asistentesMedidos('en', 'o')} get asked this and ${tenant.name} has no page that answers it. Create one.`,
     '',
     '## The page',
     '',
@@ -90,8 +91,11 @@ function promptRuta(tenant: Tenant, dominio: string, path: string, visitas: numb
     `1. Decide whether this site can answer \`${path}\` with its own data. If it cannot, dismiss this task and say why.`,
     `2. If it can, add a route handler for \`GET ${path}\` that returns JSON. Keep the response small and documented (fields and units).`,
     '3. Deploy.',
-    `4. Put a price on it in Peaje: dashboard, Routes, "Priced API routes" (method GET, path \`${path}\`, a description written for agents). The 402 then answers on this domain.`,
-    '5. Mark this task done with the live URL.',
+    // Ponerle precio solo cuando los cobros están prendidos (mainnet).
+    ...(env.cobrosVisibles
+      ? [`4. Put a price on it in Peaje: dashboard, Routes, "Priced API routes" (method GET, path \`${path}\`, a description written for agents). The 402 then answers on this domain.`]
+      : []),
+    `${env.cobrosVisibles ? 5 : 4}. Mark this task done with the live URL.`,
   ].join('\n')
 }
 

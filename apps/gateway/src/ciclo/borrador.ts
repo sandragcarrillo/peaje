@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { AgentTask, PageFormat, Tenant, VoiceProfile } from '@peaje/db'
 import { COMO_SE_ARMA } from '../citacion/formatos.js'
-import { dominioVerificable, slugify } from '@peaje/shared'
+import { asistentesMedidos, dominioVerificable, slugify } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
@@ -67,7 +67,7 @@ export async function redactarBorrador(
     // Opus razona antes de responder y eso cuenta contra max_tokens.
     max_tokens: 12_000,
     system: [
-      'You write one complete web page, in markdown, for a small business. The goal: AI assistants like ChatGPT, Claude or Perplexity cite this page when someone asks the question it answers.',
+      'You write one complete web page, in markdown, for a small business. The goal: AI assistants like ' + asistentesMedidos('en', 'o') + ' cite this page when someone asks the question it answers.',
       'Structure, in this order:',
       '1. H1: the exact question, word for word.',
       '2. First paragraph: the direct answer in 2 or 3 sentences. No preamble.',
@@ -78,7 +78,7 @@ export async function redactarBorrador(
       'When a page format is given, shape the H2 sections (step 5) to that format, for example a comparison table and one short verdict per option for a roundup, or numbered steps for a guide. Keep steps 1 to 4 and 6. When a page AI assistants already cite is given, follow its structure, never its words.',
       'When related pages of the same site are given, link each one once where it fits naturally in the text, and end with a short "Related" list (in the language of the page) linking all of them. Use the URLs exactly as given.',
       'When the business\'s voice is given, write the way the business writes: same person, formality and sentence length, their own words. Facts still come only from the site text.',
-      'Rules: use only facts present in the site text. When a fact the page needs is missing, write a clearly marked placeholder like [TODO: confirm price] instead of inventing it, and list each one in "todos", in the same order, as the short question the owner must answer to fill it, in the language of the site (e.g. "What does the annual plan cost?"). Never invent numbers, names, clients, quotes or dates. Write in the language of the site text. Plain words, short sentences, no hype, no em dashes, no keyword stuffing. Under 700 words.',
+      'Rules: use only facts present in the site text. When a fact about this business that the page needs is missing, write a clearly marked placeholder like [TODO: confirm price] instead of inventing it, and list each one in "todos", in the same order, as the short question the owner must answer to fill it, in the language of the question (e.g. "¿Cuánto cuesta el plan anual?"). A [TODO] is only for something the owner knows and the site does not say: a price, a limit, hours, a policy, a count from their own business. Never ask the owner for general knowledge or for things nobody can know for sure (how long AI assistants take to cite a page, market figures, what other companies do): leave it out, or say it plainly without a number. At most 3 todos. Never invent numbers, names, clients, quotes or dates. Write the whole page in the language of the question. Plain words, short sentences, no hype, no em dashes, no keyword stuffing. Under 700 words.',
     ].join('\n'),
     messages: [
       {
@@ -107,7 +107,7 @@ export function cuerpoConBorrador(tenant: Tenant, dominio: string, pregunta: str
   return [
     `# New page: ${pregunta}`,
     '',
-    `AI assistants like ChatGPT, Claude or Perplexity get asked this and ${tenant.name} has no page that answers it. The full page is drafted below from the facts on the site.`,
+    `AI assistants like ${asistentesMedidos('en', 'o')} get asked this and ${tenant.name} has no page that answers it. The full page is drafted below from the facts on the site.`,
     '',
     '## What to do',
     '',

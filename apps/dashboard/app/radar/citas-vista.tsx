@@ -10,7 +10,7 @@ import { Seccion } from './seccion'
 
 /**
  * "Cuando tus clientes preguntan, la IA recomienda a otros": tres preguntas
- * de compra hechas a ChatGPT, Perplexity, Claude y Gemini, si el sitio sale
+ * de compra hechas a ChatGPT y Claude (ASISTENTES_MEDIDOS), si el sitio sale
  * citado y a quién citan en su lugar. Se carga sola (hasta ~70 s) mientras el
  * resto del resultado ya se ve. Si el gateway no puede, no se muestra ningún
  * número: solo una línea y el agente.

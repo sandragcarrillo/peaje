@@ -25,7 +25,9 @@ export function tarjetaCitas(tenant: Pick<Tenant, 'slug'>, idioma: Idioma = 'es'
 export function tarjetaTarea(tenant: Pick<Tenant, 'slug'>, task: Pick<AgentTask, 'id' | 'title' | 'kind'>, idioma: Idioma = 'es'): AgentMessageLink {
   const corto = task.title.length > 48 ? `${task.title.slice(0, 47).trimEnd()}…` : task.title
   const prefijo = task.kind === 'content' ? (idioma === 'es' ? 'Página' : 'Page') : idioma === 'es' ? 'Tarea' : 'Task'
-  return { label: `${prefijo}: ${corto}`, url: `${base(tenant)}/tareas/${encodeURIComponent(task.id)}`, kind: 'task' }
+  // Una página abre en Contenido, con su etapa, evidencia y borrador; las demás tareas en su detalle.
+  const url = task.kind === 'content' ? `${base(tenant)}/contenido?id=${encodeURIComponent(task.id)}` : `${base(tenant)}/tareas/${encodeURIComponent(task.id)}`
+  return { label: `${prefijo}: ${corto}`, url, kind: 'task' }
 }
 
 /** Una página publicada (o la URL donde va a vivir). */

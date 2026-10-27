@@ -7,6 +7,7 @@ export const legal = {
   es: {
     pieNav: 'Páginas legales y precios',
     piePrecios: 'Precios',
+    pieBlog: 'Blog',
     pieTerminos: 'Términos',
     piePrivacidad: 'Privacidad',
     pieReembolsos: 'Reembolsos',
@@ -26,6 +27,7 @@ export const legal = {
   en: {
     pieNav: 'Legal pages and pricing',
     piePrecios: 'Pricing',
+    pieBlog: 'Blog',
     pieTerminos: 'Terms',
     piePrivacidad: 'Privacy',
     pieReembolsos: 'Refunds',
