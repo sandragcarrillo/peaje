@@ -69,7 +69,7 @@ export const MOTORES: Motor[] = [
       const res = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ model: process.env.CITATION_OPENAI_MODEL ?? 'gpt-5.5', input: q, tools: [{ type: 'web_search' }] }),
+        body: JSON.stringify({ model: process.env.CITATION_OPENAI_MODEL ?? 'gpt-5.4-mini', input: q, tools: [{ type: 'web_search' }] }),
         signal: AbortSignal.timeout(TIMEOUT),
       })
       const j = await json(res, 'OpenAI')
