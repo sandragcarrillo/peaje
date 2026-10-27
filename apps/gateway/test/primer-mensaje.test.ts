@@ -262,3 +262,28 @@ test('Slack: al conectar el canal llega el mismo primer mensaje, una vez, y su b
   assert.equal((await store.listMessages(t.id, 50)).length, 0)
   assert.equal(await store.creditsUsedSince(t.id, periodoCreditos().desde), 0)
 })
+
+// ---------------------------------------------------------------- fotos y archivos
+
+test('una foto sin texto recibe respuesta: el agente todavía solo lee texto', async () => {
+  const t = await negocio({ kit: true })
+  const chatId = await conectar(t.id)
+  bandeja.length = 0
+  llamadas = []
+  await procesarUpdate({ message: { message_id: 40, chat: { id: chatId }, from: { language_code: 'es' }, photo: [{}] } })
+  assert.deepEqual(
+    enviados(chatId).map((m) => m.text),
+    ['Todavía no puedo ver imágenes, audios ni archivos. Escríbeme lo que quieres decir y sigo.'],
+  )
+  assert.equal(llamadas.length, 0)
+})
+
+test('una foto con texto: avisa que no ve la imagen y el agente contesta el texto', async () => {
+  const t = await negocio({ kit: true })
+  const chatId = await conectar(t.id)
+  bandeja.length = 0
+  llamadas = []
+  await procesarUpdate({ message: { message_id: 41, chat: { id: chatId }, from: { language_code: 'es' }, photo: [{}], caption: 'estos dos son lo mismo' } })
+  assert.equal(enviados(chatId)[0]?.text, 'Todavía no puedo ver imágenes ni archivos, así que solo leí tu texto.')
+  assert.ok(llamadas.some((l) => JSON.stringify(l.body.messages).includes('estos dos son lo mismo')))
+})

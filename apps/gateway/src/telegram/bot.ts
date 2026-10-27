@@ -17,7 +17,21 @@ import { armarPrimerMensaje, esCadencia, programarCadencia, reservarPrimerMensaj
  */
 
 type Chat = { id: number; username?: string }
-type Mensaje = { message_id?: number; chat: Chat; from?: { language_code?: string; username?: string }; text?: string }
+type Mensaje = {
+  message_id?: number
+  chat: Chat
+  from?: { language_code?: string; username?: string }
+  text?: string
+  /** El texto de una foto, un video o un archivo llega acá, no en `text`. */
+  caption?: string
+  photo?: unknown[]
+  document?: unknown
+  voice?: unknown
+  audio?: unknown
+  video?: unknown
+  video_note?: unknown
+  sticker?: unknown
+}
 type Callback = { id: string; data?: string; message?: { chat: Chat; message_id: number }; from?: { language_code?: string } }
 export type Update = { message?: Mensaje; callback_query?: Callback }
 
@@ -42,6 +56,8 @@ const T = {
     descartado: 'Descartado.',
     error: 'No pude responder ahora. Prueba de nuevo en un momento.',
     botonViejo: 'Ese botón ya no sirve. Escríbeme tu respuesta y sigo.',
+    soloTexto: 'Todavía no puedo ver imágenes, audios ni archivos. Escríbeme lo que quieres decir y sigo.',
+    leiSoloTexto: 'Todavía no puedo ver imágenes ni archivos, así que solo leí tu texto.',
   },
   en: {
     sinLigar: 'Hi. I am the Peaje agent. To connect me to your business, open "My agent" in the Peaje dashboard and tap "Connect Telegram".',
@@ -61,6 +77,8 @@ const T = {
     descartado: 'Dismissed.',
     error: 'I could not answer right now. Try again in a moment.',
     botonViejo: 'That button no longer works. Type your answer and I will continue.',
+    soloTexto: 'I cannot see images, audio or files yet. Type what you want to say and I will continue.',
+    leiSoloTexto: 'I cannot see images or files yet, so I only read your text.',
   },
 }
 
@@ -139,11 +157,17 @@ async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 
 export async function procesarUpdate(u: Update): Promise<void> {
   if (u.callback_query) return procesarBoton(u.callback_query)
   const m = u.message
-  if (!m?.text) return
+  if (!m) return
+  // Una foto o un archivo con texto trae `caption` en vez de `text`: antes se
+  // descartaba sin respuesta. El agente solo lee texto, así que se lo dice.
+  const adjunto = !!(m.photo || m.document || m.voice || m.audio || m.video || m.video_note || m.sticker)
+  const crudo = (m.text ?? m.caption ?? '').trim()
+  if (!crudo && !adjunto) return
   const chatId = m.chat.id
-  const texto = m.text.trim()
+  const texto = crudo
   const link = await store.getTelegramLink(chatId)
   const idioma = (link?.language as 'es' | 'en' | undefined) ?? idiomaDe(m.from?.language_code)
+  if (!crudo) return void (await tg('sendMessage', { chat_id: chatId, text: link ? T[idioma].soloTexto : T[idioma].sinLigar }))
 
   if (texto.startsWith('/start')) {
     const codigo = texto.split(/\s+/)[1]
@@ -190,6 +214,7 @@ export async function procesarUpdate(u: Update): Promise<void> {
   if (texto === '/help') return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].ayuda }))
   const tenant = await store.getTenantById(link.tenantId)
   if (!tenant) return
+  if (adjunto) await tg('sendMessage', { chat_id: chatId, text: T[idioma].leiSoloTexto })
   await responder(chatId, tenant, texto, idioma, false, m.message_id)
 }
 

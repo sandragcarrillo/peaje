@@ -31,6 +31,13 @@ export default async function VisitasPage({
 
   const bots = stats.byKind.filter((k) => BOTS_RESPUESTA.includes(k.kind))
   const maxDia = Math.max(1, ...stats.daily.map((x) => x.visits))
+  // `daily` solo trae los días con visitas: el gráfico muestra todos los de la
+  // ventana (en UTC, como las fechas de `daily`), con 0 los que no tuvieron.
+  const porFecha = new Map(stats.daily.map((x) => [x.date, x]))
+  const diario = Array.from({ length: dias }, (_, i) => {
+    const date = new Date(Date.now() - (dias - 1 - i) * 86_400_000).toISOString().slice(0, 10)
+    return porFecha.get(date) ?? { date, visits: 0, paid: 0 }
+  })
   const base = `/t/${tenant.slug}/agentes-visitas`
 
   return (
@@ -92,13 +99,26 @@ export default async function VisitasPage({
 
             <div className="flex flex-col gap-3">
               <Cabecera texto={t.porDia} />
-              <div className="flex h-40 items-end gap-1 border border-border p-3">
-                {stats.daily.map((x) => (
-                  <div key={x.date} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${x.date}: ${x.visits}`}>
-                    <div className="w-full bg-border" style={{ height: `${(x.visits / maxDia) * 100}%` }}>
-                      <div className="w-full bg-accent" style={{ height: `${!COBROS_VISIBLES ? 100 : x.visits ? (x.paid / x.visits) * 100 : 0}%` }} />
+              {/*
+                Cada columna se estira al alto del gráfico y la barra mide su
+                porcentaje contra el área de arriba de la fecha (antes la columna
+                no tenía alto y todas las barras quedaban en 0). Con 30 días, la
+                fecha sale cada 5 para que no se pisen.
+              */}
+              <div className="flex h-44 items-stretch gap-1 border border-border px-3 pt-6 pb-3">
+                {diario.map((x, i) => (
+                  <div key={x.date} className="flex flex-1 flex-col items-center gap-1" title={`${x.date}: ${x.visits}`}>
+                    <div className="flex w-full flex-1 items-end border-b border-border">
+                      <div className="relative flex w-full flex-col justify-end bg-border" style={{ height: `${(x.visits / maxDia) * 100}%` }}>
+                        {x.visits > 0 ? (
+                          <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-mono text-[9px] text-muted">{x.visits}</span>
+                        ) : null}
+                        <div className="w-full bg-accent" style={{ height: `${!COBROS_VISIBLES ? 100 : x.visits ? (x.paid / x.visits) * 100 : 0}%` }} />
+                      </div>
                     </div>
-                    <span className="font-mono text-[9px] text-faint">{x.date.slice(5)}</span>
+                    <span className={`font-mono text-[9px] text-faint ${dias === 7 || i % 5 === 0 || i === diario.length - 1 ? '' : 'invisible'}`}>
+                      {x.date.slice(5)}
+                    </span>
                   </div>
                 ))}
               </div>
