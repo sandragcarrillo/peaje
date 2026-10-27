@@ -24,6 +24,11 @@
  * - Gateway de Peaje: NEXT_PUBLIC_GATEWAY_URL y api.usepeaje.com.
  * - Vercel: vercel.live y compañía solo en preview (toolbar y comentarios,
  *   vercel.com/docs/vercel-toolbar/managing-toolbar).
+ * - Vercel Web Analytics (@vercel/analytics 2, <Analytics /> en el layout): en
+ *   producción y preview el script y sus beacons van al mismo origen
+ *   (/_vercel/insights/* o la ruta al azar de Resilient Intake que Vercel fija
+ *   en el build), así que alcanza con 'self' en script-src y connect-src. Solo
+ *   en `next dev` el script de debug sale de va.vercel-scripts.com, y no manda nada.
  * - Fuentes: next/font las sirve desde el mismo origen.
  */
 
@@ -58,6 +63,8 @@ export function politicaCsp(nonce: string): string {
       'https://challenges.cloudflare.com',
       // React usa eval en desarrollo para reconstruir los stacks del server; en producción no.
       ...(dev ? ["'unsafe-eval'"] : []),
+      // El script de debug de Web Analytics en local; en producción es del mismo origen.
+      ...(dev ? ['https://va.vercel-scripts.com'] : []),
       ...vercel('https://vercel.live'),
     ],
     // Privy, Paddle.js y Next ponen estilos inline: la guía de Privy pide 'unsafe-inline' acá.
