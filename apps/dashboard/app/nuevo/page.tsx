@@ -4,6 +4,7 @@ import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useDict } from '@/lib/i18n/client'
+import { useSalidaPrivy } from '@/lib/privy-salida'
 import { Etiqueta } from '../acceder/etiqueta'
 import { registrarNegocio, type AltaResultado } from './actions'
 
@@ -52,6 +53,9 @@ export default function NuevoNegocio() {
   const d = useDict()
   const { getAccessToken, authenticated, logout, error: errorPrivy } = usePrivy()
   const { sendCode, loginWithCode } = useLoginWithEmail()
+  // Recién tocó Salir: la sesión de Privy que quedó es de la cuenta vieja y no se usa para crear el negocio.
+  const saliendo = useSalidaPrivy()
+  const conSesion = authenticated && !saliendo
 
   async function enviarCodigo(e: FormEvent) {
     e.preventDefault()
@@ -63,7 +67,7 @@ export default function NuevoNegocio() {
     try {
       // Con sesión Privy válida no se manda código nuevo: el segundo negocio
       // se crea directo sobre la misma cuenta.
-      if (authenticated) {
+      if (conSesion) {
         const accessToken = await getAccessToken().catch(() => null)
         if (accessToken) {
           const formData = new FormData()
@@ -83,7 +87,7 @@ export default function NuevoNegocio() {
       if (!email.trim()) return setError(d.acceso.errorFaltaEmail)
       // Si Privy no pudo arrancar, la causa más probable son tokens viejos
       // guardados en el navegador: logout los borra antes de pedir el código.
-      if (errorPrivy) await logout().catch(() => {})
+      if (errorPrivy || authenticated) await logout().catch(() => {})
       await sendCode({ email })
       setStep('code')
     } catch {
@@ -176,7 +180,7 @@ export default function NuevoNegocio() {
         <p className="mt-2 max-w-xl text-sm text-muted">{d.acceso.subtituloRegistrar}</p>
 
         <form onSubmit={enviarCodigo} className="mt-8 space-y-6">
-          <div className={`grid grid-cols-1 gap-6 ${authenticated ? '' : 'md:grid-cols-2'}`}>
+          <div className={`grid grid-cols-1 gap-6 ${conSesion ? '' : 'md:grid-cols-2'}`}>
           <label className="block">
             <span className="font-mono text-xs text-muted">
               {d.acceso.campoUrl} <span className="text-accent">*</span>
@@ -191,7 +195,7 @@ export default function NuevoNegocio() {
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaUrl}</span>
           </label>
 
-          <label className="block" hidden={authenticated}>
+          <label className="block" hidden={conSesion}>
             <span className="font-mono text-xs text-muted">
               {d.acceso.campoTuEmail} <span className="text-accent">*</span>
             </span>
@@ -199,7 +203,7 @@ export default function NuevoNegocio() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required={!authenticated}
+              required={!conSesion}
               placeholder={d.acceso.placeholderEmail}
               className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
             />
@@ -211,7 +215,7 @@ export default function NuevoNegocio() {
 
           <div className="flex flex-col justify-between gap-4 border-t border-border pt-5 sm:flex-row sm:items-center">
             <p className="max-w-lg text-xs text-muted">
-              {authenticated ? d.acceso.notaSesion : d.acceso.registrarNota}
+              {conSesion ? d.acceso.notaSesion : d.acceso.registrarNota}
             </p>
             <button
               type="submit"
@@ -219,10 +223,10 @@ export default function NuevoNegocio() {
               className="btn btn-primario shrink-0"
             >
               {pending
-                ? authenticated
+                ? conSesion
                   ? d.acceso.creando
                   : d.acceso.enviandoCodigo
-                : authenticated
+                : conSesion
                   ? d.acceso.crearDirecto
                   : d.acceso.enviarCodigo}
             </button>

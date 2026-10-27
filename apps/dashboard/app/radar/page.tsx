@@ -5,10 +5,13 @@ import { cache } from 'react'
 import { getDict, getLocale, type Dict, type Locale } from '@/lib/i18n'
 import { PRECIOS_USD } from '@peaje/db'
 import { cachedScore, gradeDe } from '@/lib/ora'
+import { SeccionCitas } from './citas-vista'
 import { Copiar } from './compartir'
-import { leer, masTiempo, principales, type Lectura, type Paso } from './datos'
+import { leer, principales, type Lectura, type Paso } from './datos'
 import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
 import { Formulario, MandarInforme, Medir } from './partes'
+import { Cuenta, Fase, Revelado } from './revelado'
+import { Barra01, Seccion } from './seccion'
 import { textoLlanoDe, textoOk } from './textos'
 
 /**
@@ -71,10 +74,17 @@ export default async function Radar({ searchParams }: Props) {
   const resultado = dominio !== null && score !== null && !pideMedir
 
   if (midiendo) {
+    // La caja de "Hoy" pasa a ser la medición en vivo; las citas arrancan en paralelo y se ven abajo.
     return (
       <div className="space-y-6 py-6">
         <Cabecera t={t} />
-        <Medir key={dominio} dominio={dominio} auto conCorreo />
+        <section className="border border-border bg-bg">
+          <Barra01 titulo={t.s01} dominio={dominio} />
+          <div className="p-6 lg:p-8">
+            <Medir key={dominio} dominio={dominio} auto conCorreo />
+          </div>
+        </section>
+        <SeccionCitas key={`citas-${dominio}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} />
       </div>
     )
   }
@@ -177,18 +187,6 @@ function Cabecera({ t }: { t: T }) {
   )
 }
 
-function Seccion({ n, titulo, children, tono = 'bg-bg' }: { n: string; titulo: string; children: React.ReactNode; tono?: string }) {
-  return (
-    <section className={`border border-border ${tono}`}>
-      <header className="flex items-baseline gap-3 border-b border-border px-6 py-4">
-        <span className="font-mono text-xs font-bold text-accent">{n}</span>
-        <h2 className="text-lg font-semibold">{titulo}</h2>
-      </header>
-      <div className="space-y-5 p-6">{children}</div>
-    </section>
-  )
-}
-
 /** Más de esto y la medición ya no cuenta como "de hoy": se avisa al lado de la fecha. */
 const DIAS_VIEJA = 7
 
@@ -213,7 +211,7 @@ function Etiqueta({ children, tono }: { children: React.ReactNode; tono: 'accent
   )
 }
 
-/** Cada arreglo en palabras del dueño: qué falta, por qué importa, cuánto trabajo pide y si lo hace su agente. */
+/** Cada arreglo en palabras del dueño: qué falta, por qué importa y que se implementa con el kit. */
 function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
   return (
     <ul className="divide-y divide-border/60 text-sm">
@@ -229,10 +227,11 @@ function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
               <span className="min-w-0 space-y-1">
                 <span className="block">{titulo}</span>
                 {detalle ? <span className="block text-xs text-muted">{detalle}</span> : null}
-                <span className="flex flex-wrap gap-1.5 pt-0.5">
-                  <Etiqueta tono="muted">{t.esfuerzo[p.esfuerzo]}</Etiqueta>
-                  {p.loArreglaElKit ? <Etiqueta tono="accent">{t.loArreglaKit}</Etiqueta> : null}
-                </span>
+                {p.loArreglaElKit ? (
+                  <span className="flex flex-wrap gap-1.5 pt-0.5">
+                    <Etiqueta tono="accent">{t.implementaKit}</Etiqueta>
+                  </span>
+                ) : null}
               </span>
             </span>
             {p.puntos > 0 ? (
@@ -264,9 +263,8 @@ function Resultado({
 }) {
   const margen = l.estimado - l.actual
   const enlace = `${BASE}/radar?d=${encodeURIComponent(dominio)}`
+  // Solo lo que se implementa con el kit; lo demás no se lista (ver principales en datos.ts).
   const lista = principales(l)
-  const despues = masTiempo(l, lista)
-  const delKit = lista.filter((p) => p.loArreglaElKit).length
   const medicion = fechaDe(l.medido, locale)
 
   return (
@@ -275,11 +273,7 @@ function Resultado({
 
       {/* 01 */}
       <section className="border border-border bg-bg">
-        <div className="flex items-center gap-3 border-b border-border bg-panel px-6 py-2.5 font-mono text-[11px] tracking-[0.04em] text-muted">
-          <span className="font-bold text-accent">01</span>
-          <span className="truncate text-text">{t.s01}</span>
-          <span className="hidden truncate sm:inline">· {dominio}</span>
-        </div>
+        <Barra01 titulo={t.s01} dominio={dominio} />
         <div className="space-y-6 p-6 lg:p-8">
           <div className="flex flex-col items-start gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-2xl text-sm text-muted">
@@ -289,36 +283,45 @@ function Resultado({
             <Medir dominio={dominio} conCorreo={conCorreo} />
           </div>
 
-          <div className="space-y-2">
-            <p className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl">
-              {t.frase(l.bien.length, l.total, dominio)}
-            </p>
-            <p className="font-mono text-sm text-muted">
-              {t.hoyFrase(l.actual, l.max, gradeDe(l.actual))}
-              {margen > 0 ? <span className="text-accent"> {t.conPeajeFrase(l.estimado, gradeDe(l.estimado))}</span> : null}
-            </p>
-          </div>
-
-          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
-            <div className="flex flex-wrap items-end gap-8">
-              <div>
-                <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.hoy}</p>
-                <p className="text-6xl font-bold tracking-tight lg:text-[72px] lg:leading-[72px]">{l.actual}</p>
-                <p className="mt-1 font-mono text-xs text-muted">{gradeDe(l.actual)}</p>
-              </div>
-              {margen > 0 ? (
-                <>
-                  <span aria-hidden className="pb-6 text-3xl text-border">→</span>
-                  <div>
-                    <p className="font-mono text-[10px] tracking-[0.08em] text-accent">{t.conPeaje}</p>
-                    <p className="text-6xl font-bold tracking-tight text-accent lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
-                    <p className="mt-1 font-mono text-xs text-muted">{gradeDe(l.estimado)}</p>
-                  </div>
-                </>
-              ) : null}
+          {/* Recién medido: el número cuenta desde 0, aparece la nota y al final lo que puede llegar a ser (revelado.tsx). */}
+          <Revelado dominio={dominio}>
+            <div className="space-y-2">
+              <p className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl">
+                {t.frase(l.bien.length, l.total, dominio)}
+              </p>
+              <Fase desde={2} como="p" className="font-mono text-sm text-muted">
+                {t.hoyFrase(l.actual, l.max, gradeDe(l.actual))}
+                {margen > 0 ? <span className="text-accent"> {t.conPeajeFrase(l.estimado, gradeDe(l.estimado))}</span> : null}
+              </Fase>
             </div>
-            <p className="max-w-sm text-sm">{margen > 0 ? t.sube(margen) : t.yaAlto}</p>
-          </div>
+
+            <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
+              <div className="flex flex-wrap items-end gap-8">
+                <div>
+                  <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.hoy}</p>
+                  <p className="text-6xl font-bold tabular-nums tracking-tight lg:text-[72px] lg:leading-[72px]">
+                    <Cuenta valor={l.actual} />
+                  </p>
+                  <Fase desde={1} como="p" className="mt-1 font-mono text-xs text-muted">
+                    {gradeDe(l.actual)}
+                  </Fase>
+                </div>
+                {margen > 0 ? (
+                  <Fase desde={2} className="flex items-end gap-8">
+                    <span aria-hidden className="pb-6 text-3xl text-border">→</span>
+                    <div>
+                      <p className="font-mono text-[10px] tracking-[0.08em] text-accent">{t.conPeaje}</p>
+                      <p className="text-6xl font-bold tracking-tight text-accent lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
+                      <p className="mt-1 font-mono text-xs text-muted">{gradeDe(l.estimado)}</p>
+                    </div>
+                  </Fase>
+                ) : null}
+              </div>
+              <Fase desde={2} como="p" className="max-w-sm text-sm">
+                {margen > 0 ? t.puedeLlegar(l.estimado, margen) : t.yaAlto}
+              </Fase>
+            </div>
+          </Revelado>
 
           {l.parcial ? <p className="border-l-2 border-border pl-3 text-sm text-muted">{t.parcial}</p> : null}
 
@@ -330,28 +333,24 @@ function Resultado({
         </div>
       </section>
 
-      {/* 02 */}
-      <Seccion n="02" titulo={t.s02} tono="bg-panel">
+      {/* 02: para las preguntas de compra, a quién cita la IA. Se carga sola desde el navegador. */}
+      <SeccionCitas key={`citas-${dominio}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} />
+
+      {/* 03 */}
+      <Seccion n="03" titulo={t.s02} tono="bg-panel">
         {lista.length > 0 ? (
           <div className="space-y-2">
             <p className="text-sm text-muted">
-              {t.ordenNota}
-              {delKit > 0 ? ` ${t.kitCuenta(delKit, lista.length)}` : ''}
+              {t.ordenNota} {t.kitCuenta(lista.length, lista.length)}
             </p>
             <Pasos t={t} locale={locale} pasos={lista} />
           </div>
+        ) : l.pasos.length > 0 ? (
+          // Falta algo, pero nada que el kit implemente: no decir "no falta nada".
+          <p className="text-sm text-accent">{t.nadaDelKit}</p>
         ) : (
           <p className="text-sm text-accent">{t.nadaQueArreglar}</p>
         )}
-        {despues.length > 0 ? (
-          <div className="space-y-2 border-t border-border pt-4">
-            <h3 className="text-sm font-semibold">{t.masTiempo}</h3>
-            <p className="text-xs text-muted">
-              {despues.some((p) => p.esfuerzo === 'dificil') ? t.notaDificil : t.notaMedio}
-            </p>
-            <Pasos t={t} locale={locale} pasos={despues} />
-          </div>
-        ) : null}
         {l.sinMedir.length > 0 ? (
           <div className="space-y-2 border-t border-border pt-4">
             <h3 className="text-sm font-semibold">{t.sinMedir(l.sinMedir.length)}</h3>
@@ -368,8 +367,8 @@ function Resultado({
         ) : null}
       </Seccion>
 
-      {/* 03 */}
-      <Seccion n="03" titulo={t.s03}>
+      {/* 04 */}
+      <Seccion n="04" titulo={t.s03}>
         {l.bien.length > 0 ? (
           <details>
             <summary className="cursor-pointer text-sm font-semibold">{t.yaBien(l.bien.length)}</summary>
@@ -387,16 +386,9 @@ function Resultado({
         )}
       </Seccion>
 
-      {/* 04 */}
-      <Seccion n="04" titulo={t.s04}>
-        {/* Dos caminos: el kit (gratis) arregla lo de arriba; el agente (Pro) es lo que hace que la IA te recomiende. */}
+      {/* 05: primero el agente (Pro); el kit solo, como enlace chico al final. */}
+      <Seccion n="05" titulo={t.s04}>
         <div className="space-y-3">
-          <p className="max-w-2xl text-sm">{t.queIncluye}</p>
-          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}`} className="btn btn-secundario">
-            {t.ctaKit}
-          </Link>
-        </div>
-        <div className="space-y-3 border-t border-border pt-5">
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>
         </div>
@@ -408,6 +400,12 @@ function Resultado({
           <MandarInforme dominio={dominio} conCorreo={conCorreo} />
         </div>
         <p className="text-xs text-muted">{t.ctaNota}</p>
+        <p className="border-t border-border pt-4 text-sm text-muted">
+          {t.soloTecnico}{' '}
+          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}`} className="text-text underline underline-offset-4 hover:text-accent">
+            {t.instalaKit}
+          </Link>
+        </p>
       </Seccion>
     </div>
   )

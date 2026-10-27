@@ -77,7 +77,6 @@ export function ChatEjemplo({ mensajes, ejemplo, negocio, bot, subtitulo, tu }: 
             </p>
           </div>
         </div>
-        <span className="etiqueta shrink-0 border border-border px-1.5 py-0.5 text-muted">{ejemplo}</span>
       </div>
 
       <div aria-live="off" className="space-y-3 px-4 py-5">

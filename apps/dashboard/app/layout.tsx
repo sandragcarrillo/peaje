@@ -66,9 +66,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
               </Link>
               {tenant ? (
                 <nav className="flex items-center gap-3 text-sm">
+                  {/* Salir junto al correo: los dos son de la cuenta; tema e idioma van al final. */}
                   <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} />
-                  <ThemeToggle />
-                  <LanguageToggle locale={locale} />
                   <form action={salir}>
                     <button
                       type="submit"
@@ -77,6 +76,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                       {d.nav.salir}
                     </button>
                   </form>
+                  <ThemeToggle />
+                  <LanguageToggle locale={locale} />
                 </nav>
               ) : (
                 <>

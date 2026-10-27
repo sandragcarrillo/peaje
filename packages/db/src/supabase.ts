@@ -53,7 +53,7 @@ import type { MysteryRun, NewMysteryRun } from './types'
 // ---- M9 ----
 import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatch } from './types'
 // ---- radar ----
-import type { NewRadarLead, RadarLead } from './types'
+import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
 import type { AgentJob, AgentMessageLink, NewAgentJob, VoiceProfile } from './types'
 // ---- Slack ----
@@ -1954,10 +1954,73 @@ export class SupabaseStore implements Store {
     this.#fail('claimRadarReport', error)
     return data ? radarLeadFrom(data as Row) : null
   }
+
+  // ---- radar público: foto de citación (20261026200000) ----
+  async getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null> {
+    const { data, error } = await this.#db
+      .from('radar_citation_runs')
+      .select()
+      .eq('domain', domain)
+      .eq('locale', locale)
+      .eq('status', 'done')
+      .gte('measured_at', since)
+      .order('measured_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    this.#fail('getRadarCitas', error)
+    return data ? radarCitasFrom(data as Row) : null
+  }
+
+  async claimRadarCitas(input: { domain: string; locale: string; at: string; dayStart: string; maxPerDay: number; staleBefore: string }): Promise<RadarCitasClaim> {
+    // Un 'running' viejo es un proceso que se cayó a mitad: se suelta el candado.
+    const { error: e1 } = await this.#db
+      .from('radar_citation_runs')
+      .update({ status: 'failed', error: 'stale' })
+      .eq('domain', input.domain)
+      .eq('locale', input.locale)
+      .eq('status', 'running')
+      .lt('started_at', input.staleBefore)
+    this.#fail('claimRadarCitas(stale)', e1)
+    const { count, error: e2 } = await this.#db.from('radar_citation_runs').select('id', { count: 'exact', head: true }).gte('started_at', input.dayStart)
+    this.#fail('claimRadarCitas(count)', e2)
+    if ((count ?? 0) >= input.maxPerDay) return { ok: false, reason: 'budget' }
+    // El índice único parcial (domain, locale) where status = 'running' es el candado entre procesos.
+    const { data, error } = await this.#db
+      .from('radar_citation_runs')
+      .insert({ domain: input.domain, locale: input.locale, status: 'running', started_at: input.at })
+      .select('id')
+      .single()
+    if (error && (error as { code?: string }).code === '23505') return { ok: false, reason: 'busy' }
+    this.#fail('claimRadarCitas(insert)', error)
+    return { ok: true, id: String((data as Row).id) }
+  }
+
+  async finishRadarCitas(id: string, outcome: { result: Omit<RadarCitas, 'cached'>; partial: boolean } | { error: string }): Promise<void> {
+    const patch =
+      'result' in outcome
+        ? { status: 'done', result: outcome.result, partial: outcome.partial, measured_at: outcome.result.measuredAt }
+        : { status: 'failed', error: outcome.error.slice(0, 300) }
+    const { error } = await this.#db.from('radar_citation_runs').update(patch).eq('id', id)
+    this.#fail('finishRadarCitas', error)
+  }
   // ---- fin radar ----
 }
 
 // ---- radar ----
+function radarCitasFrom(row: Row): RadarCitasRun {
+  return {
+    id: row.id,
+    domain: row.domain,
+    locale: row.locale,
+    status: row.status,
+    result: (row.result ?? null) as RadarCitasRun['result'],
+    partial: Boolean(row.partial),
+    error: row.error ?? null,
+    startedAt: String(row.started_at),
+    measuredAt: row.measured_at ? String(row.measured_at) : null,
+  }
+}
+
 function radarLeadFrom(row: Row): RadarLead {
   return {
     id: row.id,

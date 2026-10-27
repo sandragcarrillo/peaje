@@ -396,3 +396,27 @@ h1, h2 {
   mask-image: linear-gradient(to bottom, black 35%, rgb(0 0 0 / 0.25));
   opacity: 0.55;
 }
+
+/*
+ * Radar en vivo (app/radar/en-vivo.tsx, citas-vista.tsx): el punto verde del
+ * paso que se está revisando late con un anillo, y cada hallazgo entra con un
+ * fundido corto. Sin movimiento si la persona lo pidió.
+ */
+@keyframes radar-latido {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+.radar-latido {
+  animation: radar-latido 1.4s ease-out infinite;
+}
+@keyframes radar-aparece {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.radar-aparece {
+  animation: radar-aparece 360ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar-latido,
+  .radar-aparece { animation: none; }
+}

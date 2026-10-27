@@ -738,6 +738,50 @@ export type RadarLead = {
 }
 
 export type NewRadarLead = Pick<RadarLead, 'email' | 'domain' | 'locale' | 'marketingConsent'> & { source?: string }
+
+// ---- radar público: foto de citación (20261026200000) ----
+
+/** Qué es un dominio citado en lugar del sitio: un medio o listado, un competidor, o no se sabe. */
+export type RadarCitasKind = 'publisher' | 'competitor' | null
+
+/** Lo que contestó un motor a una pregunta. `sources`: dominios citados, como mucho 5; el propio primero si está. */
+export type RadarCitasCelda = { cited: boolean; mentioned: boolean; sources: string[] }
+
+/**
+ * La foto de citación de un dominio para el radar público: tres preguntas de
+ * compra hechas a los motores, si el sitio sale citado o mencionado y a quién
+ * citan en su lugar. Es el cuerpo de POST /_internal/radar/citas.
+ */
+export type RadarCitas = {
+  domain: string
+  measuredAt: string
+  cached: boolean
+  /** Un motor que no contestó esa pregunta no aparece en `engines` de la pregunta. */
+  questions: { text: string; engines: Record<string, RadarCitasCelda> }[]
+  /** Por motor: en cuántas de las preguntas que contestó salió citado el sitio. */
+  coverage: Record<string, { cited: number; total: number }>
+  /** Los 12 dominios más citados en las respuestas donde el sitio no salió, sin el propio. */
+  citedInstead: { domain: string; count: number; kind: RadarCitasKind }[]
+  /** Los motores que contestaron, en orden: chatgpt, perplexity, claude, gemini. */
+  engines: string[]
+}
+
+/** Una medición guardada. 'running' es el candado del dominio; las 'done' son el caché. */
+export type RadarCitasRun = {
+  id: string
+  domain: string
+  locale: string
+  status: 'running' | 'done' | 'failed'
+  /** La foto sin `cached` (se decide al servirla). */
+  result: Omit<RadarCitas, 'cached'> | null
+  /** Algún motor configurado no contestó nada: el caché dura menos. */
+  partial: boolean
+  error: string | null
+  startedAt: string
+  measuredAt: string | null
+}
+
+export type RadarCitasClaim = { ok: true; id: string } | { ok: false; reason: 'budget' | 'busy' }
 // ---- fin radar ----
 
 /** Contrato de persistencia. Lo implementan MemoryStore y SupabaseStore. */
@@ -1047,6 +1091,18 @@ export interface Store {
    * ya se mandó hace poco o no existe. Dos pedidos a la vez no mandan dos correos.
    */
   claimRadarReport(email: string, domain: string, notSince: string): Promise<RadarLead | null>
+  // ---- radar público: foto de citación ----
+  /** La última medición terminada del dominio e idioma con measured_at >= since, o null. */
+  getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null>
+  /**
+   * Toma una medición nueva: si ya van `maxPerDay` desde `dayStart` (UTC), 'budget';
+   * si hay otra 'running' del mismo dominio e idioma empezada después de
+   * `staleBefore`, 'busy' (las anteriores se dan por caídas). Si no, crea la
+   * fila 'running' con started_at = at.
+   */
+  claimRadarCitas(input: { domain: string; locale: string; at: string; dayStart: string; maxPerDay: number; staleBefore: string }): Promise<RadarCitasClaim>
+  /** Cierra la medición: 'done' con la foto (queda de caché) o 'failed' con el motivo. */
+  finishRadarCitas(id: string, outcome: { result: Omit<RadarCitas, 'cached'>; partial: boolean } | { error: string }): Promise<void>
   // ---- fin radar ----
 }
 

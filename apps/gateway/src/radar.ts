@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { radarCitas } from './citacion/radar.js'
 import { env } from './env.js'
 import { enviarCorreo } from './monitor/email.js'
 import { store } from './store.js'
@@ -8,6 +9,7 @@ import { store } from './store.js'
  * Radar público, para el dashboard (secreto interno):
  *   POST /_internal/radar/leads    guarda (o actualiza) el email que pidió medir un dominio
  *   POST /_internal/radar/report   manda el reporte del dominio a ese email
+ *   POST /_internal/radar/citas    foto de citación: 3 preguntas de compra a los motores (citacion/radar.ts)
  *
  * El dashboard calcula el reporte con los datos de Ora (lib/ora.ts) y lo
  * manda armado; acá se guarda, se evita el doble envío y se escribe el correo.
@@ -99,6 +101,19 @@ radarRouter.post('/radar/report', async (c) => {
     return c.json({ sent: false, reason: 'send-failed' })
   }
   return c.json({ sent: true })
+})
+
+/**
+ * Body { domain, locale: 'es' | 'en' }. 200 con la foto (cached: true si es la
+ * guardada); 400 invalid-domain; 422 unavailable si el sitio no se pudo leer;
+ * 429 budget con Retry-After hasta las 00:00 UTC; 503 unavailable si no hay
+ * motores o ninguno contestó.
+ */
+radarRouter.post('/radar/citas', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { domain?: unknown; locale?: unknown } | null
+  const r = await radarCitas(body && typeof body === 'object' ? body : {})
+  if (r.status !== 200 && r.body.retryAfterSeconds) c.header('Retry-After', String(r.body.retryAfterSeconds))
+  return c.json(r.body, r.status)
 })
 
 function esc(t: string): string {

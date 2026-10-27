@@ -109,30 +109,14 @@ export function leer(score: OraScore): Lectura {
 }
 
 /**
- * La lista de "Lo que falta": todo lo que entrega el agente de Peaje más los
- * tres primeros del orden aunque el kit no los cubra. Los tres primeros salen
- * de lo fácil o de lo que pide más trabajo; lo que depende de otros solo
- * encabeza si no queda nada más. Lo que el kit no cubre fuera de esos tres no
- * se lista: eran decenas de filas y tapaban lo importante.
+ * La lista de "Lo que falta" (y los tres primeros del correo): solo lo que se
+ * implementa con el kit de Peaje, en el orden de `pasos` (lo fácil primero y,
+ * dentro de eso, lo que más suma). Lo que el kit no cubre no se lista en el
+ * radar: lo que queda para que la IA te recomiende es la sección de citas y el
+ * agente (decisión de San, 26 oct 2026).
  */
 export function principales(l: Lectura): Paso[] {
-  const noDificiles = l.pasos.filter((p) => p.esfuerzo !== 'dificil')
-  const primeros = new Set((noDificiles.length > 0 ? noDificiles : l.pasos).slice(0, 3).map((p) => p.check.id))
-  return l.pasos.filter((p) => p.loArreglaElKit || primeros.has(p.check.id))
-}
-
-/**
- * Lo que más sube el puntaje pero pide más trabajo o depende de otros: de los
- * cinco arreglos que más suman, los que no están ya en la lista y no son
- * fáciles. Van al final, con la nota de que toman más tiempo. Tres como mucho.
- */
-export function masTiempo(l: Lectura, mostrados: Paso[]): Paso[] {
-  const ya = new Set(mostrados.map((p) => p.check.id))
-  const masSuman = l.pasos
-    .filter((p) => p.puntos > 0)
-    .sort((a, b) => b.puntos - a.puntos)
-    .slice(0, 5)
-  return masSuman.filter((p) => !ya.has(p.check.id) && p.esfuerzo !== 'facil').sort(porEsfuerzo).slice(0, 3)
+  return l.delKit
 }
 
 export type Barra = { clave: 'encuentran' | 'usan' | 'compran'; puntos: number; max: number }

@@ -47,7 +47,7 @@ import type { MysteryRun, NewMysteryRun } from './types'
 import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatch } from './types'
 import { DIAS_PRUEBA } from './planes'
 // ---- radar ----
-import type { NewRadarLead, RadarLead } from './types'
+import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
 import type { AgentJob, NewAgentJob, VoiceProfile } from './types'
 // ---- Slack ----
@@ -1197,6 +1197,44 @@ export class MemoryStore implements Store {
     const tomado = { ...lead, lastReportAt: new Date().toISOString() }
     this.#radarLeads.set(`${email}|${domain}`, tomado)
     return tomado
+  }
+
+  // ---- radar público: foto de citación ----
+  #radarCitas: RadarCitasRun[] = []
+
+  async getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null> {
+    const filas = this.#radarCitas.filter((r) => r.domain === domain && r.locale === locale && r.status === 'done' && !!r.measuredAt && r.measuredAt >= since)
+    const [ultima] = filas.sort((a, b) => b.measuredAt!.localeCompare(a.measuredAt!))
+    return ultima ? structuredClone(ultima) : null
+  }
+
+  async claimRadarCitas(input: { domain: string; locale: string; at: string; dayStart: string; maxPerDay: number; staleBefore: string }): Promise<RadarCitasClaim> {
+    const mismo = (r: RadarCitasRun) => r.domain === input.domain && r.locale === input.locale && r.status === 'running'
+    for (const r of this.#radarCitas) {
+      if (mismo(r) && r.startedAt < input.staleBefore) Object.assign(r, { status: 'failed', error: 'stale' })
+    }
+    if (this.#radarCitas.filter((r) => r.startedAt >= input.dayStart).length >= input.maxPerDay) return { ok: false, reason: 'budget' }
+    if (this.#radarCitas.some(mismo)) return { ok: false, reason: 'busy' }
+    const fila: RadarCitasRun = {
+      id: this.#id('rcit'),
+      domain: input.domain,
+      locale: input.locale,
+      status: 'running',
+      result: null,
+      partial: false,
+      error: null,
+      startedAt: input.at,
+      measuredAt: null,
+    }
+    this.#radarCitas.push(fila)
+    return { ok: true, id: fila.id }
+  }
+
+  async finishRadarCitas(id: string, outcome: { result: Omit<RadarCitas, 'cached'>; partial: boolean } | { error: string }): Promise<void> {
+    const fila = this.#radarCitas.find((r) => r.id === id)
+    if (!fila) return
+    if ('result' in outcome) Object.assign(fila, { status: 'done', result: structuredClone(outcome.result), partial: outcome.partial, measuredAt: outcome.result.measuredAt })
+    else Object.assign(fila, { status: 'failed', error: outcome.error.slice(0, 300) })
   }
   // ---- fin radar ----
 }

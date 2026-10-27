@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useDict } from '@/lib/i18n/client'
+import { useSalidaPrivy } from '@/lib/privy-salida'
 import { entrarConPrivy } from './actions'
 import { Etiqueta } from './etiqueta'
 
@@ -32,6 +33,8 @@ export default function Acceder() {
   const d = useDict()
   const { ready, getAccessToken, authenticated, logout, error: errorPrivy } = usePrivy()
   const { sendCode, loginWithCode } = useLoginWithEmail()
+  // Recién tocó Salir: la sesión de Privy que quedó es la de la cuenta vieja, no se reusa.
+  const saliendo = useSalidaPrivy()
 
   // Estado de Privy para los handlers async, que si no leen el de su render.
   const privy = useRef({ ready, authenticated, error: errorPrivy })
@@ -53,7 +56,7 @@ export default function Acceder() {
   // un preview distinto) o fallar por red, y el SDK solo absorbe el 401. Quien
   // volvía quedaba para siempre en "Entrando…" sin ver el formulario.
   useEffect(() => {
-    if (!ready || !authenticated || pidioCodigo.current) return
+    if (!ready || !authenticated || pidioCodigo.current || saliendo) return
     const este = ++intento.current
     const vigente = () => intento.current === este
     setRestaurando(true)
@@ -82,7 +85,7 @@ export default function Acceder() {
       setRestaurando(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, authenticated])
+  }, [ready, authenticated, saliendo])
 
   async function enviarCodigo(e: FormEvent) {
     e.preventDefault()
