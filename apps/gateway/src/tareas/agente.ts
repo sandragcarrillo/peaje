@@ -51,6 +51,7 @@ const MAX_TOKENS = 8_000
 // Charla que el filtro de tema dice que no necesita datos: la primera vuelta va corta.
 const TOPE_CHARLA = 600
 
+type Destino = { canal: string; id: string; responderA?: string }
 type Herramienta = Anthropic.Messages.Tool & { correr: (input: Record<string, unknown>, ctx: Ctx) => Promise<unknown> }
 type Ctx = {
   tenant: Tenant
@@ -60,8 +61,12 @@ type Ctx = {
   anexos: string[]
   /** Tarjetas con link bajo la respuesta (open_report, borradores). */
   links: AgentMessageLink[]
-  /** El chat donde corre la conversación (Telegram, Slack). Sin destino es el dashboard. */
-  destino?: { canal: string; id: string }
+  /**
+   * El chat donde corre la conversación (Telegram, Slack). Sin destino es el
+   * dashboard. `responderA`: el mensaje del pedido (Telegram) o el hilo
+   * (Slack, thread_ts); un trabajo largo entrega ahí lo que termina.
+   */
+  destino?: Destino
   /** La corrida de un pedido programado: no puede programar otro. */
   programado?: boolean
 }
@@ -348,7 +353,7 @@ HERRAMIENTAS.push(
       }
       // Tarda un minuto: corre en segundo plano y avisa en este chat con la tarjeta de la página.
       // `creditos`: si el trabajo falla, trabajos.ts los devuelve.
-      const job = await encolarTrabajo(tenant, 'draft_page', { question: pregunta, why: typeof i.why === 'string' ? i.why : undefined, creditos: COSTOS_CREDITOS.pagina }, destinoDeTrabajo(ctx))
+      const job = await encolarTrabajo(tenant, 'draft_page', { question: pregunta, why: typeof i.why === 'string' ? i.why : undefined, creditos: COSTOS_CREDITOS.pagina, ...hiloDe(ctx) }, destinoDeTrabajo(ctx))
       return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('draft_page', idioma) }
     },
   },
@@ -471,7 +476,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
-    'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat with its card, missing facts included. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
+    'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat on its own: how long it took, a short summary with the missing facts as questions, its card and the page as a .md file. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
     'Short answer, full report behind a card: when you answer about what to publish or which pages to create, give the top one or two in a sentence and call open_report with "opportunities". When you answer about who AI cites instead of them, name the top one or two sites and call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. Never paste long lists or tables: the card opens the full report.',
     'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
     // M7: comprador misterioso
@@ -632,8 +637,11 @@ ESTADOS.schedule_report = { es: 'Programando el envío…', en: 'Scheduling it�
 // ---- tarjetas, trabajos largos y voz ----
 /** A dónde avisa un trabajo largo: el chat de esta conversación, o el dashboard. */
 function destinoDeTrabajo(ctx: Ctx): AgentJobDestino {
-  return ctx.destino ? { ...ctx.destino, idioma: ctx.idioma } : { canal: 'dashboard', id: 'dashboard', idioma: ctx.idioma }
+  return ctx.destino ? { canal: ctx.destino.canal, id: ctx.destino.id, idioma: ctx.idioma } : { canal: 'dashboard', id: 'dashboard', idioma: ctx.idioma }
 }
+
+/** Dónde contestar al terminar: va en el input del trabajo, así sobrevive a un reinicio. */
+const hiloDe = (ctx: Ctx) => (ctx.destino?.responderA ? { responderA: ctx.destino.responderA } : {})
 
 HERRAMIENTAS.push(
   {
@@ -673,7 +681,7 @@ HERRAMIENTAS.push(
     async correr(i, ctx) {
       const tema = String(i.topic ?? '').trim()
       if (tema.length < 3) return { error: 'topic is too short' }
-      const job = await encolarTrabajo(ctx.tenant, 'page_series', { topic: tema.slice(0, 200), creditos: COSTOS_CREDITOS.serie }, destinoDeTrabajo(ctx))
+      const job = await encolarTrabajo(ctx.tenant, 'page_series', { topic: tema.slice(0, 200), creditos: COSTOS_CREDITOS.serie, ...hiloDe(ctx) }, destinoDeTrabajo(ctx))
       return { started: true, jobId: job.id, sayToOwner: avisoDeTrabajo('page_series', ctx.idioma) }
     },
   },
@@ -781,7 +789,7 @@ function anotarUso(c: Cuenta, herramienta: string, salida: unknown): void {
 // ---- fin créditos ----
 
 /** Solo para scripts de prueba: corre una herramienta sin pasar por el modelo. */
-export function probarHerramienta(nombre: string, input: Record<string, unknown>, ctx: { tenant: Tenant; idioma: 'es' | 'en'; destino?: { canal: string; id: string }; programado?: boolean }) {
+export function probarHerramienta(nombre: string, input: Record<string, unknown>, ctx: { tenant: Tenant; idioma: 'es' | 'en'; destino?: Destino; programado?: boolean }) {
   const h = HERRAMIENTAS.find((x) => x.name === nombre)
   if (!h) throw new Error(`unknown tool ${nombre}`)
   return h.correr(input, { acciones: [], opciones: [], anexos: [], links: [], ...ctx })
@@ -825,8 +833,8 @@ export async function conversar(
     idioma: 'es' | 'en'
     canal?: string
     alEstado?: (estado: string) => void
-    /** El chat de esta conversación (Telegram: el chat id). Lo usan los reportes programados. */
-    destino?: { canal: string; id: string }
+    /** El chat de esta conversación (Telegram: el chat id). Lo usan los reportes programados y los trabajos largos. */
+    destino?: Destino
     /** True cuando lo corre un reporte programado (kind custom). */
     programado?: boolean
     /** True cuando el texto sale de un botón del agente (opción o sugerencia): no pasa por el filtro de tema. */

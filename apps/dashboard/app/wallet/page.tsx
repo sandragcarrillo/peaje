@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DireccionConLinks } from '@/app/t/[slug]/wallet'
 import { Eyebrow } from '@/components/chrome'
-import { money, shortWallet } from '@/lib/config'
+import { COBROS_VISIBLES, money, shortWallet } from '@/lib/config'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 import { walletBalances } from '@/lib/walletops'
@@ -20,6 +20,8 @@ import { walletBalances } from '@/lib/walletops'
  * Peaje ya no mueve fondos de negocios (pagos directos, sin retiros).
  */
 export default async function Wallet() {
+  // Hasta mainnet la wallet existe pero no se muestra (ver COBROS_VISIBLES).
+  if (!COBROS_VISIBLES) redirect('/negocios')
   const [tenants, d] = await Promise.all([listMyTenants(), getDict()])
   const tenant = tenants[0]
   if (!tenant) redirect('/acceder')

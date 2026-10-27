@@ -54,6 +54,7 @@ oauth_config:
       - app_mentions:read
       - chat:write
       - im:history
+      - files:write
 settings:
   event_subscriptions:
     request_url: https://api.usepeaje.com/slack/events
@@ -69,7 +70,7 @@ settings:
   token_rotation_enabled: false
 ```
 
-Scopes: `app_mentions:read` (menciones en canales), `chat:write` (responder y actualizar el mensaje provisorio), `im:history` (mensajes directos al bot, evento `message.im`). No pide leer canales: el bot solo ve los mensajes donde lo mencionan. Por eso, dentro de un hilo, cada pregunta nueva también lleva `@Peaje`.
+Scopes: `app_mentions:read` (menciones en canales), `chat:write` (responder y actualizar el mensaje provisorio), `im:history` (mensajes directos al bot, evento `message.im`), `files:write` (subir los borradores como .md al hilo; sin él, el bot manda el link al dashboard). No pide leer canales: el bot solo ve los mensajes donde lo mencionan. Por eso, dentro de un hilo, cada pregunta nueva también lleva `@Peaje`.
 
 ## Lo que hay que hacer en Slack
 

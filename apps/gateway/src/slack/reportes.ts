@@ -2,13 +2,14 @@ import { store } from '../store.js'
 import { registrarCanal, type Idioma } from '../reportes/entregar.js'
 import { descifrar, slack } from './api.js'
 import { bloquesBotones, enviarAlHilo } from './bot.js'
-import { registrarEntrega } from '../tareas/trabajos.js'
+// Y la entrega de los trabajos largos del agente (página lista, serie lista), en el hilo del pedido.
+import './trabajos.js'
 
 /**
  * Slack como canal de los reportes programados. El target es `<team>:<canal>`
  * (el mismo `destino.id` que recibe conversar). Se importa una vez desde
- * slack/router.ts. Los reportes van al canal, no a un hilo. También registra
- * la entrega de los trabajos largos del agente (página lista, serie lista).
+ * slack/router.ts. Los reportes van al canal, no a un hilo. También trae la
+ * entrega de los trabajos largos del agente (slack/trabajos.ts).
  */
 
 const idiomaDe = (x: string): Idioma => (x === 'es' ? 'es' : 'en')
@@ -50,7 +51,7 @@ registrarCanal('slack', {
             },
           ]
         : []
-      return enviarAlHilo(h, encabezar(entrega.texto), botones)
+      return void (await enviarAlHilo(h, encabezar(entrega.texto), botones))
     }
     // Pedido programado: primero lo que pidió, después la respuesta del agente en su hilo.
     const r = await slack('chat.postMessage', { channel: t.channelId, text: `› ${entrega.pedido}` }, token)
@@ -71,21 +72,4 @@ registrarCanal('slack', {
       }
     })
   },
-})
-
-// Trabajos largos: el aviso de "listo" vuelve al canal de donde salió el pedido.
-registrarEntrega('slack', async (job, mensaje) => {
-  const t = job.destino ? partirTarget(job.destino.id) : null
-  if (!t) return
-  const install = await store.getSlackInstall(t.teamId)
-  if (!install) return
-  const link = (await store.listSlackChannel(t.teamId, t.channelId)).find((l) => l.tenantId === job.tenantId)
-  if (!link) return
-  const tenant = await store.getTenantById(job.tenantId)
-  const varios = (await store.listSlackChannel(t.teamId, t.channelId)).length > 1
-  await enviarAlHilo(
-    { token: descifrar(install.botTokenEnc), channel: t.channelId },
-    varios && tenant ? `**${tenant.name}**\n${mensaje.text}` : mensaje.text,
-    bloquesBotones(job.tenantId, mensaje, idiomaDe(job.destino?.idioma ?? link.language)),
-  )
 })

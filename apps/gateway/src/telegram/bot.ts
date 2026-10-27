@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { store } from '../store.js'
 import { conversar } from '../tareas/agente.js'
 import { resolverAccion } from '../tareas/acciones.js'
+import { anotarAviso } from '../tareas/trabajos.js'
 import { aHtml, nombreBot, partir, tg } from './api.js'
 // ---- M9 ----
 import { esActivo, mensajeSinPro } from '../billing/acceso.js'
@@ -16,7 +17,7 @@ import { armarPrimerMensaje, esCadencia, programarCadencia, reservarPrimerMensaj
  */
 
 type Chat = { id: number; username?: string }
-type Mensaje = { chat: Chat; from?: { language_code?: string; username?: string }; text?: string }
+type Mensaje = { message_id?: number; chat: Chat; from?: { language_code?: string; username?: string }; text?: string }
 type Callback = { id: string; data?: string; message?: { chat: Chat; message_id: number }; from?: { language_code?: string } }
 export type Update = { message?: Mensaje; callback_query?: Callback }
 
@@ -80,29 +81,51 @@ function teclado(m: AgentMessage, idioma: 'es' | 'en', conAcciones = true) {
   return filas.length ? { inline_keyboard: filas } : undefined
 }
 
-/** `conBotones` en false: los botones del chat actúan sobre el negocio activo, así que a otro negocio se le manda sin ellos. */
-export async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: 'es' | 'en', encabezado?: string, conBotones = true) {
+/**
+ * `conBotones` en false: los botones del chat actúan sobre el negocio activo, así que a otro negocio se le manda sin ellos.
+ * `responderA`: el message_id del pedido; la primera parte sale como respuesta a él.
+ * Devuelve lo que salió (ids de Telegram, null en modo prueba), para poder editarlo después.
+ */
+export async function enviarRespuesta(chatId: number, m: AgentMessage, idioma: 'es' | 'en', encabezado?: string, conBotones = true, responderA?: number) {
   const partes = partir(encabezado ? `**${encabezado}**\n${m.text}` : m.text)
   const botones = teclado(m, idioma, conBotones)
+  const ids: (number | null)[] = []
   for (let i = 0; i < partes.length; i++) {
     const ultima = i === partes.length - 1
-    await tg('sendMessage', { chat_id: chatId, text: aHtml(partes[i]!), parse_mode: 'HTML', ...(ultima && botones ? { reply_markup: botones } : {}) })
+    const r = await tg<{ message_id: number }>('sendMessage', {
+      chat_id: chatId,
+      text: aHtml(partes[i]!),
+      parse_mode: 'HTML',
+      ...(i === 0 && responderA ? { reply_parameters: { message_id: responderA, allow_sending_without_reply: true } } : {}),
+      ...(ultima && botones ? { reply_markup: botones } : {}),
+    })
+    ids.push(r?.message_id ?? null)
   }
+  return { ids, partes, botones }
 }
 
-/** `boton`: el texto sale de un botón del agente (sugerencia u opción), no lo escribió el dueño. */
-async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 'es' | 'en', boton = false) {
+/**
+ * `boton`: el texto sale de un botón del agente (sugerencia u opción), no lo escribió el dueño.
+ * `pedidoId`: el message_id del pedido; un trabajo largo que salga de acá entrega respondiéndole.
+ */
+async function responder(chatId: number, tenant: Tenant, texto: string, idioma: 'es' | 'en', boton = false, pedidoId?: number) {
   // ---- M9: el agente en Telegram es Pro ----
   if (!esActivo(tenant)) return void (await tg('sendMessage', { chat_id: chatId, text: mensajeSinPro(tenant, idioma) }))
   // "Escribiendo…" mientras el agente trabaja: Telegram lo muestra 5 s por llamada.
   await tg('sendChatAction', { chat_id: chatId, action: 'typing' })
   const latido = setInterval(() => void tg('sendChatAction', { chat_id: chatId, action: 'typing' }), 4_500)
+  const destino = { canal: 'telegram', id: String(chatId) }
   try {
-    const m = await conversar(tenant, texto, { idioma, canal: 'telegram', destino: { canal: 'telegram', id: String(chatId) }, boton })
+    const m = await conversar(tenant, texto, { idioma, canal: 'telegram', destino: { ...destino, ...(pedidoId ? { responderA: String(pedidoId) } : {}) }, boton })
     // Con varios negocios en el chat, cada respuesta dice de cuál es.
     const varios = (await store.listTelegramChat(chatId)).length > 1
-    await enviarRespuesta(chatId, m, idioma, varios ? tenant.name : undefined)
+    const enviado = await enviarRespuesta(chatId, m, idioma, varios ? tenant.name : undefined)
+    // Si la respuesta encoló una página o una serie, es su "estoy en eso": al terminar se edita a "✅ Listo en …".
+    // Solo un mensaje sin botones de acción (editarlo no puede revivir opciones ya tocadas).
+    const editable = enviado.partes.length === 1 && enviado.ids[0] && !m.options.length && !m.actions.some((a) => a.status === 'pending')
+    anotarAviso(destino, editable ? { id: String(enviado.ids[0]), texto: enviado.partes[0]!, ...(enviado.botones ? { botones: enviado.botones } : {}) } : null)
   } catch (error) {
+    anotarAviso(destino, null)
     const msj = error instanceof Error ? error.message : ''
     await tg('sendMessage', { chat_id: chatId, text: /mensajes|messages/i.test(msj) ? msj : T[idioma].error })
   } finally {
@@ -164,7 +187,7 @@ export async function procesarUpdate(u: Update): Promise<void> {
   if (texto === '/help') return void (await tg('sendMessage', { chat_id: chatId, text: T[idioma].ayuda }))
   const tenant = await store.getTenantById(link.tenantId)
   if (!tenant) return
-  await responder(chatId, tenant, texto, idioma)
+  await responder(chatId, tenant, texto, idioma, false, m.message_id)
 }
 
 async function procesarBoton(c: Callback): Promise<void> {
@@ -211,8 +234,8 @@ async function procesarBoton(c: Callback): Promise<void> {
     const ultimo = recientes[recientes.length - 1]
     const opcion = ultimo?.options[Number(data.slice(2))]
     if (opcion) {
-      await tg('sendMessage', { chat_id: chatId, text: `› ${opcion}` })
-      await responder(chatId, tenant, opcion, idioma, true)
+      const eco = await tg<{ message_id: number }>('sendMessage', { chat_id: chatId, text: `› ${opcion}` })
+      await responder(chatId, tenant, opcion, idioma, true, eco?.message_id)
     }
     return
   }

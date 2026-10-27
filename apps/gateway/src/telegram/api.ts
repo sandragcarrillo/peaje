@@ -2,6 +2,9 @@
  * Cliente mínimo de la Bot API de Telegram. Sin TELEGRAM_BOT_TOKEN corre en
  * modo prueba: no manda nada y guarda lo que habría mandado en `bandeja`
  * (lo lee el test por la ruta interna).
+ *
+ * Referencia (verificada el 2026-10-26): https://core.telegram.org/bots/api
+ * (sendDocument, sendMediaGroup 2 a 10 documentos, ReplyParameters, 50 MB por archivo).
  */
 export const token = () => process.env.TELEGRAM_BOT_TOKEN ?? ''
 export const modoPrueba = () => !token()
@@ -27,6 +30,41 @@ export async function tg<T = unknown>(metodo: string, cuerpo: Record<string, unk
   } catch (error) {
     console.warn('[telegram]', metodo, error instanceof Error ? error.message : error)
     return null
+  }
+}
+
+/** Un archivo nuevo para subir (sendDocument, sendMediaGroup). `nombre` es el nombre que ve el dueño. */
+export type ArchivoTg = { nombre: string; contenido: string; tipo?: string }
+const esArchivo = (v: unknown): v is ArchivoTg => !!v && typeof v === 'object' && 'nombre' in v && 'contenido' in v
+
+/**
+ * La Bot API con multipart/form-data, la única forma de subir un archivo
+ * nuevo. Cada ArchivoTg va como archivo con su nombre; el resto, como texto
+ * (los objetos en JSON: reply_parameters, media). En sendMediaGroup, cada
+ * archivo va en su propio campo y `media` lo nombra con "attach://<campo>".
+ * Modo prueba: a la bandeja, y cuenta como enviado.
+ */
+export async function tgArchivos(metodo: string, campos: Record<string, unknown>): Promise<{ ok: boolean; description?: string }> {
+  if (modoPrueba()) {
+    bandeja.push({ metodo, cuerpo: campos })
+    if (bandeja.length > 200) bandeja.shift()
+    return { ok: true }
+  }
+  try {
+    const form = new FormData()
+    for (const [k, v] of Object.entries(campos)) {
+      if (v === undefined || v === null) continue
+      if (esArchivo(v)) form.append(k, new Blob([v.contenido], { type: v.tipo ?? 'text/markdown; charset=utf-8' }), v.nombre)
+      else form.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v))
+    }
+    const res = await fetch(`https://api.telegram.org/bot${token()}/${metodo}`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) })
+    const j = (await res.json()) as { ok: boolean; description?: string }
+    if (!j.ok) console.warn('[telegram]', metodo, j.description)
+    return { ok: !!j.ok, description: j.description }
+  } catch (error) {
+    const description = error instanceof Error ? error.message : String(error)
+    console.warn('[telegram]', metodo, description)
+    return { ok: false, description }
   }
 }
 

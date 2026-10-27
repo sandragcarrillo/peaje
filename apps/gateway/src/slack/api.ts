@@ -12,9 +12,12 @@ import { env } from '../env.js'
  *   OAuth v2    https://docs.slack.dev/authentication/installing-with-oauth
  *   mensajes    https://docs.slack.dev/reference/methods/chat.postMessage
  *   mrkdwn      https://docs.slack.dev/messaging/formatting-message-text
+ *   archivos    https://docs.slack.dev/reference/methods/files.getUploadURLExternal
+ *               https://docs.slack.dev/reference/methods/files.completeUploadExternal (2026-10-26)
  */
 
-export const SCOPES = ['app_mentions:read', 'chat:write', 'im:history'] as const
+/** files:write: los borradores llegan como .md en el hilo. Una instalación previa sin ese permiso recibe el link a la tarea. */
+export const SCOPES = ['app_mentions:read', 'chat:write', 'im:history', 'files:write'] as const
 
 const v = (n: string) => process.env[n] ?? ''
 export const clientId = () => v('SLACK_CLIENT_ID')
@@ -92,6 +95,67 @@ export async function slack(metodo: string, cuerpo: Record<string, unknown>, tok
   } catch (error) {
     console.warn('[slack]', metodo, error instanceof Error ? error.message : error)
     return null
+  }
+}
+
+/** Igual que `slack`, pero form-urlencoded: lo aceptan todos los métodos (los de archivos, seguro). */
+async function slackForm(metodo: string, campos: Record<string, string>, token: string): Promise<RespuestaSlack | null> {
+  try {
+    const res = await fetch(`https://slack.com/api/${metodo}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Bearer ${token}` },
+      body: new URLSearchParams(campos).toString(),
+      signal: AbortSignal.timeout(15_000),
+    })
+    const j = (await res.json()) as RespuestaSlack
+    if (!j.ok) console.warn('[slack]', metodo, j.error)
+    return j
+  } catch (error) {
+    console.warn('[slack]', metodo, error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+export type ArchivoSlack = { nombre: string; contenido: string; titulo?: string }
+
+/**
+ * Sube archivos a un canal o a un hilo con el flujo de Slack de hoy (files
+ * upload v2; files.upload se retiró): por cada archivo,
+ * files.getUploadURLExternal (nombre y largo) y los bytes por POST a la
+ * upload_url; al final un solo files.completeUploadExternal que los comparte
+ * juntos, en el hilo si hay `threadTs` (el ts del mensaje padre). Necesita
+ * files:write. Modo prueba: a la bandeja.
+ */
+export async function subirArchivos(token: string, destino: { channel: string; threadTs?: string }, archivos: ArchivoSlack[]): Promise<{ ok: boolean; error?: string }> {
+  if (!archivos.length) return { ok: true }
+  const compartir = { channel_id: destino.channel, ...(destino.threadTs ? { thread_ts: destino.threadTs } : {}) }
+  if (modoPrueba()) {
+    for (const a of archivos) bandeja.push({ metodo: 'files.getUploadURLExternal', cuerpo: { filename: a.nombre, length: Buffer.byteLength(a.contenido, 'utf8') } })
+    bandeja.push({ metodo: 'files.completeUploadExternal', cuerpo: { ...compartir, files: archivos.map((a) => ({ title: a.titulo ?? a.nombre, filename: a.nombre, contenido: a.contenido })) } })
+    return { ok: true }
+  }
+  try {
+    const subidos: { id: string; title: string }[] = []
+    for (const a of archivos) {
+      const bytes = Buffer.from(a.contenido, 'utf8')
+      const u = await slackForm('files.getUploadURLExternal', { filename: a.nombre, length: String(bytes.length) }, token)
+      if (!u?.ok || typeof u.upload_url !== 'string' || typeof u.file_id !== 'string') return { ok: false, error: u?.error ?? 'no_upload_url' }
+      const destinoBytes = new URL(u.upload_url)
+      // El token solo viaja a Slack.
+      if (destinoBytes.protocol !== 'https:' || !/(^|\.)slack\.com$/.test(destinoBytes.hostname)) return { ok: false, error: 'unexpected_upload_url' }
+      const res = await fetch(destinoBytes, {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` },
+        body: bytes,
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (res.status !== 200) return { ok: false, error: `upload_${res.status}` }
+      subidos.push({ id: u.file_id, title: a.titulo ?? a.nombre })
+    }
+    const c = await slackForm('files.completeUploadExternal', { files: JSON.stringify(subidos), ...compartir }, token)
+    return c?.ok ? { ok: true } : { ok: false, error: c?.error ?? 'complete_failed' }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

@@ -7,7 +7,8 @@ import { store } from '../store.js'
 import { leerSitio } from '../monitor/reporte.js'
 import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
 import { lineasDeFormato } from '../tareas/generar.js'
-import { cuerpoConBorrador, redactarBorrador, slugDePregunta, type Borrador } from './borrador.js'
+import { cuerpoConBorrador, preguntasPendientes, redactarBorrador, slugDePregunta, type Borrador } from './borrador.js'
+import type { RevisionVoz } from './revision-voz.js'
 import { perfilDeVoz } from './voz.js'
 
 /**
@@ -51,7 +52,19 @@ export type ResultadoSerie = {
   fallidas: { pregunta: string; error: string }[]
 }
 
-export type PaginaCreada = { taskId: string; title: string; url: string; rol: 'hub' | 'spoke'; formato: PageFormat; created: boolean; updated: boolean; todos: string[]; status: AgentTask['status'] }
+/** `todos`: una pregunta por [TODO] de la página. `revision`: lo que limpió la revisión de voz (solo las redactadas ahora). */
+export type PaginaCreada = {
+  taskId: string
+  title: string
+  url: string
+  rol: 'hub' | 'spoke'
+  formato: PageFormat
+  created: boolean
+  updated: boolean
+  todos: string[]
+  status: AgentTask['status']
+  revision?: RevisionVoz
+}
 
 let anthropic: Anthropic | null = null
 
@@ -203,7 +216,7 @@ export async function crearSerie(tenant: Tenant, tema: string, opts: { alAvanzar
       source: 'series',
     })
     opts.alAvanzar?.(`draft: ${p.pregunta}`)
-    return { ...base, taskId: r.task.id, title: r.task.title, created: r.created, updated: !r.created, todos: b.todos, status: r.task.status }
+    return { ...base, taskId: r.task.id, title: r.task.title, created: r.created, updated: !r.created, todos: preguntasPendientes(b), status: r.task.status, revision: b.revision }
   })
   const [hub = null, ...spokes] = creadas
   return { tema: limpio, hub, spokes: spokes.filter((s): s is PaginaCreada => !!s), fallidas }

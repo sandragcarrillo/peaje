@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { COBROS_VISIBLES } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 
-type Item = { href: string; label: string; valor?: string; acento?: boolean }
+/** `sub`: cuelga del ítem de arriba (Contenido, debajo de Mi agente). */
+type Item = { href: string; label: string; valor?: string; acento?: boolean; sub?: boolean }
 
 /**
  * Sidebar en el orden del camino del dueño: ver su puntaje, las mejoras, su
@@ -41,6 +43,8 @@ export function Sidebar({
     { href: '', label: d.panel.navDashboard, valor: valores.score, acento: true },
     { href: '/kit', label: d.panel.navKit },
     { href: '/agente', label: d.panel.navAgente },
+    // El pipeline de páginas del agente. Sin Pro la página muestra el candado; acá se avisa.
+    { href: '/agente/contenido', label: d.contenido.nav, valor: pro ? undefined : 'Pro', sub: true },
     { href: '/agentes-visitas', label: d.panel.navVisitas },
   ]
   const cobros: Item[] = [
@@ -56,7 +60,7 @@ export function Sidebar({
         <Link
           key={item.href}
           href={href}
-          className={`flex items-center justify-between px-3 py-2 transition-colors ${
+          className={`flex items-center justify-between py-2 pr-3 transition-colors ${item.sub ? 'pl-7' : 'pl-3'} ${
             activo
               ? 'border-l-2 border-accent bg-panel-2 font-bold text-text'
               : 'border-l-2 border-transparent text-muted hover:bg-panel-2 hover:text-text'
@@ -96,10 +100,12 @@ export function Sidebar({
 
         <nav className="space-y-1 font-mono text-xs">{lista(principal)}</nav>
 
-        <div className="space-y-1 font-mono text-xs">
-          <p className="border-t border-border px-3 pt-4 pb-1 text-[10px] text-muted">{d.panel.sidebarCobros}</p>
-          {lista(cobros)}
-        </div>
+        {COBROS_VISIBLES ? (
+          <div className="space-y-1 font-mono text-xs">
+            <p className="border-t border-border px-3 pt-4 pb-1 text-[10px] text-muted">{d.panel.sidebarCobros}</p>
+            {lista(cobros)}
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-3 border-t border-border pt-4">

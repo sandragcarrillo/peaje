@@ -1,6 +1,7 @@
 import { tipoWalletCobro } from '@peaje/db'
 import { PageHeader } from '@/components/chrome'
-import { microMoney, money, shortWallet } from '@/lib/config'
+import { COBROS_VISIBLES, microMoney, money, shortWallet } from '@/lib/config'
+import { redirect } from 'next/navigation'
 import { getDict } from '@/lib/i18n'
 import { armarIngresos } from '@/lib/ingresos'
 import { requireTenant } from '@/lib/session'
@@ -15,6 +16,8 @@ import { WalletForm } from '../wallet'
  */
 export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos'>) {
   const { slug } = await params
+  // Hasta mainnet los cobros no se muestran (ver COBROS_VISIBLES).
+  if (!COBROS_VISIBLES) redirect(`/t/${slug}`)
   const tenant = await requireTenant(slug)
   const [payments, balance, d] = await Promise.all([
     store.listPayments(tenant.id, 100),

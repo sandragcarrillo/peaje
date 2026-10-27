@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { barras, leer, type Barra } from '@/app/radar/datos'
 import { textoLlanoDe } from '@/app/radar/textos'
 import { ScoreColumnas } from '@/components/score-columnas'
-import { money } from '@/lib/config'
+import { COBROS_VISIBLES, money } from '@/lib/config'
 import { getDict, getLocale } from '@/lib/i18n'
 import { cachedScore, scannableDomain } from '@/lib/ora'
 import { requireTenant } from '@/lib/session'
@@ -55,7 +55,7 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
     ...(preguntas.size > 0
       ? [{ valor: `${[...preguntas.values()].filter(Boolean).length}/${preguntas.size}`, texto: t.semanaCitas, href: `${base}/agente#citacion`, link: t.semanaVerCitas }]
       : []),
-    ...(Number(balance.revenue) > 0
+    ...(COBROS_VISIBLES && Number(balance.revenue) > 0
       ? [{ valor: money(balance.revenue), texto: t.semanaCobros(balance.requestCount), href: `${base}/ingresos`, link: t.inicioVerIngresos }]
       : []),
   ]

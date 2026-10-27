@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { store } from '../store.js'
 import { conversar } from '../tareas/agente.js'
 import { resolverAccion } from '../tareas/acciones.js'
+import { anotarAviso } from '../tareas/trabajos.js'
 import { aMrkdwn, descifrar, partir, respaldo, slack, urlInstalar } from './api.js'
 // ---- M9 ----
 import { esActivo, mensajeSinPro } from '../billing/acceso.js'
@@ -105,7 +106,7 @@ const boton = (texto: string, action_id: string, value: string, style?: 'primary
   ...(style ? { style } : {}),
 })
 
-const seccion = (mrkdwn: string): Bloque => ({ type: 'section', text: { type: 'mrkdwn', text: mrkdwn.slice(0, 3_000) } })
+export const seccion = (mrkdwn: string): Bloque => ({ type: 'section', text: { type: 'mrkdwn', text: mrkdwn.slice(0, 3_000) } })
 
 /** Los botones de un mensaje del agente: propuestas (aplicar/descartar), opciones y enlaces. */
 export function bloquesBotones(tenantId: string, m: AgentMessage, idioma: Idioma): Bloque[] {
@@ -140,12 +141,17 @@ export function bloquesBotones(tenantId: string, m: AgentMessage, idioma: Idioma
   return bloques
 }
 
-type Hilo = { token: string; channel: string; threadTs?: string }
+export type Hilo = { token: string; channel: string; threadTs?: string }
 
 const enHilo = (h: Hilo) => (h.threadTs ? { thread_ts: h.threadTs } : {})
 
-/** Manda texto (markdown del agente) y botones al hilo. Si hay un mensaje provisorio, lo reemplaza con la primera parte. */
-export async function enviarAlHilo(h: Hilo, texto: string, botones: Bloque[] = [], provisorio?: string): Promise<void> {
+/**
+ * Manda texto (markdown del agente) y botones al hilo. Si hay un mensaje
+ * provisorio, lo reemplaza con la primera parte. Devuelve el ts del primer
+ * mensaje (para editarlo después), si Slack lo dio.
+ */
+export async function enviarAlHilo(h: Hilo, texto: string, botones: Bloque[] = [], provisorio?: string): Promise<string | undefined> {
+  let primero: string | undefined
   const partes = partir(texto, 2_700)
   // Hasta 5 secciones por mensaje: lejos del tope de 50 bloques y de los 40.000 caracteres.
   const grupos: string[][] = []
@@ -156,10 +162,15 @@ export async function enviarAlHilo(h: Hilo, texto: string, botones: Bloque[] = [
     const cuerpo = { channel: h.channel, text: respaldo(grupos[g]!.join('\n\n')), blocks, unfurl_links: false, ...enHilo(h) }
     if (g === 0 && provisorio) {
       const r = await slack('chat.update', { channel: h.channel, ts: provisorio, text: cuerpo.text, blocks }, h.token)
-      if (r?.ok) continue
+      if (r?.ok) {
+        primero = provisorio
+        continue
+      }
     }
-    await slack('chat.postMessage', cuerpo, h.token)
+    const r = await slack('chat.postMessage', cuerpo, h.token)
+    if (g === 0) primero = r?.ok ? r.ts : undefined
   }
+  return primero
 }
 
 async function decir(h: Hilo, texto: string, botones: Bloque[] = []) {
@@ -179,13 +190,21 @@ async function responder(h: Hilo, teamId: string, tenant: Tenant, texto: string,
     ultimoEstado = Date.now()
     cola = cola.then(async () => void (await slack('chat.update', { channel: h.channel, ts: provisorio, text: estado }, h.token)))
   }
+  const destino = { canal: 'slack', id: destinoSlack(teamId, h.channel) }
   try {
-    // destino: los reportes programados y los trabajos largos vuelven a este canal.
-    const m = await conversar(tenant, texto, { idioma, canal: 'slack', alEstado, destino: { canal: 'slack', id: destinoSlack(teamId, h.channel) }, boton })
+    // destino: los reportes programados y los trabajos largos vuelven a este canal; responderA: a este hilo.
+    const m = await conversar(tenant, texto, { idioma, canal: 'slack', alEstado, destino: { ...destino, ...(h.threadTs ? { responderA: h.threadTs } : {}) }, boton })
     await cola
     const varios = (await store.listSlackChannel(teamId, h.channel)).length > 1
-    await enviarAlHilo(h, varios ? `**${tenant.name}**\n${m.text}` : m.text, bloquesBotones(tenant.id, m, idioma), provisorio)
+    const final = varios ? `**${tenant.name}**\n${m.text}` : m.text
+    const botones = bloquesBotones(tenant.id, m, idioma)
+    const ts = await enviarAlHilo(h, final, botones, provisorio)
+    // Si la respuesta encoló una página o una serie, es su "estoy en eso": al terminar se edita a "✅ Listo en …".
+    // Solo un mensaje de una parte y sin botones de acción (editarlo no puede revivir una propuesta ya resuelta).
+    const editable = ts && partir(final, 2_700).length === 1 && !m.options.length && !m.actions.some((a) => a.status === 'pending')
+    anotarAviso(destino, editable ? { id: ts, texto: final, botones } : null)
   } catch (error) {
+    anotarAviso(destino, null)
     await cola
     const msj = error instanceof Error ? error.message : ''
     const texto = /mensajes|messages|Pro/i.test(msj) ? msj : T[idioma].error

@@ -22,3 +22,11 @@ export function shortWallet(wallet: string | null): string {
   if (!wallet) return '—'
   return `${wallet.slice(0, 6)}…${wallet.slice(-4)}`
 }
+
+/**
+ * Wallet y cobros a la vista. Apagado hasta lanzar en mainnet: las wallets se
+ * siguen creando al registrarse (Privy), pero el panel no las muestra ni los
+ * cobros de prueba (menú de cuenta, Cobros en el sidebar, Ingresos, Rutas,
+ * /wallet). Para mostrarlos: NEXT_PUBLIC_COBROS=1 en Vercel y redeploy.
+ */
+export const COBROS_VISIBLES = process.env.NEXT_PUBLIC_COBROS === '1'

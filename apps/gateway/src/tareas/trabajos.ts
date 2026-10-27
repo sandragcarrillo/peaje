@@ -4,6 +4,8 @@ import { tareaConBorrador } from '../ciclo/borrador.js'
 import { crearSerie } from '../ciclo/serie.js'
 import { tarjetaOportunidades, tarjetaTarea } from './tarjetas.js'
 import { anotarCreditos } from './creditos.js'
+import { lineaListo, resumenPagina, resumenSerie } from '../ciclo/entrega.js'
+import { sumarRevisiones } from '../ciclo/revision-voz.js'
 
 /**
  * Trabajos largos del agente: escribir una página, una serie de páginas. El
@@ -18,7 +20,10 @@ import { anotarCreditos } from './creditos.js'
  * a la cola una vez; la segunda, falla y se avisa.
  *
  * Los canales se enchufan con registrarEntrega(canal, fn) desde su propio
- * módulo (Telegram, Slack): este archivo no importa nada de ellos.
+ * módulo (Telegram, Slack): este archivo no importa nada de ellos. Un borrador
+ * listo llega como Boring Marketing en Slack: "✅ Listo en 8 min 8 s" (el
+ * "estoy en eso" editado, si el canal lo anotó con anotarAviso), un resumen
+ * corto y la página como .md (ver ciclo/entrega.ts).
  */
 
 type Idioma = 'es' | 'en'
@@ -64,10 +69,71 @@ export function avisoDeTrabajo(kind: string, idioma: Idioma = 'es'): string {
 export async function encolarTrabajo(tenant: Pick<Tenant, 'id'>, kind: string, input: Record<string, unknown>, destino: AgentJobDestino | null = null): Promise<AgentJob> {
   if (!manejadores.has(kind)) throw new Error(`unknown job kind: ${kind}`)
   const job = await store.createJob({ tenantId: tenant.id, kind, input, destino })
+  // Queda esperando que el canal anote su "estoy en eso" (anotarAviso), para editarlo al terminar.
+  if (destino && destino.canal !== 'dashboard') {
+    const k = claveDestino(destino)
+    const ids = sinAviso.get(k) ?? new Set<string>()
+    ids.add(job.id)
+    sinAviso.set(k, ids)
+  }
   // Si el worker está prendido, que no espere al próximo tick.
   if (temporizador) setImmediate(() => void tick())
   return job
 }
+
+// ---- el "estoy en eso" de cada trabajo ----
+
+/**
+ * El mensaje "estoy en eso" que el canal ya mandó para un trabajo: su id en
+ * el canal, su texto (markdown, tal como salió) y sus botones (solo de URL).
+ * Al terminar, la entrega cambia la frase del aviso por "✅ Listo en …". Vive
+ * en memoria: después de un reinicio la línea va arriba del resumen, en un
+ * mensaje nuevo. Los trabajos de una misma respuesta comparten el objeto.
+ */
+export type AvisoEnviado = { id: string; texto: string; botones?: unknown }
+
+const claveDestino = (d: { canal: string; id: string }) => `${d.canal}:${d.id}`
+/** Trabajos encolados en un chat cuyo "estoy en eso" todavía no se anotó. */
+const sinAviso = new Map<string, Set<string>>()
+const avisos = new Map<string, AvisoEnviado>()
+
+/**
+ * El canal dice cuál fue el mensaje "estoy en eso" de los trabajos que encoló
+ * su última respuesta en ese chat. Null: esa respuesta no se puede editar
+ * (larga, o con botones de acción); esos trabajos avisan con un mensaje nuevo.
+ * Los chats contestan en fila, así que lo pendiente es de esta respuesta.
+ */
+export function anotarAviso(destino: { canal: string; id: string }, aviso: AvisoEnviado | null): void {
+  const k = claveDestino(destino)
+  const ids = sinAviso.get(k)
+  if (!ids) return
+  sinAviso.delete(k)
+  if (aviso) for (const id of ids) avisos.set(id, aviso)
+}
+
+/**
+ * El "estoy en eso" de un trabajo con su frase cambiada por `linea`. Null si
+ * el canal no lo anotó o si la frase no está (el agente escribió otra cosa):
+ * ahí la línea va en el mensaje nuevo. Tras editarlo, el canal guarda el texto
+ * nuevo en `aviso.texto`.
+ */
+export function avisoEditado(job: AgentJob, idioma: Idioma, linea: string): { aviso: AvisoEnviado; texto: string } | null {
+  const aviso = avisos.get(job.id)
+  const frase = avisoDeTrabajo(job.kind, idioma)
+  if (!aviso || !aviso.texto.includes(frase)) return null
+  return { aviso, texto: aviso.texto.replace(frase, linea) }
+}
+
+function olvidarAviso(job: AgentJob): void {
+  avisos.delete(job.id)
+  if (!job.destino) return
+  const k = claveDestino(job.destino)
+  const ids = sinAviso.get(k)
+  if (ids?.delete(job.id) && ids.size === 0) sinAviso.delete(k)
+}
+
+/** Desde cuándo corre un trabajo para el dueño: desde que lo pidió (el "estoy en eso"), aunque un reinicio lo haya reencolado. */
+const inicioDe = (job: AgentJob) => Date.parse(job.createdAt) || Date.now()
 
 // ---- worker ----
 
@@ -183,6 +249,14 @@ export function textoDeResultado(job: AgentJob, idioma: Idioma): { text: string;
  * Sin destino no avisa. Exportado para que un canal pueda reenviar a mano.
  */
 export async function alTerminar(job: AgentJob): Promise<AgentMessage | null> {
+  try {
+    return await guardarYEntregar(job)
+  } finally {
+    olvidarAviso(job)
+  }
+}
+
+async function guardarYEntregar(job: AgentJob): Promise<AgentMessage | null> {
   if (!job.destino) return null
   const idioma: Idioma = job.destino.idioma === 'en' ? 'en' : 'es'
   const { text, links } = textoDeResultado(job, idioma)
@@ -218,8 +292,6 @@ export async function esperarTrabajo(id: string, timeoutMs = 300_000, cadaMs = 1
 
 // ---- los trabajos del agente ----
 
-const lista = (xs: string[]) => xs.map((x) => x.replace(/[.\s]+$/, '')).join('; ')
-
 registrarTrabajo(
   'draft_page',
   async (job, tenant) => {
@@ -238,14 +310,14 @@ registrarTrabajo(
         datos: { taskId: r.task.id, status: r.task.status },
       }
     }
-    const faltan = r.todos.length
+    // El tiempo real, desde el pedido hasta ahora (finishJob va enseguida). La entrega no cobra: la página ya se pagó.
+    const estado = lineaListo(Date.now() - inicioDe(job))
+    const resumen = { pregunta: r.task.title, porQue: porQue?.trim() || r.task.summary || undefined, preguntas: r.todos, revision: r.revision }
     return {
-      mensaje: {
-        es: `Lista la página «${r.task.title}».${faltan ? ` Faltan ${faltan} dato${faltan === 1 ? '' : 's'} que no están en tu sitio: ${lista(r.todos)}. Mándamelos y la completo.` : ' Tiene todos los datos; revísala y publícala.'}`,
-        en: `The page "${r.task.title}" is ready.${faltan ? ` ${faltan} fact${faltan === 1 ? ' is' : 's are'} missing from your site: ${lista(r.todos)}. Send them and I will fill them in.` : ' It has every fact it needs; review it and publish it.'}`,
-      },
+      mensaje: { es: `${estado.es}\n\n${resumenPagina(resumen, 'es')}`, en: `${estado.en}\n\n${resumenPagina(resumen, 'en')}` },
       links: tarjeta(job.destino?.idioma === 'en' ? 'en' : 'es'),
-      datos: { taskId: r.task.id, created: r.created, todos: r.todos },
+      // `estado` y `paginas`: lo que el canal entrega (la línea y el .md de cada tarea, ver ciclo/entrega.ts).
+      datos: { taskId: r.task.id, created: r.created, todos: r.todos, estado, paginas: [r.task.id], ...(r.revision ? { voz: r.revision } : {}) },
     }
   },
   {
@@ -263,24 +335,22 @@ registrarTrabajo(
     const paginas = [...(r.hub ? [r.hub] : []), ...r.spokes]
     if (paginas.length === 0) throw new Error(r.fallidas[0]?.error ?? 'no page could be drafted')
     const idioma: Idioma = job.destino?.idioma === 'en' ? 'en' : 'es'
-    const todos = paginas.reduce((n, p) => n + p.todos.length, 0)
-    const viejas = paginas.filter((p) => !p.created && !p.updated).length
-    const es = [
-      `Lista la serie sobre «${r.tema}»: ${r.hub ? `la página principal «${r.hub.title}» y ` : ''}${r.spokes.length} página${r.spokes.length === 1 ? '' : 's'} que la apoya${r.spokes.length === 1 ? '' : 'n'}, enlazadas entre sí.`,
-      todos ? `Faltan ${todos} dato${todos === 1 ? '' : 's'} en total; cada página dice cuáles.` : 'Tienen todos los datos.',
-      viejas ? `${viejas} ya tenía${viejas === 1 ? '' : 'n'} tarea en curso y no la${viejas === 1 ? '' : 's'} toqué.` : '',
-      r.fallidas.length ? `No pude escribir ${r.fallidas.length}: ${r.fallidas.map((f) => `«${f.pregunta}»`).join(', ')}.` : '',
-    ]
-    const en = [
-      `The series on "${r.tema}" is ready: ${r.hub ? `the main page "${r.hub.title}" and ` : ''}${r.spokes.length} supporting page${r.spokes.length === 1 ? '' : 's'}, linked to each other.`,
-      todos ? `${todos} fact${todos === 1 ? ' is' : 's are'} missing in total; each page lists its own.` : 'They have every fact they need.',
-      viejas ? `${viejas} already had a task in progress and I left ${viejas === 1 ? 'it' : 'them'} as ${viejas === 1 ? 'it was' : 'they were'}.` : '',
-      r.fallidas.length ? `I could not write ${r.fallidas.length}: ${r.fallidas.map((f) => `"${f.pregunta}"`).join(', ')}.` : '',
-    ]
+    const nuevas = paginas.filter((p) => p.created || p.updated)
+    const revision = sumarRevisiones(nuevas.map((p) => p.revision))
+    const estado = lineaListo(Date.now() - inicioDe(job))
+    const resumen = {
+      tema: r.tema,
+      hub: r.hub ? { title: r.hub.title, todos: r.hub.todos } : null,
+      spokes: r.spokes.map((s) => ({ title: s.title, todos: s.todos })),
+      viejas: paginas.length - nuevas.length,
+      fallidas: r.fallidas.map((f) => f.pregunta),
+      revision,
+    }
     return {
-      mensaje: { es: es.filter(Boolean).join(' '), en: en.filter(Boolean).join(' ') },
+      mensaje: { es: `${estado.es}\n\n${resumenSerie(resumen, 'es')}`, en: `${estado.en}\n\n${resumenSerie(resumen, 'en')}` },
       links: [...paginas.map((p) => tarjetaTarea(tenant, { id: p.taskId, title: p.title, kind: 'content' }, idioma)), tarjetaOportunidades(tenant, idioma)],
-      datos: { tema: r.tema, hub: r.hub?.taskId ?? null, spokes: r.spokes.map((s) => s.taskId), fallidas: r.fallidas },
+      // `paginas`: solo las redactadas ahora; las que ya estaban tomadas no traen archivo nuevo.
+      datos: { tema: r.tema, hub: r.hub?.taskId ?? null, spokes: r.spokes.map((s) => s.taskId), fallidas: r.fallidas, estado, paginas: nuevas.map((p) => p.taskId), voz: revision },
     }
   },
   {

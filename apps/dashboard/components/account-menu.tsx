@@ -4,7 +4,7 @@ import { railLabel } from '@peaje/shared'
 import Link from 'next/link'
 import { useState } from 'react'
 import { resumenWallet, type ResumenWallet } from '@/app/t/[slug]/actions'
-import { money, shortWallet } from '@/lib/config'
+import { COBROS_VISIBLES, money, shortWallet } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 
 /**
@@ -25,7 +25,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
     const siguiente = !open
     setOpen(siguiente)
     setModo('resumen')
-    if (siguiente && !data) {
+    if (siguiente && !data && COBROS_VISIBLES) {
       setCargando(true)
       try {
         setData(await resumenWallet(slug))
@@ -66,8 +66,19 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-border bg-panel p-5 text-text shadow-xl shadow-black/40">
-            {cargando || !data ? (
+          <div className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-panel text-text shadow-xl shadow-black/40 ${COBROS_VISIBLES ? 'w-80 p-5' : 'w-56 p-2'}`}>
+            {!COBROS_VISIBLES ? (
+              // Hasta mainnet la wallet existe pero no se muestra (ver COBROS_VISIBLES).
+              <nav>
+                <Link
+                  href="/negocios"
+                  onClick={() => setOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-sm text-muted hover:bg-panel-2 hover:text-text"
+                >
+                  {nav.negocios}
+                </Link>
+              </nav>
+            ) : cargando || !data ? (
               <p className="py-8 text-center text-sm text-muted">
                 {cargando ? d.dinero.cargando : d.dinero.sinWallet}
               </p>

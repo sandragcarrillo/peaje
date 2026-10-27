@@ -1,4 +1,5 @@
-import { gatewayUrl, money, RAILS_LABEL } from '@/lib/config'
+import { COBROS_VISIBLES, gatewayUrl, money, RAILS_LABEL } from '@/lib/config'
+import { redirect } from 'next/navigation'
 import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -8,6 +9,8 @@ import { RutasApiPanel } from '../rutas-api'
 
 export default async function Rutas({ params }: PageProps<'/t/[slug]/rutas'>) {
   const { slug } = await params
+  // Hasta mainnet los cobros no se muestran (ver COBROS_VISIBLES).
+  if (!COBROS_VISIBLES) redirect(`/t/${slug}`)
   const tenant = await requireTenant(slug)
   const [resources, routes, balance, d] = await Promise.all([
     store.listResources(tenant.id).catch(() => []),

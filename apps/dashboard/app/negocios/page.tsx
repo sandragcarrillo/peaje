@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { money } from '@/lib/config'
+import { COBROS_VISIBLES, money } from '@/lib/config'
 import { getDict } from '@/lib/i18n'
 import { listMyTenants } from '@/lib/session'
 import { store } from '@/lib/store'
@@ -43,35 +43,37 @@ export default async function Negocios() {
         </Link>
       </section>
 
-      {/* Barra de métricas agregadas */}
-      <section className="grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <div className="flex flex-col p-5">
-          <span className="etiqueta text-muted">
-            {d.acceso.negociosRegistrados}
-          </span>
-          <span className="mt-2 text-3xl font-bold tabular-nums">
-            {String(tenants.length).padStart(2, '0')}
-          </span>
-          <span className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
-            <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
-            100% {d.acceso.negociosOperativos}
-          </span>
-        </div>
-        <div className="flex flex-col p-5">
-          <span className="etiqueta text-muted">
-            {d.acceso.negociosCobrado}
-          </span>
-          <span className="mt-2 text-3xl font-bold text-accent tabular-nums">
-            {money(totalCobrado)}
-          </span>
-        </div>
-        <div className="flex flex-col p-5">
-          <span className="etiqueta text-muted">
-            {d.acceso.negociosLinks}
-          </span>
-          <span className="mt-2 text-3xl font-bold tabular-nums">{totalLinks}</span>
-        </div>
-      </section>
+      {/* Barra de métricas agregadas: son todas de cobros, se ocultan hasta mainnet. */}
+      {COBROS_VISIBLES ? (
+        <section className="grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="flex flex-col p-5">
+            <span className="etiqueta text-muted">
+              {d.acceso.negociosRegistrados}
+            </span>
+            <span className="mt-2 text-3xl font-bold tabular-nums">
+              {String(tenants.length).padStart(2, '0')}
+            </span>
+            <span className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
+              <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+              100% {d.acceso.negociosOperativos}
+            </span>
+          </div>
+          <div className="flex flex-col p-5">
+            <span className="etiqueta text-muted">
+              {d.acceso.negociosCobrado}
+            </span>
+            <span className="mt-2 text-3xl font-bold text-accent tabular-nums">
+              {money(totalCobrado)}
+            </span>
+          </div>
+          <div className="flex flex-col p-5">
+            <span className="etiqueta text-muted">
+              {d.acceso.negociosLinks}
+            </span>
+            <span className="mt-2 text-3xl font-bold tabular-nums">{totalLinks}</span>
+          </div>
+        </section>
+      ) : null}
 
       {/* Una card por negocio, con números reales */}
       <div className="space-y-4">
@@ -90,28 +92,30 @@ export default async function Negocios() {
               </div>
               <p className="mt-1 font-mono text-xs text-muted">{t.originUrl}</p>
 
-              <div className="mt-4 grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                <div className="p-4">
-                  <span className="etiqueta text-muted">
-                    {d.acceso.negociosDisponible}
-                  </span>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums">
-                    {money(balance.revenue)}
-                  </p>
+              {COBROS_VISIBLES ? (
+                <div className="mt-4 grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                  <div className="p-4">
+                    <span className="etiqueta text-muted">
+                      {d.acceso.negociosDisponible}
+                    </span>
+                    <p className="mt-1.5 text-2xl font-bold tabular-nums">
+                      {money(balance.revenue)}
+                    </p>
+                  </div>
+                  <div className="p-4">
+                    <span className="etiqueta text-muted">
+                      {d.acceso.negociosRequests}
+                    </span>
+                    <p className="mt-1.5 text-2xl font-bold tabular-nums">{balance.requestCount}</p>
+                  </div>
+                  <div className="p-4">
+                    <span className="etiqueta text-muted">
+                      {d.acceso.negociosLinks}
+                    </span>
+                    <p className="mt-1.5 text-2xl font-bold tabular-nums">{links}</p>
+                  </div>
                 </div>
-                <div className="p-4">
-                  <span className="etiqueta text-muted">
-                    {d.acceso.negociosRequests}
-                  </span>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums">{balance.requestCount}</p>
-                </div>
-                <div className="p-4">
-                  <span className="etiqueta text-muted">
-                    {d.acceso.negociosLinks}
-                  </span>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums">{links}</p>
-                </div>
-              </div>
+              ) : null}
 
               <div className="mt-4 flex items-center justify-end gap-2">
                 <Link

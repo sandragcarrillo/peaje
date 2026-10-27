@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
 import { perfilDeVoz, textoDeVoz } from './voz.js'
+import { revisarVoz, type RevisionVoz } from './revision-voz.js'
 
 /**
  * El borrador completo de una página que los asistentes de IA citarían: Opus
@@ -30,7 +31,8 @@ const BorradorSchema = z.object({
   todos: z.array(z.string()),
 })
 
-export type Borrador = { markdown: string; todos: string[] }
+/** `revision`: lo que la revisión de voz limpió y lo que conviene mirar (ver revision-voz.ts). */
+export type Borrador = { markdown: string; todos: string[]; revision?: RevisionVoz }
 
 let anthropic: Anthropic | null = null
 
@@ -76,7 +78,7 @@ export async function redactarBorrador(
       'When a page format is given, shape the H2 sections (step 5) to that format, for example a comparison table and one short verdict per option for a roundup, or numbered steps for a guide. Keep steps 1 to 4 and 6. When a page AI assistants already cite is given, follow its structure, never its words.',
       'When related pages of the same site are given, link each one once where it fits naturally in the text, and end with a short "Related" list (in the language of the page) linking all of them. Use the URLs exactly as given.',
       'When the business\'s voice is given, write the way the business writes: same person, formality and sentence length, their own words. Facts still come only from the site text.',
-      'Rules: use only facts present in the site text. When a fact the page needs is missing, write a clearly marked placeholder like [TODO: confirm price] instead of inventing it, and list each one in "todos". Never invent numbers, names, clients, quotes or dates. Write in the language of the site text. Plain words, short sentences, no hype, no em dashes, no keyword stuffing. Under 700 words.',
+      'Rules: use only facts present in the site text. When a fact the page needs is missing, write a clearly marked placeholder like [TODO: confirm price] instead of inventing it, and list each one in "todos", in the same order, as the short question the owner must answer to fill it, in the language of the site (e.g. "What does the annual plan cost?"). Never invent numbers, names, clients, quotes or dates. Write in the language of the site text. Plain words, short sentences, no hype, no em dashes, no keyword stuffing. Under 700 words.',
     ].join('\n'),
     messages: [
       {
@@ -91,7 +93,9 @@ export async function redactarBorrador(
   if (!salida?.markdown.trim()) throw new Error('The model did not return a draft')
   // El H1 es siempre la pregunta literal, aunque el modelo la reformule.
   const cuerpo = salida.markdown.trim().replace(/^#\s+[^\n]*\n+/, '')
-  return { markdown: `# ${pregunta}\n\n${cuerpo}\n`, todos: salida.todos }
+  // Revisión de voz antes de guardar y entregar: lo mecánico (rayas, mayúscula sostenida) queda arreglado.
+  const { markdown, revision } = revisarVoz(`# ${pregunta}\n\n${cuerpo}\n`, { voz, protegidas: [tenant.name] })
+  return { markdown, todos: salida.todos, revision }
 }
 
 /** El cuerpo de una tarea de contenido con borrador: instrucciones cortas + "## Draft" + la página. */
@@ -126,6 +130,31 @@ export const tieneBorrador = (t: Pick<AgentTask, 'body'>) => t.body.includes(MAR
 
 /** Los [TODO: ...] que quedan en un borrador. */
 export const pendientesDe = (markdown: string) => [...markdown.matchAll(/\[TODO:\s*([^\]]+)\]/g)].map((m) => m[1]!.trim())
+
+/**
+ * Las preguntas que el dueño tiene que contestar, una por [TODO] del
+ * borrador: las que escribió el modelo si cuadran con los placeholders, si no
+ * el texto de cada placeholder.
+ */
+export function preguntasPendientes(b: Pick<Borrador, 'markdown' | 'todos'>): string[] {
+  const marcas = pendientesDe(b.markdown)
+  return b.todos.length === marcas.length ? b.todos : marcas
+}
+
+/** El borrador guardado en una tarea de contenido (lo que va después de "## Draft"). Vacío si no tiene. */
+export const borradorDe = (t: Pick<AgentTask, 'body'>) => (t.body.split(MARCA_BORRADOR)[1] ?? '').trim()
+
+/** El slug de la página de una tarea: el de su URL de aceptación, o el de su clave, o el de la pregunta. */
+export function slugDeTarea(t: Pick<AgentTask, 'acceptance' | 'key' | 'title'>): string {
+  const url = t.acceptance.find((a) => a.type === 'url')
+  let ruta = ''
+  try {
+    ruta = url && 'url' in url ? new URL(url.url).pathname.replace(/^\/+|\/+$/g, '') : ''
+  } catch {
+    ruta = ''
+  }
+  return ruta || t.key.replace(/^content:/, '') || slugDePregunta(t.title)
+}
 
 const CompletadoSchema = z.object({
   markdown: z.string(),
@@ -169,11 +198,10 @@ export async function completarBorrador(tenant: Tenant, taskId: string, datos: s
   if (res.stop_reason === 'max_tokens') throw new Error('The updated draft came back cut off')
   const salida = res.parsed_output
   if (!salida?.markdown.trim()) throw new Error('The model did not return the draft')
-  // El H1 sigue siendo la pregunta literal.
-  const markdown = `# ${tarea.title}\n\n${salida.markdown.trim().replace(/^#\s+[^\n]*\n+/, '')}\n`
+  // El H1 sigue siendo la pregunta literal. Lo que el modelo agregue pasa por la misma revisión de voz.
+  const { markdown } = revisarVoz(`# ${tarea.title}\n\n${salida.markdown.trim().replace(/^#\s+[^\n]*\n+/, '')}\n`, { voz: tenant.voiceProfile ?? null, protegidas: [tenant.name] })
   const faltan = pendientesDe(markdown)
-  const url = tarea.acceptance.find((a) => a.type === 'url')
-  const slug = (url && 'url' in url ? new URL(url.url).pathname.replace(/^\//, '') : '') || tarea.key.replace(/^content:/, '') || slugDePregunta(tarea.title)
+  const slug = slugDeTarea(tarea)
   // Se conserva lo que el dueño ya leyó como "por qué": va antes de la marca.
   const cabecera = tarea.body.split(MARCA_BORRADOR)[0] ?? ''
   const porQue = cabecera.match(/\nWhy an AI assistant would cite it: (.*)\n?$/)?.[1]
@@ -197,7 +225,11 @@ export async function completarBorrador(tenant: Tenant, taskId: string, datos: s
  * herramienta draft_page del chat. Misma `key` que las sugerencias del
  * monitor, así una pregunta no genera dos tareas.
  */
-export async function tareaConBorrador(tenant: Tenant, pregunta: string, porQue?: string): Promise<{ task: AgentTask; created: boolean; updated: boolean; todos: string[] }> {
+export async function tareaConBorrador(
+  tenant: Tenant,
+  pregunta: string,
+  porQue?: string,
+): Promise<{ task: AgentTask; created: boolean; updated: boolean; todos: string[]; revision?: RevisionVoz }> {
   const dominio = dominioVerificable(tenant.originUrl)
   if (!dominio) throw new Error('The business has no public domain')
   const limpia = pregunta.trim().replace(/\s+/g, ' ').slice(0, 200)
@@ -218,5 +250,6 @@ export async function tareaConBorrador(tenant: Tenant, pregunta: string, porQue?
     acceptance: [{ type: 'url', url: `https://${dominio}/${slug}` }],
     source: 'chat',
   })
-  return { task: r.task, created: r.created, updated: !r.created, todos: b.todos }
+  // `todos`: una pregunta por [TODO] que quedó en la página, para que el dueño la conteste en el chat.
+  return { task: r.task, created: r.created, updated: !r.created, todos: preguntasPendientes(b), revision: b.revision }
 }
