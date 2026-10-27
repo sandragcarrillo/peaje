@@ -1,12 +1,14 @@
 'use server'
 
 import { domainToUnicode } from 'node:url'
+import { cookies } from 'next/headers'
 import { generateEmbedSecret, slugify } from '@peaje/shared'
 import { getDict } from '@/lib/i18n'
 import { entrarComoDueno } from '@/lib/dueno'
 import { asegurarWalletDueno, usuarioPrivy, verifyPrivyAccessToken } from '@/lib/privy'
 import { setSession } from '@/lib/session'
 import { describirSitio } from '@/lib/gateway'
+import { COOKIE_ORIGEN, origenValido } from '@/lib/origen'
 import { store } from '@/lib/store'
 
 export type AltaResultado =
@@ -84,6 +86,8 @@ export async function registrarNegocio(
     custodialWalletId: null,
     email,
     privyUserId,
+    // Con qué enlace llegó (cookie del proxy, lib/origen.ts). Atribuye el alta y, después, el Pro.
+    acquisitionSource: origenValido((await cookies()).get(COOKIE_ORIGEN)?.value),
   })
 
   await store.addAllowedOrigin(tenant.id, origin.origin)

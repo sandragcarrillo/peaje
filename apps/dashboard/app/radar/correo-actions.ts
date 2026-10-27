@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { mandarReporteRadar, guardarLeadRadar, type ReporteRadar } from '@/lib/gateway'
 import { dictFor, getLocale, type Locale } from '@/lib/i18n'
 import { cachedScore, gradeDe, prevision } from '@/lib/ora'
+import { COOKIE_ORIGEN, origenValido } from '@/lib/origen'
 import { leer, principales } from './datos'
 import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
 import { textoLlanoDe } from './textos'
@@ -60,8 +61,11 @@ export async function registrarLead(input: {
   if (!dominio) return { ok: false, error: t.dominioInvalido }
   if (!dentroDelLimite('registro', await ipDe(), TOPE_REGISTRO)) return { ok: false, error: t.limite }
 
+  // Origen de primer contacto (cookie del proxy, lib/origen.ts): con qué enlace llegó.
+  const acquisitionSource = origenValido((await cookies()).get(COOKIE_ORIGEN)?.value)
+
   try {
-    await guardarLeadRadar({ email, domain: dominio, locale, marketingConsent: input.consiente === true })
+    await guardarLeadRadar({ email, domain: dominio, locale, marketingConsent: input.consiente === true, acquisitionSource })
   } catch (err) {
     console.error(`[radar] no se pudo guardar el lead de ${dominio}`, err)
     return { ok: false, error: t.fallo }
@@ -78,7 +82,7 @@ export async function registrarLead(input: {
 
   // El correo no frena la respuesta: si el dominio todavía no tiene puntaje,
   // sale después de medir (enviarReporte).
-  after(() => reportar(email, dominio, locale))
+  after(() => reportar(email, dominio, locale, false, acquisitionSource))
   return { ok: true }
 }
 
@@ -98,7 +102,9 @@ export async function enviarReporte(dominio: string): Promise<boolean> {
     const locale = await getLocale()
     // Recién medido: el correo lleva esta medición, no la que Ora tiene en su CDN.
     const fresco = dominiosFrescos(jar.get(COOKIE_FRESCO)?.value).includes(limpio)
-    after(() => reportar(email, limpio, locale, fresco))
+    // Si este dominio todavía no era lead de este email, el gateway lo crea con este origen.
+    const origen = origenValido(jar.get(COOKIE_ORIGEN)?.value)
+    after(() => reportar(email, limpio, locale, fresco, origen))
     return true
   } catch (err) {
     console.error('[radar] enviarReporte falló', err)
@@ -107,7 +113,13 @@ export async function enviarReporte(dominio: string): Promise<boolean> {
 }
 
 /** Arma el reporte con el puntaje de Ora y lo manda por el gateway. Nunca lanza. */
-async function reportar(email: string, dominio: string, locale: Locale, fresco = false): Promise<void> {
+async function reportar(
+  email: string,
+  dominio: string,
+  locale: Locale,
+  fresco = false,
+  acquisitionSource: string | null = null,
+): Promise<void> {
   try {
     const score = await cachedScore(dominio, { fresco })
     if (!score) return
@@ -129,6 +141,7 @@ async function reportar(email: string, dominio: string, locale: Locale, fresco =
       projected: p.estimado,
       projectedGrade: gradeDe(p.estimado),
       fixes,
+      acquisitionSource,
     })
     if (!r.sent) console.warn(`[radar] reporte de ${dominio} no enviado: ${r.reason ?? 'sin motivo'}`)
   } catch (err) {

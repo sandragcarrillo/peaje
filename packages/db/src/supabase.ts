@@ -104,6 +104,8 @@ function tenantFrom(row: Row): Tenant {
     ownerWalletId: row.owner_wallet_id ?? null,
     custodialWalletLegacy: row.custodial_wallet_legacy ?? null,
     custodialWalletIdLegacy: row.custodial_wallet_id_legacy ?? null,
+    // ---- origen: `??` hasta que corra la migración 20261026300000 ----
+    acquisitionSource: row.acquisition_source ?? null,
     createdAt: row.created_at,
   }
 }
@@ -388,7 +390,32 @@ export class SupabaseStore implements Store {
       .select()
       .single()
     this.#fail('createTenant', error)
-    return tenantFrom(data as Row)
+    const tenant = tenantFrom(data as Row)
+    if (input.acquisitionSource && (await this.#guardarOrigen('tenants', { id: tenant.id }, input.acquisitionSource))) {
+      tenant.acquisitionSource = input.acquisitionSource
+    }
+    return tenant
+  }
+
+  /**
+   * Origen de primer contacto, aparte del insert o upsert y solo si la fila no
+   * tenía: un alta o un lead nunca falla por la atribución (por ejemplo, si la
+   * migración 20261026300000 todavía no corrió). Devuelve si quedó guardado.
+   */
+  async #guardarOrigen(tabla: 'tenants' | 'radar_leads', donde: Record<string, string>, origen: string): Promise<boolean> {
+    try {
+      let q = this.#db.from(tabla).update({ acquisition_source: origen })
+      for (const [col, valor] of Object.entries(donde)) q = q.eq(col, valor)
+      const { data, error } = await q.is('acquisition_source', null).select('id')
+      if (error) {
+        console.warn(`[supabase] no se guardó el origen en ${tabla}: ${error.message}`)
+        return false
+      }
+      return (data?.length ?? 0) > 0
+    } catch (err) {
+      console.warn(`[supabase] no se guardó el origen en ${tabla}`, err)
+      return false
+    }
   }
 
   async #tenantWhere(column: string, value: string): Promise<Tenant | null> {
@@ -1932,8 +1959,38 @@ export class SupabaseStore implements Store {
       .select()
       .single()
     this.#fail('upsertRadarLead', error)
-    return radarLeadFrom(data as Row)
+    const lead = radarLeadFrom(data as Row)
+    // Primer contacto: solo si el lead no tenía (el upsert no toca la columna).
+    if (input.acquisitionSource && !lead.acquisitionSource) {
+      if (await this.#guardarOrigen('radar_leads', { email: input.email, domain: input.domain }, input.acquisitionSource)) {
+        lead.acquisitionSource = input.acquisitionSource
+      }
+    }
+    return lead
   }
+
+  // ---- origen de primer contacto (20261026300000) ----
+  // Supabase corta en 1000 filas por pedido (max-rows): de sobra para 30 días de leads y altas hoy.
+  async listRadarLeadsSince(since: string): Promise<RadarLead[]> {
+    const { data, error } = await this.#db
+      .from('radar_leads')
+      .select()
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+    this.#fail('listRadarLeadsSince', error)
+    return (data ?? []).map(radarLeadFrom)
+  }
+
+  async listTenantsSince(since: string): Promise<Tenant[]> {
+    const { data, error } = await this.#db
+      .from('tenants')
+      .select()
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+    this.#fail('listTenantsSince', error)
+    return (data ?? []).map(tenantFrom)
+  }
+  // ---- fin origen ----
 
   async getRadarLead(email: string, domain: string): Promise<RadarLead | null> {
     const { data, error } = await this.#db.from('radar_leads').select().eq('email', email).eq('domain', domain).maybeSingle()
@@ -2030,6 +2087,8 @@ function radarLeadFrom(row: Row): RadarLead {
     locale: row.locale,
     marketingConsent: Boolean(row.marketing_consent),
     lastReportAt: row.last_report_at ? String(row.last_report_at) : null,
+    // `??` hasta que corra la migración 20261026300000.
+    acquisitionSource: row.acquisition_source ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   }

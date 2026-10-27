@@ -116,6 +116,7 @@ export class MemoryStore implements Store {
       paddleCancelAt: null,
       voiceProfile: null,
       voiceProfileAt: null,
+      acquisitionSource: input.acquisitionSource ?? null,
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -1180,12 +1181,28 @@ export class MemoryStore implements Store {
       locale: input.locale,
       marketingConsent: input.marketingConsent,
       lastReportAt: previo?.lastReportAt ?? null,
+      // Primer contacto: el que ya estaba se queda.
+      acquisitionSource: previo?.acquisitionSource ?? input.acquisitionSource ?? null,
       createdAt: previo?.createdAt ?? ahora,
       updatedAt: ahora,
     }
     this.#radarLeads.set(clave, fila)
     return fila
   }
+
+  // ---- origen de primer contacto ----
+  async listRadarLeadsSince(since: string): Promise<RadarLead[]> {
+    return [...this.#radarLeads.values()]
+      .filter((l) => l.createdAt >= since)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
+  async listTenantsSince(since: string): Promise<Tenant[]> {
+    return [...this.#tenants.values()]
+      .filter((t) => t.createdAt >= since)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+  // ---- fin origen ----
 
   async getRadarLead(email: string, domain: string): Promise<RadarLead | null> {
     return this.#radarLeads.get(`${email}|${domain}`) ?? null

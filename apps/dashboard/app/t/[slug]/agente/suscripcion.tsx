@@ -1,6 +1,7 @@
 'use client'
 
 import type { AccesoPro, BillingPayment } from '@peaje/db'
+import { track } from '@vercel/analytics'
 import Link from 'next/link'
 import { useEffect, useState, useTransition } from 'react'
 import type { EstadoBilling } from '@/lib/gateway'
@@ -273,6 +274,8 @@ function useCheckout(slug: string, paddle: PaddleCliente) {
         customData: { tenantId: paddle.tenantId, slug, plan, locale },
         settings: { displayMode: 'overlay', variant: 'one-page', theme: temaActual(), locale },
       })
+      // Evento de Vercel Web Analytics. El pago y su origen los cuenta /admin/origenes.
+      track('pro_checkout_opened', { plan })
     } catch (e) {
       console.warn('Paddle checkout:', e)
       setEstado('error')

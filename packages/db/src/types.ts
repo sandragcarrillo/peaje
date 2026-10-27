@@ -69,6 +69,12 @@ export type Tenant = {
   voiceProfile: VoiceProfile | null
   voiceProfileAt: string | null
   // ---- fin voz ----
+  /**
+   * Origen de primer contacto de quien lo dio de alta (cookie peaje_origen del
+   * dashboard): ref, "utm_source/utm_medium/utm_campaign" o el host del
+   * referrer. Null: sin origen o antes de la migración 20261026300000.
+   */
+  acquisitionSource: string | null
   createdAt: string
 }
 
@@ -299,6 +305,8 @@ export type NewTenant = {
   privyUserId?: string | null
   ownerWallet?: string | null
   ownerWalletId?: string | null
+  /** Ver Tenant.acquisitionSource. */
+  acquisitionSource?: string | null
 }
 
 export type Resource = {
@@ -733,11 +741,20 @@ export type RadarLead = {
   /** Aceptó tips ocasionales. El reporte del dominio sale igual. */
   marketingConsent: boolean
   lastReportAt: string | null
+  /**
+   * Origen de primer contacto (cookie peaje_origen), como Tenant.acquisitionSource.
+   * `source` es otra cosa: de qué formulario vino ('radar'). El primero que
+   * llega se queda: un upsert posterior no lo pisa.
+   */
+  acquisitionSource: string | null
   createdAt: string
   updatedAt: string
 }
 
-export type NewRadarLead = Pick<RadarLead, 'email' | 'domain' | 'locale' | 'marketingConsent'> & { source?: string }
+export type NewRadarLead = Pick<RadarLead, 'email' | 'domain' | 'locale' | 'marketingConsent'> & {
+  source?: string
+  acquisitionSource?: string | null
+}
 
 // ---- radar público: foto de citación (20261026200000) ----
 
@@ -1091,6 +1108,11 @@ export interface Store {
    * ya se mandó hace poco o no existe. Dos pedidos a la vez no mandan dos correos.
    */
   claimRadarReport(email: string, domain: string, notSince: string): Promise<RadarLead | null>
+  // ---- origen de primer contacto (20261026300000) ----
+  /** Leads del radar creados desde `since` (ISO), más reciente primero. Para /admin/origenes. */
+  listRadarLeadsSince(since: string): Promise<RadarLead[]>
+  /** Negocios creados desde `since` (ISO), más reciente primero. Para /admin/origenes. */
+  listTenantsSince(since: string): Promise<Tenant[]>
   // ---- radar público: foto de citación ----
   /** La última medición terminada del dominio e idioma con measured_at >= since, o null. */
   getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null>

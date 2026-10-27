@@ -7,7 +7,7 @@ import type { MetadataRoute } from 'next'
  */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: '*', allow: '/', disallow: ['/t/', '/api/', '/acceder', '/salir', '/wallet', '/nuevo'] }],
+    rules: [{ userAgent: '*', allow: '/', disallow: ['/t/', '/api/', '/acceder', '/salir', '/wallet', '/nuevo', '/admin'] }],
     sitemap: 'https://usepeaje.com/sitemap.xml',
     host: 'https://usepeaje.com',
   }

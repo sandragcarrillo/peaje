@@ -293,7 +293,14 @@ export function describirSitio(slug: string): void {
 
 // ---- radar público: leads y reporte por correo ----
 
-export function guardarLeadRadar(body: { email: string; domain: string; locale: 'es' | 'en'; marketingConsent: boolean }) {
+/** `acquisitionSource`: origen de primer contacto (lib/origen.ts); el gateway no pisa el que ya tenga el lead. */
+export function guardarLeadRadar(body: {
+  email: string
+  domain: string
+  locale: 'es' | 'en'
+  marketingConsent: boolean
+  acquisitionSource: string | null
+}) {
   return internal<{ lead: import('@peaje/db').RadarLead }>(`/radar/leads`, {
     method: 'POST',
     body: JSON.stringify({ ...body, source: 'radar' }),
@@ -309,6 +316,8 @@ export type ReporteRadar = {
   projected: number
   projectedGrade: string
   fixes: { name: string; recommendation: string | null; points: number | null }[]
+  /** Para el lead que nace en el gateway si este dominio todavía no tenía (otro dominio del mismo email). */
+  acquisitionSource?: string | null
 }
 
 /** `sent: false` con motivo (correo sin configurar, mandado hace poco) no es error. */

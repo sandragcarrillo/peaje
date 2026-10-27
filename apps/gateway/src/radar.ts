@@ -39,6 +39,16 @@ const dominio = z
   .max(200)
   .regex(/^([a-z0-9-]+\.)+[a-z]{2,}$/)
 const locale = z.enum(['es', 'en'])
+/**
+ * Origen de primer contacto (cookie peaje_origen del dashboard, lib/origen.ts):
+ * hasta tres partes [a-z0-9._-] de 60 separadas por "/". Si llega mal se
+ * descarta y el lead se guarda igual.
+ */
+const origen = z
+  .string()
+  .regex(/^[a-z0-9._-]{1,60}(\/[a-z0-9._-]{1,60}){0,2}$/)
+  .nullish()
+  .catch(null)
 
 const leadBody = z.object({
   email,
@@ -46,6 +56,7 @@ const leadBody = z.object({
   locale,
   marketingConsent: z.boolean(),
   source: z.string().max(40).optional(),
+  acquisitionSource: origen,
 })
 
 radarRouter.post('/radar/leads', async (c) => {
@@ -66,6 +77,8 @@ const reportBody = z.object({
   fixes: z
     .array(z.object({ name: z.string().max(200), recommendation: z.string().max(600).nullable(), points: z.number().nullable() }))
     .max(3),
+  /** Para el lead que nace acá (otro dominio del mismo email). */
+  acquisitionSource: origen,
 })
 export type ReporteRadar = z.infer<typeof reportBody>
 
@@ -80,7 +93,14 @@ radarRouter.post('/radar/report', async (c) => {
   // Quien ya dejó su email puede medir otros dominios: el lead de ese dominio
   // nace acá, sin consentimiento de tips (no lo dio para este).
   if (!(await store.getRadarLead(r.email, r.domain))) {
-    await store.upsertRadarLead({ email: r.email, domain: r.domain, locale: r.locale, marketingConsent: false, source: 'radar' })
+    await store.upsertRadarLead({
+      email: r.email,
+      domain: r.domain,
+      locale: r.locale,
+      marketingConsent: false,
+      source: 'radar',
+      acquisitionSource: r.acquisitionSource,
+    })
   }
 
   if (!process.env.RESEND_API_KEY || !process.env.AGENTS_FROM_EMAIL) {

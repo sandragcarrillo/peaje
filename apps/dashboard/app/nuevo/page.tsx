@@ -1,6 +1,7 @@
 'use client'
 
 import { useLoginWithEmail, usePrivy } from '@privy-io/react-auth'
+import { track } from '@vercel/analytics'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useDict } from '@/lib/i18n/client'
@@ -47,7 +48,10 @@ export default function NuevoNegocio() {
   }, [])
 
   useEffect(() => {
-    if (resultado?.ok) router.replace(irAPlan ? `/t/${resultado.slug}/agente#plan` : `/t/${resultado.slug}`)
+    if (!resultado?.ok) return
+    // Evento de Vercel Web Analytics: el negocio quedó creado (sin el dominio ni el correo).
+    track('signup_completed')
+    router.replace(irAPlan ? `/t/${resultado.slug}/agente#plan` : `/t/${resultado.slug}`)
   }, [resultado, irAPlan, router])
 
   const d = useDict()

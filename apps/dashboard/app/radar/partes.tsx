@@ -1,5 +1,6 @@
 'use client'
 
+import { track } from '@vercel/analytics'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -75,6 +76,8 @@ export function Formulario({
       setEnviando(false)
       return
     }
+    // Evento de Vercel Web Analytics (sin el correo ni el dominio).
+    track('radar_email_saved', { from: 'form' })
     router.push(rutaRadar(dominio, medir))
     setEnviando(false)
   }
@@ -219,6 +222,7 @@ export function MandarInforme({ dominio, conCorreo }: { dominio: string; conCorr
       setEstado('pidiendo')
       return
     }
+    track('radar_email_saved', { from: 'report' })
     setEstado('listo')
   }
 

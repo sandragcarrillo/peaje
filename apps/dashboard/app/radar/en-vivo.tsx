@@ -1,5 +1,6 @@
 'use client'
 
+import { track } from '@vercel/analytics'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
@@ -188,6 +189,8 @@ export function MedicionEnVivo({ dominio }: { dominio: string }) {
       setOra('error')
       return
     }
+    // Evento de Vercel Web Analytics (sin el dominio ni el correo).
+    track('radar_measured')
     // El reporte por correo sale aparte: si falla, el resultado igual se ve.
     void enviarReporte(dominio).catch((err: unknown) => console.error('[radar] enviarReporte lanzó', err))
     marcarRevelado(dominio)
