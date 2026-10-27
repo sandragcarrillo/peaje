@@ -1,0 +1,43 @@
+Copyright (c) 2026 Sandra Carrillo. All rights reserved.
+
+This repository is public so it can be reviewed. Being able to see the code
+does not give anyone permission to use it.
+
+No one may copy, modify, merge, publish, distribute, sublicense, sell, host
+or otherwise use this software or any part of it, for any purpose, without
+prior written permission from the copyright holder. That includes running it
+as a service, building a product on it, and using it to train or evaluate
+AI models.
+
+Exceptions: the packages in packages/peaje-next, packages/peaje-proxy and
+packages/peaje-cli are published under the MIT License. Each has its own
+LICENSE file, and that license covers only those packages.
+
+"Peaje" and its logo are not licensed for any use.
+
+To ask for permission: hello@usepeaje.com
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+
+---
+
+Copyright (c) 2026 Sandra Carrillo. Todos los derechos reservados.
+
+Este repositorio es público para que se pueda revisar. Poder ver el código no
+le da a nadie permiso para usarlo.
+
+Nadie puede copiar, modificar, combinar, publicar, distribuir, sublicenciar,
+vender, alojar ni usar de ninguna otra forma este software ni ninguna parte
+de él, para ningún fin, sin permiso previo y por escrito del titular. Eso
+incluye ofrecerlo como servicio, construir un producto encima y usarlo para
+entrenar o evaluar modelos de IA.
+
+Excepciones: los paquetes de packages/peaje-next, packages/peaje-proxy y
+packages/peaje-cli se publican con licencia MIT. Cada uno tiene su propio
+archivo LICENSE, y esa licencia cubre solo esos paquetes.
+
+El nombre "Peaje" y su logo no tienen licencia para ningún uso.
+
+Para pedir permiso: hello@usepeaje.com
+
+EL SOFTWARE SE ENTREGA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO.

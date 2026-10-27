@@ -30,6 +30,7 @@ import { guardarPerfilDeVoz, perfilDeVoz, type CambioDeVoz } from '../ciclo/voz.
 import { COSTOS_CREDITOS, type AccionCreditos } from '@peaje/db'
 import { anotarCreditos, avisoCreditos, lineaSinCreditos, saldoCreditos, usoPublico, type Saldo } from './creditos.js'
 import { clasificarTema } from './tema.js'
+import { completarTarea } from './verificar.js'
 import { env } from '../env.js'
 
 const MAX_CUSTOM = 5
@@ -85,6 +86,18 @@ function listaDeOpciones(x: unknown): string[] {
     }
   }
   return (Array.isArray(lista) ? lista : []).map((c) => String(c).trim()).filter(Boolean).map((c) => c.slice(0, 80)).slice(0, 5)
+}
+
+/** Una URL https del dominio del negocio (o su www). Otra cosa no cierra una tarea. */
+function urlDelSitio(tenant: Tenant, x: unknown): string | null {
+  const dominio = dominioVerificable(tenant.originUrl)
+  if (typeof x !== 'string' || !dominio) return null
+  try {
+    const u = new URL(x.trim())
+    return u.protocol === 'https:' && u.hostname.replace(/^www\./, '') === dominio.replace(/^www\./, '') ? u.toString() : null
+  } catch {
+    return null
+  }
 }
 
 /** Herramientas que dependen de que los agentes paguen de verdad: apagadas hasta mainnet (env.cobrosVisibles). */
@@ -432,6 +445,26 @@ HERRAMIENTAS.push(
       return { attached: i.part, title: t.title, characters: texto.length }
     },
   },
+  {
+    name: 'complete_task',
+    description:
+      'Mark a task done once it is live, with the URL where it lives on their site. Peaje checks it on the live site right away: if it passes, the task is verified and the citation checks at 2 and 6 weeks get scheduled; if not, it stays done and Peaje checks again every day. Call it yourself when the owner says it is published or gives the URL, or when you see it live with read_site_page. Never ask the owner to mark it in the dashboard.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, url: { type: 'string', description: 'The live URL on their own site' } },
+      required: ['id'],
+    },
+    async correr(i, { tenant }) {
+      const t = await store.getTask(tenant.id, String(i.id ?? ''))
+      if (!t) return { error: 'task not found; call list_tasks' }
+      if (t.status === 'dismissed') return { error: 'that task was dismissed' }
+      if (t.status === 'verified') return { status: t.status, note: t.note, alreadyVerified: true }
+      const url = urlDelSitio(tenant, i.url)
+      if (i.url && !url) return { error: "the URL must be https and on the owner's own domain" }
+      const r = await completarTarea(tenant, t, url, store)
+      return { status: r.status, note: r.note, url: r.doneUrl }
+    },
+  },
 )
 
 // ---- M7: comprador misterioso ----
@@ -497,6 +530,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
     'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ' + asistentesMedidos('en', 'o') + ' cites it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, use send_task_text instead of copying it yourself.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
+    'When a page or a fix is live (the owner says it is published, gives its URL, or you see it with read_site_page), call complete_task with the live URL yourself and tell them in one sentence what happens next (Peaje checks it now and measures at 2 and 6 weeks). Never tell the owner to mark a task done in the dashboard.',
     'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
@@ -546,6 +580,7 @@ Object.assign(ESTADOS, {
   get_mystery_results: { es: 'Revisando la última prueba del agente comprador…', en: 'Checking the last buying agent test…' },
   complete_draft: { es: 'Poniendo tus datos en la página…', en: 'Putting your facts into the page…' },
   send_task_text: { es: 'Preparando el texto para copiar…', en: 'Getting the text ready to copy…' },
+  complete_task: { es: 'Revisando la página en tu sitio…', en: 'Checking the page on your site…' },
 })
 // ---- fin M7 ----
 
@@ -770,6 +805,7 @@ const sinError = (s: unknown) => !!s && typeof s === 'object' && !('error' in s)
 const empezo = (s: unknown) => (s as { started?: unknown } | null)?.started === true
 export const COBRO: Record<string, Cobro> = {
   offer_choices: 'gratis',
+  complete_task: 'gratis',
   get_credits: 'gratis',
   schedule_report: 'gratis',
   propose_route_change: 'gratis',

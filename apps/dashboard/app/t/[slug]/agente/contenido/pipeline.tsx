@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 import type { TaskCheck } from '@peaje/db'
 import { useDict, useLocale } from '@/lib/i18n/client'
 import { contarFiltros, nombreMotor, type Etapa, type EstadoEtapa, type Filtro, type Insignia, type Medicion, type Pieza } from './etapas'
 import { TextoMarkdown } from './markdown'
+import { tareaHecha } from '../actions'
 
 type FiltroLista = 'todas' | Exclude<Filtro, 'descartada'>
 type Pestana = 'evidencia' | 'brief' | 'borrador'
@@ -194,6 +196,7 @@ function Detalle({ slug, p, creditosPagina }: { slug: string; p: Pieza; creditos
         </div>
         <Etapas etapas={p.etapas} faltan={p.pendientes.length} />
         {p.resultado ? <ResultadoBloque p={p} /> : null}
+        {p.status === 'open' || p.status === 'in_progress' ? <MarcarPublicada slug={slug} id={p.id} /> : null}
       </header>
 
       <div role="tablist" aria-label={p.titulo} className="flex overflow-x-auto border-b border-border px-2">
@@ -564,6 +567,58 @@ function PanelBorrador({ slug, p, creditosPagina }: { slug: string; p: Pieza; cr
         <TextoMarkdown texto={borrador} />
       </div>
     </div>
+  )
+}
+
+/**
+ * "Ya la publiqué": la URL va a la misma acción que la lista de tareas de Mi
+ * agente. Peaje la revisa en vivo; si pasa, agenda las mediciones de 2 y 6
+ * semanas, y si todavía no está, la vuelve a revisar cada día.
+ */
+function MarcarPublicada({ slug, id }: { slug: string; id: string }) {
+  const { contenido: t } = useDict()
+  const router = useRouter()
+  const [url, setUrl] = useState('')
+  const [estado, setEstado] = useState<'nada' | 'enviando' | 'ok' | 'pendiente' | 'error'>('nada')
+
+  async function marcar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!/^https?:\/\/\S+\.\S+/.test(url.trim())) return setEstado('error')
+    setEstado('enviando')
+    try {
+      const tarea = await tareaHecha(slug, id, url)
+      setEstado(tarea.status === 'verified' ? 'ok' : 'pendiente')
+      router.refresh()
+    } catch {
+      setEstado('error')
+    }
+  }
+
+  return (
+    <form onSubmit={marcar} className="space-y-2 border border-border bg-panel p-4">
+      <p className="text-sm font-medium">{t.publicarTitulo}</p>
+      <p className="text-xs text-muted">{t.publicarTexto}</p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="url"
+          inputMode="url"
+          required
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://"
+          aria-label={t.publicarUrl}
+          className="min-w-0 flex-1 border border-border bg-bg px-3 py-2 text-sm"
+        />
+        <button type="submit" disabled={estado === 'enviando'} className="btn btn-primario btn-chico shrink-0">
+          {estado === 'enviando' ? t.publicarRevisando : t.publicarBoton}
+        </button>
+      </div>
+      {estado === 'ok' || estado === 'pendiente' || estado === 'error' ? (
+        <p role="status" className="text-xs text-muted">
+          {estado === 'ok' ? t.publicarOk : estado === 'pendiente' ? t.publicarPendiente : t.publicarError}
+        </p>
+      ) : null}
+    </form>
   )
 }
 

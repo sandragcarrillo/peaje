@@ -91,6 +91,14 @@ export const contenido = {
     // ---- pestañas ----
     tabs: { evidencia: 'Evidencia', brief: 'Instrucciones', borrador: 'Borrador' } as Record<string, string>,
     abrirTarea: 'Abrir la tarea completa',
+    publicarTitulo: '¿Ya la publicaste?',
+    publicarTexto: 'Pega la URL donde quedó. Peaje la revisa en vivo y mide a las 2 y a las 6 semanas si la IA la cita.',
+    publicarUrl: 'URL de la página publicada',
+    publicarBoton: 'Marcar como publicada',
+    publicarRevisando: 'Revisando…',
+    publicarOk: 'Listo: Peaje la vio en vivo y ya agendó las mediciones.',
+    publicarPendiente: 'Quedó marcada. Todavía no la vemos en vivo; Peaje la vuelve a revisar cada día.',
+    publicarError: 'No pudimos marcarla. Revisa la URL y prueba de nuevo.',
 
     // ---- evidencia ----
     evPregunta: 'La pregunta',
@@ -220,6 +228,14 @@ export const contenido = {
 
     tabs: { evidencia: 'Evidence', brief: 'Brief', borrador: 'Draft' } as Record<string, string>,
     abrirTarea: 'Open the full task',
+    publicarTitulo: 'Already published it?',
+    publicarTexto: 'Paste the URL where it lives. Peaje checks it on the live site and measures at 2 and 6 weeks whether AI cites it.',
+    publicarUrl: 'URL of the published page',
+    publicarBoton: 'Mark as published',
+    publicarRevisando: 'Checking…',
+    publicarOk: 'Done: Peaje saw it live and scheduled the checks.',
+    publicarPendiente: 'Marked. We do not see it live yet; Peaje checks again every day.',
+    publicarError: 'We could not mark it. Check the URL and try again.',
 
     evPregunta: 'The question',
     evPagina: 'The page',
