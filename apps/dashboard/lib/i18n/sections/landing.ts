@@ -87,15 +87,21 @@ export const landing = {
 
     // Precio
     precioTitulo: 'Precios',
-    precioMonto: (usd: number) => `US$${usd} al mes`,
-    precioEtiqueta: 'Precio de fundador',
-    precioNormal: (usd: number) => `Precio normal: US$${usd} al mes.`,
-    precioCupos: (cupos: number) => `Solo para los primeros ${cupos} negocios, y lo mantienes mientras sigas.`,
-    precioCancelar: 'Cancelas cuando quieras desde tu panel, sin llamadas.',
-    letraChica: (pct: number) =>
-      COBROS_VISIBLES
-        ? `Revisar tu sitio es gratis. Si cobras a los agentes, Peaje se queda con el ${pct}% de cada pago. Por ahora los pagos funcionan en redes de prueba: la demo es una simulación y no mueve dinero real.`
-        : `Revisar tu sitio y el kit son gratis. Solo pagas el agente, si lo quieres.`,
+    // Tarjeta de Pro de la landing (referencia de San: boringmarketing.com). Montos y cupos llegan de @peaje/db.
+    precioGratis: 'El Radar y el kit son gratis, sin tarjeta. Solo pagas el agente, si lo quieres.',
+    precioUnidad: '/mes',
+    precioCreditos: (n: number) => `${n} créditos/mes`,
+    precioValor: `Un agente que trabaja tu sitio todo el mes para que ${asistentesMedidos('es')} te recomienden.`,
+    precioTodoTitulo: 'Un solo agente, todo incluido',
+    precioHabilidades: ['Diagnóstico', 'Contenido', 'Citas en IA', 'Arreglos', 'Monitor diario', 'Reportes'],
+    precioPuntos: [
+      { titulo: 'Sabe de tu negocio', texto: 'Trabaja con los datos de tu sitio y con lo que tus clientes le preguntan a la IA.' },
+      { titulo: 'Mide si la IA te recomienda', texto: `Les pregunta a ${asistentesMedidos('es')} lo mismo que tus clientes y te dice si te citan.` },
+      { titulo: 'Te escribe las páginas', texto: 'Borradores completos de las páginas que te faltan, con datos de tu sitio.' },
+      { titulo: 'Te habla por Telegram', texto: 'Conversa contigo ahí o en tu panel, sin reuniones ni llamadas.' },
+      { titulo: 'Vuelve a medir', texto: 'A las 2 y a las 6 semanas, para que sepas si funcionó.' },
+    ],
+    precioPie: (cupos: number) => [`Precio de fundador para los primeros ${cupos} negocios`, 'Cancelas cuando quieras'],
     verPrecios: 'Ver todos los detalles del precio',
 
     // FAQ provisoria: reemplazar por la del Editor si San la pega.
@@ -221,15 +227,20 @@ export const landing = {
     ],
 
     precioTitulo: 'Pricing',
-    precioMonto: (usd: number) => `US$${usd} a month`,
-    precioEtiqueta: 'Founder price',
-    precioNormal: (usd: number) => `Regular price: US$${usd} a month.`,
-    precioCupos: (cupos: number) => `Only for the first ${cupos} businesses, and you keep it for as long as you stay.`,
-    precioCancelar: 'Cancel anytime from your dashboard, no calls.',
-    letraChica: (pct: number) =>
-      COBROS_VISIBLES
-        ? `Checking your site is free. If you charge agents, Peaje keeps ${pct}% of each payment. For now payments run on test networks: the demo is a simulation and moves no real money.`
-        : `Checking your site and the kit are free. You only pay for the agent, if you want it.`,
+    precioGratis: 'The Radar and the kit are free, no card needed. You only pay for the agent, if you want it.',
+    precioUnidad: '/month',
+    precioCreditos: (n: number) => `${n} credits/mo`,
+    precioValor: `An agent that works on your site all month so ${asistentesMedidos('en')} recommend you.`,
+    precioTodoTitulo: 'One agent, everything included',
+    precioHabilidades: ['Diagnosis', 'Content', 'AI citations', 'Fixes', 'Daily monitor', 'Reports'],
+    precioPuntos: [
+      { titulo: 'Knows your business', texto: 'Works from the facts on your site and from what your customers ask AI.' },
+      { titulo: 'Tracks whether AI recommends you', texto: `Asks ${asistentesMedidos('en')} what your customers ask and tells you whether they cite you.` },
+      { titulo: 'Writes your pages', texto: 'Full drafts of the pages you are missing, using facts from your site.' },
+      { titulo: 'Talks to you on Telegram', texto: 'It chats with you there or on your dashboard, with no meetings or calls.' },
+      { titulo: 'Measures again', texto: 'At 2 and 6 weeks, so you know whether it worked.' },
+    ],
+    precioPie: (cupos: number) => [`Founder price for the first ${cupos} businesses`, 'Cancel anytime'],
     verPrecios: 'See the full pricing details',
 
     faqTitulo: 'Questions',

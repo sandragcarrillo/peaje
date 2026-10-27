@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { CUPOS_FOUNDER, PRECIOS_USD } from '@peaje/db'
+import { CUPOS_FOUNDER, LIMITES, PRECIOS_USD } from '@peaje/db'
 import { getDict, type Dict } from '@/lib/i18n'
+import { COBROS_VISIBLES } from '@/lib/config'
 import { currentTenant } from '@/lib/session'
 import { ChatEjemplo } from './components/chat-ejemplo'
 
@@ -26,6 +27,7 @@ function Sangre({ children, className = '' }: { children: React.ReactNode; class
 export default async function Landing() {
   const [tenant, d] = await Promise.all([currentTenant(), getDict()])
   const t = d.landing
+  const P = d.precios
   const agenteHref = tenant ? `/t/${tenant.slug}/agente` : '/nuevo'
   const agenteTexto = tenant ? t.ctaDashboard : t.ctaAgente
 
@@ -97,29 +99,67 @@ export default async function Landing() {
       {/* ── Precios ──────────────────────────────────────────── */}
       <Sangre className="isla-crema bg-bg text-text">
         <section id="precio" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
-          <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
-          <div className="mt-8 grid gap-8 border border-border bg-panel p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-end">
-            <div className="space-y-3">
-              <p className="etiqueta flex items-center gap-2 font-bold text-accent">
-                <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
-                {t.precioEtiqueta}
-              </p>
-              <p className="text-4xl font-bold tracking-tight sm:text-5xl">{t.precioMonto(PRECIOS_USD.founder)}</p>
-              <p className="text-base">{t.precioCupos(CUPOS_FOUNDER)}</p>
-              <p className="text-sm text-muted">
-                {t.precioNormal(PRECIOS_USD.pro)} {t.precioCancelar}
-              </p>
+          {/*
+            Como la tarjeta de precio de boringmarketing.com (referencia de San, 26 oct
+            2026): una sola tarjeta de Pro que cuenta qué hace el agente en palabras
+            de negocio. Lo gratis va al lado en una línea;
+            el detalle (créditos, cobro, reembolso) queda en /precios.
+          */}
+          <div className="grid gap-10 md:grid-cols-[1fr_1.35fr] md:items-start">
+            <div>
+              <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
+              <p className="mt-4 max-w-sm text-base text-muted">{t.precioGratis}</p>
+              {COBROS_VISIBLES ? <p className="mt-3 max-w-sm text-sm text-muted">{P.kitComision(COMISION_PCT)}</p> : null}
+              <div className="mt-6 flex flex-col items-start gap-4">
+                <Link href="/radar" className="btn btn-secundario">
+                  {t.ctaRadar}
+                </Link>
+                <Link href="/precios" className="text-sm text-muted underline underline-offset-4 hover:text-text">
+                  {t.verPrecios}
+                </Link>
+              </div>
             </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <Link href={agenteHref} className="btn btn-primario">
+
+            <div className="rounded-lg border border-accent bg-panel p-6 sm:p-8">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p className="flex items-baseline gap-2">
+                  <span className="text-4xl font-semibold tabular-nums sm:text-5xl">US${PRECIOS_USD.founder}</span>
+                  <span className="text-lg text-muted line-through">US${PRECIOS_USD.pro}</span>
+                  <span className="font-mono text-sm text-muted">{t.precioUnidad}</span>
+                </p>
+                <p className="font-mono text-sm text-muted">{t.precioCreditos(LIMITES.pro.creditos)}</p>
+              </div>
+              <p className="mt-4 text-base">{t.precioValor}</p>
+
+              <p className="mt-7 text-sm font-semibold">{t.precioTodoTitulo}</p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {t.precioHabilidades.map((h) => (
+                  <li key={h} className="etiqueta rounded-md border border-border px-2.5 py-1 text-accent">
+                    {h}
+                  </li>
+                ))}
+              </ul>
+
+              <ul className="mt-7 space-y-3.5">
+                {t.precioPuntos.map((p) => (
+                  <li key={p.titulo} className="flex gap-3 text-[15px] leading-6">
+                    <svg className="mt-1 h-4 w-4 shrink-0 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="m5 12.5 4.5 4.5L19 7.5" />
+                    </svg>
+                    <span>
+                      <strong className="font-semibold">{p.titulo}.</strong> <span className="text-muted">{p.texto}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link href={tenant ? agenteHref : '/nuevo?plan=1'} className="btn btn-primario btn-ancho mt-8">
                 {agenteTexto}
               </Link>
-              <Link href="/precios" className="text-sm text-muted underline underline-offset-4 hover:text-text">
-                {t.verPrecios}
-              </Link>
+
+              <p className="mt-6 font-mono text-xs leading-5 text-muted">{t.precioPie(CUPOS_FOUNDER).join(' · ')}</p>
             </div>
           </div>
-          <p className="mt-5 max-w-3xl text-sm text-muted">{t.letraChica(COMISION_PCT)}</p>
         </section>
       </Sangre>
 

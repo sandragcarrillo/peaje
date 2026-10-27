@@ -12,8 +12,7 @@ export const precios = {
       'Radar gratis, kit gratis y el agente de AEO en la suscripción Pro: precio de fundador de US$30 al mes para los primeros 50 negocios, luego US$69 al mes.',
     kicker: 'Precios',
     titulo: 'Empieza gratis. Paga solo por el agente.',
-    intro:
-      'Peaje es software que deja tu sitio o tu API listo para agentes de IA: que te encuentren, te lean y, si quieres, te paguen por pedido. El radar y el kit son gratis. El agente de AEO es la suscripción Pro.',
+    intro: `Peaje es software que deja tu sitio o tu API listo para agentes de IA: que te encuentren${COBROS_VISIBLES ? ', te lean y, si quieres, te paguen por pedido' : ' y te lean'}. El radar y el kit son gratis. El agente de AEO es la suscripción Pro.`,
 
     gratis: 'Gratis',
     alMes: 'al mes',
@@ -24,7 +23,8 @@ export const precios = {
     gratisIncluye: [
       'Radar: tu puntaje de hoy, qué falla y hasta dónde sube, en menos de un minuto y solo con tu email',
       'llms.txt, openapi.json, servidor MCP, agent cards y JSON-LD generados para tu sitio',
-      'Rutas con precio que responden 402 en tu propio dominio',
+      // Cobrarles a los agentes (rutas 402, comprador misterioso) se muestra cuando se prenda en mainnet.
+      ...(COBROS_VISIBLES ? ['Rutas con precio que responden 402 en tu propio dominio'] : []),
       'Registro de visitas de agentes',
       'Monitor diario y tareas para arreglar lo que falla',
     ],
@@ -51,7 +51,7 @@ export const precios = {
       { que: 'Un borrador de página', cuanto: c.pagina },
       { que: 'Una serie de páginas', cuanto: c.serie },
       { que: 'Un reporte que le pides', cuanto: c.informe },
-      { que: 'Una prueba del comprador misterioso', cuanto: c.comprador },
+      ...(COBROS_VISIBLES ? [{ que: 'Una prueba del comprador misterioso', cuanto: c.comprador }] : []),
     ],
     creditos: (n: number) => (n === 1 ? '1 crédito' : `${n} créditos`),
     creditosGratis:
@@ -65,7 +65,7 @@ export const precios = {
       'Escribe borradores completos de las páginas que responden esas preguntas, con datos de tu sitio',
       'Le pasa cada tarea a tu herramienta de código por MCP o con la CLI, y verifica el sitio en vivo',
       'Vuelve a medir a las 2 y a las 6 semanas para saber si funcionó',
-      'Comprador misterioso: prueba el paso de pago de tus rutas como lo haría un agente',
+      ...(COBROS_VISIBLES ? ['Comprador misterioso: prueba el paso de pago de tus rutas como lo haría un agente'] : []),
       'Reporte semanal por correo',
     ],
 
@@ -113,8 +113,7 @@ export const precios = {
       'Free radar, free kit and the AEO agent in the Pro subscription: founder price of US$30 a month for the first 50 businesses, then US$69 a month.',
     kicker: 'Pricing',
     titulo: 'Start free. Pay only for the agent.',
-    intro:
-      'Peaje is software that gets your site or API ready for AI agents: they find you, read you and, if you want, pay you per request. The radar and the kit are free. The AEO agent is the Pro subscription.',
+    intro: `Peaje is software that gets your site or API ready for AI agents: they find you${COBROS_VISIBLES ? ', read you and, if you want, pay you per request' : ' and read you'}. The radar and the kit are free. The AEO agent is the Pro subscription.`,
 
     gratis: 'Free',
     alMes: 'a month',
@@ -125,7 +124,7 @@ export const precios = {
     gratisIncluye: [
       'Radar: your score today, what fails and how far it can go, in under a minute and with just your email',
       'llms.txt, openapi.json, an MCP server, agent cards and JSON-LD generated for your site',
-      'Priced routes that answer 402 on your own domain',
+      ...(COBROS_VISIBLES ? ['Priced routes that answer 402 on your own domain'] : []),
       'A log of agent visits',
       'A daily monitor and tasks to fix what breaks',
     ],
@@ -150,7 +149,7 @@ export const precios = {
       { que: 'A page draft', cuanto: c.pagina },
       { que: 'A series of pages', cuanto: c.serie },
       { que: 'A report you ask for', cuanto: c.informe },
-      { que: 'A mystery shopper test', cuanto: c.comprador },
+      ...(COBROS_VISIBLES ? [{ que: 'A mystery shopper test', cuanto: c.comprador }] : []),
     ],
     creditos: (n: number) => (n === 1 ? '1 credit' : `${n} credits`),
     creditosGratis:
@@ -164,7 +163,7 @@ export const precios = {
       'Writes full drafts of the pages that answer those questions, using facts from your site',
       'Hands each task to your coding tool over MCP or the CLI, and checks the live site',
       'Measures again at 2 and 6 weeks to see whether it worked',
-      'Mystery shopper: tests the payment step of your routes the way an agent would',
+      ...(COBROS_VISIBLES ? ['Mystery shopper: tests the payment step of your routes the way an agent would'] : []),
       'A weekly report by email',
     ],
 
