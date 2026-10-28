@@ -27,7 +27,7 @@ export const miAgente = {
     claveNinguna: 'Todavía no hay clave.',
     claveActual: (prefijo: string) => `Clave activa: ${prefijo}`,
     claveGenerar: 'Crear clave',
-    claveRotar: 'Crear una nueva (la anterior deja de servir)',
+    claveRotar: 'Crear una nueva (la anterior deja de funcionar)',
     claveUnaVez: 'Cópiala ahora: no se vuelve a mostrar.',
     claudeCode: 'Claude Code',
     terminal: 'Sin MCP, desde la terminal',
