@@ -13,7 +13,8 @@ export async function crearClaveAgente(slug: string): Promise<string> {
   const tenant = await requireTenant(slug)
   const clave = generateApiKey()
   await store.setTenantApiKey(tenant.id, await hashApiKey(clave), apiKeyPrefix(clave))
-  revalidatePath(`/t/${slug}/agente`)
+  // La clave se muestra en Conexiones desde el 28 oct 2026.
+  revalidatePath(`/t/${slug}/conexiones`)
   return clave
 }
 
