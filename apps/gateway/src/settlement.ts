@@ -11,11 +11,11 @@ import {
   type LocalAccount,
   type PublicClient,
 } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { nonceManager, privateKeyToAccount } from 'viem/accounts'
 import { settlementV3Abi } from './abi/settlement-v3.js'
 import { contextoCobro } from './contexto.js'
 import { env } from './env.js'
-import { AutorizacionUsada, eip3009Abi, liquidarV3, OrigenFallo, pagadorDeLogs, PagoAdelantado, type AutorizacionFirmada, type RielV3 } from './liquidacion-v3.js'
+import { AutorizacionUsada, eip3009Abi, LiquidacionPendiente, liquidarV3, OrigenFallo, pagadorDeLogs, PagoAdelantado, type AutorizacionFirmada, type RielV3 } from './liquidacion-v3.js'
 import { store } from './store.js'
 
 /**
@@ -31,7 +31,8 @@ import { store } from './store.js'
  */
 
 const treasury = privateKeyToAccount(env.treasuryPrivateKey)
-const relayer = env.relayerPrivateKey ? privateKeyToAccount(env.relayerPrivateKey) : null
+// Con nonceManager, dos pagos simultáneos no leen el mismo nonce pendiente (uno revertía "nonce too low").
+const relayer = env.relayerPrivateKey ? privateKeyToAccount(env.relayerPrivateKey, { nonceManager }) : null
 
 type Riel = {
   chain: Chain
@@ -105,6 +106,8 @@ export async function settleAuthorization(
       { merchant: contexto?.merchant, auth: payload, networkFee },
       {
         antesDeEnviar: contexto?.origen ?? undefined,
+        // Un reintento después de un receipt lento: si el pago ya está en el ledger, ya se sirvió.
+        yaRegistrado: async (hash) => (await store.findPaymentByReceiptRef(hash)) !== null,
         alAdelantado: async (info) => {
           const registro = await store.recordStray({
             network,
@@ -155,6 +158,7 @@ export async function settleAuthorization(
       contexto.network = network
       contexto.payoutAddress = error.info.merchant
     } else if (contexto && error instanceof AutorizacionUsada) contexto.sinLiquidar = 'usada'
+    else if (contexto && error instanceof LiquidacionPendiente) contexto.sinLiquidar = 'pendiente'
     else if (contexto && contexto.origenLlamado) contexto.sinLiquidar = 'envio'
     console.warn(`[settlement] ${NETWORKS[network].label}: no se liquidó`, error instanceof Error ? error.message : error)
     throw error

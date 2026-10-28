@@ -782,6 +782,22 @@ export const settlementV3Abi = [
   },
   {
     "type": "error",
+    "name": "NetworkFeeCapTooHigh",
+    "inputs": [
+      {
+        "name": "maxNetworkFee",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "ceiling",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NetworkFeeTooHigh",
     "inputs": [
       {

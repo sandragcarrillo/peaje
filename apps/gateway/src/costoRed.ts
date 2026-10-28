@@ -1,5 +1,6 @@
 import { NETWORKS, SETTLEMENT_NETWORKS, type SettlementNetwork } from '@peaje/shared'
 import { createPublicClient, http } from 'viem'
+import { settlementV3Abi } from './abi/settlement-v3.js'
 import { ethUsd } from './chainlink.js'
 import { env } from './env.js'
 import { contratoV3 } from './settlement.js'
@@ -15,22 +16,24 @@ import { contratoV3 } from './settlement.js'
  */
 
 /**
- * Gas de `settle` en PeajeSettlementV3: ~155k en estado estable y 190k a 195k
- * el primer pago a una wallet que nunca tuvo el token (docs/contrato-v3.md).
- * 170k por 1,2 de margen (204k) cubre los dos.
+ * Gas de `settle` en PeajeSettlementV3: ~163k en estado estable y ~203k el
+ * primer pago a una wallet que nunca tuvo el token (docs/contrato-v3.md; los
+ * chequeos de roles de la auditoría del 28 oct 2026 sumaron ~8k a cada pago).
+ * 180k por 1,2 de margen (216k) cubre los dos.
  */
-export const GAS_SETTLE = 170_000n
+export const GAS_SETTLE = 180_000n
 /** Margen sobre el precio del gas del momento: el bloque siguiente puede ser más caro. */
 const MARGEN = 1.2
 /**
- * Tope por riel, en USD: coincide con `maxNetworkFee` del contrato (0,05 en
- * Arbitrum y Robinhood). Si el gas sube más que esto, Peaje absorbe la
- * diferencia; el contrato rechaza cualquier valor mayor.
+ * Tope por riel, en USD, por si no se puede leer el del contrato. El que manda
+ * es `maxNetworkFee` del contrato (0,02 en Arbitrum y Robinhood según el
+ * script de deploy): cotizar más que eso hacía que el contrato rechazara todos
+ * los pagos del riel. Si el gas sube más que el tope, Peaje absorbe la diferencia.
  */
 const TOPE_USD: Record<SettlementNetwork, number> = {
-  arbitrum: 0.05,
-  'arbitrum-usdg': 0.05,
-  robinhood: 0.05,
+  arbitrum: 0.02,
+  'arbitrum-usdg': 0.02,
+  robinhood: 0.02,
   arc: 0.01,
 }
 const REFRESCO_MS = 30_000
@@ -65,8 +68,17 @@ async function calcular(network: SettlementNetwork): Promise<number> {
   // dólares. En las demás redes es ETH y hay que convertirlo.
   const nativoEnUsd = Number(GAS_SETTLE * gasPrice) / 1e18
   const usd = (network === 'arc' ? nativoEnUsd : nativoEnUsd * (await ethUsd())) * MARGEN
-  const tope = TOPE_USD[network]
+  const tope = Math.min(TOPE_USD[network], await topeDelContrato(network).catch(() => Number.POSITIVE_INFINITY))
   return Math.min(tope, Math.ceil(usd * 1e6) / 1e6)
+}
+
+/** `maxNetworkFee` del contrato para el token del riel, en USD (stablecoin, sus decimales). */
+async function topeDelContrato(network: SettlementNetwork): Promise<number> {
+  const contrato = contratoV3(network)
+  if (!contrato) return Number.POSITIVE_INFINITY
+  const def = NETWORKS[network]
+  const cap = await cliente(env.settlementRpcUrls[network]).readContract({ address: contrato, abi: settlementV3Abi, functionName: 'maxNetworkFee', args: [def.token as `0x${string}`] })
+  return Number(cap) / 10 ** def.decimals
 }
 
 async function refrescar(): Promise<void> {

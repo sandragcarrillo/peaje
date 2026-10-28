@@ -1,6 +1,7 @@
 import {
   BaseError,
   ContractFunctionRevertedError,
+  WaitForTransactionReceiptTimeoutError,
   erc20Abi,
   parseAbi,
   parseEventLogs,
@@ -21,10 +22,16 @@ import { settlementV3Abi } from './abi/settlement-v3.js'
  * del contrato: Peaje no guarda nada y no hay retiros.
  *
  * Orden (la regla de reembolsos: se liquida solo si el origen respondió):
- *   1. Lee `authorizationState` y el saldo del pagador. Autorización usada con
- *      los fondos probadamente en el contrato (saldo que la cubre y ningún
- *      PaymentSettled de ese nonce) = pago adelantado (front-run): se registra
- *      para el Safe y el pedido se sirve una sola vez. Sin esa prueba no se sirve.
+ *   1. Lee `authorizationState` y el saldo del pagador. Si la autorización ya
+ *      se usó, se busca la tx que la usó (el AuthorizationUsed del token):
+ *      - la liquidó Peaje para este negocio por este valor y el ledger no la
+ *        tiene (el receipt tardó y el agente reintentó): se sirve como pagada;
+ *      - en esa misma tx el pagador le transfirió exactamente ese valor al
+ *        contrato y no se ruteó con settleStray: pago adelantado (front-run),
+ *        se registra para el Safe y el pedido se sirve una sola vez;
+ *      - cualquier otra cosa (la canceló, la usó para pagarle a otro, no se
+ *        encuentra): no se sirve. El saldo total del contrato no prueba nada:
+ *        ahí está la plata de todos los adelantos.
  *   2. Simula `settle` (eth_call desde el relayer): firma, saldo, tope de
  *      costo de red, merchant válido y pausa se chequean sin gastar nada.
  *   3. Pide al origen (`antesDeEnviar`). Si falla o responde 5xx, no se envía:
@@ -35,6 +42,12 @@ import { settlementV3Abi } from './abi/settlement-v3.js'
 export const eip3009Abi = parseAbi([
   'function authorizationState(address authorizer, bytes32 nonce) view returns (bool)',
   'function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)',
+])
+
+/** Eventos del token (EIP-3009 y ERC-20) con los que se prueba qué hizo una autorización. */
+export const eventosTokenAbi = parseAbi([
+  'event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
 ])
 
 /** Evento de v2 (contratos viejos): solo para leer pagos anteriores al cambio. */
@@ -78,6 +91,11 @@ export type HooksLiquidacion = {
    * que se registra ese pago adelantado; nunca dos veces).
    */
   alAdelantado?: (info: PagoAdelantadoInfo) => Promise<boolean>
+  /**
+   * ¿El ledger ya tiene este pago (por hash de la tx)? Si lo tiene, el pedido
+   * ya se sirvió: un reintento con la misma credencial no se vuelve a servir.
+   */
+  yaRegistrado?: (hash: `0x${string}`) => Promise<boolean>
 }
 
 export type Liquidado = { hash: `0x${string}`; net: bigint; fee: bigint; networkFee: bigint; merchant: `0x${string}` }
@@ -113,6 +131,17 @@ export class LiquidacionRechazada extends Errors.VerificationFailedError {
 }
 
 /**
+ * La tx se envió pero el receipt no llegó a tiempo: puede minarse después.
+ * No se dice "no se cobró": el agente reintenta con la misma credencial y,
+ * si la tx se minó, se le sirve sin pagar de nuevo.
+ */
+export class LiquidacionPendiente extends LiquidacionRechazada {
+  constructor(readonly hash: `0x${string}`) {
+    super(`transaction ${hash} sent, confirmation pending`)
+  }
+}
+
+/**
  * La autorización ya se usó y no se puede probar que la plata esté quieta en
  * el contrato (ya tiene un PaymentSettled, el contrato no la cubre o no se
  * pudieron leer los eventos). No se sirve.
@@ -142,63 +171,93 @@ export function motivoRevert(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Ventana en la que se buscan PaymentSettled de un nonce: la credencial vence en minutos. */
+/** Ventana en la que se busca la tx que usó una autorización: la credencial vence en minutos. */
 const VENTANA_EVENTOS_S = 2 * 60 * 60
 /** Muchos RPC limitan getLogs a 10.000 bloques por llamada. */
 const TRAMO_BLOQUES = 10_000n
 
 /**
- * ¿Ya hay un PaymentSettled para este nonce en el contrato? Busca en las
- * últimas dos horas (por tramos). null si no se pudo leer: no prueba nada.
+ * La tx que usó la autorización `nonce` de `payer` en el token: su
+ * AuthorizationUsed, en las últimas dos horas (por tramos). null si no está.
+ * Lanza si no se pudo leer: quien llama lo trata como "sin prueba".
  */
-export async function liquidadoAntes(riel: RielV3, nonce: `0x${string}`): Promise<boolean | null> {
-  try {
-    const ultimo = await riel.publicClient.getBlock()
-    const muestra = ultimo.number > 1000n ? ultimo.number - 1000n : 0n
-    const previo = muestra === ultimo.number ? ultimo : await riel.publicClient.getBlock({ blockNumber: muestra })
-    const segundos = Number(ultimo.timestamp - previo.timestamp)
-    const bloques = ultimo.number - previo.number
-    // Bloques que entran en la ventana; con timestamps iguales (anvil) se busca todo.
-    const atras = segundos > 0 ? (BigInt(VENTANA_EVENTOS_S) * bloques) / BigInt(segundos) + 1n : ultimo.number
-    const desde = ultimo.number > atras ? ultimo.number - atras : 0n
-    const evento = settlementV3Abi.find((x) => x.type === 'event' && x.name === 'PaymentSettled')!
-    for (let hasta = ultimo.number; hasta >= desde; hasta -= TRAMO_BLOQUES) {
-      const inicio = hasta - TRAMO_BLOQUES + 1n > desde ? hasta - TRAMO_BLOQUES + 1n : desde
-      const logs = await riel.publicClient.getLogs({
-        address: riel.contrato,
-        event: evento as Extract<(typeof settlementV3Abi)[number], { type: 'event'; name: 'PaymentSettled' }>,
-        args: { nonce },
-        fromBlock: inicio,
-        toBlock: hasta,
-      })
-      if (logs.length > 0) return true
-      if (inicio === 0n) break
-    }
-    return false
-  } catch {
-    return null
+async function txQueUso(riel: RielV3, payer: `0x${string}`, nonce: `0x${string}`): Promise<`0x${string}` | null> {
+  const ultimo = await riel.publicClient.getBlock()
+  const muestra = ultimo.number > 1000n ? ultimo.number - 1000n : 0n
+  const previo = muestra === ultimo.number ? ultimo : await riel.publicClient.getBlock({ blockNumber: muestra })
+  const segundos = Number(ultimo.timestamp - previo.timestamp)
+  const bloques = ultimo.number - previo.number
+  // Bloques que entran en la ventana; con timestamps iguales (anvil) se busca todo.
+  const atras = segundos > 0 ? (BigInt(VENTANA_EVENTOS_S) * bloques) / BigInt(segundos) + 1n : ultimo.number
+  const desde = ultimo.number > atras ? ultimo.number - atras : 0n
+  const evento = eventosTokenAbi.find((x) => x.type === 'event' && x.name === 'AuthorizationUsed')!
+  for (let hasta = ultimo.number; hasta >= desde; hasta -= TRAMO_BLOQUES) {
+    const inicio = hasta - TRAMO_BLOQUES + 1n > desde ? hasta - TRAMO_BLOQUES + 1n : desde
+    const logs = await riel.publicClient.getLogs({
+      address: riel.token,
+      event: evento as Extract<(typeof eventosTokenAbi)[number], { type: 'event'; name: 'AuthorizationUsed' }>,
+      args: { authorizer: payer, nonce },
+      fromBlock: inicio,
+      toBlock: hasta,
+    })
+    if (logs[0]?.transactionHash) return logs[0].transactionHash
+    if (inicio === 0n) break
   }
+  return null
+}
+
+const igual = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+
+type EstadoUsada = { tipo: 'sin-usar' } | { tipo: 'probado' } | { tipo: 'sin-prueba' } | { tipo: 'liquidado'; liquidado: Liquidado }
+
+/**
+ * Qué pasó con una autorización: sin usar, liquidada por Peaje para este
+ * negocio, adelantada al contrato (front-run, la plata de ESTE pagador entró
+ * por ESTE valor en la tx que la usó y no se ruteó), o sin prueba.
+ */
+async function estadoDeLaAutorizacion(riel: RielV3, info: PagoAdelantadoInfo): Promise<EstadoUsada> {
+  const usada = await riel.publicClient.readContract({ address: riel.token, abi: eip3009Abi, functionName: 'authorizationState', args: [info.payer, info.nonce] })
+  if (!usada) return { tipo: 'sin-usar' }
+  const hash = await txQueUso(riel, info.payer, info.nonce)
+  if (!hash) return { tipo: 'sin-prueba' }
+  const receipt = await riel.publicClient.getTransactionReceipt({ hash })
+  if (receipt.status !== 'success') return { tipo: 'sin-prueba' }
+
+  // La liquidó el contrato: cuenta solo si fue para este negocio por este valor.
+  const liquidacion = parseEventLogs({ abi: settlementV3Abi, eventName: 'PaymentSettled', logs: receipt.logs }).find(
+    (l) => igual(l.address, riel.contrato) && igual(l.args.payer, info.payer) && l.args.nonce === info.nonce && igual(l.args.token, riel.token),
+  )
+  if (liquidacion) {
+    const a = liquidacion.args
+    if (!igual(a.merchant, info.merchant) || a.gross !== info.value) return { tipo: 'sin-prueba' }
+    return { tipo: 'liquidado', liquidado: { hash, net: a.net, fee: a.fee, networkFee: a.networkFee, merchant: info.merchant } }
+  }
+
+  // Adelanto: en la tx que usó la autorización, el pagador le transfirió al
+  // contrato exactamente este valor. Cancelarla o usarla para pagarle a otro
+  // (o con valor 0) no deja esta transferencia.
+  const entro = parseEventLogs({ abi: eventosTokenAbi, eventName: 'Transfer', logs: receipt.logs }).some(
+    (l) => igual(l.address, riel.token) && igual(l.args.from, info.payer) && igual(l.args.to, riel.contrato) && l.args.value === info.value,
+  )
+  if (!entro) return { tipo: 'sin-prueba' }
+  const ruteado = await riel.publicClient.readContract({ address: riel.contrato, abi: settlementV3Abi, functionName: 'straySettled', args: [riel.token, info.payer, info.nonce] })
+  return ruteado ? { tipo: 'sin-prueba' } : { tipo: 'probado' }
 }
 
 /**
- * Estado de una autorización que no se pudo liquidar: sin usar, usada con la
- * plata probadamente quieta en el contrato (adelanto), o usada sin prueba.
+ * La autorización ya se usó: devuelve el pago si lo liquidó Peaje y el ledger
+ * no lo tiene, o lanza el error que corresponde. `null` = sin usar.
  */
-async function adelantado(riel: RielV3, info: PagoAdelantadoInfo): Promise<'sin-usar' | 'probado' | 'sin-prueba'> {
-  const [usada, enContrato] = await Promise.all([
-    riel.publicClient.readContract({ address: riel.token, abi: eip3009Abi, functionName: 'authorizationState', args: [info.payer, info.nonce] }),
-    riel.publicClient.readContract({ address: riel.token, abi: erc20Abi, functionName: 'balanceOf', args: [riel.contrato] }),
-  ])
-  if (!usada) return 'sin-usar'
-  if (enContrato < info.value) return 'sin-prueba'
-  return (await liquidadoAntes(riel, info.nonce)) === false ? 'probado' : 'sin-prueba'
-}
-
-/** Si la autorización se usó fuera de Peaje, lanza el error que corresponde. */
-async function siUsada(riel: RielV3, info: PagoAdelantadoInfo, hooks: HooksLiquidacion): Promise<void> {
-  const estado = await adelantado(riel, info).catch(() => 'sin-prueba' as const)
-  if (estado === 'sin-usar') return
-  if (estado === 'sin-prueba') throw new AutorizacionUsada()
+async function resolverUsada(riel: RielV3, info: PagoAdelantadoInfo, hooks: HooksLiquidacion): Promise<Liquidado | null> {
+  const estado = await estadoDeLaAutorizacion(riel, info).catch((): EstadoUsada => ({ tipo: 'sin-prueba' }))
+  if (estado.tipo === 'sin-usar') return null
+  if (estado.tipo === 'liquidado') {
+    // Ya en el ledger = ya se sirvió. Sin el hook no se puede saber: no se sirve.
+    const registrado = hooks.yaRegistrado ? await hooks.yaRegistrado(estado.liquidado.hash).catch(() => true) : true
+    if (registrado) throw new AutorizacionUsada()
+    return estado.liquidado
+  }
+  if (estado.tipo === 'sin-prueba') throw new AutorizacionUsada()
   const servir = (await hooks.alAdelantado?.(info)) ?? false
   throw new PagoAdelantado(info, servir)
 }
@@ -213,6 +272,8 @@ export async function liquidarV3(
   // v3 eso le mandaría el 98% a la llave caliente.
   if (!merchantCrudo || !DIRECCION.test(merchantCrudo)) throw new LiquidacionRechazada('the business has no payout address')
   const merchant = merchantCrudo as `0x${string}`
+  // El contrato y el fee recipient los rechaza el contrato; el relayer no: se cobraría a sí mismo.
+  if (igual(merchant, riel.relayer.account.address) || igual(merchant, riel.contrato)) throw new LiquidacionRechazada('the payout address cannot be the relayer or the settlement contract')
 
   const signature = auth.signature as `0x${string}`
   if ((signature.length - 2) / 2 !== 65) throw new LiquidacionRechazada('only 65-byte EOA signatures')
@@ -242,7 +303,8 @@ export async function liquidarV3(
     riel.publicClient.readContract({ address: riel.token, abi: erc20Abi, functionName: 'balanceOf', args: [payer] }),
   ])
   if (usada) {
-    await siUsada(riel, info, hooks)
+    const pagado = await resolverUsada(riel, info, hooks)
+    if (pagado) return pagado
     throw new AutorizacionUsada()
   }
   if (saldo < value) throw new LiquidacionRechazada('payer balance too low')
@@ -270,13 +332,22 @@ export async function liquidarV3(
   try {
     hash = await riel.relayer.writeContract(request)
   } catch (error) {
-    await siUsada(riel, info, hooks)
+    const pagado = await resolverUsada(riel, info, hooks)
+    if (pagado) return pagado
     throw new LiquidacionRechazada(motivoRevert(error))
   }
 
-  const receipt = await riel.publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 })
+  let receipt
+  try {
+    receipt = await riel.publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 })
+  } catch (error) {
+    // La tx salió y puede minarse después: no es "no se cobró".
+    if (error instanceof WaitForTransactionReceiptTimeoutError) throw new LiquidacionPendiente(hash)
+    throw error
+  }
   if (receipt.status !== 'success') {
-    await siUsada(riel, info, hooks)
+    const pagado = await resolverUsada(riel, info, hooks)
+    if (pagado) return pagado
     throw new LiquidacionRechazada(`transaction reverted ${hash}`)
   }
 

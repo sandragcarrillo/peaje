@@ -48,6 +48,12 @@ export function motivoNoLiquidado(motivo: NonNullable<ContextoCobro['sinLiquidar
         hint: 'The funds are held in the Peaje settlement contract and will be sent to the business. Pay again with a new authorization.',
         code: 'authorization-front-run',
       }
+    case 'pendiente':
+      return {
+        error: 'Your payment was sent on-chain and is still confirming.',
+        hint: 'Do not pay again. Retry this same request with the same payment credential in a minute: once it confirms, it is served without a new charge.',
+        code: 'settlement-pending',
+      }
     case 'usada':
       return {
         error: 'This payment authorization was already used, and Peaje cannot confirm the funds are held for the business.',
@@ -87,7 +93,10 @@ export async function respuestaNoLiquidada(
     }
     return Response.json(cuerpo, { status: 502, headers: { 'x-peaje-payment': 'not-charged' } })
   }
-  const cabecera = { adelantado: 'held-for-business', usada: 'not-verified', envio: 'not-charged' } as const
+  const cabecera = { adelantado: 'held-for-business', usada: 'not-verified', envio: 'not-charged', pendiente: 'pending' } as const
+  if (cobro.sinLiquidar === 'pendiente') {
+    return Response.json(cuerpo, { status: 503, headers: { 'x-peaje-payment': cabecera.pendiente, 'retry-after': '30' } })
+  }
   return Response.json(cuerpo, {
     status: cobro.sinLiquidar === 'envio' ? 502 : 409,
     headers: { 'x-peaje-payment': cabecera[cobro.sinLiquidar] },

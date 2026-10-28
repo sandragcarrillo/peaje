@@ -49,7 +49,7 @@ export type ContextoCobro = {
    * contrato ('adelantado'), se usó sin esa prueba ('usada') o el envío falló
    * después de que el origen respondió ('envio').
    */
-  sinLiquidar: 'origen' | 'adelantado' | 'usada' | 'envio' | null
+  sinLiquidar: 'origen' | 'adelantado' | 'usada' | 'envio' | 'pendiente' | null
   /** Pago adelantado registrado por primera vez: el pedido se sirve una vez (ver cobro.ts). */
   servirAdelantado: boolean
 }
