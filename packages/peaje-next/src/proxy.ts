@@ -24,6 +24,12 @@
  * (por defecto `/api/` y `/v1/`) y fuera de los paths reservados (raíz, login,
  * auth, `/_next`): un gateway no puede tapar una página del sitio. Las cookies
  * del sitio no viajan al gateway.
+ *
+ * Desde 0.3.1, cuando un bot de IA conocido (GPTBot, ClaudeBot, OAI-SearchBot,
+ * PerplexityBot, Googlebot) lee una página que el sitio sirve solo, el proxy
+ * le avisa al gateway en segundo plano (`waitUntil`) con la ruta y el
+ * user-agent del bot, para que el registro de visitas la cuente. Las visitas
+ * de personas no se reportan. Se apaga con `reportBotVisits: false`.
  */
 import { crearProxyRuntime, HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER, PREFIJOS_API_POR_DEFECTO, type ProxyRuntime } from '@peaje/shared'
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
@@ -53,6 +59,12 @@ export type OpcionesProxy = OpcionesPeaje & {
    * (`/login`, `/auth`, `/api/auth`, `/_next`...) nunca se aceptan.
    */
   apiPrefixes?: string[]
+  /**
+   * Avisarle al gateway cuando un bot de IA lee una página del sitio, para el
+   * registro de visitas. Solo viajan la ruta (sin query) y el user-agent del
+   * bot. Por defecto `true`.
+   */
+  reportBotVisits?: boolean
 }
 
 let avisado = false
@@ -86,6 +98,7 @@ export function peajeProxy(opciones: OpcionesProxy, siguiente?: Middleware): Mid
   const base = baseDe(opciones)
   const secreto = opciones.secret ?? process.env.PEAJE_ORIGIN_SECRET ?? null
   const prefijosApi = opciones.apiPrefixes ?? PREFIJOS_API_POR_DEFECTO
+  const reportar = opciones.reportBotVisits !== false
   return async (req, ev) => {
     const runtime = runtimeDe(base, secreto, prefijosApi)
     if (!avisado) {
@@ -109,6 +122,13 @@ export function peajeProxy(opciones: OpcionesProxy, siguiente?: Middleware): Mid
       headers.set(PEAJE_HOST_HEADER, req.nextUrl.host)
       headers.set('x-forwarded-proto', req.nextUrl.protocol.replace(':', ''))
       return NextResponse.rewrite(new URL(decision.destino), { request: { headers } })
+    }
+    // Una página que el sitio sirve solo: el gateway no la ve, así que si la
+    // leyó un bot se la contamos. Fuera del camino de la respuesta.
+    const lectura = reportar ? runtime.reportarLectura({ method: req.method, pathname: req.nextUrl.pathname, headers: req.headers }) : null
+    if (lectura) {
+      if (typeof ev?.waitUntil === 'function') ev.waitUntil(lectura)
+      else void lectura
     }
     return siguiente ? siguiente(req, ev) : NextResponse.next()
   }

@@ -56,6 +56,13 @@ export function peajeVercel(opciones: OpcionesPeaje, siguiente?: MiddlewareVerce
       headers.set('x-forwarded-proto', url.protocol.replace(':', ''))
       return respuestaMiddleware({ 'x-middleware-rewrite': destino }, headers)
     }
+    // Una página que la app sirve sola: si la leyó un bot, el gateway no la
+    // vio y se la contamos, en waitUntil para no demorar la respuesta.
+    const lectura = peaje.reportarLectura(entrada)
+    if (lectura) {
+      if (context?.waitUntil) context.waitUntil(lectura)
+      else void lectura
+    }
     const propia = siguiente ? await siguiente(request, context) : undefined
     return propia ?? respuestaMiddleware({ 'x-middleware-next': '1' })
   }

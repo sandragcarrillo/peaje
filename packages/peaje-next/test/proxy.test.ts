@@ -77,3 +77,43 @@ test('el manifiesto no agrega rutas fijas ni reenvía API fuera de apiPrefixes',
     await new Promise<void>((r) => server.close(() => r()))
   }
 })
+
+test('un bot leyendo una página del sitio se reporta al gateway en waitUntil; una persona o un archivo de discovery no', async () => {
+  const { createServer } = await import('node:http')
+  const recibidos: { path: string; body: string }[] = []
+  const server = createServer((r, s) => {
+    let body = ''
+    r.on('data', (c) => (body += c))
+    r.on('end', () => {
+      recibidos.push({ path: `${r.method} ${r.url}`, body })
+      s.statusCode = r.url?.endsWith('/kit/visita') ? 204 : 404
+      s.end()
+    })
+  })
+  await new Promise<void>((ok) => server.listen(0, ok))
+  const gw = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  try {
+    const esperas: Promise<unknown>[] = []
+    const evento = { waitUntil: (p: Promise<unknown>) => void esperas.push(p) } as never
+    const gptbot = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot'
+
+    const mw = peajeProxy({ slug, gateway: gw })
+    const res = await mw(req('/blog/hola?utm=x', { 'user-agent': gptbot }), evento)
+    assert.equal(res?.headers.get('x-middleware-next'), '1', 'la página sigue normal')
+    assert.equal(esperas.length, 1)
+    await Promise.all(esperas)
+    const reporte = recibidos.find((x) => x.path === `POST /${slug}/kit/visita`)
+    assert.ok(reporte)
+    assert.deepEqual(JSON.parse(reporte.body), { path: '/blog/hola', method: 'GET', userAgent: gptbot })
+
+    await mw(req('/blog/hola', { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605.1.15' }), evento)
+    await mw(req('/llms.txt', { 'user-agent': gptbot }), evento)
+    assert.equal(esperas.length, 1, 'ni la persona ni el archivo que ya va al gateway')
+
+    const apagado = peajeProxy({ slug, gateway: gw, reportBotVisits: false })
+    await apagado(req('/blog/hola', { 'user-agent': gptbot }), evento)
+    assert.equal(esperas.length, 1, 'reportBotVisits: false no reporta')
+  } finally {
+    server.close()
+  }
+})

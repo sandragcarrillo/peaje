@@ -102,6 +102,10 @@ The forwarded request keeps method, body, query and `authorization` (the MPP cre
 
 Upgrading from 0.1.x: if your priced routes live outside `/api/` and `/v1/`, add their prefix to `apiPrefixes` before you deploy 0.2.0.
 
+## Bot visits (since 0.2.1)
+
+When a known AI bot (GPTBot, ClaudeBot, OAI-SearchBot, PerplexityBot, Googlebot) reads a page your app serves itself, such as your home page or a blog post, the proxy tells the gateway in the background, so the read shows up in your agent visits. The gateway never sees those requests otherwise. It sends only the path, without the query string, and the bot's user agent: no IP, no cookies, and visits from people are never reported. The Vercel adapter runs it in `waitUntil`, Hono on Workers in `executionCtx.waitUntil`, and `peajeFetch(request, waitUntil)` takes one; elsewhere it runs alongside the response with a 3 s timeout. Turn it off with `{ slug, reportBotVisits: false }`.
+
 ## Options
 
 | Option | Default |
@@ -110,6 +114,7 @@ Upgrading from 0.1.x: if your priced routes live outside `/api/` and `/v1/`, add
 | `secret` | `process.env.PEAJE_ORIGIN_SECRET` |
 | `gateway` | `process.env.PEAJE_GATEWAY_URL` or `https://api.usepeaje.com` |
 | `apiPrefixes` | `['/api/', '/v1/']`: where your priced API routes live; the root and reserved paths are never accepted |
+| `reportBotVisits` | `true`: tell the gateway when an AI bot reads a page of your app, for your agent visits |
 
 ## License
 

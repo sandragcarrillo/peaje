@@ -13,7 +13,7 @@ import { peajeFetch, type OpcionesPeaje } from './index'
 
 export type { OpcionesPeaje } from './index'
 
-export type ContextoMinimo = { req: { raw: Request }; env?: unknown }
+export type ContextoMinimo = { req: { raw: Request }; env?: unknown; executionCtx?: { waitUntil(promesa: Promise<unknown>): void } }
 export type MiddlewareHono = (c: ContextoMinimo, next: () => Promise<void>) => Promise<Response | void>
 
 export function peajeHono(opciones: OpcionesPeaje): MiddlewareHono {
@@ -24,9 +24,22 @@ export function peajeHono(opciones: OpcionesPeaje): MiddlewareHono {
       ...opciones,
       secret: opciones.secret ?? (c.env as { PEAJE_ORIGIN_SECRET?: string } | undefined)?.PEAJE_ORIGIN_SECRET,
     })
-    const res = await peaje(c.req.raw)
+    const res = await peaje(c.req.raw, esperaDe(c))
     if (res) return res
     await next()
+  }
+}
+
+/**
+ * El `waitUntil` de Workers, para el aviso de lectura de un bot. En Node,
+ * Hono lanza al leer `executionCtx`: ahí no hay y el aviso corre al costado.
+ */
+function esperaDe(c: ContextoMinimo): ((promesa: Promise<unknown>) => void) | undefined {
+  try {
+    const ctx = c.executionCtx
+    return ctx ? (promesa) => ctx.waitUntil(promesa) : undefined
+  } catch {
+    return undefined
   }
 }
 

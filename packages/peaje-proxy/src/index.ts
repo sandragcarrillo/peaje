@@ -17,6 +17,12 @@
  * (por defecto `/api/` y `/v1/`) y fuera de los paths reservados: un gateway
  * no puede tapar una página del sitio. Las cookies del sitio no viajan al
  * gateway.
+ *
+ * Desde 0.2.1, cuando un bot de IA conocido (GPTBot, ClaudeBot, OAI-SearchBot,
+ * PerplexityBot, Googlebot) lee una página que la app sirve sola, el proxy le
+ * avisa al gateway en segundo plano con la ruta y el user-agent del bot, para
+ * que el registro de visitas la cuente. Las visitas de personas no se
+ * reportan. Se apaga con `reportBotVisits: false`.
  */
 import { crearProxyRuntime, HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER, PREFIJOS_API_POR_DEFECTO, type ProxyRuntime } from '@peaje/shared'
 
@@ -40,6 +46,12 @@ export type OpcionesPeaje = {
    * (`/login`, `/auth`, `/api/auth`, `/_next`...) nunca se aceptan.
    */
   apiPrefixes?: string[]
+  /**
+   * Avisarle al gateway cuando un bot de IA lee una página de la app, para el
+   * registro de visitas. Solo viajan la ruta (sin query) y el user-agent del
+   * bot. Por defecto `true`.
+   */
+  reportBotVisits?: boolean
   /** Para tests o runtimes sin fetch global. */
   fetch?: typeof fetch
 }
@@ -58,6 +70,12 @@ export type Peaje = {
    * sin ellos los clientes x402 estrictos abortan el pago.
    */
   reenviar(destino: string, entrada: EntradaDecision & { body: BodyInit | null }): Promise<Response>
+  /**
+   * Para una request que no fue al gateway: si es un bot de IA leyendo una
+   * página, se lo avisa al gateway y devuelve la promesa del aviso (para
+   * `waitUntil`). Null si no hay nada que avisar. Nunca lanza.
+   */
+  reportarLectura(entrada: EntradaDecision): Promise<void> | null
 }
 
 function env(nombre: string): string | undefined {
@@ -109,6 +127,7 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
   const secreto = opciones.secret ?? env('PEAJE_ORIGIN_SECRET') ?? null
   const fetchImpl = opciones.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
   const runtime = crearProxyRuntime({ base, secreto, fetchImpl, prefijosApi: opciones.apiPrefixes ?? PREFIJOS_API_POR_DEFECTO })
+  const reportar = opciones.reportBotVisits !== false
 
   return {
     base,
@@ -145,22 +164,34 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
       vuelta.delete('connection')
       return new Response(method === 'HEAD' ? null : res.body, { status: res.status, statusText: res.statusText, headers: vuelta })
     },
+    reportarLectura({ method, url, headers }) {
+      return reportar ? runtime.reportarLectura({ method, pathname: url.pathname, headers }) : null
+    },
   }
 }
 
-export type PeajeFetch = (request: Request) => Promise<Response | null>
+export type PeajeFetch = (request: Request, waitUntil?: (promesa: Promise<unknown>) => void) => Promise<Response | null>
 
 /**
  * `(request) => Response | null`. Null: la request no es de Peaje y la
- * atiende la app. El body se lee (en memoria) solo si va al gateway.
+ * atiende la app. El body se lee (en memoria) solo si va al gateway. Con
+ * `waitUntil` (Workers, Vercel), el aviso de lectura de un bot corre ahí;
+ * sin él, al costado.
  */
 export function peajeFetch(opciones: OpcionesPeaje): PeajeFetch {
   const peaje = crearPeaje(opciones)
-  return async (request) => {
+  return async (request, waitUntil) => {
     const url = new URL(request.url)
     const entrada = { method: request.method.toUpperCase(), url, headers: request.headers }
     const destino = await peaje.decidir(entrada)
-    if (!destino) return null
+    if (!destino) {
+      const lectura = peaje.reportarLectura(entrada)
+      if (lectura) {
+        if (waitUntil) waitUntil(lectura)
+        else void lectura
+      }
+      return null
+    }
     const body = entrada.method === 'GET' || entrada.method === 'HEAD' ? null : await request.arrayBuffer()
     return peaje.reenviar(destino, { ...entrada, body })
   }

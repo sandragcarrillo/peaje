@@ -5,6 +5,7 @@ import {
   crearProxyRuntime,
   esReservado,
   generarProxy,
+  lecturaDeBot,
   manifiestoProxy,
   patronARegex,
   patronANext,
@@ -13,6 +14,7 @@ import {
   prefijosApiValidos,
   reglasNext,
   secretoOrigen,
+  tipoDeBot,
 } from '../src/kit/index'
 
 const base = 'https://gateway.example/cafe-andino'
@@ -170,4 +172,58 @@ test('el Worker de Cloudflare aplica las mismas reglas y no manda cookies', () =
   assert.ok(worker.includes("headers.delete('cookie')"))
   assert.ok(!worker.includes('m.rutas'), 'las rutas fijas no salen del manifiesto')
   assert.ok(!worker.includes('—'))
+})
+
+// ---- lecturas de bots: lo que el proxy le reporta al gateway ----
+
+const GPTBOT = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot'
+const humano = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15'
+const lectura = (pathname: string, headers: Record<string, string> = {}, method = 'GET') =>
+  lecturaDeBot({ method, pathname, headers: new Headers({ 'user-agent': GPTBOT, ...headers }) })
+
+test('tipoDeBot: los cinco bots de la lista y nada más', () => {
+  assert.equal(tipoDeBot(GPTBOT), 'gptbot')
+  assert.equal(tipoDeBot('Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)'), 'claudebot')
+  assert.equal(tipoDeBot('... OAI-SearchBot/1.0; +https://openai.com/searchbot'), 'openai-searchbot')
+  assert.equal(tipoDeBot(humano), null)
+  assert.equal(tipoDeBot(null), null)
+})
+
+test('lecturaDeBot: un bot leyendo una página se reporta, sin query', () => {
+  assert.deepEqual(lectura('/blog/hola'), { path: '/blog/hola', method: 'GET', userAgent: GPTBOT })
+  assert.equal(lectura('/', {}, 'head')?.method, 'HEAD')
+})
+
+test('lecturaDeBot: personas, assets, internos, otros métodos y Peaje mismo no se reportan', () => {
+  assert.equal(lecturaDeBot({ method: 'GET', pathname: '/blog/hola', headers: new Headers({ 'user-agent': humano }) }), null)
+  assert.equal(lecturaDeBot({ method: 'GET', pathname: '/blog/hola', headers: new Headers() }), null)
+  assert.equal(lectura('/logo.png'), null)
+  assert.equal(lectura('/_next/data/x.json'), null)
+  assert.equal(lectura('/_vercel/insights/script.js'), null)
+  assert.equal(lectura('/api/contacto', {}, 'POST'), null)
+  assert.equal(lectura('/api/forecast', { 'x-peaje-origin': 'a'.repeat(64) }), null, 'el gateway entregando un pago')
+  assert.equal(lectura('/llms.txt', { 'x-peaje-fetch': '1' }), null, 'el gateway leyendo el llms.txt propio')
+  assert.equal(lectura('/', { 'x-peaje-verificador': '1' }), null, 'la sonda del verificador')
+})
+
+test('reportarLectura: un POST al gateway con la lectura; null si no hay nada que reportar; nunca lanza', async () => {
+  const pedidos: { url: string; init?: RequestInit }[] = []
+  const runtime = crearProxyRuntime({
+    base,
+    fetchImpl: async (url, init) => {
+      pedidos.push({ url: String(url), init })
+      return new Response(null, { status: 204 })
+    },
+  })
+  const p = runtime.reportarLectura({ method: 'GET', pathname: '/blog/hola', headers: new Headers({ 'user-agent': GPTBOT }) })
+  assert.ok(p)
+  await p
+  assert.equal(pedidos.length, 1)
+  assert.equal(pedidos[0]!.url, `${base}/kit/visita`)
+  assert.equal(pedidos[0]!.init?.method, 'POST')
+  assert.deepEqual(JSON.parse(String(pedidos[0]!.init?.body)), { path: '/blog/hola', method: 'GET', userAgent: GPTBOT })
+  assert.equal(runtime.reportarLectura({ method: 'GET', pathname: '/blog/hola', headers: new Headers({ 'user-agent': humano }) }), null)
+
+  const caido = crearProxyRuntime({ base, fetchImpl: async () => Promise.reject(new Error('sin red')) })
+  await caido.reportarLectura({ method: 'GET', pathname: '/', headers: new Headers({ 'user-agent': GPTBOT }) })
 })

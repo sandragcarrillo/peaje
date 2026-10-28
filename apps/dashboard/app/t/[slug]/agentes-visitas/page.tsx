@@ -8,8 +8,9 @@ import { store } from '@/lib/store'
 
 /**
  * Visitas de agentes: lo que el ledger no ve. Cada request que entró por el
- * gateway, pague o no, con quién fue (cliente de pago o bot de respuesta) y
- * por qué ruta. Es el contenido del reporte semanal de Pro.
+ * gateway, pague o no, y cada página del sitio que leyó un bot (las reporta el
+ * proxy del kit, ver POST /:slug/kit/visita), con quién fue (cliente de pago o
+ * bot de respuesta) y por qué ruta. Es el contenido del reporte semanal de Pro.
  */
 
 const BOTS_RESPUESTA: AgentKind[] = ['openai-searchbot', 'perplexitybot', 'googlebot']

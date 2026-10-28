@@ -4,6 +4,7 @@
  *   GET /:slug/kit.json?host=next     archivos listos + qué falta + qué borrar
  *   GET /:slug/kit/verify             qué está publicado en el dominio del negocio
  *   GET /:slug/kit/INSTALL.md         las instrucciones cortas para el coding agent
+ *   POST /:slug/kit/visita            el proxy reporta una página que leyó un bot
  *
  * Reemplaza al prompt de 2.800 tokens que el dueño pegaba en su agente: los
  * bytes salen de acá y el agente solo decide cómo fusionar. Los datos son
@@ -30,6 +31,7 @@ import { Hono } from 'hono'
 import { gatewayBase } from './base.js'
 import { resourceTitle } from './mcp.js'
 import { store } from './store.js'
+import { lecturaDelKit, registrarLectura } from './visitas.js'
 
 export const kitRouter = new Hono()
 
@@ -126,6 +128,24 @@ kitRouter.get('/:slug/kit/manifest.json', async (c) => {
   return c.json(manifiestoProxy(gatewayBase(tenant), KIT_VERSION, patronesDe(routes)), 200, {
     'cache-control': 'public, max-age=60',
   })
+})
+
+/**
+ * El proxy del kit reporta acá las páginas del sitio que leyó un bot de IA:
+ * la home, el blog, todo lo que el sitio sirve solo y el gateway no ve. Sin
+ * auth, como el resto del kit: hoy cualquiera ya puede pedirle una ruta al
+ * gateway con el user-agent de un bot y queda registrada, y esto no abre más
+ * que eso. Se acepta solo un bot de la lista, un GET o HEAD, y largos acotados.
+ */
+kitRouter.post('/:slug/kit/visita', async (c) => {
+  const tenant = await store.getTenantBySlug(c.req.param('slug'))
+  if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
+  const lectura = lecturaDelKit(await c.req.json().catch(() => null))
+  if (lectura === 'invalida') {
+    return c.json({ error: 'Expected { path, method, userAgent }: a GET or HEAD of a page by a known AI bot.' }, 400)
+  }
+  if (lectura !== 'ignorar') registrarLectura(tenant.id, lectura)
+  return c.body(null, 204)
 })
 
 kitRouter.get('/:slug/kit/verify', async (c) => {

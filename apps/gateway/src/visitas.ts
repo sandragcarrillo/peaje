@@ -1,4 +1,15 @@
 import type { AgentKind, NewVisit } from '@peaje/db'
+import {
+  MAX_PATH_LECTURA,
+  MAX_UA_LECTURA,
+  NO_ES_PAGINA,
+  PEAJE_VERIFICADOR_HEADER,
+  pathCanonico,
+  RUTAS_DINAMICAS,
+  RUTAS_PROXY,
+  tipoDeBot,
+  type LecturaDeBot,
+} from '@peaje/shared'
 import { Receipt } from 'mppx'
 import { store } from './store.js'
 
@@ -11,15 +22,11 @@ import { store } from './store.js'
  * Se acumula en memoria y se descarga cada 2 s o 50 filas: nunca en el
  * camino del request, y nunca lanza. Si el pago existe, la fila se liga al
  * ledger por la referencia del Receipt.
+ *
+ * Las páginas que el sitio sirve solo (la home, el blog) no pasan por acá: de
+ * esas, el proxy del kit reporta las que lee un bot (`registrarLectura`).
+ * La lista de bots es la de @peaje/shared, la misma que usa el kit.
  */
-
-const BOTS: [RegExp, AgentKind][] = [
-  [/OAI-SearchBot/i, 'openai-searchbot'],
-  [/PerplexityBot/i, 'perplexitybot'],
-  [/Googlebot/i, 'googlebot'],
-  [/ClaudeBot|anthropic-ai/i, 'claudebot'],
-  [/GPTBot/i, 'gptbot'],
-]
 
 /** Nuestro propio verificador no cuenta como visita. */
 const IGNORAR_UA = /peaje-verificador/i
@@ -35,8 +42,9 @@ const LECTURAS_DEL_KIT = new Set(['/discovery/resources', '/.well-known/agent-ca
 const UA_DEL_KIT = /^(node|undici|Vercel Edge Functions|Next\.js Middleware|peaje-kit(\/.*)?)$/i
 
 export function esLecturaDelKit(path: string, ua: string | null): boolean {
-  // El manifest solo lo lee el kit: ningún agente lo necesita.
-  if (path === '/kit/manifest.json') return true
+  // El manifest solo lo lee el kit: ningún agente lo necesita. El reporte de
+  // lecturas lo manda el kit y se registra como la lectura que trae, no como request.
+  if (path === '/kit/manifest.json' || path === '/kit/visita') return true
   return LECTURAS_DEL_KIT.has(path) && UA_DEL_KIT.test(ua ?? '')
 }
 
@@ -50,9 +58,7 @@ export function clasificarAgente(headers: Headers): AgentKind {
   // por su user-agent (que suele ser el de fetch de Node).
   if (headers.has('payment-signature') || headers.has('x-payment')) return 'x402-client'
   if ((headers.get('authorization') ?? '').startsWith('Payment ')) return 'mpp-client'
-  const ua = headers.get('user-agent') ?? ''
-  for (const [re, kind] of BOTS) if (re.test(ua)) return kind
-  return 'other'
+  return tipoDeBot(headers.get('user-agent')) ?? 'other'
 }
 
 /**
@@ -126,6 +132,8 @@ export function registrarVisita(input: {
 }): void {
   const ua = input.headers.get('user-agent')
   if (ua && IGNORAR_UA.test(ua)) return
+  // Las sondas del verificador salen con el UA real de un bot: no son visitas.
+  if (input.headers.has(PEAJE_VERIFICADOR_HEADER)) return
   if (esLecturaDelKit(input.path, ua)) return
   let receiptRef: string | null = null
   const receipt = input.response.headers.get('Payment-Receipt')
@@ -149,6 +157,52 @@ export function registrarVisita(input: {
     priceUsd: cobro?.priceUsd ?? null,
     attempted: traeCredencial(input.headers),
     receiptRef,
+  })
+}
+
+/**
+ * Status de una lectura reportada por el kit: el proxy corre antes que la
+ * página y no sabe con qué status salió. No es 404 ni 402, así que no entra
+ * en "inexistentes" ni en el embudo de cobro.
+ */
+export const STATUS_LECTURA = 0
+
+/**
+ * El cuerpo de `POST /:slug/kit/visita`: `invalida` si no tiene la forma de
+ * una lectura de un bot de la lista, `ignorar` si es válida pero no se cuenta
+ * (un asset, o una ruta que sirve el gateway y que ya se registró al pasar por
+ * él: así no se cuenta dos veces aunque un kit viejo o nuevo decida distinto).
+ */
+export function lecturaDelKit(body: unknown): LecturaDeBot | 'invalida' | 'ignorar' {
+  if (!body || typeof body !== 'object') return 'invalida'
+  const { path, method, userAgent } = body as Record<string, unknown>
+  if (typeof path !== 'string' || typeof method !== 'string' || typeof userAgent !== 'string') return 'invalida'
+  const m = method.toUpperCase()
+  if (m !== 'GET' && m !== 'HEAD') return 'invalida'
+  // Una ruta sin query, sin espacios ni caracteres de control, y con largo acotado.
+  if (!path.startsWith('/') || path.length > MAX_PATH_LECTURA || path.includes('?') || /[\s\u0000-\u001f\u007f]/.test(path)) return 'invalida'
+  if (userAgent.length > MAX_UA_LECTURA || !tipoDeBot(userAgent)) return 'invalida'
+  const canon = pathCanonico(path).toLowerCase()
+  const delGateway =
+    RUTAS_PROXY.some((r) => r.path.toLowerCase() === canon) || RUTAS_DINAMICAS.some((r) => canon.startsWith(r.prefijo.toLowerCase()))
+  if (delGateway || NO_ES_PAGINA.test(path)) return 'ignorar'
+  return { path, method: m, userAgent }
+}
+
+/** Una página del sitio que leyó un bot, según el proxy del kit, ya validada con `lecturaDelKit`. */
+export function registrarLectura(tenantId: string, lectura: LecturaDeBot): void {
+  encolar({
+    tenantId,
+    at: new Date().toISOString(),
+    path: lectura.path,
+    method: lectura.method,
+    userAgent: lectura.userAgent,
+    agentKind: tipoDeBot(lectura.userAgent) ?? 'other',
+    status: STATUS_LECTURA,
+    routeId: null,
+    priceUsd: null,
+    attempted: false,
+    receiptRef: null,
   })
 }
 

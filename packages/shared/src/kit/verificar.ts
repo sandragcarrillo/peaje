@@ -5,6 +5,7 @@
  * gateway, CLI) les pone texto. Antes vivía como server action del dashboard y
  * el coding agent tenía que reproducirlo con seis curl y adivinar.
  */
+import { PEAJE_VERIFICADOR_HEADER } from './bots'
 
 export type ChequeoId = 'dominio' | 'proxy' | 'frescura' | 'json-ld' | 'links' | 'robots' | 'bots'
 
@@ -129,7 +130,8 @@ async function sondaBot(site: string, bot: string, ua: string, path: string): Pr
       cache: 'no-store',
       redirect: 'follow',
       signal: AbortSignal.timeout(8_000),
-      headers: { 'user-agent': ua, accept: 'text/html,*/*' },
+      // El header avisa que es una sonda: con el UA del bot, el kit la contaría como visita.
+      headers: { 'user-agent': ua, accept: 'text/html,*/*', [PEAJE_VERIFICADOR_HEADER]: '1' },
     })
     const text = (await res.text()).slice(0, 200_000)
     const challenge =

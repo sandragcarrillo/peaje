@@ -82,7 +82,11 @@ export function peajeExpress(opciones: OpcionesPeaje): MiddlewareExpress {
     peaje
       .decidir(entrada)
       .then(async (destino) => {
-        if (!destino) return next()
+        if (!destino) {
+          // Servidor de larga vida: el aviso de lectura de un bot corre al costado.
+          void peaje.reportarLectura(entrada)
+          return next()
+        }
         const body = entrada.method === 'GET' || entrada.method === 'HEAD' ? null : await bodyDe(r)
         await enviar(res, await peaje.reenviar(destino, { ...entrada, body }))
       })

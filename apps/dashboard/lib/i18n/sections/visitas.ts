@@ -1,10 +1,10 @@
 export const visitas = {
   es: {
     titulo: 'Visitas de agentes',
-    descripcion: 'Quién llega a tu sitio por Peaje, pague o no: clientes de pago, bots de respuesta y por qué rutas.',
+    descripcion: 'Quién llega a tu sitio, pague o no: clientes de pago, bots de respuesta y qué páginas y rutas leen.',
     ventana7: '7 días',
     ventana30: '30 días',
-    vacio: 'Todavía no hay visitas registradas. Se cuentan desde que el gateway recibe la primera request de un agente.',
+    vacio: 'Todavía no hay visitas registradas. Se cuentan desde que un agente pide un archivo del kit o, con el proxy del kit instalado, desde que un bot de IA lee una página de tu sitio.',
     metricaVisitas: 'Visitas',
     metricaPagadas: 'Pagadas',
     metricaIngresos: 'Ingresos',
@@ -47,10 +47,10 @@ export const visitas = {
   },
   en: {
     titulo: 'Agent visits',
-    descripcion: 'Who reaches your site through Peaje, paying or not: paying clients, answer-engine bots, and which routes.',
+    descripcion: 'Who reaches your site, paying or not: paying clients, answer-engine bots, and which pages and routes they read.',
     ventana7: '7 days',
     ventana30: '30 days',
-    vacio: 'No visits recorded yet. Counting starts with the first agent request the gateway receives.',
+    vacio: 'No visits recorded yet. Counting starts when an agent requests a kit file or, with the kit proxy installed, when an AI bot reads a page of your site.',
     metricaVisitas: 'Visits',
     metricaPagadas: 'Paid',
     metricaIngresos: 'Revenue',

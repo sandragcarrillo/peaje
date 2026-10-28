@@ -60,9 +60,11 @@ So a gateway bug or a compromised gateway cannot take over a page of your site. 
 
 Cookies: the requests the proxy forwards to the gateway leave out the `cookie` header, so your visitors' session cookies never leave your domain. `authorization` is forwarded (it carries the MPP credential). If the handler of a priced route reads a cookie, it no longer gets one through Peaje; agents do not send your site's cookies anyway. The build-time rewrites from `withPeaje` cannot drop headers; with `peajeProxy` in place (and its matcher covering those paths) it handles them first.
 
+Bot visits (since 0.3.1): when a known AI bot (GPTBot, ClaudeBot, OAI-SearchBot, PerplexityBot, Googlebot) reads a page your site serves itself, such as your home page or a blog post, the proxy tells the gateway in the background (`waitUntil`, 3 s timeout, never in the way of the page), so the read shows up in your agent visits. The gateway never sees those requests otherwise. It sends only the path, without the query string, and the bot's user agent: no IP, no cookies, and visits from people are never reported. Turn it off with `peajeProxy({ slug, reportBotVisits: false })`.
+
 With your own middleware: `export default peajeProxy({ slug }, myMiddleware)`. Peaje runs first; when the request is not one of its routes, yours runs.
 
-Options: `slug` (required), `gateway`, `secret` (default `process.env.PEAJE_ORIGIN_SECRET`) and `apiPrefixes` (default `['/api/', '/v1/']`).
+Options: `slug` (required), `gateway`, `secret` (default `process.env.PEAJE_ORIGIN_SECRET`), `apiPrefixes` (default `['/api/', '/v1/']`) and `reportBotVisits` (default `true`).
 
 ## 2. Head
 

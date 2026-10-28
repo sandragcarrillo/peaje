@@ -1,3 +1,4 @@
+import { MAX_PATH_LECTURA, MAX_UA_LECTURA, NO_ES_PAGINA, PEAJE_VERIFICADOR_HEADER, tipoDeBot, type LecturaDeBot } from './bots'
 import {
   PATHS_RESERVADOS,
   PEAJE_FETCH_HEADER,
@@ -194,6 +195,26 @@ export function patronReenviable(patron: string): boolean {
 
 export type Decision = { destino: string } | null
 
+/**
+ * La lectura que el proxy le reporta al gateway, o null si no hay que
+ * reportar nada. Se llama solo con requests que el proxy NO reenvió (esas ya
+ * las registra el gateway). Cuenta un GET o HEAD de un bot de la lista a una
+ * página; no cuenta assets, internos de Next o Vercel, ni a Peaje mismo (el
+ * gateway entregando un pago, leyendo llms.txt o sondeando con el
+ * verificador).
+ */
+export function lecturaDeBot(input: { method: string; pathname: string; headers: Headers }): LecturaDeBot | null {
+  const method = input.method.toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD') return null
+  const h = input.headers
+  if (h.has(PEAJE_ORIGIN_HEADER) || h.has(PEAJE_FETCH_HEADER) || h.has(PEAJE_VERIFICADOR_HEADER)) return null
+  const ua = h.get('user-agent')
+  if (!ua || !tipoDeBot(ua)) return null
+  const path = input.pathname
+  if (!path.startsWith('/') || path.startsWith('/_next/') || path.startsWith('/_vercel/') || NO_ES_PAGINA.test(path)) return null
+  return { path: path.slice(0, MAX_PATH_LECTURA), method, userAgent: ua.slice(0, MAX_UA_LECTURA) }
+}
+
 export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
   const base = opciones.base.replace(/\/+$/, '')
   const ttl = opciones.ttlMs ?? 60_000
@@ -248,6 +269,24 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
     },
     /** Fuerza la carga del manifiesto (útil al arrancar o en tests). */
     cargar: () => (refrescando ??= refrescar()),
+    /**
+     * Si la request es un bot leyendo una página del sitio, le avisa al
+     * gateway y devuelve la promesa del aviso (para `waitUntil`); si no, null.
+     * El aviso nunca lanza ni demora la página: 3 s de tope y se descarta la
+     * respuesta.
+     */
+    reportarLectura(input: { method: string; pathname: string; headers: Headers }): Promise<void> | null {
+      const lectura = lecturaDeBot(input)
+      if (!lectura) return null
+      return fetchImpl(`${base}/kit/visita`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(lectura),
+        signal: AbortSignal.timeout(3_000),
+      })
+        .then((res) => res.body?.cancel())
+        .catch(() => undefined)
+    },
     /**
      * Decide si la request va al gateway. `method` y `pathname` de la request,
      * `search` con el `?` incluido, y los headers para cortar bucles.

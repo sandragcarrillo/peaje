@@ -8,6 +8,8 @@ onlyBuiltDependencies:
 # mppx se publica varias veces al día (SDK nuevo). Excluido del guard de edad mínima.
 minimumReleaseAgeExclude:
   - mppx
+  # Los paquetes propios: el dashboard usa el @peaje/next recién publicado.
+  - '@peaje/*'
 
 allowBuilds:
   '@reown/appkit': true

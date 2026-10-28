@@ -95,7 +95,9 @@ export function PrivacidadEs() {
         <p>
           Por cada solicitud que pasa por Peaje registramos la ruta, el método, el <T>agente de usuario</T> (el nombre
           con el que se identifica el programa, por ejemplo GPTBot), el tipo de agente, la respuesta, si pagó, el monto,
-          la red y la hora. <T>No guardamos la dirección IP</T> de quien hace la solicitud. Estos registros los ves tú,
+          la red y la hora. Si tienes el proxy del kit instalado, también registramos cada página de tu sitio que lee un
+          bot de IA conocido, como GPTBot o ClaudeBot: la ruta sin parámetros, su agente de usuario y la hora. Las visitas
+          de personas a tus páginas no se registran. <T>No guardamos la dirección IP</T> de quien hace la solicitud. Estos registros los ves tú,
           dueño del sitio.
         </p>
 

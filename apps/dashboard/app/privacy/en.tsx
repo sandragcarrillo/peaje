@@ -89,7 +89,9 @@ export function PrivacidadEn() {
         <p>
           For each request that goes through Peaje we log the path, the method, the <T>user agent</T> (the name the
           program identifies itself with, for example GPTBot), the agent type, the response, whether it paid, the
-          amount, the network and the time. <T>We do not store the IP address</T> of whoever makes the request. You,
+          amount, the network and the time. If you have the kit proxy installed, we also log each page of your site that a
+          known AI bot reads, such as GPTBot or ClaudeBot: the path without parameters, its user agent and the time.
+          Visits from people to your pages are not logged. <T>We do not store the IP address</T> of whoever makes the request. You,
           the site owner, see these logs.
         </p>
 

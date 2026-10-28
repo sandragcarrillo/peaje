@@ -133,3 +133,19 @@ test('las cookies del sitio no viajan al gateway; authorization (la credencial M
   assert.equal(eco.cookie, null)
   assert.equal(eco.authorization, 'Payment xyz')
 })
+
+test('un bot leyendo una página de la app se reporta al gateway (en waitUntil si lo hay); una persona no', async () => {
+  const gptbot = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot'
+  const esperas: Promise<unknown>[] = []
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url })
+  const antes = gw.pedidos.length
+  assert.equal(await peaje(req('/blog/hola', { headers: { 'user-agent': gptbot } }), (p) => void esperas.push(p)), null)
+  assert.equal(esperas.length, 1)
+  await Promise.all(esperas)
+  assert.deepEqual(gw.pedidos.slice(antes).filter((p) => p.endsWith('/kit/visita')), [`POST /${SLUG}/kit/visita`])
+
+  assert.equal(await peaje(req('/blog/hola', { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh) Safari/605.1.15' } }), (p) => void esperas.push(p)), null)
+  const apagado = peajeFetch({ slug: SLUG, gateway: gw.url, reportBotVisits: false })
+  assert.equal(await apagado(req('/blog/hola', { headers: { 'user-agent': gptbot } }), (p) => void esperas.push(p)), null)
+  assert.equal(esperas.length, 1, 'ni la persona ni con reportBotVisits: false')
+})
