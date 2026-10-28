@@ -190,7 +190,7 @@ function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; bi
                   type="button"
                   disabled={estado === 'abriendo'}
                   onClick={() => void abrir(plan)}
-                  className={`btn btn-ancho ${planes.filter(disponible)[0] === plan ? 'btn-primario' : 'btn-secundario'}`}
+                  className={`btn btn-ancho whitespace-normal ${planes.filter(disponible)[0] === plan ? 'btn-primario' : 'btn-secundario'}`}
                 >
                   {estado === 'abriendo' ? t.planAbriendo : t.planSuscribirmeCorto(t.planNombres[plan] ?? plan)}
                 </button>
@@ -344,7 +344,7 @@ function PagoCripto({ billing, planes }: { billing: EstadoBilling; planes: Plan[
           const url = billing.checkout[plan]
           return url ? <Enlace key={plan} etiqueta={t.planNombres[plan] ?? plan} url={url} /> : null
         })}
-        {billing.checkout.pro ? <p className="text-xs text-muted">{t.planLinkNota(billing.checkout.pro)}</p> : null}
+        {billing.checkout.pro ? <p className="break-words text-xs text-muted">{t.planLinkNota(billing.checkout.pro)}</p> : null}
       </div>
     </div>
   )

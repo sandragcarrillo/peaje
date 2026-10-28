@@ -80,7 +80,7 @@ export default async function Radar({ searchParams }: Props) {
         <Cabecera t={t} />
         <section className="border border-border bg-bg">
           <Barra01 titulo={t.s01} dominio={dominio} />
-          <div className="p-6 lg:p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <Medir key={dominio} dominio={dominio} auto conCorreo />
           </div>
         </section>
@@ -180,7 +180,7 @@ function Cabecera({ t }: { t: T }) {
       <p className="inline-block border border-border px-2.5 py-1 font-mono text-[11px] tracking-[0.04em] text-muted">
         {t.eyebrow}
       </p>
-      <Link href="/radar" className="text-sm text-muted underline underline-offset-4 hover:text-text">
+      <Link href="/radar" className="-my-2.5 py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text sm:my-0 sm:py-0">
         {t.otroSitio}
       </Link>
     </div>
@@ -274,7 +274,7 @@ function Resultado({
       {/* 01 */}
       <section className="border border-border bg-bg">
         <Barra01 titulo={t.s01} dominio={dominio} />
-        <div className="space-y-6 p-6 lg:p-8">
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col items-start gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-2xl text-sm text-muted">
               {medicion ? <span className="text-text">{t.medido(medicion.fecha)}</span> : null}
@@ -296,10 +296,10 @@ function Resultado({
             </div>
 
             <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
-              <div className="flex flex-wrap items-end gap-8">
+              <div className="flex flex-wrap items-end gap-3 sm:gap-8">
                 <div>
                   <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.hoy}</p>
-                  <p className="text-6xl font-bold tabular-nums tracking-tight lg:text-[72px] lg:leading-[72px]">
+                  <p className="text-5xl font-bold tabular-nums tracking-tight sm:text-6xl lg:text-[72px] lg:leading-[72px]">
                     <Cuenta valor={l.actual} />
                   </p>
                   <Fase desde={1} como="p" className="mt-1 font-mono text-xs text-muted">
@@ -307,11 +307,11 @@ function Resultado({
                   </Fase>
                 </div>
                 {margen > 0 ? (
-                  <Fase desde={2} className="flex items-end gap-8">
+                  <Fase desde={2} className="flex items-end gap-3 sm:gap-8">
                     <span aria-hidden className="pb-6 text-3xl text-border">→</span>
                     <div>
                       <p className="font-mono text-[10px] tracking-[0.08em] text-accent">{t.conPeaje}</p>
-                      <p className="text-6xl font-bold tracking-tight text-accent lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
+                      <p className="text-5xl font-bold tracking-tight text-accent sm:text-6xl lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
                       <p className="mt-1 font-mono text-xs text-muted">{gradeDe(l.estimado)}</p>
                     </div>
                   </Fase>
@@ -371,7 +371,7 @@ function Resultado({
       <Seccion n="04" titulo={t.s03}>
         {l.bien.length > 0 ? (
           <details>
-            <summary className="cursor-pointer text-sm font-semibold">{t.yaBien(l.bien.length)}</summary>
+            <summary className="-my-2.5 cursor-pointer py-2.5 text-sm font-semibold sm:my-0 sm:py-0">{t.yaBien(l.bien.length)}</summary>
             <ul className="mt-3 divide-y divide-border/60 text-sm">
               {l.bien.map((c) => (
                 <li key={c.id} className="flex items-start gap-2.5 py-2.5">
@@ -393,8 +393,8 @@ function Resultado({
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {/* plan=1: después del alta, /nuevo lleva directo a la sección del plan con el checkout de Paddle. */}
-          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}&plan=1`} className="btn btn-primario">
+          {/* plan=1: después del alta, /nuevo lleva directo a la sección del plan con el checkout de Paddle. En el teléfono, a todo el ancho y en dos líneas si hace falta. */}
+          <Link href={`/nuevo?url=${encodeURIComponent(dominio)}&plan=1`} className="btn btn-primario w-full whitespace-normal text-center sm:w-auto sm:whitespace-nowrap">
             {t.cta(PRECIOS_USD.founder)}
           </Link>
           <MandarInforme dominio={dominio} conCorreo={conCorreo} />

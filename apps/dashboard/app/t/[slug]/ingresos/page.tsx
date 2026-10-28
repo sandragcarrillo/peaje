@@ -78,7 +78,8 @@ export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos
                 {ingresos.lista.map((p) => (
                   <tr key={p.id} className="hover:bg-panel-2">
                     <td className="whitespace-nowrap px-5 py-3 text-muted">{fecha(p.fecha)}</td>
-                    <td className="px-5 py-3 break-all">{p.ruta}</td>
+                    {/* En el celular la tabla ya scrollea de lado: con break-all la ruta quedaba de una letra por línea. */}
+                    <td className="whitespace-nowrap px-5 py-3 break-all md:whitespace-normal">{p.ruta}</td>
                     <td className="whitespace-nowrap px-5 py-3">{p.red}</td>
                     <td className="whitespace-nowrap px-5 py-3" title={p.llegoA ?? undefined}>
                       {p.llegoA ? shortWallet(p.llegoA) : <span className="text-muted">{t.antesDelCambio}</span>}

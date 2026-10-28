@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { LanguageToggle } from '@/components/language-toggle'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AccountMenu } from '@/components/account-menu'
+import { MenuMovil, SeccionesProvider } from '@/components/menu-movil'
 import { getDict, getLocale } from '@/lib/i18n'
 import { LocaleProvider } from '@/lib/i18n/client'
 import { currentTenant } from '@/lib/session'
@@ -64,6 +65,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
         */}
         <div className="overflow-x-clip">
         <LocaleProvider locale={locale}>
+        <SeccionesProvider>
           <div
             aria-hidden
             className="pointer-events-none fixed inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-bg via-bg/90 to-transparent"
@@ -74,7 +76,8 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                 <Logo />
               </Link>
               {tenant ? (
-                <nav className="flex items-center gap-3 text-sm">
+                <>
+                <nav className="hidden items-center gap-3 text-sm md:flex">
                   {/* Salir junto al correo: los dos son de la cuenta; tema e idioma van al final. */}
                   <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} />
                   <form action={salir}>
@@ -88,13 +91,15 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                   <ThemeToggle />
                   <LanguageToggle locale={locale} />
                 </nav>
+                {/* En el teléfono el correo, Salir, tema e idioma no entran en la píldora: van al menú. */}
+                <MenuMovil cuenta={{ email: tenant.email ?? tenant.name }} className="md:hidden" />
+                </>
               ) : (
                 <>
                   {/*
                     Enlaces al centro desde lg, como en boringmarketing.com; debajo
-                    de lg solo queda la píldora del Radar a la derecha. En el
-                    teléfono el CTA largo no entra junto al Radar y el idioma: ahí
-                    se esconde y queda el del hero de cada página. Sin CTA en la nav:
+                    de lg quedan la píldora del Radar y el botón del menú, que
+                    lleva los enlaces, Entrar, tema e idioma. Sin CTA en la nav:
                     el de cada página basta (decisión de San, 26 oct 2026).
                   */}
                   <nav aria-label={d.nav.linkComo} className="etiqueta hidden items-center gap-6 lg:flex">
@@ -107,19 +112,21 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                     <span className="contents lg:hidden">
                       <RadarPill texto={d.nav.linkRadar} />
                     </span>
-                    <Link href="/acceder" className="etiqueta hidden px-1 text-muted hover:text-text md:inline">
+                    <Link href="/acceder" className="etiqueta hidden px-1 text-muted hover:text-text lg:inline">
                       {d.nav.entrar}
                     </Link>
                     <span className="hidden lg:contents">
                       <ThemeToggle />
+                      <LanguageToggle locale={locale} />
                     </span>
-                    <LanguageToggle locale={locale} />
+                    <MenuMovil className="lg:hidden" />
                   </div>
                 </>
               )}
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-6 pt-10 pb-20">{children}</main>
+        </SeccionesProvider>
         </LocaleProvider>
         <footer className="border-t border-border px-6 py-8">
           {/* Paddle exige términos, privacidad, reembolsos y precios enlazados desde todo el sitio. */}

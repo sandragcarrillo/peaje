@@ -48,7 +48,7 @@ function Plan({
   return (
     <div className={`flex h-full flex-col rounded-lg border bg-panel p-6 ${destacado ? 'border-accent' : 'border-border'}`}>
       <p className="etiqueta text-muted">{nombre}</p>
-      <p className="mt-3 flex items-baseline gap-2 text-4xl font-semibold tabular-nums">
+      <p className="mt-3 flex flex-wrap items-baseline gap-x-2 text-4xl font-semibold tabular-nums">
         {precio}
         {antes ? <span className="text-lg font-normal text-muted line-through">{antes}</span> : null}
         {unidad ? <span className="text-sm font-normal text-muted">{unidad}</span> : null}
@@ -80,7 +80,7 @@ export default async function Precios() {
       <h1 className="mt-2 text-3xl font-semibold">{P.titulo}</h1>
       <p className="mt-3 max-w-2xl text-[15px] text-muted">{P.intro}</p>
 
-      <div className="mt-10 grid items-stretch gap-4 md:grid-cols-2">
+      <div className="mt-10 grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         <Plan
           nombre={P.gratisNombre}
           precio="US$0"
@@ -88,7 +88,7 @@ export default async function Precios() {
           incluye={P.gratisIncluye}
           nota={COBROS_VISIBLES ? P.kitComision(COMISION_PCT) : P.kitNota}
           cta={
-            <Link href="/radar" className="btn btn-secundario btn-ancho">
+            <Link href="/radar" className="btn btn-secundario btn-ancho whitespace-normal text-center">
               {P.ctaRadar}
             </Link>
           }
@@ -102,7 +102,7 @@ export default async function Precios() {
           incluye={[...P.proIncluye, P.limites(LIMITES.pro.preguntas, LIMITES.pro.creditos)]}
           nota={P.proNota(CUPOS_FOUNDER, PRECIOS_USD.pro)}
           cta={
-            <Link href="/nuevo?plan=1" className="btn btn-primario btn-ancho">
+            <Link href="/nuevo?plan=1" className="btn btn-primario btn-ancho whitespace-normal text-center">
               {P.ctaAgente}
             </Link>
           }

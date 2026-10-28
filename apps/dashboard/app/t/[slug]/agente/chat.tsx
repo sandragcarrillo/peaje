@@ -17,10 +17,13 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
   const [pending, start] = useTransition()
   const [estado, setEstado] = useState<string | null>(null)
   const router = useRouter()
-  const fin = useRef<HTMLDivElement>(null)
+  const caja = useRef<HTMLDivElement>(null)
 
+  // Baja solo la caja de mensajes: scrollIntoView también movía la página y
+  // al abrir Mi agente la dejaba en medio, sobre el chat.
   useEffect(() => {
-    fin.current?.scrollIntoView({ block: 'nearest' })
+    const c = caja.current
+    if (c) c.scrollTop = c.scrollHeight
   }, [mensajes.length, pending])
 
   // Trabajos en segundo plano (una página, una serie): mientras haya alguno,
@@ -96,7 +99,8 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
 
   return (
     <div className="border border-border">
-      <div className="max-h-[520px] min-h-40 space-y-4 overflow-y-auto p-4">
+      {/* En el celular, media pantalla: así el campo de texto queda a la vista junto a los mensajes. */}
+      <div ref={caja} className="max-h-[50dvh] min-h-40 space-y-4 overflow-y-auto p-4 sm:max-h-[520px]">
         {mensajes.length === 0 ? <p className="text-sm text-muted">{t.chatVacio}</p> : null}
         {mensajes.map((m) => (
           <Mensaje key={m.id} slug={slug} mensaje={m} />
@@ -107,7 +111,7 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
           return (
             <div className="flex flex-wrap gap-2">
               {ultimo.options.map((o) => (
-                <button key={o} onClick={() => enviar(o)} className="btn btn-secundario btn-chico">
+                <button key={o} onClick={() => enviar(o)} className="btn btn-secundario btn-chico whitespace-normal">
                   {o}
                 </button>
               ))}
@@ -116,11 +120,10 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
         })()}
         {pending ? <p className="font-mono text-xs text-muted">{estado ?? t.pensando}</p> : null}
         {!pending && trabajando ? <p className="font-mono text-xs text-muted">{r.chatTrabajando}</p> : null}
-        <div ref={fin} />
       </div>
       <div className="flex flex-wrap gap-2 border-t border-border px-4 pt-3">
         {t.sugerencias.map((s) => (
-          <button key={s} disabled={pending} onClick={() => enviar(s)} className="btn btn-secundario btn-chico text-muted hover:text-text">
+          <button key={s} disabled={pending} onClick={() => enviar(s)} className="btn btn-secundario btn-chico whitespace-normal text-muted hover:text-text">
             {s}
           </button>
         ))}
@@ -137,7 +140,8 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
           onChange={(e) => setTexto(e.target.value)}
           placeholder={t.chatPlaceholder}
           maxLength={4000}
-          className="flex-1 border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+          // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
+          className="min-w-0 flex-1 border border-border bg-bg px-3 py-2 text-base outline-none focus:border-text sm:text-sm"
         />
         <button disabled={pending || !texto.trim()} className="btn btn-primario">
           {t.enviar}
@@ -169,7 +173,7 @@ function Mensaje({ slug, mensaje }: { slug: string; mensaje: AgentMessage }) {
   const deUsuario = mensaje.role === 'user'
   return (
     <div className={deUsuario ? 'flex justify-end' : ''}>
-      <div className={deUsuario ? 'max-w-[80%] bg-panel-2 px-3 py-2 text-sm' : 'max-w-[92%] text-sm'}>
+      <div className={deUsuario ? 'max-w-[80%] break-words bg-panel-2 px-3 py-2 text-sm' : 'max-w-[92%] break-words text-sm'}>
         {deUsuario ? <p className="whitespace-pre-wrap leading-relaxed">{mensaje.text}</p> : <Texto texto={mensaje.text} />}
         {acciones.map((a) => (
           <Accion key={a.id} slug={slug} messageId={mensaje.id} accion={a} alCambiar={setAcciones} />
@@ -229,7 +233,7 @@ function Accion({ slug, messageId, accion, alCambiar }: { slug: string; messageI
     <div className="mt-3 border border-border p-3">
       <p className="font-mono text-xs">{accion.summary}</p>
       {accion.status === 'pending' ? (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">{t.propuesta}</span>
           <button disabled={pending} onClick={() => resolver(true)} className="btn btn-primario btn-chico">
             {t.aplicar}

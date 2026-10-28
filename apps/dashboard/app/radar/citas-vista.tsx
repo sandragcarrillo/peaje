@@ -145,7 +145,7 @@ export function SeccionCitas({ dominio, n, usd }: { dominio: string; n: string; 
               {t.cargando(MOTORES_POR_DEFECTO.map(nombreMotor))}
               <span className="font-mono text-muted" aria-hidden>
                 {' '}
-                · {radar.vivo.segundos(segundos)}
+                <span className="whitespace-nowrap">· {radar.vivo.segundos(segundos)}</span>
               </span>
             </span>
           </p>
@@ -170,11 +170,11 @@ function Resultado({ c, dominio, usd, t, locale }: { c: Citas; dominio: string; 
     <>
       <p className="max-w-2xl text-sm text-muted">{t.intro(c.questions.length, nombres)}</p>
 
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         {c.engines.map((id) => {
           const cob = c.coverage[id] ?? { cited: 0, total: 0 }
           return (
-            <li key={id} className="radar-aparece space-y-2 border border-border bg-panel p-4">
+            <li key={id} className="radar-aparece space-y-2 border border-border bg-panel p-3 sm:p-4">
               <p className="flex items-center gap-2 font-mono text-xs text-muted">
                 <Punto id={id} />
                 {nombreMotor(id)}
@@ -225,8 +225,8 @@ function Resultado({ c, dominio, usd, t, locale }: { c: Citas; dominio: string; 
           <h3 className="text-sm font-semibold">{t.enTuLugar}</h3>
           <ul className="flex flex-wrap gap-2">
             {c.citedInstead.map((x) => (
-              <li key={x.domain} className="inline-flex items-center gap-2 border border-border bg-bg px-2.5 py-1.5 font-mono text-xs">
-                <span className="text-text">{x.domain}</span>
+              <li key={x.domain} className="inline-flex max-w-full flex-wrap items-center gap-2 border border-border bg-bg px-2.5 py-1.5 font-mono text-xs">
+                <span className="min-w-0 break-all text-text">{x.domain}</span>
                 <span className="text-muted">{t.veces(x.count)}</span>
                 {x.kind ? (
                   <span className="border border-border px-1 py-0.5 text-[10px] leading-none text-muted">{t.kind[x.kind]}</span>

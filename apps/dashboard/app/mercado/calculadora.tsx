@@ -96,7 +96,7 @@ export function Calculadora({
                   onChange={(e) => setPctPago(Math.min(100, Math.max(1, Number(e.target.value))))}
                   className="w-full border-0 bg-transparent p-0 font-mono text-sm font-bold outline-none"
                 />
-                <span className="ml-1 font-mono text-sm text-muted">% x402</span>
+                <span className="ml-1 font-mono text-sm whitespace-nowrap text-muted sm:whitespace-normal">% x402</span>
               </div>
               <span className="block font-mono text-[10px] text-faint">
                 {d.calcPctNota(pctMercado)}
@@ -128,8 +128,10 @@ export function Calculadora({
             <span className="block font-mono text-[10px] tracking-[0.02em] text-muted">
               {d.calcProyeccion}
             </span>
-            <div className="text-5xl font-bold tracking-tight text-accent tabular-nums">
+            {/* En el teléfono, con los controles al máximo, la cifra no cabía: baja un tamaño y "/mes" puede pasar de línea. */}
+            <div className="text-4xl font-bold tracking-tight text-accent tabular-nums sm:text-5xl">
               ${usd(mensual)}
+              <wbr />
               <span className="text-2xl">{d.calcPorMes}</span>
             </div>
             <span className="block font-mono text-[10px] text-muted">
@@ -138,7 +140,7 @@ export function Calculadora({
           </div>
           <Link
             href="/nuevo"
-            className="btn btn-primario btn-ancho"
+            className="btn btn-primario btn-ancho whitespace-normal text-center"
           >
             {d.calcBoton}
           </Link>

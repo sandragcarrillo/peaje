@@ -57,7 +57,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
           pro={accesoPro(tenant).activo}
           portalUrl={`${gatewayUrl}/${tenant.slug}/developers`}
         />
-        <main className="min-w-0 flex-1 space-y-8 p-6 lg:p-10">
+        <main className="min-w-0 flex-1 space-y-8 px-4 py-6 sm:p-6 lg:p-10">
           {children}
         </main>
       </div>

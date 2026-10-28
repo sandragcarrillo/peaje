@@ -207,7 +207,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
         <section className="rounded-lg border border-border bg-panel p-4">
           <h2 className="font-medium">{d.yaActivoTitulo}</h2>
           <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
-          <ul className="mt-3 grid grid-cols-3 gap-3 text-sm">
+          <ul className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <li className="rounded-lg border border-border bg-bg p-3">
               <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.yaActivoDiscovery}</p>
               <a

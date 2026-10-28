@@ -168,11 +168,11 @@ export default function Acceder() {
   if (step === 'code') {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
-        <div className="w-full max-w-sm border border-border bg-panel p-8">
+        <div className="w-full max-w-sm border border-border bg-panel p-6 sm:p-8">
           <Etiqueta>Peaje</Etiqueta>
           <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
-            {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
+            {d.acceso.codigoEnviadoA} <span className="break-all text-text">{email}</span>.
           </p>
           <p className="mt-2 text-sm text-muted">{d.acceso.codigoRevisaSpam}</p>
           <form onSubmit={verificar} className="mt-6 space-y-4">
@@ -185,7 +185,7 @@ export default function Acceder() {
                 onChange={(e) => setCode(e.target.value)}
                 required
                 placeholder={d.acceso.placeholderCodigo}
-                className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-sm outline-none focus:border-accent"
+                className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 font-mono text-base outline-none focus:border-accent sm:text-sm"
               />
             </label>
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
@@ -209,7 +209,7 @@ export default function Acceder() {
 
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
-      <div className="w-full max-w-sm border border-border bg-panel p-8">
+      <div className="w-full max-w-sm border border-border bg-panel p-6 sm:p-8">
         <Etiqueta>Peaje</Etiqueta>
         <h1 className="mt-2 text-2xl font-semibold">{d.acceso.tituloEntrar}</h1>
         <p className="mt-2 text-sm text-muted">{d.acceso.subtituloEntrar}</p>
@@ -222,7 +222,7 @@ export default function Acceder() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder={d.acceso.placeholderEmail}
-              className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-sm outline-none focus:border-accent"
+              className="mt-1.5 w-full rounded-lg border border-border bg-panel px-3 py-2.5 text-base outline-none focus:border-accent sm:text-sm"
             />
           </label>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

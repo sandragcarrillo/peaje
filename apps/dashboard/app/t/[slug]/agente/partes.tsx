@@ -8,7 +8,8 @@ import { buscarTareasAhora, crearClaveAgente, descartarTarea, tareaHecha } from 
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
 const boton = 'btn btn-secundario btn-chico'
-const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-sm outline-none focus:border-text'
+// 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
+const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-base outline-none focus:border-text sm:text-sm'
 
 export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefijo: string | null; mcpUrl: string; gateway: string }) {
   const { miAgente: t } = useDict()
@@ -28,7 +29,7 @@ export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefij
           <span className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.claveTitulo}</span>
           <p className="mt-1 text-sm">{prefijo ? t.claveActual(prefijo) : t.claveNinguna}</p>
         </div>
-        <button disabled={pending} className={boton} onClick={() => start(async () => setClave(await crearClaveAgente(slug)))}>
+        <button disabled={pending} className={`${boton} whitespace-normal`} onClick={() => start(async () => setClave(await crearClaveAgente(slug)))}>
           {prefijo ? t.claveRotar : t.claveGenerar}
         </button>
       </div>

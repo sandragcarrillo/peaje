@@ -14,6 +14,8 @@ export const nav = {
     linkPrecios: 'Precios',
     linkBlog: 'Blog',
     linkRadar: 'Radar gratis',
+    menu: 'Menú',
+    cerrarMenu: 'Cerrar menú',
     metaTitulo: 'Peaje · que la IA te encuentre, te use y te compre',
     metaDescripcion:
       'ChatGPT, Claude y otros agentes ya visitan tu sitio, pero no entienden bien qué vendes. Tu agente de Peaje te dice qué falta y lo arregla contigo en Telegram.',
@@ -36,6 +38,8 @@ export const nav = {
     linkPrecios: 'Pricing',
     linkBlog: 'Blog',
     linkRadar: 'Free radar',
+    menu: 'Menu',
+    cerrarMenu: 'Close menu',
     metaTitulo: 'Peaje · get AI to find you, use you and buy from you',
     metaDescripcion:
       'ChatGPT, Claude and other agents already visit your site, but they do not really get what you sell. Your Peaje agent tells you what is missing and fixes it with you on Telegram.',

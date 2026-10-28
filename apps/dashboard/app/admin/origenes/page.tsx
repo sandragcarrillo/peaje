@@ -15,9 +15,9 @@ const dia = (d: string) =>
 function Celdas({ c }: { c: Cuenta }) {
   return (
     <>
-      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">{c.leads}</td>
-      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">{c.altas}</td>
-      <td className="whitespace-nowrap px-5 py-3 text-right font-bold tabular-nums">{c.pro}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums sm:px-5">{c.leads}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums sm:px-5">{c.altas}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right font-bold tabular-nums sm:px-5">{c.pro}</td>
     </>
   )
 }
@@ -26,10 +26,10 @@ function Encabezado({ primera }: { primera: string }) {
   return (
     <thead>
       <tr className="etiqueta border-b border-border bg-panel text-muted">
-        <th className="px-5 py-3 font-bold">{primera}</th>
-        <th className="px-5 py-3 text-right font-bold">Leads del radar</th>
-        <th className="px-5 py-3 text-right font-bold">Altas</th>
-        <th className="px-5 py-3 text-right font-bold">Pro</th>
+        <th className="px-3 py-3 font-bold sm:px-5">{primera}</th>
+        <th className="px-3 py-3 text-right font-bold sm:px-5">Leads del radar</th>
+        <th className="px-3 py-3 text-right font-bold sm:px-5">Altas</th>
+        <th className="px-3 py-3 text-right font-bold sm:px-5">Pro</th>
       </tr>
     </thead>
   )
@@ -92,12 +92,12 @@ export default async function Origenes({ searchParams }: { searchParams: Promise
               <tbody className="divide-y divide-border font-mono text-xs">
                 {filas.map((f) => (
                   <tr key={f.origen ?? ''} className="hover:bg-panel-2">
-                    <td className="px-5 py-3 break-all">{f.origen ?? <span className="text-muted">sin origen</span>}</td>
+                    <td className="px-3 py-3 break-all sm:px-5">{f.origen ?? <span className="text-muted">sin origen</span>}</td>
                     <Celdas c={f} />
                   </tr>
                 ))}
                 <tr className="border-t border-text bg-panel">
-                  <td className="px-5 py-3 font-bold">Total</td>
+                  <td className="px-3 py-3 font-bold sm:px-5">Total</td>
                   <Celdas c={totales} />
                 </tr>
               </tbody>
@@ -114,7 +114,7 @@ export default async function Origenes({ searchParams }: { searchParams: Promise
             <tbody className="divide-y divide-border font-mono text-xs">
               {porDia.map((d) => (
                 <tr key={d.dia} className={d.leads + d.altas + d.pro === 0 ? 'text-muted' : 'hover:bg-panel-2'}>
-                  <td className="whitespace-nowrap px-5 py-3">{dia(d.dia)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 sm:px-5">{dia(d.dia)}</td>
                   <Celdas c={d} />
                 </tr>
               ))}

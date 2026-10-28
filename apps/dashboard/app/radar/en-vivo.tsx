@@ -230,7 +230,8 @@ export function MedicionEnVivo({ dominio }: { dominio: string }) {
         <span className="font-bold text-text">{t.vivo.titulo}</span>
         <span className="text-muted" aria-hidden>
           {' '}
-          · {t.vivo.segundos(segundos)}
+          {/* El contador no se parte entre el número y la "s" en el teléfono. */}
+          <span className="whitespace-nowrap">· {t.vivo.segundos(segundos)}</span>
         </span>
       </p>
 

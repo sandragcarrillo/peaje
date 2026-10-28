@@ -63,7 +63,7 @@ export default async function ArticuloBlog({ params }: PageProps<'/blog/[slug]'>
   return (
     <article lang={a.idioma} className="mx-auto max-w-3xl py-6">
       <div className="flex items-center justify-between gap-4 text-sm text-muted">
-        <Link href="/blog" className="inline-flex items-center gap-2 hover:text-text">
+        <Link href="/blog" className="-my-2.5 inline-flex items-center gap-2 py-2.5 hover:text-text">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M19 12H5M11 18l-6-6 6-6" />
           </svg>
@@ -82,7 +82,7 @@ export default async function ArticuloBlog({ params }: PageProps<'/blog/[slug]'>
         <Cuerpo markdown={a.cuerpo} />
       </div>
 
-      <aside className="mt-16 space-y-4 border border-border bg-panel p-8 text-center">
+      <aside className="mt-16 space-y-4 border border-border bg-panel p-6 text-center sm:p-8">
         <p className="text-2xl font-medium tracking-tight">{t.cierreTitulo}</p>
         <p className="mx-auto max-w-md text-sm text-muted">{t.cierreTexto}</p>
         <Botones t={t} />
@@ -100,11 +100,11 @@ export default async function ArticuloBlog({ params }: PageProps<'/blog/[slug]'>
 function Botones({ t }: { t: ReturnType<typeof dictFor>['blog'] }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-      <Link href="/radar" className="btn btn-primario gap-1.5">
+      <Link href="/radar" className="btn btn-primario gap-1.5 whitespace-normal">
         {t.ctaPrimario}
         <Flecha />
       </Link>
-      <Link href="/precios" className="btn btn-secundario gap-1.5">
+      <Link href="/precios" className="btn btn-secundario gap-1.5 whitespace-normal">
         {t.ctaSecundario}
         <Flecha />
       </Link>

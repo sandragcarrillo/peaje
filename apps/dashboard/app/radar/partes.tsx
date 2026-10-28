@@ -83,7 +83,7 @@ export function Formulario({
   }
 
   const campo =
-    'w-full min-w-0 border border-border bg-bg px-4 py-3 font-mono text-sm outline-none focus:border-text'
+    'w-full min-w-0 border border-border bg-bg px-4 py-3 font-mono text-base outline-none focus:border-text sm:text-sm'
   return (
     <form onSubmit={enviar} className="w-full max-w-xl space-y-4">
       <label className="block space-y-1.5">
@@ -251,7 +251,7 @@ export function MandarInforme({ dominio, conCorreo }: { dominio: string; conCorr
             autoComplete="email"
             autoCapitalize="none"
             spellCheck={false}
-            className="w-full min-w-0 border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+            className="w-full min-w-0 border border-border bg-bg px-3 py-2 font-mono text-base outline-none focus:border-text sm:text-sm"
           />
           <button type="submit" disabled={estado === 'enviando'} className="btn btn-secundario shrink-0">
             {estado === 'enviando' ? d.enviando : d.informeEnviar}
@@ -264,7 +264,7 @@ export function MandarInforme({ dominio, conCorreo }: { dominio: string; conCorr
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex w-full flex-col gap-1 sm:w-auto">
       <button type="button" onClick={() => void mandar()} disabled={estado === 'enviando'} className="btn btn-secundario">
         {estado === 'enviando' ? d.enviando : d.informe}
       </button>

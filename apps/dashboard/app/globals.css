@@ -209,6 +209,20 @@
     padding: 0.4rem 0.75rem;
     font-size: 0.75rem;
   }
+  /*
+   * En el teléfono: el botón chico (~29px) se toca mal con el dedo, mínimo
+   * 40px de alto; y una etiqueta larga baja de línea en vez de salirse de la
+   * pantalla (el layout corta lo que se sale, no hay scroll de lado).
+   */
+  @media (max-width: 639px) {
+    .btn {
+      white-space: normal;
+      text-align: center;
+    }
+    .btn-chico {
+      min-height: 2.5rem;
+    }
+  }
   .btn-ancho {
     width: 100%;
   }

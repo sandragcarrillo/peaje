@@ -83,7 +83,7 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
     return (
       <section className="space-y-6">
         {checklist}
-        <h1 className="text-3xl font-bold tracking-tight">{t.listoTitulo(domain)}</h1>
+        <h1 className="text-3xl font-bold tracking-tight break-words">{t.listoTitulo(domain)}</h1>
         <div className="flex flex-col justify-between gap-4 border border-border bg-panel p-5 sm:flex-row sm:items-center">
           <p className="text-sm text-muted">{t.listoSinPuntaje(domain)}</p>
           <BotonScore slug={tenant.slug} label={t.medirAhora} />
@@ -105,7 +105,7 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
       {checklist}
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">{t.listoTitulo(domain)}</h1>
+        <h1 className="text-3xl font-bold tracking-tight break-words">{t.listoTitulo(domain)}</h1>
         <p className="text-sm text-muted">{mejoro ? d.panel.scoreMejora(antes, score.score) : t.listoSub}</p>
       </div>
 

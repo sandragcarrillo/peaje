@@ -73,14 +73,15 @@ export default async function VisitasPage({
                 ]
               : [[t.metricaVisitas, String(stats.totals.visits)]]
             ).map(([label, valor], i) => (
-              <div key={label} className={`p-6 ${COBROS_VISIBLES && i < 3 ? 'border-b border-border md:border-r md:border-b-0' : ''} ${i === 1 ? 'border-r-0 md:border-r' : ''}`}>
+              // En el celular van de a dos: divisor vertical en la columna izquierda y horizontal bajo la primera fila.
+              <div key={label} className={`border-border p-6 ${COBROS_VISIBLES ? ['border-r border-b md:border-b-0', 'border-b md:border-r md:border-b-0', 'border-r', ''][i] : ''}`}>
                 <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{label}</span>
                 <div className="mt-4 text-3xl font-bold">{valor}</div>
               </div>
             ))}
           </div>
 
-          <section className="grid gap-8 md:grid-cols-2">
+          <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="flex flex-col gap-3">
               <Cabecera texto={t.porTipo} />
               <ul className="divide-y divide-border border border-border">
@@ -104,11 +105,13 @@ export default async function VisitasPage({
                 Cada columna se estira al alto del gráfico y la barra mide su
                 porcentaje contra el área de arriba de la fecha (antes la columna
                 no tenía alto y todas las barras quedaban en 0). Con 30 días, la
-                fecha sale cada 5 para que no se pisen.
+                fecha sale cada 5 para que no se pisen. min-w-0: sin él, el ancho
+                de la fecha (que ocupa lugar aunque esté invisible) no deja que
+                las 30 columnas se achiquen y el gráfico se sale de su caja.
               */}
               <div className="flex h-44 items-stretch gap-1 border border-border px-3 pt-6 pb-3">
                 {diario.map((x, i) => (
-                  <div key={x.date} className="flex flex-1 flex-col items-center gap-1" title={`${x.date}: ${x.visits}`}>
+                  <div key={x.date} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${x.date}: ${x.visits}`}>
                     <div className="flex w-full flex-1 items-end border-b border-border">
                       <div className="relative flex w-full flex-col justify-end bg-border" style={{ height: `${(x.visits / maxDia) * 100}%` }}>
                         {x.visits > 0 ? (
@@ -117,7 +120,7 @@ export default async function VisitasPage({
                         <div className="w-full bg-accent" style={{ height: `${!COBROS_VISIBLES ? 100 : x.visits ? (x.paid / x.visits) * 100 : 0}%` }} />
                       </div>
                     </div>
-                    <span className={`font-mono text-[9px] text-faint ${dias === 7 || i % 5 === 0 || i === diario.length - 1 ? '' : 'invisible'}`}>
+                    <span className={`font-mono text-[9px] whitespace-nowrap text-faint ${dias === 7 || i % 5 === 0 || i === diario.length - 1 ? '' : 'invisible'}`}>
                       {x.date.slice(5)}
                     </span>
                   </div>
@@ -165,14 +168,15 @@ export default async function VisitasPage({
             </div>
             <ul className="divide-y divide-border border border-border">
               {stats.topPaths.map((p) => (
-                <li key={p.path} className="grid grid-cols-12 gap-4 px-4 py-2.5 text-sm">
-                  <div className={`${COBROS_VISIBLES ? 'col-span-4' : 'col-span-10'} truncate font-mono text-xs`}>{p.path}</div>
-                  <div className="col-span-2 text-right font-mono text-xs">{p.visits}</div>
+                // En el celular, fila flex: 11 gaps de la grilla de 12 se comían la mitad del ancho.
+                <li key={p.path} className="flex gap-4 px-4 py-2.5 text-sm md:grid md:grid-cols-12">
+                  <div className={`${COBROS_VISIBLES ? 'col-span-4' : 'col-span-10'} min-w-0 flex-1 truncate font-mono text-xs`}>{p.path}</div>
+                  <div className="col-span-2 shrink-0 text-right font-mono text-xs">{p.visits}</div>
                   {COBROS_VISIBLES ? (
                     <>
-                      <div className="col-span-2 text-right font-mono text-xs">{p.served402}</div>
-                      <div className="col-span-2 text-right font-mono text-xs">{p.paid}</div>
-                      <div className="col-span-2 text-right font-mono text-xs">{money(p.revenue)}</div>
+                      <div className="col-span-2 shrink-0 text-right font-mono text-xs">{p.served402}</div>
+                      <div className="col-span-2 shrink-0 text-right font-mono text-xs">{p.paid}</div>
+                      <div className="col-span-2 shrink-0 text-right font-mono text-xs">{money(p.revenue)}</div>
                     </>
                   ) : null}
                 </li>
@@ -186,12 +190,12 @@ export default async function VisitasPage({
             {(!COBROS_VISIBLES || stats.unpaidDemand.length === 0) && stats.notFound.length === 0 ? (
               <p className="text-sm text-muted">{t.noAtendidaVacio}</p>
             ) : (
-              <div className={`grid gap-6 ${COBROS_VISIBLES ? 'md:grid-cols-2' : ''}`}>
+              <div className={`grid grid-cols-1 gap-6 ${COBROS_VISIBLES ? 'md:grid-cols-2' : ''}`}>
                 <div hidden={!COBROS_VISIBLES}>
                   <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{t.noAtendidaMiradas}</span>
                   <ul className="mt-2 divide-y divide-border border border-border">
                     {stats.unpaidDemand.map((p) => (
-                      <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                      <li key={p.path} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                         <span className="truncate font-mono text-xs">{p.path}</span>
                         <span className="font-mono text-xs text-muted">
                           {p.priceUsd ? `${money(p.priceUsd)} · ` : ''}
@@ -206,7 +210,7 @@ export default async function VisitasPage({
                   <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{t.noAtendidaInexistentes}</span>
                   <ul className="mt-2 divide-y divide-border border border-border">
                     {stats.notFound.map((p) => (
-                      <li key={p.path} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                      <li key={p.path} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                         <span className="truncate font-mono text-xs">{p.path}</span>
                         <span className="font-mono text-xs text-muted">{p.visits}</span>
                       </li>

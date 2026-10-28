@@ -26,47 +26,49 @@ export function LinksPanel({
       <p className="mt-2 text-sm text-muted">{d.linksIntro}</p>
 
       {resources.length > 0 ? (
-        <table className="mt-4 w-full text-sm">
-          <thead className="text-left font-mono text-[11px] tracking-[0.02em] text-muted">
-            <tr>
-              <th className="pb-2 font-normal" />
-              <th className="pb-2 font-normal">{d.colRuta}</th>
-              <th className="pb-2 font-normal" />
-              <th className="pb-2 text-right font-normal">{d.colMonto}</th>
-              <th className="pb-2 font-normal" />
-            </tr>
-          </thead>
-          <tbody>
-            {resources.map((r) => (
-              <tr key={r.id} className="border-t border-border">
-                <td className="w-14 py-2.5 pr-2">
-                  <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">
-                    GET
-                  </span>
-                </td>
-                <td className="py-2.5 pr-4">
-                  <span className="font-mono text-sm" title={r.url}>/r/{r.slug}</span>
-                </td>
-                <td className="max-w-48 truncate py-2.5 pr-4 text-xs text-muted">
-                  {r.title ?? r.url}
-                </td>
-                <td className="py-2.5 text-right font-mono text-sm text-accent">
-                  {Number(r.priceUsd) > 0 ? `+${money(r.priceUsd)}` : d.linksGratis}
-                </td>
-                <td className="w-24 py-2.5 text-right">
-                  <span aria-hidden className="mr-3 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-                  <button
-                    disabled={pending}
-                    onClick={() => startTransition(async () => borrarLink(slug, r.id))}
-                    className="btn btn-secundario btn-chico hover:text-red-600"
-                  >
-                    {d.linksQuitar}
-                  </button>
-                </td>
+        <div className="mt-4 overflow-x-auto md:overflow-x-visible">
+          <table className="w-full text-sm">
+            <thead className="text-left font-mono text-[11px] tracking-[0.02em] text-muted">
+              <tr>
+                <th className="pb-2 font-normal" />
+                <th className="pb-2 font-normal">{d.colRuta}</th>
+                <th className="pb-2 font-normal" />
+                <th className="pb-2 text-right font-normal">{d.colMonto}</th>
+                <th className="pb-2 font-normal" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {resources.map((r) => (
+                <tr key={r.id} className="border-t border-border">
+                  <td className="w-14 py-2.5 pr-2">
+                    <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">
+                      GET
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <span className="font-mono text-sm" title={r.url}>/r/{r.slug}</span>
+                  </td>
+                  <td className="max-w-48 truncate py-2.5 pr-4 text-xs text-muted">
+                    {r.title ?? r.url}
+                  </td>
+                  <td className="py-2.5 text-right font-mono text-sm text-accent">
+                    {Number(r.priceUsd) > 0 ? `+${money(r.priceUsd)}` : d.linksGratis}
+                  </td>
+                  <td className="w-24 py-2.5 text-right">
+                    <span aria-hidden className="mr-3 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                    <button
+                      disabled={pending}
+                      onClick={() => startTransition(async () => borrarLink(slug, r.id))}
+                      className="btn btn-secundario btn-chico hover:text-red-600"
+                    >
+                      {d.linksQuitar}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted">
           {d.linksVacio}
@@ -156,12 +158,12 @@ function ImportarSitemap({ slug }: { slug: string }) {
       <h4 className="text-sm font-medium">{d.sitemapTitulo}</h4>
       <p className="mt-1 text-xs text-muted">{d.sitemapIntro}</p>
 
-      <div className="mt-3 flex gap-3">
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         <input
           value={urlSitemap}
           onChange={(e) => setUrlSitemap(e.target.value)}
           placeholder={d.sitemapPlaceholder}
-          className="min-w-72 flex-1 border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+          className="border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text sm:min-w-72 sm:flex-1"
         />
         <button
           disabled={pending || !urlSitemap.trim()}
@@ -177,7 +179,7 @@ function ImportarSitemap({ slug }: { slug: string }) {
               }
             })
           }}
-          className="btn btn-secundario"
+          className="btn btn-secundario self-start sm:self-auto"
         >
           {pending && !items ? d.sitemapLeyendo : d.sitemapLeer}
         </button>
@@ -191,8 +193,8 @@ function ImportarSitemap({ slug }: { slug: string }) {
             placeholder={d.sitemapBuscar}
             className="mb-2 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
           />
-          <div className="flex items-center justify-between text-xs text-muted">
-            <span className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            <span className="flex flex-wrap items-center gap-2">
               {d.sitemapSeleccionadas(seleccion.size, items.length)}
               <button
                 type="button"

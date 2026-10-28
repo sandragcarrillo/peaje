@@ -73,8 +73,8 @@ export default async function Citas({ params }: { params: Promise<{ slug: string
               <ul className="divide-y divide-border border border-border text-sm">
                 {s.competitors.slice(0, 10).map((c) => (
                   <li key={c.domain} className="flex items-baseline justify-between gap-3 px-4 py-2">
-                    <span className="font-medium">{c.domain}</span>
-                    <span className="font-mono text-xs text-muted">{t.ciVeces(c.count)}</span>
+                    <span className="min-w-0 break-words font-medium">{c.domain}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted">{t.ciVeces(c.count)}</span>
                   </li>
                 ))}
               </ul>

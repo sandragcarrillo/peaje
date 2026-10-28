@@ -131,32 +131,35 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               {s.competitors.slice(0, 6).map((c) => `${c.domain} (${c.count})`).join(', ')}
             </p>
           ) : null}
-          <table className="mt-4 w-full text-sm">
-            <thead className="text-left font-mono text-[10px] tracking-[0.02em] text-muted">
-              <tr>
-                <th className="pb-2 font-normal" />
-                {motores.map((m) => (
-                  <th key={m.id} className="pb-2 text-center font-normal">{m.name}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {s.byPrompt.map((p) => (
-                <tr key={p.prompt} className="border-t border-border">
-                  <td className="py-2 pr-3">{p.prompt}</td>
-                  {motores.map((m) => {
-                    const r = p.engines[m.id]
-                    const v = !r || r.error ? '·' : r.cited ? '✓' : r.mentioned ? '~' : '✗'
-                    return (
-                      <td key={m.id} className="py-2 text-center font-mono" title={r?.cited ? t.citCitado : r?.mentioned ? t.citMencion : t.citNo}>
-                        {v}
-                      </td>
-                    )
-                  })}
+          {/* Con varios motores la tabla no entra en el celular: se desliza de lado. */}
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left font-mono text-[10px] tracking-[0.02em] text-muted">
+                <tr>
+                  <th className="pb-2 font-normal" />
+                  {motores.map((m) => (
+                    <th key={m.id} className="pb-2 text-center font-normal">{m.name}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {s.byPrompt.map((p) => (
+                  <tr key={p.prompt} className="border-t border-border">
+                    <td className="py-2 pr-3">{p.prompt}</td>
+                    {motores.map((m) => {
+                      const r = p.engines[m.id]
+                      const v = !r || r.error ? '·' : r.cited ? '✓' : r.mentioned ? '~' : '✗'
+                      return (
+                        <td key={m.id} className="py-2 text-center font-mono" title={r?.cited ? t.citCitado : r?.mentioned ? t.citMencion : t.citNo}>
+                          {v}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="mt-2 text-xs text-muted">✓ {t.citCitado} · ~ {t.citMencion} · ✗ {t.citNo}</p>
         </div>
       ) : null}
@@ -189,7 +192,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder={t.citPlaceholder}
-              className="min-w-64 flex-1 border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+              className="min-w-64 flex-1 border border-border bg-bg px-3 py-2 text-base outline-none focus:border-text sm:text-sm"
             />
             <button disabled={pending || !texto.trim()} onClick={() => correr(async () => { await agregarPregunta(slug, texto); setTexto('') })} className="btn btn-secundario">
               {t.citAgregar}
@@ -213,7 +216,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
               }
             })
           }}
-          className="btn btn-primario"
+          className="btn btn-primario whitespace-normal"
         >
           {pending && midiendo ? t.citMidiendo : t.citMedir}
         </button>

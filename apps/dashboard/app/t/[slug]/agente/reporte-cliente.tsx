@@ -17,7 +17,7 @@ export function BuscarOportunidades({ slug }: { slug: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <button
         disabled={pending}
-        className="btn btn-primario"
+        className="btn btn-primario whitespace-normal"
         onClick={() =>
           start(async () => {
             setMsj(null)
@@ -58,7 +58,7 @@ export function CopiarTexto({ texto }: { texto: string }) {
 /** El borrador de la página como se va a ver: markdown con tablas. */
 export function PaginaMarkdown({ texto }: { texto: string }) {
   return (
-    <div className="text-sm leading-relaxed [&_a]:text-accent [&_a]:underline [&_code]:font-mono [&_code]:text-xs [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mt-5 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:mt-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mt-2 [&_strong]:font-semibold [&_ul]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
+    <div className="text-sm leading-relaxed break-words [&_a]:text-accent [&_a]:underline [&_code]:font-mono [&_code]:text-xs [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mt-5 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:mt-1 [&_ol]:mt-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mt-2 [&_strong]:font-semibold [&_ul]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
       <div className="overflow-x-auto">
         <Markdown
           remarkPlugins={[remarkGfm]}

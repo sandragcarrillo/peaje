@@ -133,7 +133,7 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
         <p className="mt-2 max-w-xl text-sm text-muted">{d.ctaCuerpo}</p>
         <Link
           href="/nuevo"
-          className="btn btn-primario mt-4"
+          className="btn btn-primario mt-4 whitespace-normal text-center"
         >
           {d.ctaBoton}
         </Link>
@@ -297,11 +297,12 @@ function RegistrosPorMes({ agentes, d }: { agentes: MarketAgent[]; d: Mercado })
             )
           })}
         </div>
+        {/* En el teléfono no caben los 12 meses: se ve uno sí y uno no, siempre con el mes en curso. */}
         <div className="flex justify-between gap-1 pt-2 sm:gap-3">
           {meses.map((m, i) => (
             <span
               key={m.clave}
-              className={`flex-1 text-center font-mono text-[10px] ${
+              className={`flex min-w-0 flex-1 justify-center font-mono text-[10px] odd:invisible sm:odd:visible ${
                 i === meses.length - 1 ? 'font-bold text-text' : 'text-muted'
               }`}
             >
@@ -326,7 +327,7 @@ function BarrasH({
   const max = Math.max(...datos.map((d) => d.valor), 1)
   return (
     <section className="border border-border bg-panel p-6">
-      <div className="flex items-baseline justify-between border-b border-border pb-3">
+      <div className="flex flex-col gap-y-1 border-b border-border pb-3 sm:flex-row sm:items-baseline sm:justify-between">
         <h2 className="font-mono text-[11px] font-bold tracking-[0.02em]">{titulo}</h2>
         <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{nota}</p>
       </div>

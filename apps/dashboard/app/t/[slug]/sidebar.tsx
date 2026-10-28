@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { usePublicarSecciones } from '@/components/menu-movil'
 import { COBROS_VISIBLES } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 
@@ -14,6 +15,9 @@ type Item = { href: string; label: string; valor?: string; acento?: boolean; sub
  * Los ceros no se muestran (rutas e ingresos vacíos hacen sentir el producto
  * vacío); el puntaje sí, porque invita a subirlo. El botón principal lleva a
  * activar el agente si no paga, o a las mejoras si ya paga.
+ *
+ * En el teléfono la columna no se ve: las mismas secciones van al menú del
+ * navbar (ver usePublicarSecciones).
  */
 export function Sidebar({
   slug,
@@ -51,6 +55,14 @@ export function Sidebar({
     { href: '/rutas', label: d.panel.navRutas, valor: valores.rutas },
     { href: '/ingresos', label: d.panel.navIngresos, valor: valores.ingresos, acento: true },
   ]
+
+  const conRuta = (items: Item[]) => items.map((i) => ({ ...i, href: `${base}${i.href}` }))
+  usePublicarSecciones({
+    nombre: name,
+    grupos: [{ items: conRuta(principal) }, ...(COBROS_VISIBLES ? [{ titulo: d.panel.sidebarCobros, items: conRuta(cobros) }] : [])],
+    boton: { href: pro ? `${base}/kit` : `${base}/agente#plan`, label: pro ? d.panel.sidebarVerMejoras : d.panel.sidebarActivarAgente },
+    portal: { href: portalUrl, label: d.panel.navPortal },
+  })
 
   const lista = (items: Item[]) =>
     items.map((item) => {

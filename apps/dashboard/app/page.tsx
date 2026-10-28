@@ -105,7 +105,7 @@ export default async function Landing() {
             de negocio. Lo gratis va al lado en una línea;
             el detalle (créditos, cobro, reembolso) queda en /precios.
           */}
-          <div className="grid gap-10 md:grid-cols-[1fr_1.35fr] md:items-start">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-[1fr_1.35fr] md:items-start">
             <div>
               <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
               <p className="mt-4 max-w-sm text-base text-muted">{t.precioGratis}</p>
@@ -114,15 +114,15 @@ export default async function Landing() {
                 <Link href="/radar" className="btn btn-secundario">
                   {t.ctaRadar}
                 </Link>
-                <Link href="/precios" className="text-sm text-muted underline underline-offset-4 hover:text-text">
+                <Link href="/precios" className="-my-2.5 py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text">
                   {t.verPrecios}
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-lg border border-accent bg-panel p-6 sm:p-8">
+            <div className="rounded-lg border border-accent bg-panel p-5 sm:p-8">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="flex items-baseline gap-2">
+                <p className="flex flex-wrap items-baseline gap-x-2">
                   <span className="text-4xl font-semibold tabular-nums sm:text-5xl">US${PRECIOS_USD.founder}</span>
                   <span className="text-lg text-muted line-through">US${PRECIOS_USD.pro}</span>
                   <span className="font-mono text-sm text-muted">{t.precioUnidad}</span>
@@ -153,7 +153,7 @@ export default async function Landing() {
                 ))}
               </ul>
 
-              <Link href={tenant ? agenteHref : '/nuevo?plan=1'} className="btn btn-primario btn-ancho mt-8">
+              <Link href={tenant ? agenteHref : '/nuevo?plan=1'} className="btn btn-primario btn-ancho mt-8 whitespace-normal text-center">
                 {agenteTexto}
               </Link>
 
@@ -170,7 +170,8 @@ export default async function Landing() {
           <div className="mt-8 divide-y divide-border border-y border-border">
             {t.faq(COMISION_PCT).map((f) => (
               <details key={f.p} className="group rounded-none py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+                {/* -my-4 py-4: en el teléfono el toque abarca toda la fila, no solo la línea de texto; el diseño no se mueve. */}
+                <summary className="-my-4 flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
                   {f.p}
                   <span aria-hidden className="font-mono text-sm text-muted group-open:rotate-45">
                     +
@@ -204,9 +205,9 @@ export default async function Landing() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-sm">
           <span className="etiqueta font-bold text-accent">{t.devsEtiqueta}</span>
           <span className="text-muted">
-            {t.devsTexto} <code className="font-mono text-text">npx @peaje/cli@1 init &lt;slug&gt;</code>
+            {t.devsTexto} <code className="font-mono whitespace-nowrap text-text">npx @peaje/cli@1 init &lt;slug&gt;</code>
           </span>
-          <a href="/developers" className="text-muted underline underline-offset-4 hover:text-text">
+          <a href="/developers" className="-my-2.5 py-2.5 text-muted underline underline-offset-4 hover:text-text">
             {t.devsPortal} →
           </a>
         </div>

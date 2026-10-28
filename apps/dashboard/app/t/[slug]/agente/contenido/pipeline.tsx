@@ -506,7 +506,7 @@ function PanelBorrador({ slug, p, creditosPagina }: { slug: string; p: Pieza; cr
         <div className="space-y-3 text-sm">
           <p>{t.boSinBorrador}</p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={chatCon(slug, t.boPedirMensaje(p.titulo))} className="btn btn-primario btn-chico">
+            <Link href={chatCon(slug, t.boPedirMensaje(p.titulo))} className="btn btn-primario btn-chico whitespace-normal">
               {t.boPedir}
             </Link>
             <span className="text-xs text-muted">{t.boPedirCosto(creditosPagina)}</span>
@@ -607,7 +607,8 @@ function MarcarPublicada({ slug, id }: { slug: string; id: string }) {
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://"
           aria-label={t.publicarUrl}
-          className="min-w-0 flex-1 border border-border bg-bg px-3 py-2 text-sm"
+          // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
+          className="min-w-0 flex-1 border border-border bg-bg px-3 py-2 text-base sm:text-sm"
         />
         <button type="submit" disabled={estado === 'enviando'} className="btn btn-primario btn-chico shrink-0">
           {estado === 'enviando' ? t.publicarRevisando : t.publicarBoton}

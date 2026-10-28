@@ -292,7 +292,7 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
                     setCopiado(true)
                     setTimeout(() => setCopiado(false), 1500)
                   }}
-                  className="btn btn-primario"
+                  className="btn btn-primario whitespace-normal sm:whitespace-nowrap"
                 >
                   {copiado ? d.implementaCopiado : d.implementaCopiar}
                 </button>

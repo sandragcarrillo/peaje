@@ -143,11 +143,11 @@ export default function NuevoNegocio() {
   if (step === 'code') {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
-        <div className="w-full max-w-sm border border-border bg-panel p-8">
+        <div className="w-full max-w-sm border border-border bg-panel p-6 sm:p-8">
           <Etiqueta>Peaje</Etiqueta>
           <h1 className="mt-2 text-2xl font-semibold">{d.acceso.revisaTuEmail}</h1>
           <p className="mt-2 text-sm text-muted">
-            {d.acceso.codigoEnviadoA} <span className="text-text">{email}</span>.
+            {d.acceso.codigoEnviadoA} <span className="break-all text-text">{email}</span>.
           </p>
           <p className="mt-2 text-sm text-muted">{d.acceso.codigoRevisaSpam}</p>
           <form onSubmit={verificarYCrear} className="mt-6 space-y-4">
@@ -160,7 +160,7 @@ export default function NuevoNegocio() {
                 onChange={(e) => setCode(e.target.value)}
                 required
                 placeholder={d.acceso.placeholderCodigo}
-                className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+                className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-base outline-none focus:border-text sm:text-sm"
               />
             </label>
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -179,7 +179,7 @@ export default function NuevoNegocio() {
 
   return (
     <div className="flex min-h-[65vh] items-center justify-center">
-      <div className="w-full max-w-4xl border border-border bg-panel p-8">
+      <div className="w-full max-w-4xl border border-border bg-panel p-6 sm:p-8">
         <h1 className="text-2xl font-semibold">{d.acceso.tituloRegistrar}</h1>
         <p className="mt-2 max-w-xl text-sm text-muted">{d.acceso.subtituloRegistrar}</p>
 
@@ -194,7 +194,7 @@ export default function NuevoNegocio() {
               onChange={(e) => setOriginUrl(e.target.value)}
               required
               placeholder={d.acceso.placeholderUrl}
-              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-text"
+              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 font-mono text-base outline-none focus:border-text sm:text-sm"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaUrl}</span>
           </label>
@@ -209,7 +209,7 @@ export default function NuevoNegocio() {
               onChange={(e) => setEmail(e.target.value)}
               required={!conSesion}
               placeholder={d.acceso.placeholderEmail}
-              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-text"
+              className="mt-1.5 w-full border border-border bg-bg px-3 py-2 text-base outline-none focus:border-text sm:text-sm"
             />
             <span className="mt-1.5 block text-xs text-muted">{d.acceso.ayudaEmail}</span>
           </label>

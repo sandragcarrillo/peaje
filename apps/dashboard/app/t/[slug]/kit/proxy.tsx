@@ -74,7 +74,7 @@ export function BloqueProxy({ base }: { base: string }) {
           <button
             type="button"
             onClick={copiar}
-            className="btn btn-primario"
+            className="btn btn-primario whitespace-normal sm:whitespace-nowrap"
           >
             {copiado ? d.proxyConfigCopiada : d.proxyCopiarConfig}
           </button>
@@ -103,7 +103,7 @@ export function BloqueProxy({ base }: { base: string }) {
           <ul className="mt-2 space-y-1 text-xs text-muted">
             {RUTAS_PROXY.map((r) => (
               <li key={r.path} className="flex flex-wrap gap-2">
-                <code className="font-mono text-accent">{r.path}</code>
+                <code className="font-mono break-all text-accent">{r.path}</code>
                 <span>{r.nota}</span>
               </li>
             ))}

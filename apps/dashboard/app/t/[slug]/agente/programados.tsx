@@ -11,7 +11,8 @@ import { programarReporte, quitarReporte } from './actions'
  * programó hablando con el agente. Va dentro de la sección Telegram.
  */
 
-const select = 'mt-1 block border border-border bg-bg px-2 py-1.5 text-sm outline-none focus:border-text'
+// 16px en el celular: con menos, iOS hace zoom al abrir el select.
+const select = 'mt-1 block border border-border bg-bg px-2 py-1.5 text-base outline-none focus:border-text sm:text-sm'
 type Frecuencia = 'off' | 'daily' | 'weekly' | 'monthly'
 
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`

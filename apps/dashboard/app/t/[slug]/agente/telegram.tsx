@@ -66,11 +66,11 @@ export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado
       ))}
       <div className="flex flex-wrap items-center gap-3">
         {enlace ? (
-          <a href={enlace} target="_blank" rel="noreferrer" className="btn btn-primario">
+          <a href={enlace} target="_blank" rel="noreferrer" className="btn btn-primario whitespace-normal">
             {t.tgAbrir}
           </a>
         ) : (
-          <button disabled={pending} onClick={conectar} className="btn btn-primario">
+          <button disabled={pending} onClick={conectar} className="btn btn-primario whitespace-normal">
             {estado.links.length ? t.tgOtro : t.tgConectar}
           </button>
         )}

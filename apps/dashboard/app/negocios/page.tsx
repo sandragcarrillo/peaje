@@ -37,7 +37,7 @@ export default async function Negocios() {
         </div>
         <Link
           href="/nuevo"
-          className="btn btn-primario shrink-0 self-start md:self-auto"
+          className="btn btn-primario w-full shrink-0 self-start whitespace-normal text-center sm:w-auto sm:whitespace-nowrap md:self-auto"
         >
           {d.acceso.registrarOtro}
         </Link>
@@ -81,8 +81,8 @@ export default async function Negocios() {
           return (
             <article key={t.id} className="border border-border bg-panel p-6">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-lg font-bold">{t.name}</h2>
-                <span className="border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                <h2 className="min-w-0 break-words text-lg font-bold">{t.name}</h2>
+                <span className="max-w-full break-all border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted">
                   ID: {t.slug}
                 </span>
                 <span className="flex items-center gap-1.5 border border-accent/50 px-1.5 py-0.5 font-mono text-[10px] text-accent">
@@ -90,7 +90,7 @@ export default async function Negocios() {
                   {d.acceso.negociosOnline}
                 </span>
               </div>
-              <p className="mt-1 font-mono text-xs text-muted">{t.originUrl}</p>
+              <p className="mt-1 break-all font-mono text-xs text-muted">{t.originUrl}</p>
 
               {COBROS_VISIBLES ? (
                 <div className="mt-4 grid grid-cols-1 divide-y divide-border border border-border bg-bg sm:grid-cols-3 sm:divide-x sm:divide-y-0">
