@@ -49,6 +49,7 @@ export function Sidebar({
     { href: '/agente', label: d.panel.navAgente },
     // El pipeline de páginas del agente. Sin Pro la página muestra el candado; acá se avisa.
     { href: '/agente/contenido', label: d.contenido.nav, valor: pro ? undefined : 'Pro', sub: true },
+    { href: '/conexiones', label: d.panel.navConexiones, sub: true },
     { href: '/agentes-visitas', label: d.panel.navVisitas },
   ]
   const cobros: Item[] = [

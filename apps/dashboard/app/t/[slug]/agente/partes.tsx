@@ -3,64 +3,12 @@
 import type { AgentTask, TaskFollowup } from '@peaje/db'
 import { useState, useTransition } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
-import { Copiable } from '../kit/comando'
-import { buscarTareasAhora, crearClaveAgente, descartarTarea, tareaHecha } from './actions'
+import { buscarTareasAhora, descartarTarea, tareaHecha } from './actions'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
 const boton = 'btn btn-secundario btn-chico'
 // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
 const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-base outline-none focus:border-text sm:text-sm'
-
-export function Clave({ slug, prefijo, mcpUrl, gateway }: { slug: string; prefijo: string | null; mcpUrl: string; gateway: string }) {
-  const { miAgente: t } = useDict()
-  const [clave, setClave] = useState<string | null>(null)
-  const [pending, start] = useTransition()
-  const k = clave ?? t.placeholderClave
-  const claude = `claude mcp add --transport http peaje ${mcpUrl} --header "Authorization: Bearer ${k}"`
-  const cursor = JSON.stringify({ mcpServers: { peaje: { url: mcpUrl, headers: { Authorization: `Bearer ${k}` } } } }, null, 2)
-  // Sin la clave en el comando: el CLI la lee de PEAJE_AGENT_KEY, así no queda
-  // en el historial de la terminal ni en una captura de pantalla.
-  const terminal = `npx @peaje/cli@1 tasks${gateway.includes('localhost') ? ` --gateway ${gateway}` : ''}`
-
-  return (
-    <div className="space-y-4 border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <span className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.claveTitulo}</span>
-          <p className="mt-1 text-sm">{prefijo ? t.claveActual(prefijo) : t.claveNinguna}</p>
-        </div>
-        <button disabled={pending} className={`${boton} whitespace-normal`} onClick={() => start(async () => setClave(await crearClaveAgente(slug)))}>
-          {prefijo ? t.claveRotar : t.claveGenerar}
-        </button>
-      </div>
-      {clave ? (
-        <div>
-          <span className="text-xs text-muted">{t.claveVariable}</span>
-          <div className="mt-1">
-            {/* Tapada en pantalla; copiar usa el texto real. */}
-            <Copiable texto={`export PEAJE_AGENT_KEY=${clave}`} secreto={clave} />
-          </div>
-          <p className="mt-1 text-xs text-red-600">{t.claveUnaVez}</p>
-        </div>
-      ) : null}
-      <Bloque titulo={t.claudeCode} texto={claude} secreto={clave} />
-      <Bloque titulo={t.cursor} texto={cursor} secreto={clave} />
-      <Bloque titulo={t.terminal} texto={terminal} nota={t.terminalNota} />
-    </div>
-  )
-}
-
-function Bloque({ titulo, texto, secreto, nota }: { titulo: string; texto: string; secreto?: string | null; nota?: string }) {
-  return (
-    <div>
-      <span className="text-xs text-muted">{titulo}</span>
-      <div className="mt-1">
-        {secreto ? <Copiable texto={texto} secreto={secreto} /> : <pre className={pre}>{texto}</pre>}
-      </div>
-      {nota ? <p className="mt-1 text-xs text-muted">{nota}</p> : null}
-    </div>
-  )
-}
 
 export function Buscar({ slug }: { slug: string }) {
   const { miAgente: t } = useDict()

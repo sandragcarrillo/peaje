@@ -46,6 +46,7 @@ export const panel = {
     navKit: 'Mejoras',
     navVisitas: 'Visitas de agentes',
     navAgente: 'Mi agente',
+    navConexiones: 'Conexiones',
     navIngresos: 'Ingresos',
     navWallet: 'Mi wallet',
 
@@ -226,6 +227,7 @@ export const panel = {
     navKit: 'Improvements',
     navVisitas: 'Agent visits',
     navAgente: 'My agent',
+    navConexiones: 'Connections',
     navIngresos: 'Revenue',
     navWallet: 'My wallet',
 

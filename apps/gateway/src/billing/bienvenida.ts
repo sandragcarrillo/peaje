@@ -149,7 +149,8 @@ export type CorreoBienvenida = { subject: string; preheader: string; html: strin
 export function correoBienvenida(o: { idioma: IdiomaBienvenida; plan: PlanPago; slug: string; negocio: string; base?: string }): CorreoBienvenida {
   const base = (o.base ?? DASHBOARD()).replace(/\/$/, '')
   const agente = `${base}/t/${encodeURIComponent(o.slug)}/agente`
-  const urls = { agente, telegram: `${agente}#telegram`, plan: `${agente}#plan` }
+  // Telegram vive en Conexiones desde el 28 oct 2026 (antes, en Mi agente).
+  const urls = { agente, telegram: `${base}/t/${encodeURIComponent(o.slug)}/conexiones#telegram`, plan: `${agente}#plan` }
   // Embebido: se ve aunque el programa de correo bloquee imágenes externas.
   const logo = `cid:${LOGO_CID}`
   const c = copia(o.idioma, o.plan, o.negocio, urls)

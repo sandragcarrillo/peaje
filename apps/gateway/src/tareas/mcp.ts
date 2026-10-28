@@ -7,11 +7,13 @@ import { store } from '../store.js'
 import { buscarTareasDelDueno, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
 import { planConAvance } from './plan.js'
+import { conversar } from './agente.js'
 
 /**
- * MCP del dueño: el coding agent del negocio (Claude Code, Cursor) lee las
- * tareas del agente de Peaje y las aplica en el repo. Nada acá cambia el
- * sitio: Peaje propone, el coding agent del dueño ejecuta, Peaje verifica.
+ * MCP del dueño: el coding agent del negocio (Claude Code, Cursor, Codex,
+ * Lovable) lee las tareas del agente de Peaje y las aplica en el repo, y le
+ * puede preguntar al agente lo mismo que el chat (peaje_ask). Nada acá cambia
+ * el sitio: Peaje propone, la herramienta del dueño ejecuta, Peaje verifica.
  */
 function texto(obj: unknown) {
   return { content: [{ type: 'text' as const, text: typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2) }] }
@@ -22,7 +24,7 @@ export function construir(tenant: Tenant): McpServer {
   const server = new McpServer(
     { name: `peaje-${tenant.slug}`, version: '1.0.0' },
     {
-      instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. Start with peaje_plan to see the owner's goal and priorities. Then work through the tasks in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
+      instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. When the owner asks something about their business (who AI cites instead of them, what to publish next, what else to improve, their visits), call peaje_ask with their question and relay the answer. Start with peaje_plan to see the owner's goal and priorities. Then work through the tasks in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
     },
   )
 
@@ -109,6 +111,29 @@ export function construir(tenant: Tenant): McpServer {
       const t = await store.getTask(tenant.id, id)
       if (!t) return { ...texto(`No task ${id}`), isError: true }
       return texto(tareaPublica(await store.updateTask(tenant.id, id, { status: 'dismissed', note: reason.slice(0, 500) })))
+    },
+  )
+
+  // El mismo agente del chat y de Telegram, con el mismo historial y los mismos créditos.
+  server.registerTool(
+    'peaje_ask',
+    {
+      description:
+        `Ask the Peaje agent for this business anything about it: who AI assistants cite instead of it and why, what pages to publish next, what else to improve, its agent visits. Same agent and conversation as the Peaje dashboard chat and Telegram. Answers with the business's real data; links point to full reports in the dashboard. Needs the Pro plan. Talking is free; a reply that looks up data uses ${COSTOS_CREDITOS.consulta} of the owner's monthly credits.`,
+      inputSchema: {
+        question: z.string().min(1).max(2_000).describe("The owner's question, in their words"),
+        language: z.enum(['es', 'en']).optional().describe('Reply language. Default: the language of the question'),
+      },
+    },
+    async ({ question, language }) => {
+      const idioma = language ?? (/[¿¡ñáéíóú]|\b(qué|cómo|cuál|dónde|quién|por qué|mis?|tengo|puedo|hay)\b/i.test(question) ? 'es' : 'en')
+      try {
+        const m = await conversar(tenant, question, { idioma, canal: 'mcp' })
+        return texto({ answer: m.text, links: m.links.map((l) => ({ label: l.label, url: l.url })), suggestedReplies: m.options })
+      } catch (error) {
+        // Sin Pro, el límite por hora o una falla del modelo: el texto ya es para el dueño.
+        return { ...texto(error instanceof Error ? error.message : String(error)), isError: true }
+      }
     },
   )
 

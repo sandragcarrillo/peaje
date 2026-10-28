@@ -1,17 +1,14 @@
 import type { AgentTask } from '@peaje/db'
-import { COBROS_VISIBLES, gatewayUrl } from '@/lib/config'
+import Link from 'next/link'
+import { COBROS_VISIBLES } from '@/lib/config'
 import { PageHeader, SectionBar } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
-import { Buscar, Clave, ListaTareas } from './partes'
+import { Buscar, ListaTareas } from './partes'
 import { Plan } from './plan'
 import { Chat } from './chat'
-import { TelegramPanel } from './telegram'
-// ---- Slack ----
-import { SlackPanel } from './slack'
-import { leerSlack } from '@/lib/gateway'
-import { leerCitacion, leerPlan, leerReportes, leerTelegram } from '@/lib/gateway'
+import { leerCitacion, leerPlan } from '@/lib/gateway'
 import { CitacionPanel } from './citacion'
 // ---- M7 ----
 import { CompradorPanel } from './comprador'
@@ -37,18 +34,11 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
     leerPlan(tenant.slug).catch(() => null),
     store.listMessages(tenant.id, 50).catch(() => []),
   ])
-  const [citacion, telegram, reportes] = await Promise.all([
-    leerCitacion(tenant.slug).catch(() => null),
-    leerTelegram(tenant.slug).catch(() => null),
-    leerReportes(tenant.slug).catch(() => null),
-  ])
-  // ---- Slack ----
-  const slack = await leerSlack(tenant.slug).catch(() => null)
+  const citacion = await leerCitacion(tenant.slug).catch(() => null)
   // ---- M6: resultado a 2 y 6 semanas de cada tarea verificada ----
   const seguimientos = await store.listFollowups(tenant.id, 200).catch(() => [])
   // ---- M7: última corrida del comprador misterioso ----
   const comprador = await store.lastMysteryRun(tenant.id).catch(() => null)
-  const mcpUrl = `${gatewayUrl}/_owner/mcp`
   // ---- M9: qué tiene Pro (se calcula acá; el gateway da precios, cupos y pagos) ----
   const acceso = accesoPro(tenant)
   const billing = await leerBilling(tenant.slug).catch(() => billingDeRespaldo(tenant.slug, acceso))
@@ -76,18 +66,13 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         {pro ? <Chat slug={tenant.slug} inicial={mensajes} primerMensaje={typeof primerMensaje === 'string' ? primerMensaje.slice(0, 500) : null} /> : <Bloqueado que="chat" />}
       </section>
 
-      <section id="telegram" className="scroll-mt-28 space-y-3">
-        <SectionBar label={t.tgTitulo} />
-        {pro ? <TelegramPanel slug={tenant.slug} estado={telegram} reportes={reportes} /> : <Bloqueado que="telegram" />}
-      </section>
-
-      {/* ---- Slack ---- (solo cuando el gateway tiene la app de Slack configurada) */}
-      {slack?.configured ? (
-        <section className="space-y-3">
-          <SectionBar label={t.slTitulo} />
-          {pro ? <SlackPanel slug={tenant.slug} estado={slack} /> : <Bloqueado que="slack" />}
-        </section>
-      ) : null}
+      {/* Telegram, Slack y la herramienta del dueño viven en Conexiones. */}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border px-4 py-3 text-sm text-muted">
+        {t.conexionesAviso}
+        <Link href={`/t/${tenant.slug}/conexiones`} className="font-mono text-xs text-text underline underline-offset-4">
+          {t.conexionesIr} →
+        </Link>
+      </p>
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />
@@ -117,14 +102,6 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
       </section>
-
-      <details className="border border-border p-4">
-        <summary className="cursor-pointer text-sm">{t.avanzado}</summary>
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-muted">{t.conectarIntro}</p>
-          <Clave slug={tenant.slug} prefijo={tenant.apiKeyPrefix} mcpUrl={mcpUrl} gateway={gatewayUrl} />
-        </div>
-      </details>
     </div>
   )
 }

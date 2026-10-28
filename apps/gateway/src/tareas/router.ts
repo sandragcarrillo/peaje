@@ -54,7 +54,7 @@ export async function tenantDeClave(authorization: string | undefined): Promise<
 
 tareasRouter.use('/_owner/*', async (c, next) => {
   const tenant = await tenantDeClave(c.req.header('authorization'))
-  if (!tenant) return c.json({ error: 'Missing or invalid agent key. Create one in the Peaje dashboard, "My agent" page.' }, 401)
+  if (!tenant) return c.json({ error: 'Missing or invalid agent key. Create one in the Peaje dashboard, Connections page.' }, 401)
   c.set('tenant', tenant)
   await next()
 })

@@ -42,7 +42,7 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
   const pasos: Paso[] = [
     { hecho: kitListo, titulo: t.pasoKit, texto: t.pasoKitTexto, href: `${base}/kit`, boton: t.pasoKitBoton },
     { hecho: pro, titulo: t.pasoAgente, texto: t.pasoAgenteTexto, href: `${base}/agente#plan`, boton: t.pasoAgenteBoton },
-    { hecho: pro && telegram.length > 0, titulo: t.pasoTelegram, texto: t.pasoTelegramTexto, href: `${base}/agente#telegram`, boton: t.pasoTelegramBoton },
+    { hecho: pro && telegram.length > 0, titulo: t.pasoTelegram, texto: t.pasoTelegramTexto, href: `${base}/conexiones#telegram`, boton: t.pasoTelegramBoton },
   ]
 
   // Citas de la última medición: una pregunta cuenta como citada si algún asistente citó el sitio.
