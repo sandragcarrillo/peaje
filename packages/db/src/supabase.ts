@@ -368,6 +368,28 @@ export class SupabaseStore implements Store {
     if (error) throw new Error(`[supabase] ${context}: ${error.message}`)
   }
 
+  /**
+   * PostgREST corta cada respuesta en `max_rows` (1000 en Supabase) aunque
+   * `.limit()` pida más, y no avisa: el panel de visitas mostraba 1000 justas.
+   * Trae por páginas con `.range()` hasta una vacía o el tope. `consulta`
+   * arma una consulta nueva por página y tiene que terminar ordenando por una
+   * columna única (id), si no las páginas se pisan.
+   */
+  async #todas(
+    context: string,
+    consulta: (desde: number, hasta: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+    tope: number,
+  ): Promise<Row[]> {
+    const filas: Row[] = []
+    while (filas.length < tope) {
+      const { data, error } = await consulta(filas.length, Math.min(filas.length + 1000, tope) - 1)
+      this.#fail(context, error)
+      if (!data?.length) break
+      filas.push(...(data as Row[]))
+    }
+    return filas
+  }
+
   async createTenant(input: NewTenant): Promise<Tenant> {
     const { data, error } = await this.#db
       .from('tenants')
@@ -759,10 +781,14 @@ export class SupabaseStore implements Store {
   }
 
   async creditsUsedSince(tenantId: string, since: string): Promise<number> {
-    // Sin agregados en PostgREST: se suman acá. Son unas decenas de filas por mes.
-    const { data, error } = await this.#db.from('agent_credit_charges').select('credits').eq('tenant_id', tenantId).gte('created_at', since).limit(5_000)
-    this.#fail('creditsUsedSince', error)
-    return (data ?? []).reduce((n, r) => n + Number((r as Row).credits ?? 0), 0)
+    // Sin agregados en PostgREST: se suman acá, por páginas (ver #todas).
+    const data = await this.#todas(
+      'creditsUsedSince',
+      (desde, hasta) =>
+        this.#db.from('agent_credit_charges').select('credits').eq('tenant_id', tenantId).gte('created_at', since).order('id').range(desde, hasta),
+      5_000,
+    )
+    return data.reduce((n, r) => n + Number(r.credits ?? 0), 0)
   }
 
   // ---- trabajos largos del agente ----
@@ -1783,15 +1809,20 @@ export class SupabaseStore implements Store {
   async visitStats(tenantId: string, opts: { days: number; from?: string; to?: string }): Promise<VisitStats> {
     const since = opts.from ?? new Date(Date.now() - opts.days * 86_400_000).toISOString()
     // La wallet del agente vive en el ledger: se trae por la FK payment_id.
-    let q = this.#db
-      .from('agent_visits')
-      .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, route_id, price_usd, attempted, payments(agent_wallet)')
-      .eq('tenant_id', tenantId)
-      .gte('at', since)
-    if (opts.to) q = q.lt('at', opts.to)
-    const { data, error } = await q.order('at', { ascending: false }).limit(20_000)
-    this.#fail('visitStats', error)
-    const rows: VisitRow[] = ((data ?? []) as Row[]).map((r) => ({
+    const data = await this.#todas(
+      'visitStats',
+      (desde, hasta) => {
+        let q = this.#db
+          .from('agent_visits')
+          .select('at, path, method, user_agent, agent_kind, paid, network, amount, payment_id, status, route_id, price_usd, attempted, payments(agent_wallet)')
+          .eq('tenant_id', tenantId)
+          .gte('at', since)
+        if (opts.to) q = q.lt('at', opts.to)
+        return q.order('at', { ascending: false }).order('id', { ascending: false }).range(desde, hasta)
+      },
+      20_000,
+    )
+    const rows: VisitRow[] = data.map((r) => ({
       tenantId,
       at: String(r.at),
       path: r.path,
