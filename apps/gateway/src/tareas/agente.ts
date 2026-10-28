@@ -8,6 +8,7 @@ import { MODEL } from '../monitor/reporte.js'
 import { generarPlan, medirMetricas, planConAvance } from './plan.js'
 import { buscarTareas, medirAhora, tareaPublica } from './router.js'
 import { maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
+import { competidoresCitados, paginasCitadas } from '../citacion/competidores.js'
 // ---- M9 ----
 import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
 import { LIMITES } from '@peaje/db'
@@ -246,6 +247,38 @@ const HERRAMIENTAS: Herramienta[] = [
     },
   },
   {
+    name: 'get_competitors',
+    description:
+      'The sites AI assistants cite instead of the business, one by one, from the latest measurement: how many answers each wins, for which questions and engines, and the pages that win (title, URL, format). formatNotes says what the winning pages of each format have in common. Use it for any question about competitors or what content works for them.',
+    input_schema: { type: 'object', properties: {} },
+    async correr(_i, { tenant }) {
+      return competidoresCitados(tenant)
+    },
+  },
+  {
+    name: 'read_competitor_page',
+    description:
+      'Read the text of a page AI assistants cited instead of the business (a URL from get_competitors or get_citations), to explain why it wins: how it opens, its headings, what facts and dates it shows. Only pages from this business\'s measurements can be read.',
+    input_schema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+    async correr(i, { tenant }) {
+      const url = String(i.url ?? '')
+      if (!(await paginasCitadas(tenant)).has(url)) return { error: 'only pages cited in this business\'s measurements; take the URL from get_competitors' }
+      let destino: URL
+      try {
+        destino = new URL(url)
+      } catch {
+        return { error: 'invalid URL' }
+      }
+      if (!['http:', 'https:'].includes(destino.protocol) || destino.hostname === 'localhost' || /^[\d.:]+$/.test(destino.hostname)) return { error: 'not a public page' }
+      try {
+        const res = await fetch(destino, { signal: AbortSignal.timeout(8_000), headers: { 'user-agent': 'Mozilla/5.0 (compatible; PeajeAgent/1.0; +https://usepeaje.com)' } })
+        return { status: res.status, url, text: textoDeHtml(await res.text()).slice(0, 6_000) }
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  },
+  {
     name: 'manage_questions',
     description: `Change the questions Peaje asks AI assistants for this business (max ${LIMITES.pro.preguntas} on Pro, ${LIMITES.founder.preguntas} on Founder). Peaje picks them itself when the plan is built; only use this when the owner asks to add or drop one, or to regenerate them. Questions must not include the business name.`,
     input_schema: {
@@ -348,15 +381,17 @@ const HERRAMIENTAS: Herramienta[] = [
       const path = String(i.path ?? '/').startsWith('/') ? String(i.path ?? '/') : `/${i.path}`
       try {
         const res = await fetch(`https://${dominio}${path}`, { signal: AbortSignal.timeout(8_000), headers: { 'user-agent': 'peaje-monitor/1.0' } })
-        const html = await res.text()
-        const texto = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        return { status: res.status, url: `https://${dominio}${path}`, text: texto.slice(0, 6_000) }
+        return { status: res.status, url: `https://${dominio}${path}`, text: textoDeHtml(await res.text()).slice(0, 6_000) }
       } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) }
       }
     },
   },
 ]
+
+function textoDeHtml(html: string): string {
+  return html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
 
 // ---- M6: borrador completo de página y resultados del ciclo ----
 HERRAMIENTAS.push(
@@ -502,9 +537,10 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     '',
     'How you talk:',
     '- Like a warm, sharp person who knows this field, talking to someone who does not. Plain words. Short sentences. One idea at a time.',
-    '- No jargon unless they use it first: say "things Peaje checks on your site" instead of "checks", "the payment step" instead of "402", "your developer or AI coding tool" instead of "coding agent", "sources the AI links to" instead of "citations".',
+    '- No jargon unless they use it first: say "things Peaje checks on your site" instead of "checks", "the payment step" instead of "402", "your developer or AI coding tool" instead of "coding agent", "sources the AI links to" instead of "citations". Name kinds of pages in plain words in their language (a guide, a comparison, a "best options" list, documentation), never the format ids from the data (roundup, docs, guide, research).',
     '- Do not open with a pile of numbers. Lead with what matters for them in one sentence; bring in a number only when it supports the point.',
-    '- Keep messages under 40 words by default. The only long message is the finished plan.',
+    '- Keep messages under 40 words by default. When the owner asks a question about their data (competitors, who AI cites, visits, what to publish), the answer can run up to 90 words (120 for a list of opportunities), with at most 5 short lines that start with "- ". The finished plan is the only longer message.',
+    '- When the owner asks something, answer it in this same message with their data first. Never reply with only a question, an offer or a card, and never send them to the dashboard for an answer you can give here.',
     '- Ask at most one question per message. Every message that ends in a question must also call offer_choices (2 to 5 short answers in their language, the last one a "something else" style option, or a yes/no pair), so they can tap instead of typing.',
     '- Numbers come after you know their goal, one at a time, each tied to what to do about it.',
     '- Before suggesting something, check list_tasks (including dismissed): never repeat a suggestion they already dismissed.',
@@ -530,12 +566,14 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'What actually works, with evidence: being mentioned on other sites (Reddit threads, YouTube, "best X" lists hold most of what AI assistants cite), pages whose title is the exact question with a direct answer, a concrete number and a source, being indexed by Bing (ChatGPT search leans on it), visible recent dates, and not blocking the AI bots. llms.txt and JSON-LD barely move recommendations; do not sell them for that. For agent sales, most unpaid attempts fail for technical reasons, not price: fix the payment step and the descriptions before touching price.',
     'When you create or suggest a task (a page, a fix, a route), your reply has exactly these three short parts, each one or two sentences, in plain words: why we suggest it (with their data), what we expect once it is live (for a page: AI assistants get a page that answers that exact question, and Peaje checks two weeks later whether ' + asistentesMedidos('en', 'o') + ' cites it), and how to do it (the text is ready in My agent, Tasks: copy it into their site or paste it into their AI tool). Mention missing facts ([TODO]) in one line if any. Then call offer_choices with options like "Send me the text here" and "I will see it in the dashboard", in their language. If they want the text in the chat, use send_task_text instead of copying it yourself.',
     'For "why am I not recommended", use get_citations: where they are and are not cited, which sites show up instead, and one concrete next move. If nothing was measured yet, offer to run the check.',
+    'For questions about competitors (who AI cites instead of them, what content works for their competitors, why a site wins, how to beat it), call get_competitors and answer here: the top two or three sites, each with how many answers it wins and the kind of page that wins, (see how you talk), with one example title; one line on why those pages work, from formatNotes, or from reading the top page with read_competitor_page when they ask why or how; and one concrete move for them, naming the question with the biggest gap. Then call open_report with "citations", and offer_choices with writing that page first. If nothing was measured yet, say it in one line and offer to run the check.',
     'When a page or a fix is live (the owner says it is published, gives its URL, or you see it with read_site_page), call complete_task with the live URL yourself and tell them in one sentence what happens next (Peaje checks it now and measures at 2 and 6 weeks). Never tell the owner to mark a task done in the dashboard.',
     'When a draft has missing facts, ask for them in the chat as one short list and say they can answer right here in their own words, all at once or a few at a time; never ask "did you complete the missing facts?". When they answer, call complete_draft with their words. If something is still missing, ask only for that. Once nothing is missing, say the page is updated and ready to publish, and give the two ways in one short sentence each: paste the prompt into their AI coding tool (Lovable, Cursor, Claude Code, v0), or connect Peaje to that tool once so they only have to say "apply my Peaje tasks". Then offer_choices with "Send me the prompt" and "How do I connect it?" in their language. For the prompt, call send_task_text (part "prompt"); for only the page text, part "page". To connect: in Peaje, My agent, section "For devs and vibecoders", they tap "Generate key" and copy the command for their tool (Claude Code, Cursor, or terminal); after that they tell their tool "apply my Peaje tasks" and it reads them, publishes the page and marks it done.',
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
     'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat on its own: how long it took, a short summary with the missing facts as questions, its card and the page as a .md file. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
-    'Short answer, full report behind a card: when you answer about what to publish or which pages to create, give the top one or two in a sentence and call open_report with "opportunities". When you answer about who AI cites instead of them, name the top one or two sites and call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. Never paste long lists or tables: the card opens the full report.',
+    'For "what else can we do", "find me more opportunities" or "what should I publish": look at get_competitors, list_tasks (including dismissed) and get_overview, and give four or five (fewer only if the data has no more), ranked by how much they can move recommendations, one line each with the reason from their data. Start with the list itself: competitors only appear inside a reason, never as a summary before it. Mix three kinds when the data supports it: pages to create (a question where others win and they have nothing), fixes on their own site (what Peaje checks and fails, in plain words), and places to get mentioned (the lists, comparisons or forums AI cites for their questions: ask to be included, or answer there). Leave out dismissed ones without saying so; if they ask for more after that, call refresh_tasks. Then call open_report with "opportunities", and offer_choices with starting the first one.',
+    'Answer here, full report behind a card: when you answer about what to publish, follow the line above, then call open_report with "opportunities". When you answer about who AI cites instead of them, give the summary above, then call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. The reply is the summary; the card holds the complete lists and tables.',
     'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
     // M7: comprador misterioso (apagado hasta mainnet)
     env.cobrosVisibles ? 'For "do agents pick me?", "why does nobody pay?" or "would an agent buy from me?", use get_mystery_results, or run_mystery_shopper if it never ran or the owner asks to test now. Lead with the verdict in one sentence (found or not, picked or not, and who won instead), then the one fix that matters most.' : '',
@@ -563,6 +601,8 @@ const ESTADOS: Record<string, { es: string; en: string }> = {
   propose_route_change: { es: 'Preparando la propuesta…', en: 'Preparing the proposal…' },
   read_site_page: { es: 'Leyendo tu sitio…', en: 'Reading your site…' },
   get_citations: { es: 'Revisando qué dicen de ti los asistentes de IA…', en: 'Checking what AI assistants say about you…' },
+  get_competitors: { es: 'Revisando a quién cita la IA en tu lugar…', en: 'Checking who AI cites instead of you…' },
+  read_competitor_page: { es: 'Leyendo la página de un competidor…', en: 'Reading a competitor page…' },
   check_site_access: { es: 'Entrando a tu sitio como lo hacen ChatGPT, Perplexity y Google…', en: 'Opening your site the way ChatGPT, Perplexity and Google do…' },
   manage_questions: { es: 'Ajustando las preguntas que medimos…', en: 'Updating the questions we track…' },
   run_citation_check: { es: `Preguntándole a ${asistentesMedidos('es')} (1 a 3 minutos)…`, en: `Asking ${asistentesMedidos('en')} (1 to 3 minutes)…` },
@@ -953,9 +993,11 @@ export async function conversar(
       .trim()
     // El texto de una vuelta que usa herramientas de trabajo es un anuncio
     // ("armo la página ya"): la pantalla ya muestra el estado, no se guarda.
-    // Sí se guarda si la vuelta solo ofrece opciones (ahí va la pregunta).
+    // Sí se guarda si la vuelta solo pone opciones o la tarjeta de un reporte:
+    // ahí va la respuesta (el resumen de competidores se perdía con la tarjeta).
+    const soloPresenta = usos.length > 0 && usos.every((u) => u.name === 'offer_choices' || u.name === 'open_report')
     const soloOpciones = usos.length > 0 && usos.every((u) => u.name === 'offer_choices')
-    if (texto && (usos.length === 0 || soloOpciones)) partes.push(texto)
+    if (texto && (usos.length === 0 || soloPresenta)) partes.push(texto)
     if (res.stop_reason !== 'tool_use' || usos.length === 0) break
     const resultados: Anthropic.Messages.ToolResultBlockParam[] = []
     for (const u of usos) {
