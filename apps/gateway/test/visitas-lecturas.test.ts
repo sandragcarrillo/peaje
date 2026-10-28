@@ -19,7 +19,8 @@ Object.assign(process.env, {
 
 const { store } = await import('../src/store.js')
 const { kitRouter } = await import('../src/kit.js')
-const { descargarVisitas, esLecturaDelKit, registrarVisita } = await import('../src/visitas.js')
+const { noEsVisita } = await import('@peaje/db')
+const { descargarVisitas, registrarVisita } = await import('../src/visitas.js')
 
 const GPTBOT = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot'
 const CLAUDEBOT = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)'
@@ -77,7 +78,7 @@ test('las rutas que sirve el gateway y los assets se aceptan pero no se cuentan 
 })
 
 test('el reporte mismo no cuenta como request, y las sondas del verificador tampoco', async () => {
-  assert.ok(esLecturaDelKit('/kit/visita', 'node'))
+  assert.ok(noEsVisita('/kit/visita', 'node'))
   const t = await negocio()
   const respuesta = new Response('ok')
   registrarVisita({ tenantId: t.id, method: 'GET', path: '/developers', headers: new Headers({ 'user-agent': GPTBOT, 'x-peaje-verificador': '1' }), response: respuesta })

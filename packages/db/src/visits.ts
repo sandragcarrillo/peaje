@@ -1,7 +1,89 @@
-import type { AgentKind, NewVisit, VisitStats } from './types'
+import type { AgentKind, NewVisit, QuienVisita, VisitStats } from './types'
 
 /** Una visita ya persistida más, si pagó, la wallet que sale del ledger. */
 export type VisitRow = NewVisit & { agentWallet?: string | null }
+
+/**
+ * Lo que no es la visita de un agente, aunque pase por el gateway:
+ * - Nuestras herramientas (verificador, monitor diario, radar) y Ora, el
+ *   servicio que calcula el puntaje: OraBot entra cada vez que se mide el sitio.
+ * - Lo que lee el propio kit instalado en el sitio del negocio. El proxy pide
+ *   el manifest cada minuto por instancia y PeajeHead pide el catálogo y el
+ *   agent card cada hora por página, con el user-agent de Node o de Vercel.
+ *   Antes se contaban y eran cerca del 75% del total.
+ * El gateway no lo guarda; el agregador tampoco cuenta lo que se guardó
+ * antes de este filtro, así que las visitas viejas quedan limpias sin borrar.
+ */
+const UA_PROPIOS = /peaje-verificador|peaje-monitor|PeajeRadar|OraBot/i
+const LECTURAS_DEL_KIT = new Set(['/discovery/resources', '/.well-known/agent-card.json'])
+const UA_DEL_KIT = /^(node|undici|Vercel Edge Functions|Next\.js Middleware|peaje-kit(\/.*)?)$/i
+
+export function noEsVisita(path: string, ua: string | null | undefined): boolean {
+  if (ua && UA_PROPIOS.test(ua)) return true
+  // El manifest solo lo lee el kit. El reporte de lecturas lo manda el kit y
+  // se registra como la lectura que trae, no como request.
+  if (path === '/kit/manifest.json' || path === '/kit/visita') return true
+  return LECTURAS_DEL_KIT.has(path) && UA_DEL_KIT.test(ua ?? '')
+}
+
+/**
+ * Agentes y bots con nombre que no tienen tipo propio en `agent_kind` (ese
+ * tipo es un check de la base; agregar uno pide migración). Se reconocen por
+ * el user-agent al leer, así que sirven también para las visitas viejas. El
+ * nombre es la marca, igual en los dos idiomas.
+ */
+const AGENTES_CON_NOMBRE: [RegExp, string | ((m: string) => string)][] = [
+  [/ChatGPT-User/i, 'ChatGPT (ChatGPT-User)'],
+  [/Claude-User/i, 'Claude (Claude-User)'],
+  [/Claude-SearchBot/i, 'Claude (Claude-SearchBot)'],
+  [/Perplexity-User/i, 'Perplexity (Perplexity-User)'],
+  [/claude-code/i, 'Claude Code'],
+  [/bingbot/i, 'Bing'],
+  [/Applebot/i, 'Apple'],
+  [/meta-external\w*/i, 'Meta'],
+  [/facebookexternalhit|facebookcatalog/i, 'Facebook'],
+  [/LinkedInBot/i, 'LinkedIn'],
+  [/Twitterbot/i, 'X'],
+  [/WhatsApp/i, 'WhatsApp'],
+  [/Slackbot|Slack-ImgProxy/i, 'Slack'],
+  [/TelegramBot/i, 'Telegram'],
+  [/Discordbot/i, 'Discord'],
+  [/Amazonbot/i, 'Amazon'],
+  [/DuckAssistBot|DuckDuckBot/i, 'DuckDuckGo'],
+  [/Bytespider/i, 'ByteDance'],
+  [/CCBot/i, 'Common Crawl'],
+  [/MistralAI-User/i, 'Mistral'],
+  [/cohere-ai/i, 'Cohere'],
+  [/GoogleOther|Google-InspectionTool|Storebot-Google|AdsBot-Google/i, (m) => `Google (${m})`],
+  [/AhrefsBot/i, 'Ahrefs'],
+  [/SemrushBot/i, 'Semrush'],
+  [/YandexBot/i, 'Yandex'],
+  [/Baiduspider/i, 'Baidu'],
+]
+
+const SCRIPTS = /^(curl|wget|node|undici|python-requests|python-httpx|python-urllib|aiohttp|go-http-client|axios|postmanruntime|okhttp|java|deno|bun|node-fetch|httpie|ruby|php|libwww-perl)\b/i
+
+/**
+ * Quién es una visita de tipo `other`, por su user-agent. Primero los que
+ * tienen nombre conocido; después cualquiera que se presente como bot o
+ * lector (`CreoraPublicReader/1.0`); después scripts y herramientas (curl,
+ * node), navegadores (lo más probable, una persona) y el resto por el primer
+ * nombre de su user-agent.
+ */
+export function quienEs(ua: string | null | undefined): QuienVisita {
+  const u = (ua ?? '').trim()
+  if (!u) return { tipo: 'sin-ua', nombre: null }
+  for (const [patron, nombre] of AGENTES_CON_NOMBRE) {
+    const m = u.match(patron)
+    if (m) return { tipo: 'agente', nombre: typeof nombre === 'string' ? nombre : nombre(m[0]) }
+  }
+  const bot = u.match(/([A-Za-z][\w.-]*(?:bot|crawler|spider|reader|fetcher))\b/i)
+  if (bot?.[1]) return { tipo: 'agente', nombre: bot[1].slice(0, 40) }
+  const script = u.match(SCRIPTS)
+  if (script?.[1]) return { tipo: 'script', nombre: script[1].toLowerCase() }
+  if (/^Mozilla\/5\.0/.test(u) && /(Chrome|Safari|Firefox|Edg)\//.test(u)) return { tipo: 'navegador', nombre: null }
+  return { tipo: 'desconocido', nombre: u.split(/[\s/;(]/)[0]?.slice(0, 40) || u.slice(0, 40) }
+}
 
 /**
  * Agrega visitas en memoria. Lo comparten MemoryStore y SupabaseStore: los
@@ -17,6 +99,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
   const byDay = new Map<string, { visits: number; paid: number }>()
   const notFound = new Map<string, number>()
   const wallets = new Set<string>()
+  const otros = new Map<string, { quien: QuienVisita; visits: number }>()
   let visits = 0
   let paid = 0
   let revenue = 0
@@ -26,6 +109,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
   for (const r of rows) {
     const t = new Date(r.at).getTime()
     if (t < since || t >= until) continue
+    if (noEsVisita(r.path, r.userAgent)) continue
     visits += 1
     const monto = r.paid && r.amount ? Number(r.amount) : 0
     if (r.paid) paid += 1
@@ -35,6 +119,14 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
     k.visits += 1
     if (r.paid) k.paid += 1
     byKind.set(r.agentKind, k)
+
+    if (r.agentKind === 'other') {
+      const quien = quienEs(r.userAgent)
+      const clave = `${quien.tipo}:${quien.nombre ?? ''}`
+      const o = otros.get(clave) ?? { quien, visits: 0 }
+      o.visits += 1
+      otros.set(clave, o)
+    }
 
     const es402 = r.status === 402
     if (es402) served402 += 1
@@ -74,6 +166,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
     byKind: [...byKind.entries()]
       .map(([kind, v]) => ({ kind, ...v }))
       .sort((a, b) => b.visits - a.visits),
+    otros: [...otros.values()].map((o) => ({ ...o.quien, visits: o.visits })).sort((a, b) => b.visits - a.visits),
     topPaths: [...byPath.entries()]
       .map(([path, v]) => ({ path, visits: v.visits, served402: v.served402, attempted: v.attempted, paid: v.paid, revenue: v.revenue.toFixed(6) }))
       .sort((a, b) => b.visits - a.visits)

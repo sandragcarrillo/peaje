@@ -710,10 +710,25 @@ export type NewVisit = {
   attempted: boolean
 }
 
+/**
+ * Quién hizo una visita sin tipo propio. `agente`: un bot o agente con
+ * nombre. `script`: una herramienta o código (curl, node). `navegador`: lo
+ * más probable, una persona. `sin-ua`: no mandó user-agent. `desconocido`:
+ * ninguno de los anteriores, con el primer nombre de su user-agent.
+ */
+export type QuienVisita =
+  | { tipo: 'agente' | 'script' | 'desconocido'; nombre: string }
+  | { tipo: 'navegador' | 'sin-ua'; nombre: null }
+
 export type VisitStats = {
   days: number
   totals: { visits: number; paid: number; unpaid: number; revenue: string }
   byKind: { kind: AgentKind; visits: number; paid: number }[]
+  /**
+   * Las visitas de tipo `other` por quién las hizo, sacado del user-agent
+   * (ver `quienEs`): agentes y bots con nombre, y lo que no se puede atribuir.
+   */
+  otros: (QuienVisita & { visits: number })[]
   topPaths: { path: string; visits: number; served402: number; attempted: number; paid: number; revenue: string }[]
   daily: { date: string; visits: number; paid: number }[]
   /**

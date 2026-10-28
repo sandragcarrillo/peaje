@@ -1,4 +1,4 @@
-import type { AgentKind, NewVisit } from '@peaje/db'
+import { noEsVisita, type AgentKind, type NewVisit } from '@peaje/db'
 import {
   MAX_PATH_LECTURA,
   MAX_UA_LECTURA,
@@ -28,25 +28,6 @@ import { store } from './store.js'
  * La lista de bots es la de @peaje/shared, la misma que usa el kit.
  */
 
-/** Nuestro propio verificador no cuenta como visita. */
-const IGNORAR_UA = /peaje-verificador/i
-
-/**
- * Lo que lee el propio kit instalado en el sitio del negocio tampoco cuenta.
- * El proxy pide el manifest cada minuto por instancia y PeajeHead pide el
- * catálogo y el agent card cada hora por página, siempre que alguien (humano
- * o bot) entra al sitio. Salen con el user-agent de Node o de Vercel. Antes
- * se contaban como visitas de agentes y eran cerca del 75% del total.
- */
-const LECTURAS_DEL_KIT = new Set(['/discovery/resources', '/.well-known/agent-card.json'])
-const UA_DEL_KIT = /^(node|undici|Vercel Edge Functions|Next\.js Middleware|peaje-kit(\/.*)?)$/i
-
-export function esLecturaDelKit(path: string, ua: string | null): boolean {
-  // El manifest solo lo lee el kit: ningún agente lo necesita. El reporte de
-  // lecturas lo manda el kit y se registra como la lectura que trae, no como request.
-  if (path === '/kit/manifest.json' || path === '/kit/visita') return true
-  return LECTURAS_DEL_KIT.has(path) && UA_DEL_KIT.test(ua ?? '')
-}
 
 /** La request trae una credencial de pago: el agente entendió el 402 y volvió a intentar. */
 export function traeCredencial(headers: Headers): boolean {
@@ -131,10 +112,10 @@ export function registrarVisita(input: {
   request?: Request
 }): void {
   const ua = input.headers.get('user-agent')
-  if (ua && IGNORAR_UA.test(ua)) return
+  // Nuestras herramientas, Ora y lo que lee el propio kit (ver noEsVisita en @peaje/db).
+  if (noEsVisita(input.path, ua)) return
   // Las sondas del verificador salen con el UA real de un bot: no son visitas.
   if (input.headers.has(PEAJE_VERIFICADOR_HEADER)) return
-  if (esLecturaDelKit(input.path, ua)) return
   let receiptRef: string | null = null
   const receipt = input.response.headers.get('Payment-Receipt')
   if (receipt) {
