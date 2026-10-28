@@ -21,7 +21,10 @@ contract MockStablecoin is ERC20, EIP712 {
 
     error AuthorizationNotYetValid();
     error AuthorizationExpired();
-    error AuthorizationUsed();
+    error AuthorizationAlreadyUsed();
+
+    /// @dev Como USDC (EIP-3009): el gateway encuentra con este evento la tx que usó una autorización.
+    event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce);
     error InvalidSignature();
     error Blacklisted(address account);
     error TokenPaused();
@@ -66,7 +69,7 @@ contract MockStablecoin is ERC20, EIP712 {
     ) external virtual {
         if (block.timestamp <= validAfter) revert AuthorizationNotYetValid();
         if (block.timestamp >= validBefore) revert AuthorizationExpired();
-        if (authorizationState[from][nonce]) revert AuthorizationUsed();
+        if (authorizationState[from][nonce]) revert AuthorizationAlreadyUsed();
 
         bytes32 digest = _hashTypedDataV4(
             keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce))
@@ -74,6 +77,7 @@ contract MockStablecoin is ERC20, EIP712 {
         if (ECDSA.recover(digest, v, r, s) != from) revert InvalidSignature();
 
         authorizationState[from][nonce] = true;
+        emit AuthorizationUsed(from, nonce);
         _transfer(from, to, value);
     }
 

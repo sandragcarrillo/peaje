@@ -6,19 +6,40 @@ import {PeajeSettlementV3} from "../../src/PeajeSettlementV3.sol";
 import {DeployPeajeSettlementV3} from "../../script/DeployPeajeSettlementV3.s.sol";
 import {MockStablecoin} from "../mocks/MockStablecoinV3.sol";
 
+/// @dev Lo mínimo de un Safe que lee el script: umbral y firmantes.
+contract SafeFalso {
+    uint256 internal umbral;
+    address[] internal firmantes;
+
+    constructor(uint256 umbral_, uint256 cuantos) {
+        umbral = umbral_;
+        for (uint256 i; i < cuantos; ++i) {
+            firmantes.push(address(uint160(0x5AFE00 + i)));
+        }
+    }
+
+    function getThreshold() external view returns (uint256) {
+        return umbral;
+    }
+
+    function getOwners() external view returns (address[] memory) {
+        return firmantes;
+    }
+}
+
 /// @dev Runs the deploy script locally (no RPC): fakes each network's chain id, etches a mock
-///      stablecoin at the real token addresses and a stand-in contract at the Safe address.
+///      stablecoin at the real token addresses and uses a 2-of-3 SafeFalso as the owner.
 ///      Everything is in one test because env vars are process-wide.
 contract DeployScriptV3Test is Test {
     DeployPeajeSettlementV3 internal script;
-    address internal safe = makeAddr("safe");
+    address internal safe;
     address internal feeRecipient = makeAddr("coldFeeRecipient");
     address internal relayer = makeAddr("hotRelayer");
     address internal guardian = makeAddr("pauseGuardian");
 
     function setUp() public {
         script = new DeployPeajeSettlementV3();
-        vm.etch(safe, hex"00");
+        safe = address(new SafeFalso(2, 3));
     }
 
     function _env(string memory network, address owner, address relayer_) internal {
@@ -78,6 +99,18 @@ contract DeployScriptV3Test is Test {
         vm.setEnv("ALLOW_EOA_OWNER", "true");
         _env("arbitrum-one", makeAddr("eoa"), relayer);
         vm.expectRevert(bytes("OWNER has no code: deploy the Safe on this network first"));
+        script.run();
+
+        // Mainnet owner must be a Safe of at least 2 of 3: any other contract used to pass.
+        vm.chainId(42161);
+        _env("arbitrum-one", address(new SafeFalso(1, 3)), relayer);
+        vm.expectRevert(bytes("OWNER Safe threshold must be at least 2"));
+        script.run();
+        _env("arbitrum-one", address(new SafeFalso(2, 2)), relayer);
+        vm.expectRevert(bytes("OWNER Safe must have at least 3 signers"));
+        script.run();
+        _env("arbitrum-one", address(new MockStablecoin("USD Coin", "2", 6)), relayer);
+        vm.expectRevert(bytes("OWNER is not a Safe (no getThreshold/getOwners)"));
         script.run();
 
         // On a testnet ALLOW_EOA_OWNER lets an EOA own it.

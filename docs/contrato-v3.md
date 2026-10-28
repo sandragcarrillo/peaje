@@ -47,7 +47,7 @@ El agente firma `value = precio + networkFee` (lo que dice el 402). Con `price =
 
 **Redondeo: el fee redondea hacia abajo**, a favor del negocio. El negocio recibe exactamente `value - fee - networkFee`, nunca más, y nunca menos del 98% del precio. Bajo 50 unidades (US$0,00005 con 6 decimales) el fee es 0. Es la misma regla que `splitPrecio` del gateway para Tempo y que v2, así que el ledger no cambia. `quote(value, networkFee)` devuelve `(net, fee)` para chequear off-chain.
 
-Se rechaza: `merchant` igual a `address(0)`, al contrato o al fee recipient; `value <= networkFee` (incluye `value == 0`); `networkFee` sobre el tope; token no aceptado; un token que entrega menos de lo firmado (fee-on-transfer: `UnexpectedAmountReceived`); y un token que deja saldo en el contrato después del reparto (`BalanceNotRestored`).
+Se rechaza: `merchant` igual a `address(0)`, al contrato, al fee recipient, al owner, al guardian o a un relayer habilitado; `value <= networkFee` (incluye `value == 0`); `networkFee` sobre el tope; token no aceptado; un token que entrega menos de lo firmado (fee-on-transfer: `UnexpectedAmountReceived`); y un token que deja saldo en el contrato después del reparto (`BalanceNotRestored`).
 
 ## Modelo de seguridad
 
@@ -55,12 +55,12 @@ Se rechaza: `merchant` igual a `address(0)`, al contrato o al fee recipient; `va
 
 | Rol | Quién | Puede | No puede |
 |---|---|---|---|
-| owner | un Safe (multisig) por red | rotar relayers y fee recipient, listar tokens y su tope de networkFee, pausar, `settleStray`, transferir ownership en dos pasos | cambiar el 2%, tocar fondos en tránsito, barrer el contrato a Peaje, renunciar al ownership |
+| owner | un Safe (multisig) por red | rotar relayers y fee recipient, listar tokens y su tope de networkFee (hasta 0,10 del token), pausar, `settleStray`, transferir ownership en dos pasos | cambiar el 2%, poner un tope de networkFee sobre 0,10 del token, nombrar como merchant a quien tiene hoy un rol de Peaje (ex roles y un owner pendiente sí pueden), renunciar al ownership. Es de confianza en dos cosas: a qué merchant rutea cada excedente con `settleStray`, y que puede habilitarse a sí mismo (o a otra llave suya) como relayer y liquidar autorizaciones pendientes |
 | guardian | llave rápida (EOA en hardware wallet o un Safe 1 de N), distinta de todos los demás roles | solo `pause()` | despausar, cambiar cualquier configuración, `settleStray`, liquidar pagos |
 | relayer | llave caliente del gateway, con poco saldo (solo gas nativo) | `settle`: elige el merchant y el networkFee dentro del tope | nada de admin, nada con fondos sin una autorización firmada por el pagador |
 | fee recipient | dirección fría (puede ser otro Safe) | recibe el 2% y el networkFee | nada: no llama al contrato |
 
-El script de deploy exige que el owner tenga código (un Safe) en mainnet, que el guardian exista y sea distinto del owner, del fee recipient y de los relayers, que ningún relayer sea el owner ni el fee recipient, y que los relayers sean EOAs.
+El script de deploy exige que el owner sea un Safe de al menos 2 de 3 en mainnet (`getThreshold() >= 2`, `getOwners().length >= 3`), que el guardian exista y sea distinto del owner, del fee recipient y de los relayers, que ningún relayer sea el owner ni el fee recipient, y que los relayers sean EOAs.
 
 ### Por qué `settle` es solo de relayers
 
@@ -70,11 +70,11 @@ Una autorización EIP-3009 fija pagador, monto, destino (el contrato) y nonce, p
 
 - Una llave por red, solo con gas nativo (ETH en Arbitrum y Robinhood, USDC en Arc) para unos días de operación. Nunca tokens.
 - Vive solo en el gateway (env de Railway), separada de la treasury y del fee recipient. Hoy `env.treasuryPrivateKey` hace de relayer: en v3 esa llave tiene que ser otra.
-- Si se filtra: el Safe llama `setRelayer(vieja, false)` y `setRelayer(nueva, true)`. Lo peor que puede hacer quien la tenga, mientras siga habilitada, es mandar autorizaciones pendientes (firmadas a favor del contrato y no liquidadas, ventana de minutos) a un merchant suyo y cobrar el networkFee tope. El guardian puede llamar `pause()` de inmediato, sin esperar las firmas del Safe; el Safe después rota el relayer y despausa.
+- Si se filtra: el Safe llama `setRelayer(vieja, false)` y `setRelayer(nueva, true)`. Lo peor que puede hacer quien la tenga, mientras siga habilitada, es mandar el 98% de las autorizaciones pendientes (firmadas a favor del contrato y no liquidadas) a un merchant suyo. El networkFee no es ganancia para el atacante: va al fee recipient. La ventana es la de cada autorización hasta su `validBefore`; el contrato no la acota, los clientes honestos usan minutos (300 s o lo que vence el challenge). El guardian puede llamar `pause()` de inmediato, sin esperar las firmas del Safe; el Safe después rota el relayer y despausa.
 
 ### Fee inmutable
 
-`FEE_BPS` es una `constant`. No hay `setFee` ni `feeBps`: el owner no puede subir el fee de los negocios. Un fee distinto es otro deploy y otra revisión.
+`FEE_BPS` es una `constant`. No hay `setFee` ni `feeBps`. Un fee distinto es otro deploy y otra revisión. Lo que sí define el owner es el tope del networkFee por token, y el contrato no deja que pase de 0,10 del token (US$0,10 en una stablecoin): antes no tenía techo, y un tope mal puesto (en otros decimales, o el máximo) dejaba que el networkFee se comiera casi todo el pago.
 
 ### networkFee y su tope
 
@@ -86,7 +86,7 @@ El networkFee le devuelve al relayer el gas de `settle`. Lo elige el relayer en 
 | Robinhood Chain / Testnet | USDG | 20.000 (US$0,02) | ~US$0,007 a 0,009 |
 | Arc / Testnet | USDC | 10.000 (US$0,01) | ~US$0,003 a 0,004 (gas en USDC) |
 
-El tope acota lo que un relayer comprometido le puede sacar al negocio por pago. El script además rechaza topes sobre US$0,10.
+La firma del pagador fija el `value` total, no cuánto es networkFee: el relayer lo elige hasta el tope. En pagos chicos (del orden del tope) el relayer podría dejar al negocio casi en nada, a favor del fee recipient (Peaje), no de sí mismo. El gateway lo cotiza con el gas y Chainlink y lo topa con `maxNetworkFee` del propio contrato (`costoRed.ts`). El tope no acota lo que un relayer comprometido le saca al negocio: ese riesgo es el merchant (ver arriba).
 
 ### Pausa
 
@@ -100,22 +100,26 @@ La autorización viaja en el pago del agente, así que alguien puede mandarla di
 settleStray(token, merchant, from, value, nonce, networkFee)
 ```
 
-Chequea que `authorizationState(from, nonce)` esté usado en el token, que ese `(token, from, nonce)` no se haya repartido antes por esta vía, y que el saldo del contrato cubra `value`. Reparte exactamente igual que `settle` y emite `PaymentSettled` más `StraySettled`. El merchant y el networkFee salen del registro del 402 en Peaje.
+Chequea que `authorizationState(from, nonce)` esté usado en el token, que ese `(token, from, nonce)` no se haya repartido antes por esta vía, que el saldo del contrato cubra `value` y que, después del reparto, salga exactamente `value`. Reparte igual que `settle` y emite `PaymentSettled` más `StraySettled`. El merchant y el networkFee salen del registro del 402 en Peaje.
+
+El contrato no puede distinguir un adelanto de una donación: cualquier nonce gastado en el token pasa el primer chequeo, aunque se haya usado para pagarle a otro o con valor 0, y `value` no está atado a lo que se firmó. La prueba la hace el gateway antes de servir y anotar el excedente (`liquidacion-v3.ts`): busca la tx del `AuthorizationUsed(from, nonce)` del token y exige que en esa misma tx haya un `Transfer(from → contrato)` por exactamente `value`, sin `PaymentSettled` de ese pagador y nonce y sin `straySettled`. El Safe repite ese chequeo con los logs de la tx antes de firmar.
 
 Diferencia con la firma del diseño: se agregó `networkFee` al final para que el reparto sea idéntico al que prometió el 402 (sin él, el negocio recibiría el 98% del networkFee también).
 
-Límite que el Safe tiene que respetar: `settle` no registra nonces (costaría una escritura de storage por pago, unos 22k gas), así que el contrato no puede saber si ese nonce ya se liquidó por `settle`. Si hubiera dos excedentes a la vez, el Safe podría repartir el equivocado. Antes de firmar, el Safe confirma off-chain que el nonce no tiene `PaymentSettled`.
+Límite que el Safe tiene que respetar: `settle` no registra nonces (costaría una escritura de storage por pago, unos 22k gas), así que el contrato no puede saber si ese nonce ya se liquidó por `settle`. Si hubiera dos excedentes a la vez, el Safe podría repartir el equivocado. Antes de firmar, el Safe hace el chequeo de logs de arriba.
 
-Plata mandada al contrato sin autorización (una transferencia común) queda atrapada: no hay barrido. Es deliberado.
+Plata mandada al contrato sin autorización (una transferencia común) no queda atrapada: el owner la puede rutear con `settleStray` citando cualquier nonce gastado, a un merchant que no sea un rol de Peaje. Es poder del owner (el Safe), no de terceros.
 
 ## Invariantes (probadas)
 
 1. Sin pagos adelantados, el saldo del contrato es 0 después de cada llamada (invariante estricto, 256 corridas × 64 llamadas, dos tokens de 6 y 18 decimales, pausas y rotación de fee recipient intercaladas).
-2. Con pagos adelantados y donaciones, el saldo es exactamente lo adelantado sin repartir más lo donado: `settle` nunca lo toca y `settleStray` solo mueve el que nombra.
+2. Con pagos adelantados y donaciones, el saldo es exactamente lo adelantado sin repartir más lo donado menos lo que ruteó `settleStray`: `settle` nunca lo toca y `settleStray` mueve exactamente el `value` que le pasa el owner (que el `value` sea el de ese adelanto lo verifica el Safe, ver arriba).
 3. Todo lo que sale va a merchants o fee recipients: suma a merchants = suma de `net`; suma a fee recipients = suma de `fee + networkFee`; las dos suman el bruto.
 4. Cada reparto es exacto: `fee = floor(2% del precio)`, `net ≥ 98% del precio`, merchant recibe exactamente `net`.
-5. Replays, networkFee sobre el tope, merchant = fee recipient y llamadas de terceros nunca pasan.
-6. Dentro de `settle`, el contrato termina con el mismo saldo con que empezó (`BalanceNotRestored`), comprobado on-chain en cada pago.
+5. Replays, networkFee sobre el tope, topes sobre 0,10 del token, un rol de Peaje como merchant y llamadas de terceros nunca pasan.
+6. Dentro de `settle`, el contrato termina con el mismo saldo con que empezó, y en `settleStray` con exactamente `value` menos (`BalanceNotRestored`), comprobado on-chain en cada llamada.
+
+Auditoría interna del 28 oct 2026 (cuatro revisiones en paralelo: caminos de pago, roles y deploy, invariantes con mutaciones, y la integración del gateway): las pruebas quedan en `contracts/test/auditoria/` y `apps/gateway/test/auditoria-liquidacion-v3.test.ts`. No es una auditoría externa.
 
 ## Riesgos conocidos (para el revisor)
 
@@ -123,8 +127,9 @@ Plata mandada al contrato sin autorización (una transferencia común) queda atr
 - **Blacklists del emisor.** USDC (`isBlacklisted`) y USDG (`isFrozen`) bloquean transferencias desde y hacia direcciones. Merchant bloqueado: todo el `settle` revierte, el agente conserva su plata y la autorización queda sin usar (probado). Fee recipient bloqueado: todos los pagos de ese token fallan hasta que el Safe rote el fee recipient (probado). Contrato bloqueado: ese riel muere; se despliega otro. Token pausado por el emisor: falla igual que un merchant bloqueado.
 - **Autorización sin usar tras un revert.** Si un `settle` revierte (merchant bloqueado, pausa), la autorización sigue válida hasta `validBefore` y el relayer la podría reintentar con otro merchant. El gateway no debe reintentar con un merchant distinto al del 402.
 - **Front-run como molestia.** Alguien puede adelantar todos los pagos para obligar al Safe a repartirlos a mano. No roba nada y le cuesta gas. Opción futura: `receiveWithAuthorization` (exige `msg.sender == to`) elimina el caso, pero requiere que los clientes firmen ese tipo en vez de `TransferWithAuthorization`.
-- **Tokens raros.** Solo se aceptan tokens que lista el owner. Fee-on-transfer, rebasing o tokens que dejan saldo se rechazan en el mismo pago (probado con mocks).
+- **Tokens raros.** Solo se aceptan tokens que lista el owner. Fee-on-transfer al cobrar, rebasing o tokens que dejan saldo se rechazan en el mismo pago (probado con mocks). Un token que cobra su comisión solo en lo que sale del contrato no se detecta: el negocio recibe menos que el `net` del evento. USDC y USDG no cobran comisión, pero son proxies actualizables: es una propiedad del emisor.
 - **Reentrancy.** `nonReentrant` en `settle` y `settleStray`; probado con un token malicioso que reentra durante el cobro y durante el reparto, incluso con el token habilitado como relayer y como owner.
+- **Roles que se rotan.** El chequeo de merchant mira quién tiene cada rol en ese momento (owner, guardian, relayers, fee recipient). Si un rol se rota a una dirección que es la wallet de cobro de un negocio, los pagos y excedentes de ese negocio empiezan a revertir con `InvalidMerchant` hasta que cambie su dirección o se rote el rol. Las llaves de Peaje no se reusan como wallets de negocios.
 - **Gas del primer pago.** Pagar a una wallet que nunca tuvo el token cuesta más (escritura de saldo de cero a no cero): ver la tabla de gas.
 
 ## Redes y tokens
@@ -220,11 +225,11 @@ Chequeo después de verificar: `cast call <addr> "owner()(address)"`, `guardian(
 - [ ] El reparto: `net + fee + networkFee == value`, fee redondeando hacia abajo, merchant nunca recibe más de `value - fee - networkFee`.
 - [ ] `FEE_BPS` no se puede cambiar por ninguna vía.
 - [ ] Control de acceso: `settle` solo relayers; `pause` owner o guardian; `unpause`, admin y `settleStray` solo owner; `renounceOwnership` deshabilitado; transferencia de ownership en dos pasos.
-- [ ] `settleStray`: no permite repartir dos veces el mismo `(token, from, nonce)`, ni sin autorización usada, ni más que el saldo; no hay forma de mandar todo al fee recipient.
+- [ ] `settleStray`: no permite repartir dos veces el mismo `(token, from, nonce)`, ni sin autorización usada, ni más que el saldo, y sale exactamente `value`; ningún rol de Peaje puede ser el merchant.
 - [ ] Reentrancy y orden de llamadas externas (`transferWithAuthorization`, `balanceOf`, `safeTransfer`) con tokens proxy (USDC FiatToken, USDG Paxos).
-- [ ] Validaciones de merchant (cero, el contrato, el fee recipient) y de fee recipient (cero, el contrato).
+- [ ] Validaciones de merchant (cero, el contrato, el fee recipient, el owner, el guardian, un relayer), de fee recipient (cero, el contrato) y del tope de networkFee (como mucho 0,10 del token, según `decimals()`).
 - [ ] `ReentrancyGuardTransient` en las seis redes (TSTORE probado vía `eth_call` en las seis).
-- [ ] Riesgos aceptados (sección anterior): merchant elegido por el relayer, blacklists, front-run, donaciones atrapadas, nonces de `settle` sin registrar.
+- [ ] Riesgos aceptados (sección anterior): merchant y networkFee elegidos por el relayer, blacklists, front-run, el owner rutea excedentes y donaciones, nonces de `settle` sin registrar.
 - [ ] Que el script de deploy no deje roles al deployer y que los argumentos del constructor coincidan con lo verificado.
 
 ## Cambios en el gateway (próximo milestone)
@@ -236,7 +241,7 @@ Chequeo después de verificar: `cast call <addr> "owner()(address)"`, `guardian(
 5. **Saldos y retiros**: los rieles de contrato v3 pasan a comportarse como `tempo-split`: `available` siempre 0, retiro rechazado con mensaje claro, el dashboard muestra "ya está en tu wallet". `claimableEnContrato` y `withdrawFromSettlement` quedan solo para v2. Lo mismo en `apps/dashboard/lib/saldos.ts` y `CLAIMABLE_ABI` de `packages/shared`.
 6. **Reembolsos** cuando falla el origen: igual que `tempo-split`, no se pueden sacar del contrato (el neto ya está en la wallet del negocio).
 7. **Front-run**: si `settle` revierte por autorización usada, consultar `authorizationState` y el saldo del contrato; si los fondos están ahí, registrar el pago como pendiente de `settleStray` y avisar (propuesta para el Safe).
-8. **`costoRed.ts`**: `GAS_SETTLE = 160_000` con margen 1,2 (192k) cubre el estado estable de v3 (~155k gas totales con intrínseco y calldata). El primer pago a una wallet que nunca tuvo el token ronda 190k a 195k: queda al borde, como ya pasaba con v2 (~215k). Subirlo a 170k lo cubre.
+8. **`costoRed.ts`**: `GAS_SETTLE = 180_000` con margen 1,2 (216k). Cubre el estado estable de v3 (~163k gas totales con intrínseco y calldata, después de los chequeos de roles de la auditoría) y el primer pago a una wallet que nunca tuvo el token (~203k).
 9. **Subgraph**: ABI nuevo, handler de `PaymentSettled` leyendo `net` del evento, sin `Withdrawn`, nuevas direcciones y `startBlock`.
 
 ## Decisiones de San (25 oct 2026)
@@ -261,7 +266,9 @@ Chequeo después de verificar: `cast call <addr> "owner()(address)"`, `guardian(
 | USDC real | estado estable | 126.333 | 129.077 | +2.744 |
 | USDG real (fork Arbitrum Sepolia) | primer pago | 194.200 | 169.042 | −25.158 |
 | USDG real | estado estable | 125.800 | 130.054 | +4.254 |
-| Mock | primer pago / estable | 177.870 / 109.470 | 146.503 / 112.303 | −31.367 / +2.833 |
+| Mock | primer pago / estable | 179.391 / 110.991 | 154.576 / 120.376 | −24.815 / +9.385 |
+
+Las filas con tokens reales se midieron antes de la auditoría del 28 oct 2026. Los chequeos de roles que agregó (owner, guardian y relayer no pueden ser merchant) suman unos 8k de gas a cada `settle`, medido en el mock, que ahora también emite `AuthorizationUsed` como USDC: con USDC real, el primer pago queda cerca de 171k y el estado estable cerca de 137k (ejecución, como la tabla; con intrínseco y calldata, ~203k y ~163k). Hay que volver a correr el test de fork antes de mainnet.
 
 En v2 además cada retiro cuesta 91k a 94k de ejecución (`withdrawWithSignature`), que v3 elimina. En estado estable v3 cuesta 2% a 3% más por pago (dos transferencias en vez de dos escrituras de saldo, más el chequeo de saldo final) y nada en retiros. Deploy: 1,64M gas y 8.546 bytes de initcode (v2: 2,42M y 12.064). El guardian no cambia el gas de `settle`: solo agrega un slot que lee `pause()`.
 

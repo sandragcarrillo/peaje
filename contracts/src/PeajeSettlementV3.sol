@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -17,15 +18,20 @@ import {IEIP3009} from "./interfaces/IEIP3009.sol";
 ///        fee = floor(price * FEE_BPS / 10_000)       (2%, rounded down, in favour of the merchant)
 ///        net = price - fee                            -> merchant
 ///        fee + networkFee                             -> feeRecipient
-///      `networkFee` reimburses the relayer's gas. The relayer chooses it per payment and the
-///      owner caps it per token.
+///      `networkFee` reimburses the relayer's gas. The relayer chooses it per payment, the
+///      owner caps it per token, and the contract caps the cap at 0.10 of a token unit (US$0.10
+///      on a stablecoin), so not even the owner can turn it into a bigger fee.
 ///
 ///      `settle` is relayer-only: an EIP-3009 authorization binds payer, amount and nonce but not
 ///      the merchant, so an open `settle` would let anyone route a signed payment to themselves.
 ///
 ///      If someone submits an authorization straight to the token (it is public once in the
 ///      mempool or in the 402 flow), the funds land here unsplit. The owner routes them with
-///      `settleStray`, which applies the same split. Nothing can ever be swept to Peaje.
+///      `settleStray`, which applies the same split. No payment, in `settle` or `settleStray`,
+///      can name this contract or whoever holds a Peaje role right now (owner, guardian, a
+///      relayer, the fee recipient) as the merchant. Former or pending role holders can be.
+///      The owner is still trusted to route each stray to the right merchant: the contract
+///      cannot tell a front-run from a donation (see `settleStray`).
 contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
@@ -89,6 +95,7 @@ contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
     error AuthorizationNotUsed(address payer, bytes32 nonce);
     error StrayAlreadySettled(address payer, bytes32 nonce);
     error InsufficientStray(uint256 available, uint256 requested);
+    error NetworkFeeCapTooHigh(uint256 maxNetworkFee, uint256 ceiling);
     error LengthMismatch();
     error RenounceDisabled();
 
@@ -170,10 +177,13 @@ contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
     ///         funds sit here unsplit. Applies exactly the split `settle` would have applied.
     /// @dev Owner-only: the authorization does not bind the merchant, and the owner (a Safe)
     ///      takes the merchant from Peaje's records of the 402 that `nonce` paid. The owner must
-    ///      check off-chain that `nonce` has no `PaymentSettled` yet: `settle` does not record
-    ///      nonces (it would cost a storage write per payment) and the contract only enforces that
-    ///      the nonce is spent at the token, was never routed here before, and that the surplus
-    ///      covers `value`. Works while paused and for delisted tokens.
+    ///      check off-chain, in the transaction that spent `nonce` at the token, that `from`
+    ///      transferred exactly `value` to this contract and that it has no `PaymentSettled`:
+    ///      `settle` does not record nonces (it would cost a storage write per payment) and the
+    ///      contract only enforces that the nonce is spent at the token, was never routed here
+    ///      before, that the surplus covers `value`, and that exactly `value` leaves. Any spent
+    ///      nonce passes the first check, so a donation can be routed too: the owner decides.
+    ///      Works while paused and for delisted tokens.
     function settleStray(
         address token,
         address merchant,
@@ -195,6 +205,12 @@ contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
 
         straySettled[token][from][nonce] = true;
         _payout(token, merchant, net, fee + networkFee);
+
+        // Same control as `settle`: exactly `value` left, so a rebasing token fails here. A token that
+        // takes its cut from the recipient still debits exactly `value` and is not caught (see docs).
+        uint256 remaining = IERC20(token).balanceOf(address(this));
+        // slither-disable-next-line incorrect-equality
+        if (remaining != available - value) revert BalanceNotRestored(available - value, remaining);
 
         emit PaymentSettled(nonce, token, merchant, from, value, net, fee, networkFee);
         emit StraySettled(nonce, token, from);
@@ -249,13 +265,20 @@ contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
 
     /// @dev Validates a payment and computes its split. Fee rounds down: the merchant gets
     ///      `price - floor(price * 2%)`, never less than 98% of the price, and never more than
-    ///      `value - fee - networkFee` because that is exactly what is sent.
+    ///      `value - fee - networkFee` because that is exactly what is sent. The price is
+    ///      `value - networkFee`, and the relayer picks `networkFee` up to the cap: the payer's
+    ///      signature does not bind it, so on a payment at or below the cap the relayer could
+    ///      leave the merchant almost nothing. That share goes to the fee recipient, not to the
+    ///      relayer; the gateway quotes it from gas and Chainlink (apps/gateway/src/costoRed.ts).
     function _split(address token, address merchant, uint256 value, uint256 networkFee)
         private
         view
         returns (uint256 net, uint256 fee)
     {
-        if (merchant == address(0) || merchant == address(this) || merchant == feeRecipient) {
+        if (
+            merchant == address(0) || merchant == address(this) || merchant == feeRecipient || merchant == owner()
+                || merchant == guardian || isRelayer[merchant]
+        ) {
             revert InvalidMerchant(merchant);
         }
         uint256 cap = maxNetworkFee[token];
@@ -297,6 +320,13 @@ contract PeajeSettlementV3 is Ownable2Step, Pausable, ReentrancyGuardTransient {
 
     function _setAcceptedToken(address token, bool accepted, uint256 maxNetworkFee_) private {
         if (token == address(0)) revert ZeroAddress();
+        // At most 0.10 of a token unit: a cap in the wrong decimals (or max uint) would let a relayer
+        // take almost the whole payment as network fee. A zero cap skips the read, so a token whose
+        // decimals() breaks can still be delisted with (token, false, 0).
+        if (maxNetworkFee_ != 0) {
+            uint256 ceiling = 10 ** IERC20Metadata(token).decimals() / 10;
+            if (maxNetworkFee_ > ceiling) revert NetworkFeeCapTooHigh(maxNetworkFee_, ceiling);
+        }
         isAcceptedToken[token] = accepted;
         maxNetworkFee[token] = maxNetworkFee_;
         emit TokenUpdated(token, accepted, maxNetworkFee_);

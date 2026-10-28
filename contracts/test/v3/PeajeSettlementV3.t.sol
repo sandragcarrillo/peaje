@@ -194,7 +194,7 @@ contract PeajeSettlementV3Test is BaseV3 {
         vm.startPrank(relayer);
         settlement.settle(address(usdc), merchant, auth, 0);
 
-        vm.expectRevert(MockStablecoin.AuthorizationUsed.selector);
+        vm.expectRevert(MockStablecoin.AuthorizationAlreadyUsed.selector);
         settlement.settle(address(usdc), otherMerchant, auth, 0);
         vm.stopPrank();
         assertEq(usdc.balanceOf(otherMerchant), 0);
@@ -466,7 +466,7 @@ contract PeajeSettlementV3Test is BaseV3 {
         assertEq(usdc.balanceOf(address(settlement)), 28_000);
 
         // The relayer's settle now fails: the authorization is spent.
-        vm.expectRevert(MockStablecoin.AuthorizationUsed.selector);
+        vm.expectRevert(MockStablecoin.AuthorizationAlreadyUsed.selector);
         vm.prank(relayer);
         settlement.settle(address(usdc), merchant, auth, 8_000);
 
@@ -574,7 +574,9 @@ contract PeajeSettlementV3Test is BaseV3 {
         relayers[1] = otherMerchant;
         address[] memory tokens = new address[](2);
         tokens[0] = address(usdc);
-        tokens[1] = address(0xBEEF);
+        // Un token real: el contrato lee sus decimals() para el techo del tope de costo de red.
+        address otro = address(new MockStablecoin("USDG", "1", 6));
+        tokens[1] = otro;
         uint256[] memory caps = new uint256[](2);
         caps[0] = 50_000;
         caps[1] = 10_000;
@@ -592,7 +594,7 @@ contract PeajeSettlementV3Test is BaseV3 {
         assertTrue(fresh.isRelayer(otherMerchant));
         assertFalse(fresh.isRelayer(owner));
         assertTrue(fresh.isAcceptedToken(address(usdc)));
-        assertEq(fresh.maxNetworkFee(address(0xBEEF)), 10_000);
+        assertEq(fresh.maxNetworkFee(otro), 10_000);
         assertEq(fresh.FEE_BPS(), 200);
         assertFalse(fresh.paused());
     }

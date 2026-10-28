@@ -129,6 +129,15 @@ contract DeployPeajeSettlementV3 is Script {
         if (net.mainnet || !vm.envOr("ALLOW_EOA_OWNER", false)) {
             require(owner.code.length > 0, "OWNER has no code: deploy the Safe on this network first");
         }
+        // En mainnet el owner es un Safe de al menos 2 de 3 (docs/contrato-v3.md): cualquier otro
+        // contrato pasaba el chequeo de código, y el owner se fija en el constructor sin vuelta atrás.
+        if (net.mainnet) {
+            (bool okUmbral, bytes memory umbral) = owner.staticcall(abi.encodeWithSignature("getThreshold()"));
+            (bool okFirmantes, bytes memory firmantes) = owner.staticcall(abi.encodeWithSignature("getOwners()"));
+            require(okUmbral && okFirmantes && umbral.length == 32, "OWNER is not a Safe (no getThreshold/getOwners)");
+            require(abi.decode(umbral, (uint256)) >= 2, "OWNER Safe threshold must be at least 2");
+            require(abi.decode(firmantes, (address[])).length >= 3, "OWNER Safe must have at least 3 signers");
+        }
         for (uint256 i; i < relayers.length; ++i) {
             require(relayers[i] != owner, "a relayer cannot be the OWNER");
             require(relayers[i] != feeRecipient, "a relayer cannot be the FEE_RECIPIENT");
