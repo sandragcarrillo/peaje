@@ -11,7 +11,7 @@
   "dependencies": {
     "@paddle/paddle-js": "^1.6.5",
     "@peaje/db": "workspace:*",
-    "@peaje/next": "^0.2.2",
+    "@peaje/next": "^0.3.1",
     "@peaje/shared": "workspace:*",
     "@privy-io/node": "^0.30.0",
     "@privy-io/react-auth": "^3.37.4",
