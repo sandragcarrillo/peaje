@@ -10,11 +10,11 @@ import { useDict } from '@/lib/i18n/client'
 type Item = { href: string; label: string; valor?: string; acento?: boolean; sub?: boolean }
 
 /**
- * Sidebar en el orden del camino del dueño: ver su puntaje, las mejoras, su
+ * Sidebar en el orden del camino del dueño: ver su puntaje, el kit, su
  * agente y las visitas. Cobrar es opcional y va aparte, abajo de un separador.
  * Los ceros no se muestran (rutas e ingresos vacíos hacen sentir el producto
  * vacío); el puntaje sí, porque invita a subirlo. El botón principal lleva a
- * activar el agente si no paga, o a las mejoras si ya paga.
+ * activar el agente si no paga, o al kit si ya paga.
  *
  * En el teléfono la columna no se ve: las mismas secciones van al menú del
  * navbar (ver usePublicarSecciones).

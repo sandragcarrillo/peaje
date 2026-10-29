@@ -103,9 +103,12 @@ export async function articulos(): Promise<Articulo[]> {
       .filter((n) => n.endsWith('.md') && !n.startsWith('_'))
       .map(async (n) => leer(n, await readFile(path.join(CARPETA, n), 'utf8'))),
   )
+  // Los empates de fecha se desempatan por el slug en español (en inglés, el de
+  // su traducción), para que los dos idiomas salgan en el mismo orden.
+  const orden = (a: Articulo) => (a.idioma === 'en' && a.traduccion) || a.slug
   return todos
     .filter((a): a is Articulo => a !== null && !pendiente(a))
-    .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.slug.localeCompare(b.slug))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || orden(a).localeCompare(orden(b)))
 }
 
 export async function articulo(slug: string): Promise<Articulo | null> {
