@@ -255,32 +255,34 @@ Chequeo después de verificar: `cast call <addr> "owner()(address)"`, `guardian(
 
 ## Resultados
 
-- **Tests**: 85 en `test/v3/` (76 unitarios y fuzz, 8 de ellos del guardian; 6 invariantes en dos suites, 1 del script de deploy, 2 de gas; el de fork se corre con `FORK_GAS_RPC`). Todo el repo: 155, 154 pasan y 1 se salta sin fork (pasó corriéndolo contra Arbitrum Sepolia). Fuzz 1.000 corridas por test, con 6 y 18 decimales hasta mil millones de dólares; invariantes 256 × 64, con pausas hechas por el owner y por el guardian e intentos del guardian de despausar o reconfigurar (deben fallar siempre).
+- **Tests**: 85 en `test/v3/` (76 unitarios y fuzz, 8 de ellos del guardian; 6 invariantes en dos suites, 1 del script de deploy, 2 de gas; el de fork se corre con `FORK_GAS_RPC`). Todo el repo (29 oct 2026, con los arreglos de la auditoría y sus pruebas en `test/auditoria/`): 232, 231 pasan y 1 se salta sin fork (pasó corriéndolo contra Arbitrum Sepolia). Fuzz 1.000 corridas por test, con 6 y 18 decimales hasta mil millones de dólares; invariantes 256 × 64, con pausas hechas por el owner y por el guardian e intentos del guardian de despausar o reconfigurar (deben fallar siempre).
 - **Cobertura** (`forge coverage --ir-minimum`): `PeajeSettlementV3.sol` 100% de ramas (18/18) y funciones (19/19), 96% de líneas (81/84). Las tres líneas "sin cubrir" (`_checkRelayer()`, `_pause()`, `_unpause()`) sí corren en los tests; es un artefacto de `--ir-minimum`, igual que en v2.
 - **Slither 0.11.6** (`slither . --filter-paths "lib/|test/|script/"`): 0 hallazgos. Uno triageado inline: `reentrancy-balance` en `settle`, porque leer el saldo antes y después del cobro es justamente el control contra tokens que entregan menos; la reentrada está bloqueada. Fuera del filtro solo aparece `pragma` por las versiones de OpenZeppelin.
 - **Gas** (`forge test --match-contract GasComparison --isolate`, ejecución sin los 21k intrínsecos, que son iguales en ambas versiones porque el calldata es el mismo):
 
 | Token | Caso | v2 `settle` | v3 `settle` | Diferencia |
 |---|---|---|---|---|
-| USDC real (fork Arbitrum Sepolia) | primer pago a un merchant | 194.737 | 163.309 | −31.428 |
-| USDC real | estado estable | 126.333 | 129.077 | +2.744 |
-| USDG real (fork Arbitrum Sepolia) | primer pago | 194.200 | 169.042 | −25.158 |
-| USDG real | estado estable | 125.800 | 130.054 | +4.254 |
+| USDC real (fork Arbitrum Sepolia) | primer pago a un merchant | 194.757 | 169.841 | −24.916 |
+| USDC real | estado estable | 126.337 | 135.649 | +9.312 |
+| USDG real (fork Arbitrum Sepolia) | primer pago | 194.200 | 175.594 | −18.606 |
+| USDG real | estado estable | 125.800 | 136.594 | +10.794 |
 | Mock | primer pago / estable | 179.391 / 110.991 | 154.576 / 120.376 | −24.815 / +9.385 |
 
-Las filas con tokens reales se midieron antes de la auditoría del 28 oct 2026. Los chequeos de roles que agregó (owner, guardian y relayer no pueden ser merchant) suman unos 8k de gas a cada `settle`, medido en el mock, que ahora también emite `AuthorizationUsed` como USDC: con USDC real, el primer pago queda cerca de 171k y el estado estable cerca de 137k (ejecución, como la tabla; con intrínseco y calldata, ~203k y ~163k). Hay que volver a correr el test de fork antes de mainnet.
+Medido el 29 oct 2026 con los arreglos de la auditoría del 28 oct (los chequeos de roles suman unos 6k a 8k por `settle`), con `FORK_GAS_RPC=https://sepolia-rollup.arbitrum.io/rpc`. Queda dentro de lo previsto (~171k y ~137k) y de `GAS_SETTLE` del gateway (180k × 1,2). Un pago real en el contrato nuevo de Arbitrum Sepolia (primer pago a una wallet nueva, fee recipient con saldo) gastó 170.177 de gas en total: ver "Prueba de pago" abajo.
 
-En v2 además cada retiro cuesta 91k a 94k de ejecución (`withdrawWithSignature`), que v3 elimina. En estado estable v3 cuesta 2% a 3% más por pago (dos transferencias en vez de dos escrituras de saldo, más el chequeo de saldo final) y nada en retiros. Deploy: 1,64M gas y 8.546 bytes de initcode (v2: 2,42M y 12.064). El guardian no cambia el gas de `settle`: solo agrega un slot que lee `pause()`.
+En v2 además cada retiro cuesta 91k a 94k de ejecución (`withdrawWithSignature`), que v3 elimina. En estado estable v3 cuesta 2% a 3% más por pago (dos transferencias en vez de dos escrituras de saldo, más el chequeo de saldo final) y nada en retiros. Deploy: 1,83M gas y 9.505 bytes de initcode desde la auditoría (antes 1,64M y 8.546; v2: 2,42M y 12.064). El guardian no cambia el gas de `settle`: solo agrega un slot que lee `pause()`.
 
-## Deploys de testnet v3 (25 oct 2026)
+## Deploys de testnet v3 (29 oct 2026)
 
-Desplegados desde la treasury (`0x3715986D44f5d56BC6ae3E983D1928CEc37dE253`), que también queda como owner: EOA, solo testnet (`ALLOW_EOA_OWNER=true`), igual que en los deploys de v2. Mismo bytecode en las tres (6.573 bytes desplegados), `forge build` y `forge test` limpios antes del deploy (155 tests, 154 pasan, 1 se salta sin fork).
+Con los arreglos de la auditoría interna del 28 oct. Desplegados desde la treasury (`0x3715986D44f5d56BC6ae3E983D1928CEc37dE253`), que también queda como owner: EOA, solo testnet (`ALLOW_EOA_OWNER=true`), igual que en los deploys de v2. Mismo bytecode en las tres (7.410 bytes desplegados), `forge build` y `forge test` limpios antes del deploy (232 tests, 231 pasan, 1 se salta sin fork y pasó aparte con fork), simulación del script en las tres antes de enviar.
 
 | Red | Contrato | Tx de deploy | Bloque | Gas |
 |---|---|---|---|---|
-| Arbitrum Sepolia (421614) | [`0xFFE62DAcB3DadC18D3a4Fc7EBAC2eCf6Cffb95A7`](https://sepolia.arbiscan.io/address/0xFFE62DAcB3DadC18D3a4Fc7EBAC2eCf6Cffb95A7) | [`0x61b5c054…3553c`](https://sepolia.arbiscan.io/tx/0x61b5c05422a04f5c220691d8f58ed086eec47759e254ad340df9c48a4da3553c) | 322.914.899 | 1.682.804 (0,0000338 ETH) |
-| Robinhood Chain Testnet (46630) | [`0x699F634b39d6f1eC99FDD4E9D6C0bEc8603dc754`](https://explorer.testnet.chain.robinhood.com/address/0x699F634b39d6f1eC99FDD4E9D6C0bEc8603dc754) | [`0xabf8da87…0dea4`](https://explorer.testnet.chain.robinhood.com/tx/0xabf8da87f9bd7c4bff83523197520749f2de3e9efa5247bfc46c936c3630dea4) | 142.807.863 | 1.635.728 (0,0000164 ETH) |
-| Arc Testnet (5042002) | [`0x39F31599D7d424E3E0131d2E80db96B8ecE07417`](https://explorer.testnet.arc.io/address/0x39F31599D7d424E3E0131d2E80db96B8ecE07417) | [`0xd664ed22…91ace`](https://explorer.testnet.arc.io/tx/0xd664ed2271ecdb25328fa2051a1a12490059d2d96e006494386ba19090491ace) | 69.147.530 | 1.635.500 (0,0372 USDC) |
+| Arbitrum Sepolia (421614) | [`0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42`](https://sepolia.arbiscan.io/address/0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42) | [`0x3c8d5a15…c32ca`](https://sepolia.arbiscan.io/tx/0x3c8d5a15adceabc484c34eec24ca4dbd2f52dcb1437e9cffcb5d7ef9ea3c32ca) | 324.155.911 | 1.892.230 (0,000038 ETH) |
+| Robinhood Chain Testnet (46630) | [`0x3e0f648349432A5195e498D8D3b7Fa7d759752cC`](https://explorer.testnet.chain.robinhood.com/address/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC) | [`0xfea49867…11ad2`](https://explorer.testnet.chain.robinhood.com/tx/0xfea498672d6a9b9599964ef4c30e6b6f81444b4f4aa815e15ea9cf809ac11ad2) | 145.040.355 | 1.832.289 (0,0000183 ETH) |
+| Arc Testnet (5042002) | [`0x5a810d1317412A9635D0F84B74ff9F2DFbEc0E21`](https://explorer.testnet.arc.io/address/0x5a810d1317412A9635D0F84B74ff9F2DFbEc0E21) | [`0x5c08b834…0d00e`](https://explorer.testnet.arc.io/tx/0x5c08b8343998b3016caca41dc8eb79f9c5e7acbe09c0bc7a329730d296f0d00e) | 69.744.527 | 1.836.469 (0,0494 USDC) |
+
+Los del 25 oct, sin los arreglos (`0xFFE62DAc…95A7` en Arbitrum Sepolia, `0x699F634b…c754` en Robinhood Testnet, `0x39F31599…7417` en Arc Testnet), quedan en la cadena sin uso: el gateway deja de apuntarles cuando Railway tiene las direcciones nuevas. No guardan saldos, así que no hay nada que sacar de ellos.
 
 Roles (los mismos en las tres redes; llaves en el `.env` raíz, gitignoreado):
 
@@ -293,12 +295,14 @@ Roles (los mismos en las tres redes; llaves en el `.env` raíz, gitignoreado):
 
 Tokens y topes: Arbitrum Sepolia USDC `0x75faf114…AA4d` y USDG `0xFFC95faa…1892` con 20.000 (US$0,02); Robinhood Testnet USDG `0x7E955252…802F` con 20.000; Arc Testnet USDC `0x3600…0000` con 10.000 (US$0,01).
 
-Verificación: Sourcify `exact_match` (creación y runtime) en las tres: [421614](https://repo.sourcify.dev/421614/0xFFE62DAcB3DadC18D3a4Fc7EBAC2eCf6Cffb95A7), [46630](https://repo.sourcify.dev/46630/0x699F634b39d6f1eC99FDD4E9D6C0bEc8603dc754), [5042002](https://repo.sourcify.dev/5042002/0x39F31599D7d424E3E0131d2E80db96B8ecE07417). Pendiente:
+Verificación: Sourcify `exact_match` (creación y runtime) en las tres, con `--verify --verifier sourcify` en el mismo deploy: [421614](https://repo.sourcify.dev/421614/0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42), [46630](https://repo.sourcify.dev/46630/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC), [5042002](https://repo.sourcify.dev/5042002/0x5a810d1317412A9635D0F84B74ff9F2DFbEc0E21). Pendiente (igual que con los del 25 oct, no se reintentó):
 
 - Arbiscan: no hay `ETHERSCAN_API_KEY` en el `.env`; con la key, el comando de la tabla de verificación de arriba.
 - Blockscout de Robinhood Testnet y de Arc Testnet: responden `Fail - Unable to verify` con `forge verify-contract --verifier blockscout`, con standard JSON y con código aplanado por la API v2, aunque el bytecode que indexan es idéntico al del artefacto y v2 sí verificó ahí con la misma configuración. Tampoco toman la verificación de Sourcify por ahora. Reintentar más adelante o desde la UI del explorer.
 
-Chequeo on-chain con `cast call` en las tres: `owner()` = treasury, `pendingOwner()` = 0, `guardian()`, `feeRecipient()`, `isRelayer(relayer)` = true, `isRelayer(treasury)` = false, `isAcceptedToken` y `maxNetworkFee` por token según la tabla, `FEE_BPS()` = 200, `paused()` = false, saldo del contrato en cada token = 0 y `quote(1000000, 20000)` = (960.400, 19.600).
+Chequeo on-chain con `cast call` en las tres: `owner()` = treasury, `guardian()`, `feeRecipient()`, `isRelayer(relayer)` = true, `isRelayer(treasury)` = false, `isAcceptedToken` y `maxNetworkFee` por token según la tabla, `FEE_BPS()` = 200 y `paused()` = false. En Arbitrum Sepolia además `quote(1000000, 20000)` = (960.400, 19.600).
+
+**Prueba de pago** (29 oct, Arbitrum Sepolia, sin pasar por el gateway): el agente comprador (`0x96d6…2653`) firmó un `TransferWithAuthorization` de 50.000 (US$0,05) de USDC al contrato y el relayer llamó `settle` con networkFee 8.000 hacia una wallet nueva (`0xe43e…dBce`). Tx [`0x940e69b0…5a6`](https://sepolia.arbiscan.io/tx/0x940e69b02735694514e13ca4bf5abfa5d9dc479d51a7eba4852df64c52cb15a6), 170.177 de gas. El negocio recibió 41.160 (98% de 42.000), el fee recipient 8.840 (840 de fee más los 8.000 de red) y el contrato quedó en 0.
 
 Gas del relayer (desde la treasury, alcanza para unos 20 `settle` con margen de 2x a 3x):
 
@@ -308,4 +312,4 @@ Gas del relayer (desde la treasury, alcanza para unos 20 `settle` con margen de 
 | Robinhood Testnet | 0,0001 ETH | [`0x184125f1…1411f`](https://explorer.testnet.chain.robinhood.com/tx/0x184125f196927a47824ee24af8210e3cdf73ab83510da95df10d170ccdb1411f) | 0,009838 ETH |
 | Arc Testnet | 0,3 USDC | [`0x5313bf40…2a8f5`](https://explorer.testnet.arc.io/tx/0x5313bf40ad3a601d47492824ae7e774354677781a9a7f7aa2c9a95aa3ed2a8f5) | 14,097 USDC |
 
-El guardian y el fee recipient quedan sin gas: el guardian necesita algo de gas nativo antes de poder llamar `pause()`. Direcciones del gateway en el `.env` raíz: `PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA`, `PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET`, `PEAJE_SETTLEMENT_V3_ARC_TESTNET` y `RELAYER_PRIVATE_KEY`. Railway todavía no las tiene.
+El guardian y el fee recipient quedan sin gas: el guardian necesita algo de gas nativo antes de poder llamar `pause()`. Direcciones del gateway en el `.env` raíz: `PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA`, `PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET`, `PEAJE_SETTLEMENT_V3_ARC_TESTNET` y `RELAYER_PRIVATE_KEY`; el 29 oct el `.env` ya tiene las del redeploy y Railway tiene que recibir las mismas tres. Saldo del relayer el 29 oct, después de la prueba de pago: 0,000147 ETH en Arbitrum Sepolia, 0,0001 ETH en Robinhood Testnet y 0,3 USDC en Arc Testnet.
