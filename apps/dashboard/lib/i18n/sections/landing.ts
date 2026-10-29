@@ -6,6 +6,9 @@ import { COBROS_VISIBLES } from '@/lib/config'
  * Protocolos y redes viven en el portal para desarrolladores, no acá.
  * Precios y cupos llegan como argumentos desde @peaje/db (planes.ts).
  */
+
+/** Lo que trae Pro cada mes: PAQUETE_MENSUAL, LIMITES.pro.preguntas y CREDITOS_MENSUALES de planes.ts. */
+type Paquete = { paginas: number; preguntas: number; informes: number; respuestas: number; creditos: number }
 export type MensajeChat = {
   de: 'dueno' | 'agente'
   texto: string
@@ -94,22 +97,23 @@ export const landing = {
     precioValor: `Un agente que trabaja tu sitio todo el mes para que ${asistentesMedidos('es')} te recomienden.`,
     precioTodoTitulo: 'Un solo agente, todo incluido',
     precioHabilidades: ['Diagnóstico', 'Contenido', 'Citas en IA', 'Arreglos', 'Monitor diario', 'Reportes'],
-    precioPuntos: [
-      { titulo: 'Sabe de tu negocio', texto: 'Trabaja con los datos de tu sitio y con lo que tus clientes le preguntan a la IA.' },
-      { titulo: 'Mide si la IA te recomienda', texto: `Les pregunta a ${asistentesMedidos('es')} lo mismo que tus clientes y te dice si te citan.` },
-      { titulo: 'Te escribe las páginas', texto: 'Borradores completos de las páginas que te faltan, con datos de tu sitio.' },
-      { titulo: 'Te habla por Telegram', texto: 'Conversa contigo ahí o en tu panel, sin reuniones ni llamadas.' },
-      { titulo: 'Vuelve a medir', texto: 'A las 2 y a las 6 semanas, para que sepas si funcionó.' },
+    // Lo que trae el plan por mes, en unidades (PAQUETE_MENSUAL y LIMITES en planes.ts). Copy de San, 29 oct 2026.
+    precioPuntos: (p: Paquete) => [
+      { fuerte: `${p.paginas} páginas al mes`, resto: ', escritas con los datos de tu sitio' },
+      { fuerte: `${p.preguntas} preguntas de tus clientes`, resto: ` medidas en ${asistentesMedidos('es')}` },
+      { fuerte: 'Nueva medición de cada página', resto: ' a las 2 y a las 6 semanas' },
+      { fuerte: `${p.informes} informes a pedido`, resto: ' (plan, medición de citas, búsqueda de tareas)' },
+      { fuerte: `${p.respuestas} respuestas con datos`, resto: ' de tu agente, en el panel, Telegram o tu herramienta de IA' },
+      { fuerte: 'Monitor diario, tareas de arreglo y reporte semanal', resto: ' sin límite' },
     ],
     precioPie: (cupos: number) => [`Precio de fundador para los primeros ${cupos} negocios`, 'Cancelas cuando quieras'],
     verPrecios: 'Ver todos los detalles del precio',
 
     // FAQ provisoria: reemplazar por la del Editor si San la pega.
-    // Los 7 días (DIAS_REEMBOLSO en packages/db/src/planes.ts) y los 500 créditos
-    // (LIMITES.pro.creditos, provisorio) van escritos a mano porque
-    // app/page.tsx solo le pasa la comisión a faq(). Si cambian, cambiarlos acá (es y en).
+    // Los 7 días (DIAS_REEMBOLSO en packages/db/src/planes.ts) van escritos a
+    // mano; si cambian, cambiarlos acá (es y en). Créditos y paquete llegan en `p`.
     faqTitulo: 'Preguntas',
-    faq: (pct: number) => [
+    faq: (pct: number, p: Paquete) => [
       {
         p: '¿Qué es Peaje?',
         r: `Un agente que deja tu sitio listo para la IA. Revisa cómo te ven ${asistentesMedidos('es')}, te dice qué falta y lo arregla contigo en Telegram.`,
@@ -145,7 +149,7 @@ export const landing = {
       },
       {
         p: '¿Qué pasa si se me acaban los créditos?',
-        r: 'Cada mes tu plan trae 500 créditos para el trabajo del agente, como arreglos, páginas y reportes que le pides. Hablar con tu agente es gratis. Si se acaban, tu agente sigue hablando contigo, pero no hace trabajo nuevo hasta el 1 del mes siguiente. Lo que ya te entregó sigue en tu panel y no se cobra nada extra.',
+        r: `Cada mes tu plan trae ${p.creditos} créditos para el trabajo del agente. Alcanzan para ${p.paginas} páginas, ${p.informes} informes y ${p.respuestas} respuestas con datos, y los repartes como quieras. Hablar con tu agente es gratis. Si se acaban, tu agente sigue hablando contigo, pero no hace trabajo nuevo hasta el 1 del mes siguiente. Lo que ya te entregó sigue en tu panel y no se cobra nada extra.`,
       },
       {
         p: '¿Qué datos usan?',
@@ -233,18 +237,19 @@ export const landing = {
     precioValor: `An agent that works on your site all month so ${asistentesMedidos('en')} recommend you.`,
     precioTodoTitulo: 'One agent, everything included',
     precioHabilidades: ['Diagnosis', 'Content', 'AI citations', 'Fixes', 'Daily monitor', 'Reports'],
-    precioPuntos: [
-      { titulo: 'Knows your business', texto: 'Works from the facts on your site and from what your customers ask AI.' },
-      { titulo: 'Tracks whether AI recommends you', texto: `Asks ${asistentesMedidos('en')} what your customers ask and tells you whether they cite you.` },
-      { titulo: 'Writes your pages', texto: 'Full drafts of the pages you are missing, using facts from your site.' },
-      { titulo: 'Talks to you on Telegram', texto: 'It chats with you there or on your dashboard, with no meetings or calls.' },
-      { titulo: 'Measures again', texto: 'At 2 and 6 weeks, so you know whether it worked.' },
+    precioPuntos: (p: Paquete) => [
+      { fuerte: `${p.paginas} pages a month`, resto: ', written from the facts on your site' },
+      { fuerte: `${p.preguntas} questions your customers ask`, resto: ` tracked in ${asistentesMedidos('en')}` },
+      { fuerte: 'A new measurement of each page', resto: ' at 2 and 6 weeks' },
+      { fuerte: `${p.informes} reports on demand`, resto: ' (plan, citation check, task search)' },
+      { fuerte: `${p.respuestas} answers with your data`, resto: ' from your agent, in the dashboard, Telegram or your AI tool' },
+      { fuerte: 'Daily monitor, fix tasks and weekly report', resto: ' with no limit' },
     ],
     precioPie: (cupos: number) => [`Founder price for the first ${cupos} businesses`, 'Cancel anytime'],
     verPrecios: 'See the full pricing details',
 
     faqTitulo: 'Questions',
-    faq: (pct: number) => [
+    faq: (pct: number, p: Paquete) => [
       {
         p: 'What is Peaje?',
         r: `An agent that gets your site ready for AI. It checks how ${asistentesMedidos('en')} see you, tells you what is missing and fixes it with you on Telegram.`,
@@ -280,7 +285,7 @@ export const landing = {
       },
       {
         p: 'What happens if I run out of credits?',
-        r: `Each month your plan comes with 500 credits for the agent's work, like fixes, pages and the reports you ask for. Talking to your agent is free. If you run out, your agent keeps talking with you, but it does no new work until the 1st of next month. What it already handed you stays in your dashboard and nothing extra is charged.`,
+        r: `Each month your plan comes with ${p.creditos} credits for the agent's work. They cover ${p.paginas} pages, ${p.informes} reports and ${p.respuestas} answers with your data, split however you like. Talking to your agent is free. If you run out, your agent keeps talking with you, but it does no new work until the 1st of next month. What it already handed you stays in your dashboard and nothing extra is charged.`,
       },
       {
         p: 'What data do you use?',

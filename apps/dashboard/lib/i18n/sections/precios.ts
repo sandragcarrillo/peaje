@@ -5,6 +5,9 @@ import { COBROS_VISIBLES } from '@/lib/config'
  * Página /precios. Los montos, cupos y límites salen de @peaje/db (planes.ts),
  * así que los textos los reciben como argumentos y no se desincronizan.
  */
+
+/** Lo que trae Pro cada mes: PAQUETE_MENSUAL y LIMITES.pro.preguntas de planes.ts. */
+type Paquete = { paginas: number; preguntas: number; informes: number; respuestas: number }
 export const precios = {
   es: {
     metaTitulo: 'Precios',
@@ -38,8 +41,7 @@ export const precios = {
     proNota: (cupos: number, pro: number) =>
       `Precio de fundador para los primeros ${cupos} negocios que se suscriben, y lo mantienes mientras tu suscripción siga activa. Después de esos ${cupos}, Pro cuesta US$${pro} al mes. Si cancelas y vuelves, pagas el precio normal.`,
     ctaAgente: 'Empezar con mi agente',
-    limites: (preguntas: number, creditos: number) =>
-      `${creditos} créditos al mes para el trabajo del agente y ${preguntas} preguntas medidas en asistentes de IA. Hablar con tu agente es gratis.`,
+    limites: (creditos: number) => `Todo sale de ${creditos} créditos al mes, que repartes como quieras. Hablar con tu agente es gratis.`,
 
     // Créditos: número y costos de packages/db/src/planes.ts (LIMITES.*.creditos, COSTOS_CREDITOS).
     creditosTitulo: 'Cómo funcionan los créditos',
@@ -59,14 +61,16 @@ export const precios = {
     creditosRenuevan:
       'Los créditos se renuevan el 1 de cada mes. Los que no usas no pasan al mes siguiente, y no se pueden comprar créditos extra.',
 
-    proIncluye: [
-      'Arma un plan según tu objetivo y conversa contigo en el dashboard y en Telegram',
-      `Mide si ${asistentesMedidos('es')} citan tu sitio para las preguntas de tu negocio`,
-      'Escribe borradores completos de las páginas que responden esas preguntas, con datos de tu sitio',
+    // Los mismos puntos que la tarjeta de la landing (copy de San, 29 oct 2026), más el paso a la herramienta de código.
+    proIncluye: (p: Paquete) => [
+      `${p.paginas} páginas al mes, escritas con los datos de tu sitio`,
+      `${p.preguntas} preguntas de tus clientes medidas en ${asistentesMedidos('es')}`,
+      'Nueva medición de cada página a las 2 y a las 6 semanas',
+      `${p.informes} informes a pedido (plan, medición de citas, búsqueda de tareas)`,
+      `${p.respuestas} respuestas con datos de tu agente, en el panel, Telegram o tu herramienta de IA`,
       'Le pasa cada tarea a tu herramienta de código por MCP o con la CLI, y verifica el sitio en vivo',
-      'Vuelve a medir a las 2 y a las 6 semanas para saber si funcionó',
       ...(COBROS_VISIBLES ? ['Comprador misterioso: prueba el paso de pago de tus rutas como lo haría un agente'] : []),
-      'Reporte semanal por correo',
+      'Monitor diario, tareas de arreglo y reporte semanal sin límite',
     ],
 
     pruebaTitulo: (dias: number) => `Reembolso del primer pago en ${dias} días`,
@@ -137,8 +141,7 @@ export const precios = {
     proNota: (cupos: number, pro: number) =>
       `Founder price for the first ${cupos} businesses that subscribe, and you keep it while your subscription stays active. After those ${cupos}, Pro costs US$${pro} a month. If you cancel and come back, you pay the regular price.`,
     ctaAgente: 'Start with my agent',
-    limites: (preguntas: number, creditos: number) =>
-      `${creditos} credits a month for the agent's work and ${preguntas} questions tracked in AI assistants. Talking to your agent is free.`,
+    limites: (creditos: number) => `It all comes from ${creditos} credits a month, which you split however you like. Talking to your agent is free.`,
 
     creditosTitulo: 'How credits work',
     creditosIntro: (creditos: number) =>
@@ -157,14 +160,15 @@ export const precios = {
     creditosRenuevan:
       'Credits renew on the 1st of each month. Unused credits do not carry over, and you cannot buy extra credits.',
 
-    proIncluye: [
-      'Builds a plan around your goal and talks with you on the dashboard and on Telegram',
-      `Measures whether ${asistentesMedidos('en')} cite your site for your business questions`,
-      'Writes full drafts of the pages that answer those questions, using facts from your site',
+    proIncluye: (p: Paquete) => [
+      `${p.paginas} pages a month, written from the facts on your site`,
+      `${p.preguntas} questions your customers ask, tracked in ${asistentesMedidos('en')}`,
+      'A new measurement of each page at 2 and 6 weeks',
+      `${p.informes} reports on demand (plan, citation check, task search)`,
+      `${p.respuestas} answers with your data from your agent, in the dashboard, Telegram or your AI tool`,
       'Hands each task to your coding tool over MCP or the CLI, and checks the live site',
-      'Measures again at 2 and 6 weeks to see whether it worked',
       ...(COBROS_VISIBLES ? ['Mystery shopper: tests the payment step of your routes the way an agent would'] : []),
-      'A weekly report by email',
+      'Daily monitor, fix tasks and weekly report with no limit',
     ],
 
     pruebaTitulo: (dias: number) => `First payment refunded within ${dias} days`,

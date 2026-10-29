@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CUPOS_FOUNDER, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { CUPOS_FOUNDER, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD } from '@peaje/db'
 import { getDict, type Dict } from '@/lib/i18n'
 import { COBROS_VISIBLES } from '@/lib/config'
 import { currentTenant } from '@/lib/session'
@@ -30,6 +30,7 @@ export default async function Landing() {
   const P = d.precios
   const agenteHref = tenant ? `/t/${tenant.slug}/agente` : '/nuevo'
   const agenteTexto = tenant ? t.ctaDashboard : t.ctaAgente
+  const paquete = { ...PAQUETE_MENSUAL, preguntas: LIMITES.pro.preguntas, creditos: LIMITES.pro.creditos }
 
   return (
     <div className="pb-4">
@@ -141,13 +142,14 @@ export default async function Landing() {
               </ul>
 
               <ul className="mt-7 space-y-3.5">
-                {t.precioPuntos.map((p) => (
-                  <li key={p.titulo} className="flex gap-3 text-[15px] leading-6">
+                {t.precioPuntos(paquete).map((p) => (
+                  <li key={p.fuerte} className="flex gap-3 text-[15px] leading-6">
                     <svg className="mt-1 h-4 w-4 shrink-0 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                       <path d="m5 12.5 4.5 4.5L19 7.5" />
                     </svg>
                     <span>
-                      <strong className="font-semibold">{p.titulo}.</strong> <span className="text-muted">{p.texto}</span>
+                      <strong className="font-semibold">{p.fuerte}</strong>
+                      <span className="text-muted">{p.resto}</span>
                     </span>
                   </li>
                 ))}
@@ -168,7 +170,7 @@ export default async function Landing() {
         <section className="mx-auto max-w-5xl px-6 py-20">
           <h2 className="text-2xl font-semibold sm:text-3xl">{t.faqTitulo}</h2>
           <div className="mt-8 divide-y divide-border border-y border-border">
-            {t.faq(COMISION_PCT).map((f) => (
+            {t.faq(COMISION_PCT, paquete).map((f) => (
               <details key={f.p} className="group rounded-none py-4">
                 {/* -my-4 py-4: en el teléfono el toque abarca toda la fila, no solo la línea de texto; el diseño no se mueve. */}
                 <summary className="-my-4 flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-base font-semibold [&::-webkit-details-marker]:hidden">

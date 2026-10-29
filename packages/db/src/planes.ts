@@ -17,10 +17,10 @@ export const PRECIOS_USD: Record<PlanPago, number> = { founder: 30, pro: 69 }
 
 /**
  * Créditos del agente por mes calendario (UTC), iguales en founder, pro y
- * prueba. 500 y los costos de abajo: decisión de San, 25 oct 2026 (alcanza para
- * lo mismo que 300 con los costos anteriores). Cambiar el número acá cambia todo.
+ * prueba. 800: decisión de San, 29 oct 2026, para que entre el paquete que
+ * promete la tarjeta (PAQUETE_MENSUAL, abajo). Cambiar el número acá cambia todo.
  */
-export const CREDITOS_MENSUALES = 500
+export const CREDITOS_MENSUALES = 800
 
 export type Limites = {
   preguntas: number
@@ -51,14 +51,22 @@ export const COSTOS_CREDITOS = {
   /** Una tarea nueva para el desarrollador o la herramienta de IA del dueño (un arreglo, una ruta, una página por escribir). */
   tarea: 8,
   /** Una página completa escrita por el agente. */
-  pagina: 15,
-  /** Una serie de páginas sobre un tema. */
-  serie: 50,
+  pagina: 10,
+  /** Una serie de páginas sobre un tema (la principal y 3 a 5 más): nunca más cara por página que una suelta. */
+  serie: 40,
   /** Un informe hecho a pedido: el plan, una medición de citación. */
   informe: 30,
   /** Una corrida del comprador misterioso. */
   comprador: 30,
 } as const
+
+/**
+ * Lo que la tarjeta de precios promete por mes, todo junto. Sale de los mismos
+ * créditos, así que tiene que caber en CREDITOS_MENSUALES (lo prueba el test
+ * de planes): 40 páginas, 6 informes y 100 respuestas con datos, más un margen
+ * para tareas. Decisión de San, 29 oct 2026.
+ */
+export const PAQUETE_MENSUAL = { paginas: 40, informes: 6, respuestas: 100 } as const
 
 export type AccionCreditos = keyof typeof COSTOS_CREDITOS
 

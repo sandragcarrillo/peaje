@@ -73,7 +73,7 @@ const { store } = await import('../src/store.js')
 const { conversar, cargoDeRespuesta } = await import('../src/tareas/agente.js')
 const { iniciarTrabajos, esperarTrabajo } = await import('../src/tareas/trabajos.js')
 const { billingRouter } = await import('../src/billing/router.js')
-const { COSTOS_CREDITOS, CREDITOS_MENSUALES, periodoCreditos } = await import('@peaje/db')
+const { COSTOS_CREDITOS, CREDITOS_MENSUALES, PAQUETE_MENSUAL, periodoCreditos } = await import('@peaje/db')
 
 const AGENTE = 'claude-sonnet-5'
 const chat = () => pedidos.filter((p) => p.model === AGENTE)
@@ -224,6 +224,14 @@ test('un trabajo que falla devuelve sus créditos', async () => {
     apagar()
   }
   assert.equal(await usados(t.id), 0)
+})
+
+test('el paquete de la tarjeta de precios cabe en los créditos del mes', () => {
+  const p = PAQUETE_MENSUAL
+  const total = p.paginas * COSTOS_CREDITOS.pagina + p.informes * COSTOS_CREDITOS.informe + p.respuestas * COSTOS_CREDITOS.consulta
+  assert.ok(total <= CREDITOS_MENSUALES, `el paquete cuesta ${total} y el mes trae ${CREDITOS_MENSUALES}`)
+  // Una serie (la principal y al menos 3 más) no sale más cara por página que una suelta.
+  assert.ok(COSTOS_CREDITOS.serie <= 4 * COSTOS_CREDITOS.pagina)
 })
 
 test('informes a pedido y comprador misterioso: el cargo sale de la tabla', () => {

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ENLACE } from '../components/legal'
 import { getDict } from '@/lib/i18n'
 import { COBROS_VISIBLES } from '@/lib/config'
-import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PRECIOS_USD } from '@peaje/db'
+import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD } from '@peaje/db'
 
 /**
  * Precios. Montos, cupos, prueba, límites y créditos salen de packages/db/src/planes.ts;
@@ -99,7 +99,7 @@ export default async function Precios() {
           antes={`US$${PRECIOS_USD.pro}`}
           unidad={P.alMes}
           texto={P.proTexto}
-          incluye={[...P.proIncluye, P.limites(LIMITES.pro.preguntas, LIMITES.pro.creditos)]}
+          incluye={[...P.proIncluye({ ...PAQUETE_MENSUAL, preguntas: LIMITES.pro.preguntas }), P.limites(LIMITES.pro.creditos)]}
           nota={P.proNota(CUPOS_FOUNDER, PRECIOS_USD.pro)}
           cta={
             <Link href="/nuevo?plan=1" className="btn btn-primario btn-ancho whitespace-normal text-center">
