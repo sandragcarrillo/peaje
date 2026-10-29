@@ -55,7 +55,7 @@ import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatc
 // ---- radar ----
 import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
-import type { AgentJob, AgentMessageLink, NewAgentJob, VoiceProfile } from './types'
+import type { AgentJob, AgentMessageLink, HerramientaUsada, NewAgentJob, VoiceProfile } from './types'
 // ---- Slack ----
 import type { SlackCode, SlackInstall, SlackLink } from './types'
 // ---- reportes programados ----
@@ -106,6 +106,8 @@ function tenantFrom(row: Row): Tenant {
     custodialWalletIdLegacy: row.custodial_wallet_id_legacy ?? null,
     // ---- origen: `??` hasta que corra la migración 20261026300000 ----
     acquisitionSource: row.acquisition_source ?? null,
+    // `??` hasta que corra la migración 20261028000000.
+    herramientas: (row.herramientas ?? {}) as Record<string, HerramientaUsada>,
     createdAt: row.created_at,
   }
 }
@@ -565,6 +567,11 @@ export class SupabaseStore implements Store {
   async setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void> {
     const { error } = await this.#db.from('tenants').update({ api_key_hash: hash, api_key_prefix: prefix }).eq('id', tenantId)
     this.#fail('setTenantApiKey', error)
+  }
+
+  async setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void> {
+    const { error } = await this.#db.from('tenants').update({ herramientas }).eq('id', tenantId)
+    this.#fail('setTenantHerramientas', error)
   }
 
   async upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }> {

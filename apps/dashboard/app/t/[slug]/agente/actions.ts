@@ -1,6 +1,6 @@
 'use server'
 
-import { apiKeyPrefix, generateApiKey, hashApiKey } from '@peaje/shared'
+import { apiKeyPrefix, claveAgente, hashApiKey } from '@peaje/shared'
 import { revalidatePath } from 'next/cache'
 import { desconectarTelegram, enlaceTelegram, agregarPreguntas, buscarTareas, completarTarea, enviarAlAgente, medirCitacion, quitarPregunta } from '@/lib/gateway'
 import { avisarIndexNow } from '@/lib/indexnow'
@@ -11,10 +11,11 @@ import { store } from '@/lib/store'
 /** Crea (o rota) la clave del agente. Se devuelve una sola vez; en la base queda el hash. */
 export async function crearClaveAgente(slug: string): Promise<string> {
   const tenant = await requireTenant(slug)
-  const clave = generateApiKey()
+  // Derivada (no al azar): Integraciones la puede volver a mostrar, tapada, como el secreto del origen.
+  const clave = await claveAgente(tenant.embedSecret)
   await store.setTenantApiKey(tenant.id, await hashApiKey(clave), apiKeyPrefix(clave))
-  // La clave se muestra en Conexiones desde el 28 oct 2026.
-  revalidatePath(`/t/${slug}/conexiones`)
+  // La clave se muestra en Integraciones.
+  revalidatePath(`/t/${slug}/integraciones`)
   return clave
 }
 
@@ -78,12 +79,6 @@ export async function resolverAccion(slug: string, messageId: string, actionId: 
   revalidatePath(`/t/${slug}/agente`)
   revalidatePath(`/t/${slug}/rutas`)
   return acciones
-}
-
-export async function empezarDeNuevo(slug: string) {
-  const tenant = await requireTenant(slug)
-  await store.clearMessages(tenant.id)
-  revalidatePath(`/t/${slug}/agente`)
 }
 
 export async function agregarPregunta(slug: string, texto: string) {

@@ -3,7 +3,7 @@
  *   peaje tasks                lista las abiertas
  *   peaje task <id>            el prompt completo, para ejecutarlo en este repo
  *   peaje done <id> [--url u]  la marca hecha; Peaje la verifica en el sitio en vivo
- * Autenticación: la clave del agente (dashboard, "Connections"), en --key o PEAJE_AGENT_KEY.
+ * Autenticación: la clave del agente (dashboard, "Integrations"), en --key o PEAJE_AGENT_KEY.
  */
 import { ErrorCli } from './tipos'
 
@@ -13,7 +13,7 @@ export type TareaCompleta = TareaResumen & { prompt: string; acceptance: unknown
 export function claveDe(flag: string | undefined): string {
   const clave = flag ?? process.env.PEAJE_AGENT_KEY
   if (!clave) {
-    throw new ErrorCli('Missing the agent key. Create it in the Peaje dashboard ("Connections") and pass --key <key> or set PEAJE_AGENT_KEY.')
+    throw new ErrorCli('Missing the agent key. Create it in the Peaje dashboard ("Integrations") and pass --key <key> or set PEAJE_AGENT_KEY.')
   }
   return clave
 }
@@ -30,7 +30,7 @@ async function llamar<T>(gateway: string, clave: string, path: string, init?: Re
     throw new ErrorCli(`Could not reach the Peaje gateway at ${gateway}: ${error instanceof Error ? error.message : String(error)}`)
   }
   const data = (await res.json().catch(() => ({}))) as T & { error?: string }
-  if (res.status === 401) throw new ErrorCli('The agent key was rejected. Create a new one in the Peaje dashboard ("Connections").')
+  if (res.status === 401) throw new ErrorCli('The agent key was rejected. Create a new one in the Peaje dashboard ("Integrations").')
   if (!res.ok) throw new ErrorCli(data.error ?? `Gateway answered ${res.status}`)
   return data
 }

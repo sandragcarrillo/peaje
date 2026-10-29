@@ -372,14 +372,15 @@ function Enlace({ etiqueta, url }: { etiqueta: string; url: string }) {
 export type SeccionPro = 'chat' | 'telegram' | 'slack' | 'citacion' | 'comprador' | 'plan'
 
 /** Lo que ven las secciones Pro sin Pro: qué hay ahí y cómo se activa, con el botón al plan. */
-export function Bloqueado({ que }: { que: SeccionPro }) {
+/** `plan`: fuera de Mi agente (Integraciones, el chat), la dirección de Tu suscripción en Mi agente. */
+export function Bloqueado({ que, plan }: { que: SeccionPro; plan?: string }) {
   const { miAgente: t } = useDict()
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-border p-4">
       <p className="max-w-xl text-sm text-muted">
-        {t.bloqueadoQue[que]} {t.bloqueado}
+        {t.bloqueadoQue[que]} {plan ? t.bloqueadoFuera : t.bloqueado}
       </p>
-      <a href="#plan" className="btn btn-primario">
+      <a href={plan ?? '#plan'} className="btn btn-primario">
         {t.bloqueadoCta}
       </a>
     </div>

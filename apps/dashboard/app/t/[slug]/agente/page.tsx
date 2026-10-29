@@ -1,5 +1,5 @@
 import type { AgentTask } from '@peaje/db'
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { COBROS_VISIBLES } from '@/lib/config'
 import { PageHeader, SectionBar } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
@@ -7,7 +7,6 @@ import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Buscar, ListaTareas } from './partes'
 import { Plan } from './plan'
-import { Chat } from './chat'
 import { leerCitacion, leerPlan } from '@/lib/gateway'
 import { CitacionPanel } from './citacion'
 // ---- M7 ----
@@ -27,12 +26,13 @@ import { leer } from '@/app/radar/datos'
  */
 export default async function MiAgente({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ m?: string }> }) {
   const [{ slug }, { m: primerMensaje }] = await Promise.all([params, searchParams])
+  // Enlaces viejos con ?m= (mandaban al chat de esta página): el chat ahora tiene la suya.
+  if (typeof primerMensaje === 'string') redirect(`/t/${slug}/chat?m=${encodeURIComponent(primerMensaje)}`)
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const t = d.miAgente
-  const [tareas, plan, mensajes] = await Promise.all([
+  const [tareas, plan] = await Promise.all([
     store.listTasks(tenant.id).catch((): AgentTask[] => []),
     leerPlan(tenant.slug).catch(() => null),
-    store.listMessages(tenant.id, 50).catch(() => []),
   ])
   const citacion = await leerCitacion(tenant.slug).catch(() => null)
   // ---- M6: resultado a 2 y 6 semanas de cada tarea verificada ----
@@ -61,18 +61,7 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
       </section>
 
-      <section id="chat" className="scroll-mt-28 space-y-3">
-        <SectionBar label={t.chatTitulo} />
-        {pro ? <Chat slug={tenant.slug} inicial={mensajes} primerMensaje={typeof primerMensaje === 'string' ? primerMensaje.slice(0, 500) : null} /> : <Bloqueado que="chat" />}
-      </section>
 
-      {/* Telegram, Slack y la herramienta del dueño viven en Conexiones. */}
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-border px-4 py-3 text-sm text-muted">
-        {t.conexionesAviso}
-        <Link href={`/t/${tenant.slug}/conexiones`} className="font-mono text-xs text-text underline underline-offset-4">
-          {t.conexionesIr} →
-        </Link>
-      </p>
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />

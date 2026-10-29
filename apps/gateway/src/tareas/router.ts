@@ -7,6 +7,7 @@ import type { HttpBindings } from '@hono/node-server'
 import { env } from '../env.js'
 import { store } from '../store.js'
 import { generarTareas } from './generar.js'
+import { anotarHerramienta, clienteMcp } from './herramientas.js'
 import { handleOwnerMcp } from './mcp.js'
 import { completarTarea } from './verificar.js'
 import { generarPlan, planConAvance } from './plan.js'
@@ -54,7 +55,7 @@ export async function tenantDeClave(authorization: string | undefined): Promise<
 
 tareasRouter.use('/_owner/*', async (c, next) => {
   const tenant = await tenantDeClave(c.req.header('authorization'))
-  if (!tenant) return c.json({ error: 'Missing or invalid agent key. Create one in the Peaje dashboard, Connections page.' }, 401)
+  if (!tenant) return c.json({ error: 'Missing or invalid agent key. Create one in the Peaje dashboard, Integrations page.' }, 401)
   c.set('tenant', tenant)
   await next()
 })
@@ -119,6 +120,9 @@ tareasRouter.post('/_owner/tasks/:id/dismiss', async (c) => {
 
 tareasRouter.post('/_owner/mcp', async (c) => {
   const body = await c.req.json().catch(() => undefined)
+  // Integraciones muestra en Activas qué herramienta se conectó.
+  const cliente = clienteMcp(body)
+  if (cliente) void anotarHerramienta(c.get('tenant'), cliente)
   await handleOwnerMcp(c.get('tenant'), c.env.incoming, c.env.outgoing, body)
   return RESPONSE_ALREADY_SENT
 })

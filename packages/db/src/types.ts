@@ -75,8 +75,17 @@ export type Tenant = {
    * referrer. Null: sin origen o antes de la migración 20261026300000.
    */
   acquisitionSource: string | null
+  /**
+   * Herramientas que se conectaron al MCP del dueño, por marca (claude, cursor,
+   * codex…). Integraciones muestra en Activas las que usaron la clave vigente.
+   * Vacío hasta la migración 20261028000000.
+   */
+  herramientas?: Record<string, HerramientaUsada>
   createdAt: string
 }
+
+/** Una herramienta que se conectó al MCP: el nombre con que se presentó, cuándo y con qué clave. */
+export type HerramientaUsada = { nombre: string; at: string; prefijo: string | null }
 
 // ---- voz de marca ----
 /** Perfil compacto de la voz del negocio. Las frases de muestra son citas literales del sitio. */
@@ -713,7 +722,8 @@ export type NewVisit = {
 /**
  * Quién hizo una visita sin tipo propio. `agente`: un bot o agente con
  * nombre. `script`: una herramienta o código (curl, node). `navegador`: lo
- * más probable, una persona. `sin-ua`: no mandó user-agent. `desconocido`:
+ * más probable, una persona. `sin-ua`: no dice quién es (sin user-agent, o un
+ * "Mozilla/5.0" sin navegador ni bot). `desconocido`:
  * ninguno de los anteriores, con el primer nombre de su user-agent.
  */
 export type QuienVisita =
@@ -729,6 +739,11 @@ export type VisitStats = {
    * (ver `quienEs`): agentes y bots con nombre, y lo que no se puede atribuir.
    */
   otros: (QuienVisita & { visits: number })[]
+  /**
+   * Visitas desde un navegador sin nombre de bot: personas, o agentes que
+   * navegan como una. No entran en ningún otro número de visitas.
+   */
+  navegadores: number
   topPaths: { path: string; visits: number; served402: number; attempted: number; paid: number; revenue: string }[]
   daily: { date: string; visits: number; paid: number }[]
   /**
@@ -847,6 +862,8 @@ export interface Store {
   updateTenantEntity(tenantId: string, patch: TenantEntityUpdate): Promise<void>
   /** La clave con la que el coding agent del dueño entra al MCP y al CLI. Solo el hash. */
   setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void>
+  /** Reemplaza el registro de herramientas conectadas (ver Tenant.herramientas). */
+  setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void>
   /** Crea la tarea, o actualiza su contenido si sigue abierta. Nunca reabre una descartada o verificada. */
   upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }>
   listTasks(tenantId: string, opts?: { statuses?: TaskStatus[] }): Promise<AgentTask[]>

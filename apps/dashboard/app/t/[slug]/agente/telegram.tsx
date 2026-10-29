@@ -44,7 +44,8 @@ export function TelegramPanel({ slug, estado, reportes }: { slug: string; estado
     document.addEventListener('visibilitychange', alVolver)
     return () => document.removeEventListener('visibilitychange', alVolver)
   }, [router])
-  if (!estado) return null
+  // Sin respuesta del gateway: avisar en vez de dejar el panel en blanco.
+  if (!estado) return <p className="border border-border p-4 text-sm text-muted">{t.tgSinEstado}</p>
 
   const correr = (fn: () => Promise<void>) =>
     start(async () => {

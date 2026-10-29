@@ -39,7 +39,7 @@ const idiomaDe = (codigo?: string): 'es' | 'en' => (codigo?.toLowerCase().starts
 
 const T = {
   es: {
-    sinLigar: 'Hola. Soy el agente de Peaje. Para conectarme a tu negocio, abre "Conexiones" en el dashboard de Peaje y toca "Abrir Telegram y conectar".',
+    sinLigar: 'Hola. Soy el agente de Peaje. Para conectarme a tu negocio, abre "Integraciones" en el dashboard de Peaje y toca "Abrir Telegram y conectar".',
     codigoMalo: 'Ese enlace ya se usó o venció. Genera uno nuevo en "Mi agente" → "Conectar Telegram".',
     ligado: (n: string) => `Listo, estoy conectado a ${n}. Escríbeme lo que quieras sobre tu negocio, o toca una opción.`,
     desligado: 'Listo, desconecté este chat. Puedes volver a conectarlo desde el dashboard cuando quieras.',
@@ -60,7 +60,7 @@ const T = {
     leiSoloTexto: 'Todavía no puedo ver imágenes ni archivos, así que solo leí tu texto.',
   },
   en: {
-    sinLigar: 'Hi. I am the Peaje agent. To connect me to your business, open "Connections" in the Peaje dashboard and tap "Open Telegram and connect".',
+    sinLigar: 'Hi. I am the Peaje agent. To connect me to your business, open "Integrations" in the Peaje dashboard and tap "Open Telegram and connect".',
     codigoMalo: 'That link was already used or expired. Get a new one in "My agent" → "Connect Telegram".',
     ligado: (n: string) => `Done, I am connected to ${n}. Ask me anything about your business, or tap an option.`,
     desligado: 'Done, this chat is disconnected. You can connect it again from the dashboard anytime.',

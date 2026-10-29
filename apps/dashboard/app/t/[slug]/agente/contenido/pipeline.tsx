@@ -21,7 +21,7 @@ function useFecha() {
   return (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale === 'es' ? 'es' : 'en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '')
 }
 
-const chatCon = (slug: string, mensaje: string) => `/t/${slug}/agente?m=${encodeURIComponent(mensaje)}#chat`
+const chatCon = (slug: string, mensaje: string) => `/t/${slug}/chat?m=${encodeURIComponent(mensaje)}`
 
 const enlace = 'underline decoration-border underline-offset-2 hover:decoration-text'
 

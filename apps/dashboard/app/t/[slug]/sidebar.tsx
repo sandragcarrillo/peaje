@@ -49,7 +49,7 @@ export function Sidebar({
     { href: '/agente', label: d.panel.navAgente },
     // El pipeline de páginas del agente. Sin Pro la página muestra el candado; acá se avisa.
     { href: '/agente/contenido', label: d.contenido.nav, valor: pro ? undefined : 'Pro', sub: true },
-    { href: '/conexiones', label: d.panel.navConexiones, sub: true },
+    { href: '/integraciones', label: d.panel.navIntegraciones, valor: pro ? undefined : 'Pro', sub: true },
     { href: '/agentes-visitas', label: d.panel.navVisitas },
   ]
   const cobros: Item[] = [
@@ -63,6 +63,7 @@ export function Sidebar({
     grupos: [{ items: conRuta(principal) }, ...(COBROS_VISIBLES ? [{ titulo: d.panel.sidebarCobros, items: conRuta(cobros) }] : [])],
     boton: { href: pro ? `${base}/kit` : `${base}/agente#plan`, label: pro ? d.panel.sidebarVerMejoras : d.panel.sidebarActivarAgente },
     portal: { href: portalUrl, label: d.panel.navPortal },
+    chat: { href: `${base}/chat`, label: d.miAgente.chatTitulo },
   })
 
   const lista = (items: Item[]) =>
@@ -112,6 +113,20 @@ export function Sidebar({
         </div>
 
         <nav className="space-y-1 font-mono text-xs">{lista(principal)}</nav>
+
+        {/* El chat va aparte, como el punto de entrada principal: tiene su propia página. */}
+        <Link
+          href={`${base}/chat`}
+          aria-current={pathname === `${base}/chat` ? 'page' : undefined}
+          className={`flex items-center gap-3 rounded-lg border p-2.5 text-sm transition-colors ${
+            pathname === `${base}/chat` ? 'border-accent bg-panel-2 font-bold' : 'border-border bg-bg hover:border-accent'
+          }`}
+        >
+          <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-2 font-mono text-base leading-none">
+            +
+          </span>
+          {d.miAgente.chatTitulo}
+        </Link>
 
         {COBROS_VISIBLES ? (
           <div className="space-y-1 font-mono text-xs">

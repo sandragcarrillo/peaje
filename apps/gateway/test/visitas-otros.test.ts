@@ -37,6 +37,7 @@ test('cada user-agent cae donde corresponde', () => {
   })
   assert.deepEqual(quienEs(''), { tipo: 'sin-ua', nombre: null })
   assert.deepEqual(quienEs(null), { tipo: 'sin-ua', nombre: null })
+  assert.deepEqual(quienEs('Mozilla/5.0 (compatible)'), { tipo: 'sin-ua', nombre: null })
   assert.deepEqual(quienEs('Algo/2.0'), { tipo: 'desconocido', nombre: 'Algo' })
 })
 
@@ -48,6 +49,8 @@ test('el panel recibe "otros" agrupado por quién, de mayor a menor', async () =
   visita('curl/8.7.1', '/llms.txt')
   visita('curl/8.14.1', '/mcp')
   visita(null)
+  // Un navegador sin nombre de bot no es una visita de agente: va aparte.
+  visita('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36')
   // Nuestras herramientas y Ora no se registran.
   visita('PeajeRadar/1.0 (+https://usepeaje.com/radar)')
   visita('peaje-monitor/1.0')
@@ -62,6 +65,8 @@ test('el panel recibe "otros" agrupado por quién, de mayor a menor', async () =
     { tipo: 'sin-ua', nombre: null, visits: 1 },
   ])
   assert.equal(s.byKind.find((k) => k.kind === 'other')?.visits, 6)
+  assert.equal(s.navegadores, 1)
+  assert.equal(s.totals.visits, 7, 'el navegador no suma al total')
 })
 
 test('lo guardado antes del filtro (kit, Ora, nuestras herramientas) tampoco se cuenta al leer', async () => {

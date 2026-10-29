@@ -14,6 +14,7 @@ export type SeccionesMovil = {
   grupos: { titulo?: string; items: { href: string; label: string; valor?: string; acento?: boolean; sub?: boolean }[] }[]
   boton: { href: string; label: string }
   portal: { href: string; label: string }
+  chat: { href: string; label: string }
 }
 
 const SeccionesCtx = createContext<{ secciones: SeccionesMovil | null; publicar: (s: SeccionesMovil | null) => void }>({
@@ -95,6 +96,10 @@ export function MenuMovil({ cuenta, className = '' }: { cuenta?: { email: string
             {secciones ? (
               <div className="etiqueta mb-1 border-b border-border pb-3">
                 <p className="truncate px-3 pt-2 pb-1 font-bold">{secciones.nombre}</p>
+                <Link href={secciones.chat.href} onClick={cerrar} className="mx-1 my-1 flex items-center gap-3 rounded-lg border border-border bg-bg p-2.5 text-text">
+                  <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-2 text-base leading-none">+</span>
+                  {secciones.chat.label}
+                </Link>
                 {secciones.grupos.map((g, i) => (
                   <nav key={g.titulo ?? i} className={i > 0 ? 'mt-1 border-t border-border pt-1' : ''}>
                     {g.titulo ? <p className="px-3 pt-2 pb-1 text-faint">{g.titulo}</p> : null}

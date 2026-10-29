@@ -143,6 +143,7 @@ export default async function VisitasPage({
                   </li>
                 ) : null}
               </ul>
+              {stats.navegadores > 0 ? <p className="text-xs text-faint">{t.navegadoresNota(stats.navegadores)}</p> : null}
             </div>
 
             <div className="flex flex-col gap-3">

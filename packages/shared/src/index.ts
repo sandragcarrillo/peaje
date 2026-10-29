@@ -414,6 +414,26 @@ export function generateApiKey(): string {
   return `${KEY_PREFIX}${randomHex(24)}`
 }
 
+/**
+ * Clave del agente que el panel puede volver a mostrar, como el
+ * PEAJE_ORIGIN_SECRET: se deriva del embedSecret del negocio y de una sal de 6
+ * hex que viaja en el prefijo visible (`peaje_live_<sal>…`, ver apiKeyPrefix).
+ * Mismo largo y formato que generateApiKey; en la DB sigue yendo solo el hash.
+ * Quien lea el embedSecret puede derivarla, igual que el secreto del origen.
+ */
+export async function claveAgente(embedSecret: string, sal: string = randomHex(3)): Promise<string> {
+  const clave = await crypto.subtle.importKey('raw', new TextEncoder().encode(embedSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const firma = await crypto.subtle.sign('HMAC', clave, new TextEncoder().encode(`peaje-agent-key-v1:${sal}`))
+  return `${KEY_PREFIX}${sal}${toHex(new Uint8Array(firma)).slice(0, 42)}`
+}
+
+/** La sal de una clave derivada, sacada de su prefijo visible. null si no tiene el formato. */
+export function salDeClave(prefijo: string | null | undefined): string | null {
+  if (!prefijo?.startsWith(KEY_PREFIX)) return null
+  const sal = prefijo.slice(KEY_PREFIX.length, KEY_PREFIX.length + 6)
+  return /^[0-9a-f]{6}$/.test(sal) ? sal : null
+}
+
 /** Secreto para firmar los JWT del iframe. Distinto del API key. */
 export function generateEmbedSecret(): string {
   return randomHex(32)

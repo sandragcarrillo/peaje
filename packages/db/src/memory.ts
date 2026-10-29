@@ -49,7 +49,7 @@ import { DIAS_PRUEBA } from './planes'
 // ---- radar ----
 import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
-import type { AgentJob, NewAgentJob, VoiceProfile } from './types'
+import type { AgentJob, HerramientaUsada, NewAgentJob, VoiceProfile } from './types'
 // ---- Slack ----
 import type { SlackCode, SlackInstall, SlackLink } from './types'
 // ---- reportes programados ----
@@ -240,6 +240,11 @@ export class MemoryStore implements Store {
     for (const [h, id] of this.#hashes) if (id === tenantId) this.#hashes.delete(h)
     this.#hashes.set(hash, tenantId)
     t.apiKeyPrefix = prefix
+  }
+
+  async setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void> {
+    const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
+    if (t) t.herramientas = herramientas
   }
 
   #tasks: AgentTask[] = []

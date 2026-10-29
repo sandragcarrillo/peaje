@@ -150,7 +150,7 @@ function Pasos({ destino, activo }: { destino: DestinoAgente; activo: boolean })
   const telegram = useConectarTelegram(destino.slug)
   const agente = `/t/${destino.slug}/agente`
   const radar = destino.dominio ? `/radar?d=${encodeURIComponent(destino.dominio)}` : '/radar'
-  const plan = `${agente}?m=${encodeURIComponent(t.pasoPlan.mensaje)}#chat`
+  const plan = `/t/${destino.slug}/chat?m=${encodeURIComponent(t.pasoPlan.mensaje)}`
 
   const pasos = [
     {

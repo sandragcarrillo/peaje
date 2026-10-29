@@ -4,11 +4,17 @@ import type { AgentAction, AgentMessage, AgentMessageLink } from '@peaje/db'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { useDict } from '@/lib/i18n/client'
-import { empezarDeNuevo, resolverAccion } from './actions'
+import { LogoMark } from '@/app/components/logo'
+import { useDict, useLocale } from '@/lib/i18n/client'
+import { resolverAccion } from './actions'
 import { novedadesChat } from './chat-novedades'
 
-/** Chat con el agente Pro del negocio. El historial vive en la base (lo comparte Telegram). */
+/**
+ * Chat con el agente Pro del negocio, en su propia página (/t/[slug]/chat).
+ * El historial vive en la base (lo comparte Telegram). Sin mensajes, la
+ * portada: la pregunta grande, el campo y sugerencias para empezar. Con
+ * mensajes, la conversación ocupa la página y el campo queda abajo.
+ */
 export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; inicial: AgentMessage[]; primerMensaje?: string | null }) {
   const { miAgente: t, agenteReportes: r } = useDict()
   const [mensajes, setMensajes] = useState(inicial)
@@ -18,13 +24,35 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
   const [estado, setEstado] = useState<string | null>(null)
   const router = useRouter()
   const caja = useRef<HTMLDivElement>(null)
+  // Si la persona subió a leer, una respuesta nueva no la baja de golpe: aparece el aviso.
+  const [abajo, setAbajo] = useState(true)
+  const [hayNueva, setHayNueva] = useState(false)
 
-  // Baja solo la caja de mensajes: scrollIntoView también movía la página y
-  // al abrir Mi agente la dejaba en medio, sobre el chat.
-  useEffect(() => {
+  const bajar = () => {
     const c = caja.current
     if (c) c.scrollTop = c.scrollHeight
+    setHayNueva(false)
+  }
+  useEffect(() => {
+    if (abajo) bajar()
+    else setHayNueva(true)
+    // Solo cuando cambia la cantidad de mensajes o el estado de espera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mensajes.length, pending])
+  // El contenido crece después de pintar (las horas aparecen al montar, las
+  // tarjetas cargan): si estaba abajo, sigue abajo.
+  const contenido = useRef<HTMLDivElement>(null)
+  const abajoRef = useRef(abajo)
+  abajoRef.current = abajo
+  useEffect(() => {
+    const el = contenido.current
+    if (!el) return
+    const observador = new ResizeObserver(() => {
+      if (abajoRef.current && caja.current) caja.current.scrollTop = caja.current.scrollHeight
+    })
+    observador.observe(el)
+    return () => observador.disconnect()
+  }, [mensajes.length === 0])
 
   // Trabajos en segundo plano (una página, una serie): mientras haya alguno,
   // se consulta cada 8 s y el aviso de "lista" entra al chat con su tarjeta.
@@ -63,6 +91,7 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
     if (!limpio || pending) return
     setError(null)
     setTexto('')
+    setAbajo(true)
     const provisional: AgentMessage = { id: `tmp-${Date.now()}`, tenantId: '', role: 'user', text: limpio, actions: [], options: [], links: [], channel: 'dashboard', createdAt: new Date().toISOString() }
     setMensajes((m) => [...m, provisional])
     start(async () => {
@@ -72,7 +101,7 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
         setMensajes((m) => [...m, respuesta])
         // Pudo dejar un trabajo en segundo plano: se vuelve a mirar.
         setVuelta(0)
-        // El agente pudo armar el plan, crear tareas o lanzar la medición: se vuelve a leer lo de abajo.
+        // El agente pudo armar el plan, crear tareas o lanzar la medición: se vuelve a leer el resto del panel.
         router.refresh()
       } catch (e) {
         const msj = e instanceof Error ? e.message : String(e)
@@ -97,84 +126,166 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return (
-    <div className="border border-border">
-      {/* En el celular, media pantalla: así el campo de texto queda a la vista junto a los mensajes. */}
-      <div ref={caja} className="max-h-[50dvh] min-h-40 space-y-4 overflow-y-auto p-4 sm:max-h-[520px]">
-        {mensajes.length === 0 ? <p className="text-sm text-muted">{t.chatVacio}</p> : null}
-        {mensajes.map((m) => (
-          <Mensaje key={m.id} slug={slug} mensaje={m} />
-        ))}
-        {(() => {
-          const ultimo = mensajes[mensajes.length - 1]
-          if (!ultimo || ultimo.role !== 'assistant' || !ultimo.options?.length || pending) return null
-          return (
-            <div className="flex flex-wrap gap-2">
-              {ultimo.options.map((o) => (
-                <button key={o} onClick={() => enviar(o)} className="btn btn-secundario btn-chico whitespace-normal">
-                  {o}
-                </button>
-              ))}
-            </div>
-          )
-        })()}
-        {pending ? <p className="font-mono text-xs text-muted">{estado ?? t.pensando}</p> : null}
-        {!pending && trabajando ? <p className="font-mono text-xs text-muted">{r.chatTrabajando}</p> : null}
-      </div>
-      <div className="flex flex-wrap gap-2 border-t border-border px-4 pt-3">
-        {t.sugerencias.map((s) => (
-          <button key={s} disabled={pending} onClick={() => enviar(s)} className="btn btn-secundario btn-chico whitespace-normal text-muted hover:text-text">
-            {s}
-          </button>
-        ))}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          enviar(texto)
-        }}
-        className="flex gap-2 p-4"
-      >
-        <input
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder={t.chatPlaceholder}
-          maxLength={4000}
-          // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
-          className="min-w-0 flex-1 border border-border bg-bg px-3 py-2 text-base outline-none focus:border-text sm:text-sm"
-        />
-        <button disabled={pending || !texto.trim()} className="btn btn-primario">
-          {t.enviar}
-        </button>
-      </form>
-      {mensajes.length > 0 ? (
-        <div className="px-4 pb-3">
-          <button
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                await empezarDeNuevo(slug)
-                setMensajes([])
-              })
-            }
-            className="btn btn-secundario btn-chico"
-          >
-            {t.reiniciar}
-          </button>
+  const campo = <Campo texto={texto} setTexto={setTexto} enviar={enviar} pending={pending} grande={mensajes.length === 0} />
+
+  // Portada: todavía no hay conversación.
+  if (mensajes.length === 0) {
+    return (
+      <div className="flex min-h-[calc(100dvh-14rem)] flex-col items-center justify-center gap-8 py-6">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <LogoMark className="h-12 w-12 text-accent" />
+          <h1 className="text-2xl font-semibold sm:text-3xl">{t.chatHeroTitulo}</h1>
+          <p className="max-w-md text-sm text-muted">{t.chatHeroSub}</p>
         </div>
-      ) : null}
-      {error ? <p className="px-4 pb-3 text-sm text-red-600">{error}</p> : null}
+        <div className="w-full max-w-2xl">
+          {campo}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {t.chatAtajos.map((a) => (
+              <button key={a.label} disabled={pending} onClick={() => enviar(a.texto)} className="btn btn-secundario btn-chico gap-2 rounded-full">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex w-full max-w-2xl flex-col items-center gap-3">
+          <p className="font-mono text-[11px] tracking-[0.02em] text-faint">{t.chatEmpezarCon}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {t.sugerencias.map((x) => (
+              <button key={x} disabled={pending} onClick={() => enviar(x)} className="btn btn-secundario btn-chico gap-2 whitespace-normal text-muted hover:text-text">
+                <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
+                {x}
+              </button>
+            ))}
+          </div>
+        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </div>
+    )
+  }
+
+  const ultimo = mensajes[mensajes.length - 1]
+  return (
+    <div className="mx-auto flex h-[calc(100dvh-12rem)] min-h-[24rem] w-full max-w-3xl flex-col">
+      {/* Sin "empezar de nuevo": el historial es uno solo (panel, Telegram, Slack, MCP) y el agente lee solo los últimos 20 mensajes. */}
+      <div className="border-b border-border pb-3">
+        <h1 className="text-lg font-semibold">{t.chatTitulo}</h1>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={caja}
+          onScroll={(e) => {
+            const c = e.currentTarget
+            const enElFondo = c.scrollHeight - c.scrollTop - c.clientHeight < 40
+            setAbajo(enElFondo)
+            if (enElFondo) setHayNueva(false)
+          }}
+          className="scroll-thin h-full overflow-y-auto py-5 pr-1"
+        >
+          <div ref={contenido} className="space-y-6">
+            {mensajes.map((m) => (
+              <Mensaje key={m.id} slug={slug} mensaje={m} />
+            ))}
+            {ultimo && ultimo.role === 'assistant' && ultimo.options?.length && !pending ? (
+              <div className="flex flex-wrap gap-2 pl-7">
+                {ultimo.options.map((o) => (
+                  <button key={o} onClick={() => enviar(o)} className="btn btn-secundario btn-chico whitespace-normal">
+                    {o}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {pending ? <p className="pl-7 font-mono text-xs text-muted">{estado ?? t.pensando}</p> : null}
+            {!pending && trabajando ? <p className="pl-7 font-mono text-xs text-muted">{r.chatTrabajando}</p> : null}
+          </div>
+        </div>
+        {hayNueva ? (
+          <button onClick={bajar} className="btn btn-secundario btn-chico absolute bottom-3 left-1/2 -translate-x-1/2 gap-2 rounded-full bg-panel shadow-lg">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+            {t.chatNuevaRespuesta} ↓
+          </button>
+        ) : null}
+      </div>
+
+      {campo}
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
     </div>
   )
+}
+
+/**
+ * El campo para escribirle al agente: Enter envía, Shift + Enter hace una
+ * línea nueva. Una línea de acento arriba lo marca como lo principal de la página.
+ */
+function Campo({ texto, setTexto, enviar, pending, grande }: { texto: string; setTexto: (v: string) => void; enviar: (v: string) => void; pending: boolean; grande: boolean }) {
+  const { miAgente: t } = useDict()
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        enviar(texto)
+      }}
+      className="relative rounded-xl border border-border bg-panel shadow-lg shadow-black/10"
+    >
+      <span aria-hidden className="absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-accent to-transparent" />
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            enviar(texto)
+          }
+        }}
+        placeholder={t.chatPlaceholder}
+        maxLength={4000}
+        rows={grande ? 3 : 2}
+        // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
+        className="block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-base outline-none placeholder:text-faint sm:text-sm"
+      />
+      <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
+        <span className="hidden font-mono text-[11px] text-faint sm:inline">{t.chatAyudaTeclas}</span>
+        <button disabled={pending || !texto.trim()} className="btn btn-primario btn-chico ml-auto">
+          {t.enviar}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** La hora del mensaje en la zona del navegador. Solo después de montar: el servidor no sabe la zona. */
+function Hora({ fecha }: { fecha: string }) {
+  const locale = useLocale()
+  const [hora, setHora] = useState<string | null>(null)
+  useEffect(() => {
+    setHora(new Date(fecha).toLocaleTimeString(locale === 'es' ? 'es-CO' : 'en-US', { hour: 'numeric', minute: '2-digit' }))
+  }, [fecha, locale])
+  return hora ? <span className="font-mono text-[11px] text-faint">{hora}</span> : null
 }
 
 function Mensaje({ slug, mensaje }: { slug: string; mensaje: AgentMessage }) {
   const [acciones, setAcciones] = useState<AgentAction[]>(mensaje.actions)
   const deUsuario = mensaje.role === 'user'
+  if (deUsuario) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <div className="max-w-[85%] break-words rounded-xl border border-border bg-panel-2 px-4 py-2.5 text-sm sm:max-w-[75%]">
+          <p className="whitespace-pre-wrap leading-relaxed">{mensaje.text}</p>
+        </div>
+        <Hora fecha={mensaje.createdAt} />
+      </div>
+    )
+  }
   return (
-    <div className={deUsuario ? 'flex justify-end' : ''}>
-      <div className={deUsuario ? 'max-w-[80%] break-words bg-panel-2 px-3 py-2 text-sm' : 'max-w-[92%] break-words text-sm'}>
-        {deUsuario ? <p className="whitespace-pre-wrap leading-relaxed">{mensaje.text}</p> : <Texto texto={mensaje.text} />}
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <LogoMark className="h-5 w-5 text-accent" />
+        <span className="font-mono text-xs font-bold text-accent">Peaje</span>
+        <Hora fecha={mensaje.createdAt} />
+      </div>
+      <div className="max-w-[92%] break-words pl-7 text-sm">
+        <Texto texto={mensaje.text} />
         {acciones.map((a) => (
           <Accion key={a.id} slug={slug} messageId={mensaje.id} accion={a} alCambiar={setAcciones} />
         ))}

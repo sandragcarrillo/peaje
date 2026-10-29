@@ -114,7 +114,7 @@ test('primer cobro founder en español: una bienvenida con asunto, link del agen
   assert.equal(e!.subject, 'Tu agente de Peaje ya está activo')
   assert.match(e!.html, /<html lang="es">/)
   assert.ok(e!.html.includes('href="https://usepeaje.com/t/panaderia-luz/agente"'), 'botón al agente')
-  assert.ok(e!.html.includes('https://usepeaje.com/t/panaderia-luz/conexiones#telegram'), 'paso de Telegram')
+  assert.ok(e!.html.includes('https://usepeaje.com/t/panaderia-luz/integraciones#telegram'), 'paso de Telegram')
   assert.ok(e!.html.includes('https://usepeaje.com/t/panaderia-luz/agente#plan'), 'gestionar suscripción')
   assert.ok(e!.html.includes('src="cid:peaje-logo"'), 'logo embebido')
   assert.equal(e!.attachments?.[0]?.content_id, 'peaje-logo', 'el logo va adjunto e inline')

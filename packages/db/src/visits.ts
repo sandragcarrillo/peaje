@@ -82,6 +82,8 @@ export function quienEs(ua: string | null | undefined): QuienVisita {
   const script = u.match(SCRIPTS)
   if (script?.[1]) return { tipo: 'script', nombre: script[1].toLowerCase() }
   if (/^Mozilla\/5\.0/.test(u) && /(Chrome|Safari|Firefox|Edg)\//.test(u)) return { tipo: 'navegador', nombre: null }
+  // "Mozilla/5.0" sin navegador ni bot: alguien que no dice quién es. "Mozilla" no es un nombre.
+  if (/^Mozilla\//.test(u)) return { tipo: 'sin-ua', nombre: null }
   return { tipo: 'desconocido', nombre: u.split(/[\s/;(]/)[0]?.slice(0, 40) || u.slice(0, 40) }
 }
 
@@ -100,6 +102,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
   const notFound = new Map<string, number>()
   const wallets = new Set<string>()
   const otros = new Map<string, { quien: QuienVisita; visits: number }>()
+  let navegadores = 0
   let visits = 0
   let paid = 0
   let revenue = 0
@@ -110,6 +113,13 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
     const t = new Date(r.at).getTime()
     if (t < since || t >= until) continue
     if (noEsVisita(r.path, r.userAgent)) continue
+    // Un navegador sin nombre de bot es, lo más probable, una persona (o un agente
+    // que navega como una): no se puede decir que sea un agente. Se cuenta aparte.
+    const quien = r.agentKind === 'other' ? quienEs(r.userAgent) : null
+    if (quien?.tipo === 'navegador') {
+      navegadores += 1
+      continue
+    }
     visits += 1
     const monto = r.paid && r.amount ? Number(r.amount) : 0
     if (r.paid) paid += 1
@@ -120,8 +130,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
     if (r.paid) k.paid += 1
     byKind.set(r.agentKind, k)
 
-    if (r.agentKind === 'other') {
-      const quien = quienEs(r.userAgent)
+    if (quien) {
       const clave = `${quien.tipo}:${quien.nombre ?? ''}`
       const o = otros.get(clave) ?? { quien, visits: 0 }
       o.visits += 1
@@ -167,6 +176,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
       .map(([kind, v]) => ({ kind, ...v }))
       .sort((a, b) => b.visits - a.visits),
     otros: [...otros.values()].map((o) => ({ ...o.quien, visits: o.visits })).sort((a, b) => b.visits - a.visits),
+    navegadores,
     topPaths: [...byPath.entries()]
       .map(([path, v]) => ({ path, visits: v.visits, served402: v.served402, attempted: v.attempted, paid: v.paid, revenue: v.revenue.toFixed(6) }))
       .sort((a, b) => b.visits - a.visits)

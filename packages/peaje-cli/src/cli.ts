@@ -36,7 +36,7 @@ Flags
   --yes, -y           apply without asking
   --json              one JSON object on stdout, nothing else
   --wait <seconds>    verify: retry every 15 s until it passes or time runs out
-  --key <key>         tasks: the agent key from the dashboard ("Connections"), or $PEAJE_AGENT_KEY
+  --key <key>         tasks: the agent key from the dashboard ("Integrations"), or $PEAJE_AGENT_KEY
   --url <url>         done: the live URL of what you built
   --status <s>        tasks: open,in_progress,done,verified,dismissed or all
   --help, -h
