@@ -14,10 +14,10 @@ import { TelegramPanel } from '../agente/telegram'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
 
-type Id = 'telegram' | 'slack' | 'claudeapp' | 'chatgpt' | 'claude' | 'cursor' | 'codex' | 'lovable' | 'otras'
-const HERRAMIENTAS: Id[] = ['claudeapp', 'chatgpt', 'claude', 'cursor', 'codex', 'lovable', 'otras']
+type Id = 'telegram' | 'slack' | 'claudeapp' | 'chatgpt' | 'grok' | 'claude' | 'cursor' | 'codex' | 'lovable' | 'otras'
+const HERRAMIENTAS: Id[] = ['claudeapp', 'chatgpt', 'grok', 'claude', 'cursor', 'codex', 'lovable', 'otras']
 /** Las que se conectan con inicio de sesión (OAuth): no muestran la clave. */
-const CON_SESION: Id[] = ['claudeapp', 'chatgpt']
+const CON_SESION: Id[] = ['claudeapp', 'chatgpt', 'grok']
 
 /** Cómo se llama cada marca que anota el gateway (apps/gateway/src/tareas/herramientas.ts). */
 const NOMBRES: Partial<Record<Marca, string>> = {
@@ -34,7 +34,7 @@ const NOMBRES: Partial<Record<Marca, string>> = {
 /**
  * Integraciones: arriba lo que ya está conectado, abajo una tarjeta por
  * integración con su logo. Tocar una abre su instalación debajo de la grilla.
- * Claude (la app) y ChatGPT entran con inicio de sesión; las demás, con la clave.
+ * Claude (la app), ChatGPT y Grok entran con inicio de sesión; las demás, con la clave.
  * La clave del agente vive acá arriba (en el estado) para que siga igual al
  * cambiar de herramienta. Sale tapada, con el ojito, como el secreto del origen.
  */
@@ -85,6 +85,7 @@ export function Integraciones({
     ...(slack?.configured ? [{ id: 'slack' as const, marca: 'slack' as const, nombre: 'Slack', texto: t.intSlack }] : []),
     { id: 'claudeapp', marca: 'claude', nombre: 'Claude', texto: t.intClaudeApp },
     { id: 'chatgpt', marca: 'chatgpt', nombre: 'ChatGPT', texto: t.intChatgpt },
+    { id: 'grok', marca: 'grok', nombre: 'Grok', texto: t.intGrok },
     { id: 'claude', marca: 'claude', nombre: 'Claude Code', texto: t.intClaude },
     { id: 'cursor', marca: 'cursor', nombre: 'Cursor', texto: t.intCursor },
     { id: 'codex', marca: 'codex', nombre: 'Codex', texto: t.intCodex },
@@ -217,12 +218,19 @@ function Herramienta({
   const terminal = `npx @peaje/cli@1 tasks${gateway.includes('localhost') ? ` --gateway ${gateway}` : ''}`
 
   if (CON_SESION.includes(id)) {
-    const chatgpt = id === 'chatgpt'
+    const { pasos, nota } = { claudeapp: { pasos: t.pasosClaudeApp, nota: t.notaClaudeApp }, chatgpt: { pasos: t.pasosChatgpt, nota: t.notaChatgpt }, grok: { pasos: t.pasosGrok, nota: t.notaGrok } }[id as 'claudeapp' | 'chatgpt' | 'grok']
     return (
       <div className="space-y-5">
         <p className="max-w-2xl text-sm text-muted">{t.sesionIntro}</p>
+        {id === 'grok' ? (
+          // Página de conectores de Grok según la doc de xAI (docs.x.ai/grok/connectors).
+          <a href="https://grok.com/connectors" target="_blank" rel="noopener noreferrer" className="btn btn-secundario btn-chico">
+            <Logo marca="grok" className="h-4 w-4" />
+            {t.abrirGrok}
+          </a>
+        ) : null}
         <ol className="list-decimal space-y-1 pl-5 text-sm">
-          {(chatgpt ? t.pasosChatgpt : t.pasosClaudeApp).map((p) => (
+          {pasos.map((p) => (
             <li key={p}>{p}</li>
           ))}
         </ol>
@@ -232,7 +240,7 @@ function Herramienta({
             <Copiable texto={mcpUrl} />
           </div>
         </div>
-        <p className="text-xs text-muted">{chatgpt ? t.notaChatgpt : t.notaClaudeApp}</p>
+        <p className="text-xs text-muted">{nota}</p>
         <Ejemplos pro={pro} />
       </div>
     )

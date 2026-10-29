@@ -2,7 +2,7 @@
  * Qué herramienta se conectó al MCP del dueño, por el nombre con que se
  * presenta: clientInfo.name en el `initialize` (Claude Code manda
  * "claude-code", Codex "codex-mcp-client", Cursor "cursor-…") o client_name en
- * el registro OAuth ("Claude", "ChatGPT"). Se reconoce por pedazos del nombre
+ * el registro OAuth ("Claude", "ChatGPT", "Grok"). Se reconoce por pedazos del nombre
  * para no depender de la versión exacta.
  *
  * El orden importa: Cursor va antes que Copilot porque su nombre también trae
@@ -15,6 +15,7 @@ const MARCAS: [marca: string, pedazos: string[]][] = [
   ['cursor', ['cursor']],
   ['codex', ['codex']],
   ['chatgpt', ['chatgpt', 'openai']],
+  ['grok', ['grok', 'xai']],
   ['lovable', ['lovable']],
   ['windsurf', ['windsurf', 'codeium']],
   ['copilot', ['copilot', 'vscode', 'visual studio code']],

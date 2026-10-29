@@ -26,6 +26,14 @@ export const miAgente = {
     desconectar: 'Desconectar',
     intClaudeApp: 'En la app de Claude (web, escritorio y celular), con tu cuenta de Peaje y sin clave.',
     intChatgpt: 'En ChatGPT, con tu cuenta de Peaje y sin clave.',
+    intGrok: 'En Grok, con tu cuenta de Peaje y sin clave.',
+    abrirGrok: 'Abrir conectores de Grok',
+    pasosGrok: [
+      'En grok.com, entra a Conectores y toca "New Connector".',
+      'Elige Custom y pega la URL de abajo.',
+      'Conecta: se abre Peaje, eliges tu negocio y das permiso.',
+    ],
+    notaGrok: 'Los conectores personalizados están en los planes pagos de Grok.',
     sesionIntro: 'Esta se conecta con tu cuenta de Peaje, sin clave: al final eliges el negocio y das permiso. Desde ahí le preguntas a tu agente y le pides tus tareas.',
     urlConector: 'URL del conector',
     pasosClaudeApp: [
@@ -422,6 +430,14 @@ export const miAgente = {
     desconectar: 'Disconnect',
     intClaudeApp: 'In the Claude app (web, desktop and mobile), with your Peaje account and no key.',
     intChatgpt: 'In ChatGPT, with your Peaje account and no key.',
+    intGrok: 'In Grok, with your Peaje account and no key.',
+    abrirGrok: 'Open Grok connectors',
+    pasosGrok: [
+      'On grok.com, go to Connectors and tap "New Connector".',
+      'Choose Custom and paste the URL below.',
+      'Connect: Peaje opens, you pick your business and allow it.',
+    ],
+    notaGrok: 'Custom connectors are on paid Grok plans.',
     sesionIntro: 'This one connects with your Peaje account, no key: at the end you pick the business and allow it. From there you ask your agent and get your tasks.',
     urlConector: 'Connector URL',
     pasosClaudeApp: [
