@@ -98,6 +98,8 @@ export const env = {
   circleNanopayments: process.env.CIRCLE_NANOPAYMENTS_ENABLED === 'true',
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
+  /** URL pública del dashboard: ahí vive la pantalla de permiso del inicio de sesión del MCP. */
+  dashboardUrl: process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com',
   /**
    * Take rate de Peaje por transacción (0.02 = 2%). El agente paga el precio
    * listado completo y el negocio recibe el neto en su wallet. En los rieles

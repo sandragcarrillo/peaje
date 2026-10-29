@@ -50,6 +50,7 @@ import { DIAS_PRUEBA } from './planes'
 import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
 import type { AgentJob, HerramientaUsada, NewAgentJob, VoiceProfile } from './types'
+import type { NewOauthClient, OauthClient, OauthCode, OauthGrant, OauthRotacion, OauthTokens } from './types'
 // ---- Slack ----
 import type { SlackCode, SlackInstall, SlackLink } from './types'
 // ---- reportes programados ----
@@ -64,6 +65,9 @@ import type { CreditCharge } from './types'
  * interfaz. Se pierde al reiniciar: sirve para desarrollo y para el fallback
  * si no hay credenciales configuradas.
  */
+/** Una conexión OAuth como la guarda la memoria: con los hashes que la base no devuelve. */
+type GrantEnMemoria = Omit<OauthGrant, 'clientName'> & OauthTokens & { refreshPrevHash: string | null }
+
 export class MemoryStore implements Store {
   #tenants = new Map<string, Tenant>()
   #origins = new Map<string, Set<string>>()
@@ -246,6 +250,90 @@ export class MemoryStore implements Store {
     const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
     if (t) t.herramientas = herramientas
   }
+
+  // ---- OAuth del MCP del dueño ----
+  #oauthClients = new Map<string, OauthClient>()
+  #oauthCodes = new Map<string, OauthCode & { usedAt: string | null }>()
+  #oauthGrants: GrantEnMemoria[] = []
+
+  #grantPublico(g: GrantEnMemoria): OauthGrant {
+    return {
+      id: g.id,
+      clientId: g.clientId,
+      clientName: this.#oauthClients.get(g.clientId)?.name ?? '',
+      tenantId: g.tenantId,
+      privyUserId: g.privyUserId,
+      accessExpiresAt: g.accessExpiresAt,
+      refreshExpiresAt: g.refreshExpiresAt,
+      createdAt: g.createdAt,
+      lastUsedAt: g.lastUsedAt,
+      revokedAt: g.revokedAt,
+    }
+  }
+
+  async createOauthClient(c: NewOauthClient): Promise<OauthClient> {
+    const cliente = { ...c, redirectUris: [...c.redirectUris], createdAt: new Date().toISOString() }
+    this.#oauthClients.set(c.id, cliente)
+    return { ...cliente }
+  }
+
+  async getOauthClient(id: string): Promise<OauthClient | null> {
+    const c = this.#oauthClients.get(id)
+    return c ? { ...c, redirectUris: [...c.redirectUris] } : null
+  }
+
+  async createOauthCode(c: OauthCode): Promise<void> {
+    this.#oauthCodes.set(c.codeHash, { ...c, usedAt: null })
+  }
+
+  async consumeOauthCode(codeHash: string, ahora: string): Promise<OauthCode | null> {
+    const c = this.#oauthCodes.get(codeHash)
+    if (!c || c.usedAt || c.expiresAt <= ahora) return null
+    c.usedAt = ahora
+    const { usedAt: _, ...codigo } = c
+    return codigo
+  }
+
+  async createOauthGrant(g: { clientId: string; tenantId: string; privyUserId: string } & OauthTokens): Promise<OauthGrant> {
+    const fila = { ...g, id: this.#id('grant'), createdAt: new Date().toISOString(), lastUsedAt: null, revokedAt: null, refreshPrevHash: null }
+    this.#oauthGrants.push(fila)
+    return this.#grantPublico(fila)
+  }
+
+  async rotateOauthGrant(refreshHash: string, next: OauthTokens, ahora: string): Promise<OauthRotacion> {
+    const g = this.#oauthGrants.find((x) => x.refreshHash === refreshHash && !x.revokedAt && x.refreshExpiresAt > ahora)
+    if (!g) {
+      const reusado = this.#oauthGrants.find((x) => x.refreshPrevHash === refreshHash && !x.revokedAt)
+      if (!reusado) return null
+      reusado.revokedAt = ahora
+      return { reuso: true }
+    }
+    Object.assign(g, { ...next, refreshPrevHash: refreshHash, lastUsedAt: ahora })
+    return { grant: this.#grantPublico(g) }
+  }
+
+  async getOauthGrantByAccessHash(accessHash: string, ahora: string): Promise<OauthGrant | null> {
+    const g = this.#oauthGrants.find((x) => x.accessHash === accessHash && !x.revokedAt && x.accessExpiresAt > ahora)
+    return g ? this.#grantPublico(g) : null
+  }
+
+  async touchOauthGrant(id: string, ahora: string): Promise<void> {
+    const g = this.#oauthGrants.find((x) => x.id === id)
+    if (g) g.lastUsedAt = ahora
+  }
+
+  async listOauthGrants(tenantId: string, ahora: string): Promise<OauthGrant[]> {
+    return this.#oauthGrants
+      .filter((x) => x.tenantId === tenantId && !x.revokedAt && x.refreshExpiresAt > ahora)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((g) => this.#grantPublico(g))
+  }
+
+  async revokeOauthGrant(tenantId: string, id: string, ahora: string): Promise<void> {
+    const g = this.#oauthGrants.find((x) => x.id === id && x.tenantId === tenantId)
+    if (g && !g.revokedAt) g.revokedAt = ahora
+  }
+  // ---- fin OAuth ----
 
   #tasks: AgentTask[] = []
 

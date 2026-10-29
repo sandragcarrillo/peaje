@@ -18,6 +18,16 @@ const ESPERA_RESTAURAR_MS = 8000
 
 const pausa = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/**
+ * ?volver=: adónde seguir después de entrar (la pantalla de permiso del MCP
+ * manda acá). Solo rutas de este sitio: "//otro.com" o "/\otro.com" serían
+ * otro dominio para el navegador.
+ */
+function volverA(): string | null {
+  const v = new URLSearchParams(window.location.search).get('volver')
+  return v && v.startsWith('/') && !v.startsWith('//') && !v.includes('\\') ? v : null
+}
+
 export default function Acceder() {
   const router = useRouter()
   const [step, setStep] = useState<Step>('email')
@@ -72,7 +82,7 @@ export default function Acceder() {
         if (!vigente()) return
         if (r?.ok) {
           clearTimeout(tope)
-          router.push(r.slug ? `/t/${r.slug}` : '/negocios')
+          router.push(volverA() ?? (r.slug ? `/t/${r.slug}` : '/negocios'))
           return
         }
       } catch (err) {
@@ -148,7 +158,7 @@ export default function Acceder() {
         setError(r.error)
         return
       }
-      router.push(r.slug ? `/t/${r.slug}` : '/negocios')
+      router.push(volverA() ?? (r.slug ? `/t/${r.slug}` : '/negocios'))
     } catch (err) {
       console.error('[acceder]', err)
       setError(d.acceso.errorIngresoFallo)

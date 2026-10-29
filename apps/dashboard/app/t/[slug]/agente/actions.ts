@@ -166,3 +166,10 @@ export async function abrirPortal(slug: string) {
   }
 }
 // ---- fin Paddle ----
+
+/** Corta una herramienta conectada con inicio de sesión (Integraciones, Activas). */
+export async function desconectarHerramienta(slug: string, id: string): Promise<void> {
+  const tenant = await requireTenant(slug)
+  await store.revokeOauthGrant(tenant.id, id, new Date().toISOString())
+  revalidatePath(`/t/${slug}/integraciones`)
+}

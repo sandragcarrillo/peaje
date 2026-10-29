@@ -18,6 +18,7 @@ import { proxyToOrigin } from './proxy.js'
 import { matchRoute } from './router.js'
 import { rutasRouter } from './rutas.js'
 import { tareasRouter } from './tareas/router.js'
+import { oauthRouter } from './oauth.js'
 import { registrarWebhook, telegramRouter } from './telegram/router.js'
 import { slackRouter } from './slack/router.js'
 import { reportesRouter } from './reportes/router.js'
@@ -118,6 +119,8 @@ app.route('/_internal', rutasRouter)
 // ---- M7: comprador misterioso ----
 app.route('/_internal', compradorRouter)
 app.route('/_internal', radarRouter)
+// Inicio de sesión del MCP del dueño (antes de /:slug/*: si no, /.well-known/* parece un negocio).
+app.route('/', oauthRouter)
 app.route('/', tareasRouter)
 app.route('/', telegramRouter)
 // ---- Slack: mismo agente en los canales del equipo (antes de /:slug/*, que si no se come /slack/*) ----

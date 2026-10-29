@@ -3,6 +3,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { COSTOS_CREDITOS, type Tenant } from '@peaje/db'
 import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
+import { env } from '../env.js'
+import { ICONO_DATA_URI } from '../oauth.js'
 import { store } from '../store.js'
 import { buscarTareasDelDueno, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
@@ -22,7 +24,14 @@ function texto(obj: unknown) {
 export function construir(tenant: Tenant): McpServer {
   const dominio = dominioVerificable(tenant.originUrl) ?? tenant.originUrl
   const server = new McpServer(
-    { name: `peaje-${tenant.slug}`, version: '1.0.0' },
+    {
+      name: `peaje-${tenant.slug}`,
+      version: '1.0.0',
+      // title, icons y websiteUrl (spec 2025-11-25): los clientes que muestran el conector usan esto.
+      title: 'Peaje',
+      websiteUrl: env.dashboardUrl,
+      icons: [{ src: ICONO_DATA_URI, mimeType: 'image/png', sizes: ['192x192'] }],
+    },
     {
       instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. When the owner asks something about their business (who AI cites instead of them, what to publish next, what else to improve, their visits), call peaje_ask with their question and relay the answer. Start with peaje_plan to see the owner's goal and priorities. Then work through the tasks in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
     },

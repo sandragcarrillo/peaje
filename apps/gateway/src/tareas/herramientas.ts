@@ -1,30 +1,8 @@
 import type { Tenant } from '@peaje/db'
+import { marcaDeCliente } from '@peaje/shared/herramientas'
 import { store } from '../store.js'
 
-/**
- * Qué herramienta se conectó al MCP del dueño. Cada cliente se presenta en el
- * `initialize` con clientInfo.name (Claude Code manda "claude-code", Codex
- * "codex-mcp-client", Cursor "cursor-…"): se reconoce por pedazos del nombre
- * para no depender de la versión exacta. Cursor va antes que Copilot porque su
- * nombre también trae "vscode". v0 solo por nombre entero o con guion: "v0"
- * suelto aparece en versiones de cualquier cliente ("client-v0.3").
- */
-const MARCAS: [marca: string, pedazos: string[]][] = [
-  ['claude', ['claude']],
-  ['cursor', ['cursor']],
-  ['codex', ['codex']],
-  ['lovable', ['lovable']],
-  ['windsurf', ['windsurf', 'codeium']],
-  ['copilot', ['copilot', 'vscode', 'visual studio code']],
-  ['v0', ['vercel', 'v0-', 'v0 ']],
-  ['replit', ['replit']],
-]
-
-export function marcaDeCliente(nombre: string): string {
-  const n = nombre.toLowerCase()
-  if (n === 'v0') return 'v0'
-  return MARCAS.find(([, pedazos]) => pedazos.some((p) => n.includes(p)))?.[0] ?? 'otra'
-}
+export { marcaDeCliente }
 
 /** El clientInfo.name del `initialize`, si el body lo trae (suelto o en un lote). */
 export function clienteMcp(body: unknown): string | null {

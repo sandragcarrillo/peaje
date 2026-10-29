@@ -87,6 +87,40 @@ export type Tenant = {
 /** Una herramienta que se conectó al MCP: el nombre con que se presentó, cuándo y con qué clave. */
 export type HerramientaUsada = { nombre: string; at: string; prefijo: string | null }
 
+// ---- OAuth del MCP del dueño (migración 20261028100000) ----
+/** Una herramienta registrada sola (RFC 7591). secretHash null = cliente público con PKCE. */
+export type OauthClient = { id: string; name: string; redirectUris: string[]; secretHash: string | null; createdAt: string }
+export type NewOauthClient = Omit<OauthClient, 'createdAt'>
+/** El código de un solo uso que la pantalla de permiso le pasa a la herramienta. */
+export type OauthCode = {
+  codeHash: string
+  clientId: string
+  tenantId: string
+  privyUserId: string
+  redirectUri: string
+  codeChallenge: string
+  resource: string | null
+  expiresAt: string
+}
+/** Los hashes y vencimientos de un par de tokens recién emitido. */
+export type OauthTokens = { accessHash: string; accessExpiresAt: string; refreshHash: string; refreshExpiresAt: string }
+/** Una conexión: una herramienta con acceso a un negocio. */
+export type OauthGrant = {
+  id: string
+  clientId: string
+  clientName: string
+  tenantId: string
+  privyUserId: string
+  accessExpiresAt: string
+  refreshExpiresAt: string
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+/** Resultado de canjear un refresh token: la conexión rotada, reuso detectado (queda revocada) o nada. */
+export type OauthRotacion = { grant: OauthGrant } | { reuso: true } | null
+// ---- fin OAuth ----
+
 // ---- voz de marca ----
 /** Perfil compacto de la voz del negocio. Las frases de muestra son citas literales del sitio. */
 export type VoiceProfile = {
@@ -864,6 +898,25 @@ export interface Store {
   setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void>
   /** Reemplaza el registro de herramientas conectadas (ver Tenant.herramientas). */
   setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void>
+  // ---- OAuth del MCP del dueño ----
+  createOauthClient(c: NewOauthClient): Promise<OauthClient>
+  getOauthClient(id: string): Promise<OauthClient | null>
+  createOauthCode(c: OauthCode): Promise<void>
+  /** Lo marca usado y lo devuelve; null si no existe, ya se usó o venció. Un código sirve una sola vez. */
+  consumeOauthCode(codeHash: string, ahora: string): Promise<OauthCode | null>
+  createOauthGrant(g: { clientId: string; tenantId: string; privyUserId: string } & OauthTokens): Promise<OauthGrant>
+  /**
+   * Canjea un refresh token vigente por tokens nuevos. Si llega el anterior
+   * (ya rotado), revoca la conexión: alguien lo copió.
+   */
+  rotateOauthGrant(refreshHash: string, next: OauthTokens, ahora: string): Promise<OauthRotacion>
+  /** La conexión de un token de acceso vigente y no revocado. */
+  getOauthGrantByAccessHash(accessHash: string, ahora: string): Promise<OauthGrant | null>
+  touchOauthGrant(id: string, ahora: string): Promise<void>
+  /** Las conexiones activas del negocio, la más reciente primero. */
+  listOauthGrants(tenantId: string, ahora: string): Promise<OauthGrant[]>
+  revokeOauthGrant(tenantId: string, id: string, ahora: string): Promise<void>
+  // ---- fin OAuth ----
   /** Crea la tarea, o actualiza su contenido si sigue abierta. Nunca reabre una descartada o verificada. */
   upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }>
   listTasks(tenantId: string, opts?: { statuses?: TaskStatus[] }): Promise<AgentTask[]>

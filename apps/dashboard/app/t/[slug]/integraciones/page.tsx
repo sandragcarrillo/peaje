@@ -23,6 +23,8 @@ export default async function IntegracionesPage({ params }: { params: Promise<{ 
     leerSlack(tenant.slug).catch(() => null),
     claveVisible(tenant),
   ])
+  // Antes de la migración 20261028100000 la tabla no existe: sin conexiones.
+  const sesiones = await store.listOauthGrants(tenant.id, new Date().toISOString()).catch(() => [])
 
   return (
     <div className="space-y-8">
@@ -35,6 +37,7 @@ export default async function IntegracionesPage({ params }: { params: Promise<{ 
         slack={slack}
         prefijo={tenant.apiKeyPrefix}
         herramientas={conectadas(tenant)}
+        sesiones={sesiones.map((s) => ({ id: s.id, nombre: s.clientName || 'MCP', dias: diasDesde(s.lastUsedAt ?? s.createdAt) }))}
         claveGuardada={clave}
         mcpUrl={`${gatewayUrl}/_owner/mcp`}
         gateway={gatewayUrl}
@@ -66,5 +69,7 @@ function conectadas(tenant: Tenant): { marca: string; nombre: string; dias: numb
   return Object.entries(tenant.herramientas ?? {})
     .filter(([, h]) => h.prefijo !== null && h.prefijo === tenant.apiKeyPrefix)
     .sort(([, a], [, b]) => b.at.localeCompare(a.at))
-    .map(([marca, h]) => ({ marca, nombre: h.nombre, dias: Math.floor((Date.now() - Date.parse(h.at)) / 86_400_000) }))
+    .map(([marca, h]) => ({ marca, nombre: h.nombre, dias: diasDesde(h.at) }))
 }
+
+const diasDesde = (iso: string) => Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)

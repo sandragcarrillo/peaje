@@ -9,6 +9,7 @@ import { store } from '../store.js'
 import { generarTareas } from './generar.js'
 import { anotarHerramienta, clienteMcp } from './herramientas.js'
 import { handleOwnerMcp } from './mcp.js'
+import { desafio, PREFIJO_ACCESO, tenantDeAcceso } from '../oauth.js'
 import { completarTarea } from './verificar.js'
 import { generarPlan, planConAvance } from './plan.js'
 import { conversar } from './agente.js'
@@ -22,7 +23,8 @@ import { cobrarAccion } from './creditos.js'
  * Tareas del agente Pro.
  *
  * Para el coding agent del dueño, con la clave del agente (`Authorization:
- * Bearer peaje_live_…`, se genera en el dashboard, página "Mi agente"):
+ * Bearer peaje_live_…`, se genera en el dashboard, página Integraciones) o con
+ * un token del inicio de sesión (`peaje_oat_…`, ver oauth.ts):
  *   GET  /_owner/tasks?status=open        lista
  *   GET  /_owner/tasks/:id                una, con el prompt completo
  *   POST /_owner/tasks/:id/start          la toma
@@ -40,7 +42,7 @@ import { cobrarAccion } from './creditos.js'
  * `error: 'not-enough-credits'` y el mismo texto del chat en `message`
  * (`language` en el cuerpo, es o en). El monitor diario sigue gratis.
  */
-export const tareasRouter = new Hono<{ Bindings: HttpBindings; Variables: { tenant: Tenant } }>()
+export const tareasRouter = new Hono<{ Bindings: HttpBindings; Variables: { tenant: Tenant; oauth: boolean } }>()
 
 tareasRouter.onError((err, c) => {
   console.error('[tareas] error no manejado', err)
@@ -54,9 +56,17 @@ export async function tenantDeClave(authorization: string | undefined): Promise<
 }
 
 tareasRouter.use('/_owner/*', async (c, next) => {
-  const tenant = await tenantDeClave(c.req.header('authorization'))
-  if (!tenant) return c.json({ error: 'Missing or invalid agent key. Create one in the Peaje dashboard, Integrations page.' }, 401)
+  const auth = c.req.header('authorization')
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+  const oauth = token.startsWith(PREFIJO_ACCESO)
+  const tenant = oauth ? await tenantDeAcceso(token) : await tenantDeClave(auth)
+  if (!tenant) {
+    // El header le dice a la herramienta dónde iniciar sesión (spec de MCP).
+    c.header('WWW-Authenticate', desafio(!!token))
+    return c.json({ error: 'Missing or invalid credentials. Sign in, or create an agent key in the Peaje dashboard, Integrations page.' }, 401)
+  }
   c.set('tenant', tenant)
+  c.set('oauth', oauth)
   await next()
 })
 
@@ -120,9 +130,10 @@ tareasRouter.post('/_owner/tasks/:id/dismiss', async (c) => {
 
 tareasRouter.post('/_owner/mcp', async (c) => {
   const body = await c.req.json().catch(() => undefined)
-  // Integraciones muestra en Activas qué herramienta se conectó.
+  // Integraciones muestra en Activas qué herramienta se conectó con la clave.
+  // Las del inicio de sesión ya salen de su conexión (oauth_grants).
   const cliente = clienteMcp(body)
-  if (cliente) void anotarHerramienta(c.get('tenant'), cliente)
+  if (cliente && !c.get('oauth')) void anotarHerramienta(c.get('tenant'), cliente)
   await handleOwnerMcp(c.get('tenant'), c.env.incoming, c.env.outgoing, body)
   return RESPONSE_ALREADY_SENT
 })

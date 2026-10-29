@@ -56,12 +56,37 @@ import type { BillingMethod, BillingPayment, NewBillingPayment, TenantPaddlePatc
 import type { NewRadarLead, RadarCitas, RadarCitasClaim, RadarCitasRun, RadarLead } from './types'
 // ---- trabajos y voz ----
 import type { AgentJob, AgentMessageLink, HerramientaUsada, NewAgentJob, VoiceProfile } from './types'
+import type { NewOauthClient, OauthClient, OauthCode, OauthGrant, OauthRotacion, OauthTokens } from './types'
 // ---- Slack ----
 import type { SlackCode, SlackInstall, SlackLink } from './types'
 // ---- reportes programados ----
 import type { ReportKind, ReportSchedule, ReportScheduleInput } from './types'
 
 type Row = Record<string, any>
+
+// ---- OAuth del MCP del dueño ----
+// Sin los hashes: el gateway nunca necesita leerlos de vuelta.
+const GRANT_COLS = 'id, client_id, tenant_id, privy_user_id, access_expires_at, refresh_expires_at, created_at, last_used_at, revoked_at, oauth_clients(name)'
+
+function oauthClientFrom(r: Row): OauthClient {
+  return { id: r.id, name: r.name, redirectUris: r.redirect_uris ?? [], secretHash: r.secret_hash ?? null, createdAt: r.created_at }
+}
+
+function oauthGrantFrom(r: Row): OauthGrant {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    clientName: r.oauth_clients?.name ?? '',
+    tenantId: r.tenant_id,
+    privyUserId: r.privy_user_id,
+    accessExpiresAt: r.access_expires_at,
+    refreshExpiresAt: r.refresh_expires_at,
+    createdAt: r.created_at,
+    lastUsedAt: r.last_used_at ?? null,
+    revokedAt: r.revoked_at ?? null,
+  }
+}
+// ---- fin OAuth ----
 
 function tenantFrom(row: Row): Tenant {
   return {
@@ -573,6 +598,153 @@ export class SupabaseStore implements Store {
     const { error } = await this.#db.from('tenants').update({ herramientas }).eq('id', tenantId)
     this.#fail('setTenantHerramientas', error)
   }
+
+  // ---- OAuth del MCP del dueño ----
+  async createOauthClient(c: NewOauthClient): Promise<OauthClient> {
+    const { data, error } = await this.#db
+      .from('oauth_clients')
+      .insert({ id: c.id, name: c.name, redirect_uris: c.redirectUris, secret_hash: c.secretHash })
+      .select()
+      .single()
+    this.#fail('createOauthClient', error)
+    return oauthClientFrom(data as Row)
+  }
+
+  async getOauthClient(id: string): Promise<OauthClient | null> {
+    const { data, error } = await this.#db.from('oauth_clients').select().eq('id', id).maybeSingle()
+    this.#fail('getOauthClient', error)
+    return data ? oauthClientFrom(data as Row) : null
+  }
+
+  async createOauthCode(c: OauthCode): Promise<void> {
+    const { error } = await this.#db.from('oauth_codes').insert({
+      code_hash: c.codeHash,
+      client_id: c.clientId,
+      tenant_id: c.tenantId,
+      privy_user_id: c.privyUserId,
+      redirect_uri: c.redirectUri,
+      code_challenge: c.codeChallenge,
+      resource: c.resource,
+      expires_at: c.expiresAt,
+    })
+    this.#fail('createOauthCode', error)
+  }
+
+  async consumeOauthCode(codeHash: string, ahora: string): Promise<OauthCode | null> {
+    // El update condicional es el candado: dos canjes a la vez, solo uno lo marca.
+    const { data, error } = await this.#db
+      .from('oauth_codes')
+      .update({ used_at: ahora })
+      .eq('code_hash', codeHash)
+      .is('used_at', null)
+      .gt('expires_at', ahora)
+      .select()
+    this.#fail('consumeOauthCode', error)
+    const r = (data as Row[] | null)?.[0]
+    if (!r) return null
+    return {
+      codeHash: r.code_hash,
+      clientId: r.client_id,
+      tenantId: r.tenant_id,
+      privyUserId: r.privy_user_id,
+      redirectUri: r.redirect_uri,
+      codeChallenge: r.code_challenge,
+      resource: r.resource ?? null,
+      expiresAt: r.expires_at,
+    }
+  }
+
+  async createOauthGrant(g: { clientId: string; tenantId: string; privyUserId: string } & OauthTokens): Promise<OauthGrant> {
+    const { data, error } = await this.#db
+      .from('oauth_grants')
+      .insert({
+        client_id: g.clientId,
+        tenant_id: g.tenantId,
+        privy_user_id: g.privyUserId,
+        access_hash: g.accessHash,
+        access_expires_at: g.accessExpiresAt,
+        refresh_hash: g.refreshHash,
+        refresh_expires_at: g.refreshExpiresAt,
+      })
+      .select(GRANT_COLS)
+      .single()
+    this.#fail('createOauthGrant', error)
+    return oauthGrantFrom(data as Row)
+  }
+
+  async rotateOauthGrant(refreshHash: string, next: OauthTokens, ahora: string): Promise<OauthRotacion> {
+    const { data: vigente, error: e1 } = await this.#db
+      .from('oauth_grants')
+      .select('id')
+      .eq('refresh_hash', refreshHash)
+      .is('revoked_at', null)
+      .gt('refresh_expires_at', ahora)
+      .maybeSingle()
+    this.#fail('rotateOauthGrant', e1)
+    if (!vigente) {
+      // ¿Es uno ya rotado? Entonces alguien más lo tiene: se corta la conexión.
+      const { data: reusado, error: e2 } = await this.#db
+        .from('oauth_grants')
+        .update({ revoked_at: ahora })
+        .eq('refresh_prev_hash', refreshHash)
+        .is('revoked_at', null)
+        .select('id')
+      this.#fail('rotateOauthGrant(reuso)', e2)
+      return (reusado as Row[] | null)?.length ? { reuso: true } : null
+    }
+    // Condicional al hash viejo: si dos refrescos llegan juntos, gana uno.
+    const { data, error } = await this.#db
+      .from('oauth_grants')
+      .update({
+        access_hash: next.accessHash,
+        access_expires_at: next.accessExpiresAt,
+        refresh_prev_hash: refreshHash,
+        refresh_hash: next.refreshHash,
+        refresh_expires_at: next.refreshExpiresAt,
+        last_used_at: ahora,
+      })
+      .eq('id', (vigente as Row).id)
+      .eq('refresh_hash', refreshHash)
+      .select(GRANT_COLS)
+    this.#fail('rotateOauthGrant(update)', error)
+    const r = (data as Row[] | null)?.[0]
+    return r ? { grant: oauthGrantFrom(r) } : null
+  }
+
+  async getOauthGrantByAccessHash(accessHash: string, ahora: string): Promise<OauthGrant | null> {
+    const { data, error } = await this.#db
+      .from('oauth_grants')
+      .select(GRANT_COLS)
+      .eq('access_hash', accessHash)
+      .is('revoked_at', null)
+      .gt('access_expires_at', ahora)
+      .maybeSingle()
+    this.#fail('getOauthGrantByAccessHash', error)
+    return data ? oauthGrantFrom(data as Row) : null
+  }
+
+  async touchOauthGrant(id: string, ahora: string): Promise<void> {
+    const { error } = await this.#db.from('oauth_grants').update({ last_used_at: ahora }).eq('id', id)
+    this.#fail('touchOauthGrant', error)
+  }
+
+  async listOauthGrants(tenantId: string, ahora: string): Promise<OauthGrant[]> {
+    const { data, error } = await this.#db
+      .from('oauth_grants')
+      .select(GRANT_COLS)
+      .eq('tenant_id', tenantId)
+      .is('revoked_at', null)
+      .gt('refresh_expires_at', ahora)
+      .order('created_at', { ascending: false })
+    this.#fail('listOauthGrants', error)
+    return ((data as Row[] | null) ?? []).map(oauthGrantFrom)
+  }
+
+  async revokeOauthGrant(tenantId: string, id: string, ahora: string): Promise<void> {
+    const { error } = await this.#db.from('oauth_grants').update({ revoked_at: ahora }).eq('id', id).eq('tenant_id', tenantId)
+    this.#fail('revokeOauthGrant', error)
+  }
+  // ---- fin OAuth ----
 
   async upsertTask(task: NewAgentTask): Promise<{ task: AgentTask; created: boolean }> {
     const { data: previa, error: e1 } = await this.#db
