@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.usepeaje/peaje",
+  "title": "Peaje",
+  "description": "Your Peaje agent: tasks to get your site cited by AI, its score, and answers about your business.",
+  "version": "1.0.0",
+  "websiteUrl": "https://usepeaje.com",
+  "icons": [{ "src": "https://api.usepeaje.com/favicon.ico", "mimeType": "image/png", "sizes": ["192x192"] }],
+  "remotes": [{ "type": "streamable-http", "url": "https://api.usepeaje.com/_owner/mcp" }]
+}
