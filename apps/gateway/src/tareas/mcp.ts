@@ -5,6 +5,7 @@ import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { env } from '../env.js'
 import { ICONO_DATA_URI } from '../oauth.js'
+import { scoreOra } from '../monitor/correr.js'
 import { store } from '../store.js'
 import { buscarTareasDelDueno, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
@@ -47,11 +48,13 @@ export function construir(tenant: Tenant): McpServer {
         store.visitStats(tenant.id, { days: 7 }).catch(() => null),
       ])
       const checks = (v?.checks ?? []) as { id: string; ok: boolean }[]
+      // Sin puntaje guardado (verificaciones viejas del botón Verificar, o Ora no respondió): se pide en el momento.
+      const score = v?.score ?? (await scoreOra(dominio).catch(() => null))
       return texto({
         business: tenant.name,
         domain: dominio,
         checks: { ok: checks.filter((c) => c.ok).length, total: checks.length, failing: checks.filter((c) => !c.ok).map((c) => c.id), measuredAt: v?.runAt ?? null },
-        score: v?.score ?? null,
+        score,
         tasks: { open: tareas.filter((t) => t.status === 'open').length, inProgress: tareas.filter((t) => t.status === 'in_progress').length, waitingVerification: tareas.filter((t) => t.status === 'done').length },
         last7Days: visitas ? { agentRequests: visitas.totals.visits, paid: visitas.totals.paid, revenueUsd: visitas.totals.revenue, funnel: visitas.funnel } : null,
       })

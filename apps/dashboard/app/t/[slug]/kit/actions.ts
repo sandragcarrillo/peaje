@@ -44,12 +44,15 @@ export async function verificarIntegracion(slug: string): Promise<ChequeoIntegra
   // Queda guardada igual que la del monitor diario: así el panel y la lista
   // de pasos saben que el kit ya está en el dominio sin esperar a mañana.
   if (chequeos[0]?.id !== 'dominio') {
+    // El puntaje no se mide acá: se conserva el del monitor. Antes iba null y,
+    // como esta queda como la última, el MCP (peaje_status) mostraba el puntaje vacío.
+    const previa = await store.lastVerification(tenant.id).catch(() => null)
     await store
       .recordVerification({
         tenantId: tenant.id,
         checks: chequeos,
         ok: chequeos.every((c) => c.ok),
-        score: null,
+        score: previa?.score ?? null,
         robotsHash: null,
         llmsHash: null,
         alerted: [],

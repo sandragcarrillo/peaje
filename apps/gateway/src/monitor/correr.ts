@@ -31,16 +31,29 @@ export type Corrida = {
   dominio: string
 }
 
-async function scoreOra(domain: string): Promise<number | null> {
+async function scoreDeHost(host: string): Promise<{ score: number; scannedAt: string } | null> {
   try {
-    const res = await fetch(`${ORA}/score/${domain}`, { signal: AbortSignal.timeout(15_000) })
+    const res = await fetch(`${ORA}/score/${host}`, { signal: AbortSignal.timeout(15_000) })
     if (!res.ok) return null
-    const data = (await res.json()) as { score?: number; code?: string }
+    const data = (await res.json()) as { score?: number; code?: string; scannedAt?: string }
     if (data.code === 'DOMAIN_NOT_SCANNED' || typeof data.score !== 'number') return null
-    return Math.round(data.score)
+    return { score: Math.round(data.score), scannedAt: data.scannedAt ?? '' }
   } catch {
     return null
   }
+}
+
+/**
+ * El puntaje de Ora del sitio. Ora guarda el escaneo bajo el host que
+ * respondió (www o la raíz): se consultan los dos y gana el más reciente,
+ * como hace el dashboard (apps/dashboard/lib/ora.ts): un sitio escaneado en
+ * www no queda sin puntaje porque su origen diga la raíz, ni al revés.
+ */
+export async function scoreOra(domain: string): Promise<number | null> {
+  const raiz = domain.replace(/^www\./, '')
+  const hosts = [...new Set([domain, raiz, `www.${raiz}`])]
+  const scores = (await Promise.all(hosts.map(scoreDeHost))).filter((s): s is { score: number; scannedAt: string } => s !== null)
+  return scores.sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))[0]?.score ?? null
 }
 
 async function hashDe(url: string): Promise<string | null> {
