@@ -55,7 +55,7 @@ export default async function Blog() {
           </Link>
         </div>
         <Link href={`/blog/${primero.slug}`} tabIndex={-1} className="block">
-          <Portada texto={primero.tituloPortada} n={primero.portada} icono={primero.iconoPortada} grande />
+          <Portada texto={primero.tituloPortada} n={primero.portada} icono={primero.iconoPortada} logos={primero.logosPortada} grande />
         </Link>
       </article>
 
@@ -64,7 +64,7 @@ export default async function Blog() {
           {resto.map((a) => (
             <li key={a.slug} lang={a.idioma}>
               <Link href={`/blog/${a.slug}`} className="group block space-y-3">
-                <Portada texto={a.tituloPortada} n={a.portada} icono={a.iconoPortada} />
+                <Portada texto={a.tituloPortada} n={a.portada} icono={a.iconoPortada} logos={a.logosPortada} />
                 <p className="flex items-center gap-2 text-sm text-muted">
                   {a.categoria ? (
                     <>

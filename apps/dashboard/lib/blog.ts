@@ -17,6 +17,7 @@ import path from 'node:path'
  *   portada: 2          (opcional: 1 a 4, el degradado de la portada)
  *   portada_titulo: Recomendado por ChatGPT   (opcional: el texto corto de la portada; sin él va el título)
  *   portada_icono: check                      (opcional: un ícono junto al texto de la portada)
+ *   portada_logos: claude, cursor, codex      (opcional: logos de integraciones debajo del texto, ver components/logos)
  *   traduccion: how-do-i-get-chatgpt-to-recommend-my-website   (opcional: el slug del mismo artículo en el otro idioma)
  *   ---
  *
@@ -38,6 +39,8 @@ export type Articulo = {
   /** El texto corto de la portada (como "Grok Voice 3.0" en x.ai/news). */
   tituloPortada: string
   iconoPortada: 'check' | null
+  /** Marcas de integraciones para pintar debajo del texto de la portada ("claude", "cursor"…). */
+  logosPortada: string[]
   categoria: string | null
   /** El slug del mismo artículo en el otro idioma. */
   traduccion: string | null
@@ -86,6 +89,7 @@ function leer(nombre: string, texto: string): Articulo | null {
     portada: portada >= 1 && portada <= 4 ? portada : (hash(slug) % 4) + 1,
     tituloPortada: datos.portada_titulo?.trim() || titulo,
     iconoPortada: datos.portada_icono?.trim() === 'check' ? 'check' : null,
+    logosPortada: (datos.portada_logos ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     categoria: datos.categoria?.trim() || null,
     traduccion: datos.traduccion?.trim() || null,
     cuerpo,
