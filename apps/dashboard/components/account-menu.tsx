@@ -2,21 +2,30 @@
 
 import { railLabel } from '@peaje/shared'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { resumenWallet, type ResumenWallet } from '@/app/t/[slug]/actions'
-import { COBROS_VISIBLES, money, shortWallet } from '@/lib/config'
+import { money, shortWallet } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 
 /**
  * Menú de cuenta: se abre desde el email en el navbar. Arriba la wallet
  * (balance, recibir, ingresos) y abajo el submenu de navegación
  * personal (Mis negocios). El agente vive dentro de cada negocio (Mi agente).
+ * `conWallet` sale de walletVisible (lib/config.ts): sin cobros activos en
+ * ningún negocio, el menú es solo navegación. La wallet y "Ver ingresos" son
+ * del negocio que se está mirando (/t/<slug>/…); fuera de un negocio, del más
+ * reciente (`slug`). El menú vive en el layout raíz y no se desmonta al
+ * cambiar de negocio, así que el resumen se guarda con el negocio al que
+ * pertenece y se vuelve a pedir si cambió.
  */
-export function AccountMenu({ slug, email }: { slug: string; email: string }) {
+export function AccountMenu({ slug, email, conWallet }: { slug: string; email: string; conWallet: boolean }) {
   const d = useDict()
   const nav = useDict().nav
   const [open, setOpen] = useState(false)
-  const [data, setData] = useState<ResumenWallet | null>(null)
+  const actual = usePathname()?.match(/^\/t\/([^/]+)/)?.[1] ?? slug
+  const [guardado, setGuardado] = useState<{ slug: string; resumen: ResumenWallet | null } | null>(null)
+  const data = guardado?.slug === actual ? guardado.resumen : null
   const [cargando, setCargando] = useState(false)
   const [modo, setModo] = useState<'resumen' | 'recibir'>('resumen')
   const [copiado, setCopiado] = useState(false)
@@ -25,10 +34,10 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
     const siguiente = !open
     setOpen(siguiente)
     setModo('resumen')
-    if (siguiente && !data && COBROS_VISIBLES) {
+    if (siguiente && !data && conWallet) {
       setCargando(true)
       try {
-        setData(await resumenWallet(slug))
+        setGuardado({ slug: actual, resumen: await resumenWallet(actual) })
       } finally {
         setCargando(false)
       }
@@ -66,9 +75,9 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-panel text-text shadow-xl shadow-black/40 ${COBROS_VISIBLES ? 'w-80 p-5' : 'w-56 p-2'}`}>
-            {!COBROS_VISIBLES ? (
-              // Hasta mainnet la wallet existe pero no se muestra (ver COBROS_VISIBLES).
+          <div className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-panel text-text shadow-xl shadow-black/40 ${conWallet ? 'w-80 p-5' : 'w-56 p-2'}`}>
+            {!conWallet ? (
+              // Sin cobros activos la wallet existe pero no se muestra (ver walletVisible).
               <nav>
                 <Link
                   href="/negocios"
@@ -151,7 +160,7 @@ export function AccountMenu({ slug, email }: { slug: string; email: string }) {
                     {d.dinero.recibir}
                   </button>
                   <Link
-                    href={`/t/${slug}/ingresos`}
+                    href={`/t/${actual}/ingresos`}
                     onClick={() => setOpen(false)}
                     className="btn btn-secundario btn-chico"
                   >

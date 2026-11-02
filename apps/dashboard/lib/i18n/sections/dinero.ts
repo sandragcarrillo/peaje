@@ -28,9 +28,9 @@ export const dinero = {
     copiado: 'Copiado',
 
     // Cobros a agentes (mainnet): el negocio decide cuándo empieza a cobrar
-    cobrosAvisoTitulo: 'Los agentes ya pueden pagarte',
+    cobrosAvisoTitulo: 'Activa cobros a agentes',
     cobrosAvisoTexto:
-      'Peaje ya cobra con plata real. Mientras no actives los cobros, los agentes usan gratis tus rutas y links con precio. Cuando los actives, cada pago llega a tu wallet en el momento, menos el 2% de Peaje.',
+      'Los agentes ya pueden pagar por lo que usen en tu sitio. Te creamos una wallet para que recibas esos pagos. Peaje se queda con el 2%; el resto es tuyo.',
     cobrosSinWallet: 'Antes de activarlos, elige en Ingresos la wallet donde recibes los pagos.',
     cobrosIrAIngresos: 'Ir a Ingresos',
     cobrosTitulo: 'Cobros a agentes',
@@ -96,9 +96,9 @@ export const dinero = {
     copiado: 'Copied',
 
     // Cobros a agentes (mainnet)
-    cobrosAvisoTitulo: 'Agents can now pay you',
+    cobrosAvisoTitulo: 'Turn on payments from agents',
     cobrosAvisoTexto:
-      "Peaje now charges real money. Until you turn on payments, agents use your priced routes and links for free. Once you do, every payment lands in your wallet right away, minus Peaje's 2%.",
+      'Agents can now pay for what they use on your site. We created a wallet for you to receive those payments. Peaje keeps 2%; the rest is yours.',
     cobrosSinWallet: 'Before turning them on, choose in Revenue the wallet where you get paid.',
     cobrosIrAIngresos: 'Go to Revenue',
     cobrosTitulo: 'Payments from agents',

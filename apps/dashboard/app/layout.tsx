@@ -8,7 +8,8 @@ import { AccountMenu } from '@/components/account-menu'
 import { MenuMovil, SeccionesProvider } from '@/components/menu-movil'
 import { getDict, getLocale } from '@/lib/i18n'
 import { LocaleProvider } from '@/lib/i18n/client'
-import { currentTenant } from '@/lib/session'
+import { walletVisible } from '@/lib/config'
+import { currentTenant, listMyTenants } from '@/lib/session'
 import { CONTACTO } from '@/lib/legal'
 import { Logo } from './components/logo'
 import { RadarPill } from './components/radar-pill'
@@ -36,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
-  const [tenant, locale, d, h] = await Promise.all([currentTenant(), getLocale(), getDict(), headers()])
+  const [tenant, misNegocios, locale, d, h] = await Promise.all([currentTenant(), listMyTenants(), getLocale(), getDict(), headers()])
   // El nonce de la CSP (proxy.ts): el script del tema es inline y sin él no corre.
   const nonce = h.get('x-nonce') ?? undefined
 
@@ -79,7 +80,7 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
                 <>
                 <nav className="hidden items-center gap-3 text-sm md:flex">
                   {/* Salir junto al correo: los dos son de la cuenta; tema e idioma van al final. */}
-                  <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} />
+                  <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} conWallet={walletVisible(misNegocios)} />
                   <form action={salir}>
                     <button
                       type="submit"

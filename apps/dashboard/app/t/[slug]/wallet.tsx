@@ -55,8 +55,9 @@ export function DireccionConLinks({ address }: { address: string }) {
 }
 
 /**
- * Dónde cobra el negocio: su wallet de Privy (del dueño, no custodial) o una
- * dirección propia que pegó. Reemplaza al viejo "cambiar wallet de retiro".
+ * Dónde cobra el negocio: su wallet de Privy (del dueño, no custodial).
+ * Pegar una dirección propia ya no se ofrece (decisión de San, 1 nov 2026);
+ * si un negocio viejo tiene una, puede volver a su wallet de Peaje.
  */
 export function WalletForm({
   slug,
@@ -70,7 +71,6 @@ export function WalletForm({
   tipo: TipoWalletCobro
 }) {
   const t = useDict().walletPropia
-  const [abierto, setAbierto] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -81,7 +81,6 @@ export function WalletForm({
     startTransition(async () => {
       const r = await guardarWallet(slug, formData)
       if (r.ok) {
-        setAbierto(false)
         setAviso(`${t.guardado} ${t.yaCobrado}`)
       } else {
         setError(r.error)
@@ -101,42 +100,14 @@ export function WalletForm({
 
       {wallet ? <DireccionConLinks address={wallet} /> : <p className="text-sm text-muted">{t.sinWallet}</p>}
 
-      {abierto ? (
-        <form action={guardar} className="space-y-3 border-t border-border pt-4">
-          <p className="text-sm font-medium">{t.propiaTitulo}</p>
-          <p className="text-xs text-muted">{t.propiaAyuda}</p>
-          <input
-            name="wallet"
-            defaultValue={tipo === 'externa' ? (wallet ?? '') : ''}
-            placeholder="0x…"
-            autoComplete="off"
-            spellCheck={false}
-            className="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button disabled={pending} className="btn btn-primario">
-              {pending ? t.guardando : t.guardar}
-            </button>
-            <button type="button" onClick={() => setAbierto(false)} className="btn btn-secundario">
-              {t.cancelar}
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setAbierto(true)} className="btn btn-secundario btn-chico">
-            {t.usarPropia}
+      {tipo === 'externa' && ownerWallet ? (
+        <form action={guardar}>
+          <input type="hidden" name="wallet" value="" />
+          <button disabled={pending} className="btn btn-secundario btn-chico">
+            {pending ? t.guardando : t.volverAMiWallet}
           </button>
-          {tipo === 'externa' && ownerWallet ? (
-            <form action={guardar}>
-              <input type="hidden" name="wallet" value="" />
-              <button disabled={pending} className="btn btn-secundario btn-chico">
-                {pending ? t.guardando : t.volverAMiWallet}
-              </button>
-            </form>
-          ) : null}
-        </div>
-      )}
+        </form>
+      ) : null}
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {aviso ? <p className="text-sm text-accent">{aviso}</p> : null}

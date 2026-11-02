@@ -1,3 +1,4 @@
+import type { Tenant } from '@peaje/db'
 import { chainLabels, modoTestnet } from '@peaje/shared'
 export const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8787'
 
@@ -36,3 +37,13 @@ export function shortWallet(wallet: string | null): string {
  * /wallet). Para mostrarlos: NEXT_PUBLIC_COBROS=1 en Vercel y redeploy.
  */
 export const COBROS_VISIBLES = process.env.NEXT_PUBLIC_COBROS === '1'
+
+/**
+ * La wallet (menú de cuenta y /wallet) se muestra cuando hay algo que mirar
+ * en ella: en mainnet, solo si alguno de los negocios del dueño ya activó los
+ * cobros (decisión de San, 1 nov 2026). Ingresos se sigue viendo porque ahí
+ * se activan.
+ */
+export function walletVisible(negocios: Pick<Tenant, 'cobrosActivos'>[]): boolean {
+  return COBROS_VISIBLES && (TESTNET || negocios.some((n) => n.cobrosActivos))
+}
