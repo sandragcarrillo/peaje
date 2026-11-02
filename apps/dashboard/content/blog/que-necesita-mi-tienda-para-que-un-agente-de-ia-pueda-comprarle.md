@@ -14,7 +14,7 @@ traduccion: what-does-my-store-need-so-an-ai-agent-can-buy-from-it
 
 Necesita cuatro cosas, en este orden: que el agente te encuentre, que entienda qué vendes y a qué precio, que pueda usar tu sitio sin trabarse y que tenga una forma de pagarte. Si falla cualquiera de las dos primeras, el agente nunca llega al pago, así que conviene empezar por ahí. El [radar gratis de Peaje](https://usepeaje.com/radar) revisa las cuatro en menos de un minuto.
 
-Actualizado: octubre de 2026
+Actualizado: noviembre de 2026
 
 El radar de Peaje agrupa sus chequeos en esas cuatro capas, es gratis y solo pide tu correo y tu dominio, según la [página del radar](https://usepeaje.com/radar).
 
@@ -59,7 +59,7 @@ Hoy conviven varios protocolos, y cada asistente usa el suyo:
 | AP2 (Agent Payments Protocol) | Google con más de 60 empresas, septiembre de 2025 | Probar con una firma que el cliente autorizó esa compra. Acepta tarjetas, transferencias y stablecoins |
 | x402 y MPP | Coinbase, y Stripe con Tempo | Cobrar por cada uso con una respuesta HTTP 402. Sirven más para APIs y contenido digital que para un carrito. Comparamos los dos en [esta guía](https://usepeaje.com/blog/x402-vs-mpp-cual-protocolo-de-pago-para-agentes-de-ia-deberia-usar) |
 
-Si vendes productos físicos en Shopify o Etsy, lo más probable es que ACP y UCP te lleguen a través de tu plataforma, así que revisa sus ajustes antes de construir nada. Si vendes acceso a una API o contenido por uso, el camino es el 402. Peaje responde con x402 y MPP en el mismo 402, hoy en redes de prueba, así que todavía no mueve dinero real.
+Si vendes productos físicos en Shopify o Etsy, lo más probable es que ACP y UCP te lleguen a través de tu plataforma, así que revisa sus ajustes antes de construir nada. Si vendes acceso a una API o contenido por uso, el camino es el 402. Peaje responde con x402 y MPP en el mismo 402, con pagos reales en USDC en Arbitrum y en pathUSD en Tempo, y el pago te llega a la wallet en la misma transacción ([cómo funciona](https://usepeaje.com/blog/como-le-paga-un-agente-de-ia-a-mi-sitio-y-donde-recibo-el-pago)).
 
 ## ¿Por dónde empiezo?
 

@@ -31,6 +31,8 @@ export const dinero = {
     cobrosAvisoTitulo: 'Activa cobros a agentes',
     cobrosAvisoTexto:
       'Los agentes ya pueden pagar por lo que usen en tu sitio. Te creamos una wallet para que recibas esos pagos. Peaje se queda con el 2%; el resto es tuyo.',
+    cobrosConoceMas: 'Conoce más aquí',
+    cobrosArticulo: '/blog/como-le-paga-un-agente-de-ia-a-mi-sitio-y-donde-recibo-el-pago',
     cobrosSinWallet: 'Antes de activarlos, elige en Ingresos la wallet donde recibes los pagos.',
     cobrosIrAIngresos: 'Ir a Ingresos',
     cobrosTitulo: 'Cobros a agentes',
@@ -99,6 +101,8 @@ export const dinero = {
     cobrosAvisoTitulo: 'Turn on payments from agents',
     cobrosAvisoTexto:
       'Agents can now pay for what they use on your site. We created a wallet for you to receive those payments. Peaje keeps 2%; the rest is yours.',
+    cobrosConoceMas: 'Learn more here',
+    cobrosArticulo: '/blog/how-does-an-ai-agent-pay-my-website-and-where-does-the-money-go',
     cobrosSinWallet: 'Before turning them on, choose in Revenue the wallet where you get paid.',
     cobrosIrAIngresos: 'Go to Revenue',
     cobrosTitulo: 'Payments from agents',

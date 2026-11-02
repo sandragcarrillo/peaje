@@ -201,7 +201,12 @@ function AvisoCobros({ slug, conWallet, t }: { slug: string; conWallet: boolean;
     <div className="flex flex-col justify-between gap-4 border border-accent bg-panel p-5 sm:flex-row sm:items-center">
       <div className="space-y-1.5">
         <p className="text-sm font-semibold">{t.cobrosAvisoTitulo}</p>
-        <p className="text-sm text-muted">{t.cobrosAvisoTexto}</p>
+        <p className="text-sm text-muted">
+          {t.cobrosAvisoTexto}{' '}
+          <Link href={t.cobrosArticulo} className="underline underline-offset-4 hover:text-text">
+            {t.cobrosConoceMas}
+          </Link>
+        </p>
         {conWallet ? null : <p className="text-sm text-muted">{t.cobrosSinWallet}</p>}
       </div>
       {conWallet ? (

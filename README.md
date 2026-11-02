@@ -14,23 +14,23 @@ Built by:
 
 **Live:** [usepeaje.com](https://usepeaje.com) · Gateway: `api.usepeaje.com` · Packages: [`@peaje/cli`](https://www.npmjs.com/package/@peaje/cli), [`@peaje/next`](https://www.npmjs.com/package/@peaje/next), [`@peaje/proxy`](https://www.npmjs.com/package/@peaje/proxy)
 
-Try the payment cycle right now (a real priced route, weather data proxied from Open-Meteo):
+Payments run on mainnet since 1 November 2026: USDC on Arbitrum One through [PeajeSettlementV3](./contracts) and pathUSD on Tempo. Each business turns charging on from its dashboard, and until it does, its priced routes are served for free. A priced route answers like this:
 
 ```bash
-curl -i "https://api.usepeaje.com/clima-andino/v1/forecast?latitude=4.71&longitude=-74.07&daily=temperature_2m_max&forecast_days=5"
+curl -i "https://api.usepeaje.com/<business>/<priced-path>"
 ```
 
-It answers `402 Payment Required` with one offer per rail (Arbitrum Sepolia USDC and USDG, Robinhood Chain USDG, Tempo pathUSD, Arc USDC, plus Circle Nanopayments); an MPP or x402 agent picks one, pays and gets the data. All rails are testnets today.
+The response is `402 Payment Required` with one offer per rail, as MPP (`WWW-Authenticate: Payment`) and as x402 (`Payment-Required`). The agent picks one, pays and gets the data, and the business gets 98% in its wallet in the same transaction. The owner's side, step by step: [How does an AI agent pay my website and where does the money go?](https://usepeaje.com/blog/how-does-an-ai-agent-pay-my-website-and-where-does-the-money-go)
 
 ## What it is
 
 Three steps, in the order a site owner meets them:
 
 1. **Radar, free, no account.** Enter a domain at [usepeaje.com/radar](https://usepeaje.com/radar): in about 30 seconds you see your agent-readiness score today, the ceiling with Peaje, and the list of what agents find and what is missing. The score comes from [Ora](https://ora.ai), an independent measure.
-2. **Install Peaje.** One command, `npx @peaje/cli@1 init <slug>`, or one text pasted into Claude Code, Cursor, Lovable or v0. The site becomes readable by agents (`llms.txt`, `openapi.json`, an MCP server, agent cards, JSON-LD) and every route can carry a price, including zero. Charging is optional: when a route has a price, the site answers `402` on its own domain and agents pay in stablecoin via **[MPP](https://mpp.dev/)** or x402. No API keys, no accounts for agents, and no crypto in the onboarding: the business wallet is created automatically ([Privy](https://privy.io)).
-3. **AEO agent (Pro, US$29 a month, 14-day trial).** An agent that measures whether ChatGPT, Perplexity, Gemini and Claude cite the site for a set of questions, builds a plan around the owner's goal, writes the pages that answer those questions from facts on the site, hands each task to the owner's coding tool through an MCP server or the CLI, verifies the live site and measures again at 2 and 6 weeks. It also checks which AI bots can read the site and runs a mystery shopper against the payment step. Talks on the dashboard and on Telegram.
+2. **Install Peaje.** One command, `npx @peaje/cli@1 init <slug>`, or one text pasted into Claude Code, Cursor, Lovable or v0. The site becomes readable by agents (`llms.txt`, `openapi.json`, an MCP server, agent cards, JSON-LD) and every route can carry a price, including zero. Charging is optional and starts turned off: the owner turns it on from the dashboard, and from then on a route with a price answers `402` on the site's own domain and agents pay in stablecoin via **[MPP](https://mpp.dev/)** or x402. No API keys, no accounts for agents, and no crypto in the onboarding: the business wallet is created automatically ([Privy](https://privy.io)).
+3. **AEO agent (Pro: US$30 a month at the founder price for the first 50 businesses, then US$69).** An agent that measures whether ChatGPT and Claude cite the site for a set of questions, builds a plan around the owner's goal, writes the pages that answer those questions from facts on the site, hands each task to the owner's coding tool through an MCP server or the CLI, verifies the live site and measures again at 2 and 6 weeks. It also checks which AI bots can read the site and runs a mystery shopper against the payment step. Talks on the dashboard and on Telegram.
 
-Peaje keeps 2% of each payment. On Tempo the split is native: 98% lands in the business wallet and 2% in Peaje's, in the agent's own transaction, and Peaje holds nothing. On Arbitrum, Robinhood and Arc the [PeajeSettlement](./contracts) contract credits the business and the fee on-chain in the same transaction, and the business withdraws without gas.
+Peaje keeps 2% of each payment and holds nothing. On Arbitrum, [PeajeSettlementV3](./contracts) splits each payment in the same transaction: 98% of the price goes straight to the business wallet, and 2% plus the network cost goes to Peaje's fee recipient. There are no balances and no withdrawals. On Tempo the split is native, in the agent's own transaction.
 
 ## How Peaje has been improving
 
@@ -60,20 +60,27 @@ Three hackathons, one product, each round building on the last.
 - **Pro billing through Peaje's own 402**, payable by any x402 or MPP wallet or from the Peaje balance. Own domain: `usepeaje.com` and `api.usepeaje.com`.
 - **Peaje runs on Peaje.** usepeaje.com installs `@peaje/next` from npm like any customer, and sells its radar to agents as a paid API (`GET /api/radar/:domain`). The description agents read in `llms.txt`, `openapi.json` and the MCP server is written by Peaje from each site's own pages.
 
+### Mainnet (November 2026): real money, the owner's call
+
+- **PeajeSettlementV3** ([contracts](./contracts), [design and security model](./docs/contrato-v3.md)): a stateless split with the 2% fixed in code, a 2-of-3 Safe as owner and a guardian that can only pause. Internal audit on 28 October (four parallel reviews, with regression tests), no external audit, 232 Foundry tests. Deployed on Arbitrum One on 1 November and verified on Arbiscan and Sourcify, with the same bytecode as on Arbitrum Sepolia.
+- **USDC only at launch.** The offers follow the tokens the contract accepts, so adding USDG later is one Safe transaction, with no redeploy and no config change.
+- **One switch for every rail** (`NEXT_PUBLIC_RED`), with each token defined per chain so a testnet token can never be charged on mainnet. Tested end to end against an Arbitrum One fork with the real USDC and USDG.
+- **Charging is each business's decision.** It starts off, priced routes stay free until the owner turns it on, and testnet and mainnet payments are recorded apart.
+
 Our own team and a group of content creators who have never touched crypto are using the MVP: the radar, the install and the AEO agent, with the wallet created for them. What they find decides what ships next.
 
 ## Contracts
 
-PeajeSettlement, verified on each network ([source and tests](./contracts)):
+PeajeSettlementV3, verified on each network ([source and tests](./contracts)):
 
 | Network | Address | Settles |
 |---|---|---|
-| Arbitrum Sepolia (421614) | [`0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231`](https://sepolia.arbiscan.io/address/0x36F9aEBeBce767A1FEE25Fa90F9bF13137E61231) | USDC, USDG |
-| Robinhood Chain Testnet (46630) | [`0xcfe4837a55fcf45c697f61b4577ddb894aa46eb7`](https://explorer.testnet.chain.robinhood.com/address/0xcfe4837a55fcf45c697f61b4577ddb894aa46eb7) | USDG |
-| Arc Testnet (5042002) | [`0xc0a98a8091a987bbb86f149f61253094e663d0ed`](https://testnet.arcscan.app/address/0xc0a98a8091a987bbb86f149f61253094e663d0ed) | USDC |
-| Tempo Testnet (42431) | [`0x3e0f648349432A5195e498D8D3b7Fa7d759752cC`](https://explore.testnet.tempo.xyz/address/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC) | pathUSD via `settleWithPermit` |
+| **Arbitrum One (42161)** | [`0x2339369b423902281bF5c81d53AD1b59fd452020`](https://arbiscan.io/address/0x2339369b423902281bf5c81d53ad1b59fd452020) | USDC |
+| Arbitrum Sepolia (421614) | [`0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42`](https://sepolia.arbiscan.io/address/0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42) | USDC, USDG |
+| Robinhood Chain Testnet (46630) | [`0x3e0f648349432A5195e498D8D3b7Fa7d759752cC`](https://explorer.testnet.chain.robinhood.com/address/0x3e0f648349432A5195e498D8D3b7Fa7d759752cC) | USDG |
+| Arc Testnet (5042002) | [`0x5a810d1317412A9635D0F84B74ff9F2DFbEc0E21`](https://explorer.testnet.arc.io/address/0x5a810d1317412A9635D0F84B74ff9F2DFbEc0E21) | USDC |
 
-On Tempo the contract is deployed and tested with real payments, but the gateway charges through Tempo's native split instead: 98% goes straight to the business wallet and 2% to Peaje in the agent's own transaction, so Peaje holds nothing.
+On Arbitrum One the owner is a 2-of-3 Safe (`0x15Ec5d65c81E416Ba046A35aED7f8376f9cE4492`). Tempo has no Peaje contract in use: the gateway charges through Tempo's native split, so 98% goes straight to the business wallet and 2% to Peaje in the agent's own transaction. The earlier PeajeSettlement v2 (balances and gasless withdrawals) stays on the testnets until its balances are withdrawn; its addresses are in [contracts/README.md](./contracts/README.md).
 
 ## Install cost for the coding agent, measured
 
@@ -97,24 +104,23 @@ The old prompt left the JSON-LD out in one of three runs. The CLI never missed t
 [Agent] ──HTTP/MCP──> [Business site · @peaje/next or @peaje/proxy] ──priced routes──> [Gateway Hono + mppx · Railway] ──proxy──> [Business origin]
                          discovery files, MCP, 402 on the business domain       │  402 → on-chain payment → receipt
                                                                                 ├─ Tempo: native split, 98% to the business wallet, 2% to Peaje
-                                                                                ├─ PeajeSettlement (Arbitrum · Robinhood · Arc): merchant/fee split on-chain
-                                                                                ├─ Circle Nanopayments (Arbitrum · Arc): gasless after one deposit
-                                                                                └─ Ledger (Supabase) credits each site net of the fee
+                                                                                ├─ PeajeSettlementV3 (Arbitrum One): 98% to the business wallet, 2% + network cost to Peaje, same tx
+                                                                                └─ Ledger (Supabase): every payment, testnet and mainnet apart
 
 [AEO agent] ─ citation measurement (OpenAI, Perplexity, Gemini, Claude) · plan · page drafts (Opus)
             ─ tasks → owner MCP (/_owner/mcp) and `npx @peaje/cli tasks` → live verification → 2w/6w re-measure
             ─ bot access and freshness checks · mystery shopper · Telegram
 
-[Dashboard Next.js · Vercel] ─ radar (public) · email onboarding (Privy) · prices · kit · agent · withdrawals
+[Dashboard Next.js · Vercel] ─ radar (public) · email onboarding (Privy) · prices · kit · agent · payments switch and revenue
 ```
 
 | Piece | What it does |
 |---|---|
-| `apps/gateway` | Multi-tenant: `/{slug}/*` charges via MPP or x402 and proxies to the origin. Paid-tools MCP at `/{slug}/mcp`, owner MCP at `/_owner/mcp`. Discovery docs generated from the DB and anchored at the business domain. UCP/ACP/AP2. The AEO agent (plan, measurement, drafts, tasks, follow-ups, Telegram). Treasury, settlement and withdrawals with on-chain reconciliation. Pro billing. |
-| `apps/dashboard` | Public radar, email registration (Privy, automatic wallet), score with before/after, priced links and API routes, kit with two install paths and a verifier, the AEO agent (chat, plan, citations, tasks, Telegram, mystery shopper, subscription), withdrawals. |
+| `apps/gateway` | Multi-tenant: `/{slug}/*` charges via MPP or x402 and proxies to the origin. Paid-tools MCP at `/{slug}/mcp`, owner MCP at `/_owner/mcp`. Discovery docs generated from the DB and anchored at the business domain. UCP/ACP/AP2. The AEO agent (plan, measurement, drafts, tasks, follow-ups, Telegram). Settlement through PeajeSettlementV3 and Tempo splits, Tempo refunds, a per-business payments switch. Pro billing. |
+| `apps/dashboard` | Public radar, email registration (Privy, automatic wallet), score with before/after, priced links and API routes, kit with two install paths and a verifier, the AEO agent (chat, plan, citations, tasks, Telegram, mystery shopper, subscription), the payments switch and revenue per business. |
 | `packages/peaje-next`, `packages/peaje-proxy`, `packages/peaje-cli` | The 402 on the business's own domain for Next.js, Express, Hono and Vite on Vercel, and the CLI that installs it and applies the agent's tasks. |
 | `packages/shared`, `packages/db` | Network definitions, kit generation and verification, route matching; schema and stores (Supabase / in-memory). |
-| `contracts` | PeajeSettlement, Foundry. |
+| `contracts` | PeajeSettlementV3 (in use) and v2 (testnets only), Foundry. |
 
 ## Run locally
 
@@ -129,16 +135,16 @@ Same cycle locally: `curl -i http://localhost:8787/<slug>/<priced-path>` returns
 
 ## Tech
 
-- **Arbitrum**: [PeajeSettlement](./contracts) on Arbitrum Sepolia settles USDC and USDG, crediting the merchant and the platform fee on-chain in the same transaction; merchants withdraw without gas. A subgraph indexes every settlement and withdrawal.
+- **Arbitrum**: [PeajeSettlementV3](./contracts) on Arbitrum One settles USDC in production, splitting each payment between the business wallet and Peaje in the same transaction. The same contract runs on Arbitrum Sepolia with USDC and USDG.
 - **Robinhood Chain**: the same contract settles USDG on Robinhood Chain testnet.
 - **Tempo**: MPP/402 charging with native splits; pathUSD on both sides of the loop (charge, fund, buy).
-- **Circle / Arc**: USDC rail with EIP-3009 authorizations. **Circle Nanopayments** on Arbitrum Sepolia and Arc: one deposit into Circle Gateway, then each request is a signature, no gas; measured at 250 ms per payment ([details](./docs/improvements/2026-09-27-nanopayments.md)).
+- **Circle / Arc**: USDC rail with EIP-3009 authorizations on Arc testnet. **Circle Nanopayments** were built and measured at 250 ms per payment ([details](./docs/improvements/2026-09-27-nanopayments.md)) and are turned off, because they pool payments in Peaje's balance and Peaje no longer holds funds.
 - **The Graph**: ERC-8004 subgraphs feed identity and on-chain reputation into the buyer agent, and a PeajeSettlement subgraph indexes settlements and withdrawals.
 - **Privy**: server wallets for businesses and agents; email-only onboarding.
 - **Base / x402**: the real third-party market the buyer agent purchases from with real USDC.
 
 ## Status
 
-- Live at [usepeaje.com](https://usepeaje.com). Payments run on test networks today, and the dashboard says so on every screen that shows money.
-- Real payments verified on Arbitrum Sepolia (USDC through PeajeSettlement, payment and withdrawal), Tempo testnet (pathUSD with native split), Arc testnet (USDC) and Circle Nanopayments.
+- Live at [usepeaje.com](https://usepeaje.com). Payments run on mainnet since 1 November 2026, USDC on Arbitrum One and pathUSD on Tempo, and each business turns charging on from its dashboard.
+- PeajeSettlementV3 is deployed and verified on Arbitrum One and tested end to end against an Arbitrum One fork with the real USDC and USDG. Real payments verified on Arbitrum Sepolia (USDC and USDG) and Arc testnet through PeajeSettlementV3, and on Tempo testnet with the native split.
 - The AEO agent runs end to end on the dashboard and Telegram, with results measured on the live site at 2 and 6 weeks.

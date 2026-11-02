@@ -12,11 +12,11 @@ traduccion: x402-vs-mpp-cual-protocolo-de-pago-para-agentes-de-ia-deberia-usar
 
 # x402 vs MPP: which payment protocol for AI agents should I use?
 
-If you can, do not pick: offer both in the same response and let the agent pay with the one it knows. x402 and MPP solve the same thing, an agent paying you without a person stepping in, and both use the HTTP 402 "Payment Required" response, but each agent speaks one or the other. Peaje answers with both in the same 402, and today they run on test networks, so they move no real money yet.
+If you can, do not pick: offer both in the same response and let the agent pay with the one it knows. x402 and MPP solve the same thing, an agent paying you without a person stepping in, and both use the HTTP 402 "Payment Required" response, but each agent speaks one or the other. Peaje answers with both in the same 402, with real payments in USDC on Arbitrum and pathUSD on Tempo.
 
-Updated: October 2026
+Updated: November 2026
 
-Once payments are real, Peaje keeps 2% of each payment and the rest goes to your business's wallet, according to the [homepage](https://usepeaje.com/).
+Peaje keeps 2% of each payment and the rest lands in your business's wallet in the same transaction, according to the [homepage](https://usepeaje.com/). How to turn it on and where to see it is in [how does an AI agent pay my website](https://usepeaje.com/blog/how-does-an-ai-agent-pay-my-website-and-where-does-the-money-go).
 
 ## What is x402?
 

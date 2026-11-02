@@ -130,8 +130,8 @@ export const landing = {
       ...(COBROS_VISIBLES
         ? [
       {
-        p: '¿Cómo cobran los agentes?',
-        r: `Es opcional. x402 es una forma de cobrar por internet en la que tu sitio le pide un pago al agente antes de entregarle lo que pidió. MPP es otro estándar para lo mismo: el agente paga y recibe la respuesta en el mismo pedido. Hoy los dos funcionan en redes de prueba, así que todavía no mueven dinero real. Cuando haya pagos reales, Peaje se queda con el ${pct}% de cada uno.`,
+        p: '¿Cómo me pagan los agentes?',
+        r: `Es opcional. x402 es una forma de cobrar por internet en la que tu sitio le pide un pago al agente antes de entregarle lo que pidió. MPP es otro estándar para lo mismo: el agente paga y recibe la respuesta en el mismo pedido. Los pagos son reales, en USDC en Arbitrum y en pathUSD en Tempo, y te llegan a la wallet en la misma transacción, menos el ${pct}% de Peaje. Vienen apagados y los activas desde tu panel cuando quieras.`,
       },
           ]
         : []),
@@ -266,8 +266,8 @@ export const landing = {
       ...(COBROS_VISIBLES
         ? [
       {
-        p: 'How do agents pay?',
-        r: `It is optional. x402 is a way to charge on the web where your site asks the agent for a payment before handing over what it asked for. MPP is another standard for the same thing: the agent pays and gets the answer in the same request. Today both run on test networks, so they move no real money yet. Once payments are real, Peaje keeps ${pct}% of each one.`,
+        p: 'How do agents pay me?',
+        r: `It is optional. x402 is a way to charge on the web where your site asks the agent for a payment before handing over what it asked for. MPP is another standard for the same thing: the agent pays and gets the answer in the same request. Payments are real, in USDC on Arbitrum and pathUSD on Tempo, and they land in your wallet in the same transaction, minus Peaje's ${pct}%. They come turned off and you turn them on from your dashboard whenever you want.`,
       },
           ]
         : []),

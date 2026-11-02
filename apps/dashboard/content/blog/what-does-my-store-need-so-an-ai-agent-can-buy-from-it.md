@@ -14,7 +14,7 @@ traduccion: que-necesita-mi-tienda-para-que-un-agente-de-ia-pueda-comprarle
 
 It needs four things, in this order: the agent has to find you, understand what you sell and at what price, use your site without getting stuck and have a way to pay you. If either of the first two fails, the agent never reaches payment, so that is where to start. Peaje's [free radar](https://usepeaje.com/radar) checks all four in under a minute.
 
-Updated: October 2026
+Updated: November 2026
 
 Peaje's radar groups its checks into those four layers, it is free and it only asks for your email and your domain, according to the [radar page](https://usepeaje.com/radar).
 
@@ -59,7 +59,7 @@ Several protocols coexist today, and each assistant uses its own:
 | AP2 (Agent Payments Protocol) | Google with more than 60 companies, September 2025 | Proving with a signature that the customer authorized that purchase. It takes cards, bank transfers and stablecoins |
 | x402 and MPP | Coinbase, and Stripe with Tempo | Charging per use with an HTTP 402 response. They fit APIs and digital content better than a cart. We compare the two in [this guide](https://usepeaje.com/blog/x402-vs-mpp-which-payment-protocol-for-ai-agents-should-i-use) |
 
-If you sell physical products on Shopify or Etsy, ACP and UCP will most likely reach you through your platform, so check its settings before you build anything. If you sell access to an API or content per use, the route is the 402. Peaje answers with x402 and MPP in the same 402, on test networks today, so it moves no real money yet.
+If you sell physical products on Shopify or Etsy, ACP and UCP will most likely reach you through your platform, so check its settings before you build anything. If you sell access to an API or content per use, the route is the 402. Peaje answers with x402 and MPP in the same 402, with real payments in USDC on Arbitrum and pathUSD on Tempo, and the payment lands in your wallet in the same transaction ([how it works](https://usepeaje.com/blog/how-does-an-ai-agent-pay-my-website-and-where-does-the-money-go)).
 
 ## Where do I start?
 
