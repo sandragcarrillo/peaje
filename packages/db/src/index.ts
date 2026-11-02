@@ -6,6 +6,7 @@ export * from './planes'
 // ---- app de Privy propia ----
 export * from './wallet-dueno'
 export { noEsVisita, quienEs } from './visits'
+export { registroTestnet } from './red'
 
 import { MemoryStore } from './memory'
 import { SupabaseStore } from './supabase'

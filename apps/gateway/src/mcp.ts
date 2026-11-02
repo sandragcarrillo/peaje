@@ -6,7 +6,7 @@ import { Mppx, Transport } from 'mppx/server'
 import { z } from 'zod'
 import { contextoCobro, nuevoContexto, prepararOrigen, type ContextoCobro } from './contexto.js'
 import { creditPayment, refundOriginFailure } from './charge.js'
-import { motivoNoLiquidado, sinDireccionDeCobro, tieneDireccionDeCobro } from './cobro.js'
+import { conPrecioVigente, motivoNoLiquidado, sinDireccionDeCobro, tieneDireccionDeCobro } from './cobro.js'
 import { cortado, registrarFalloOrigen, respuestaCortado } from './cortacircuito.js'
 import { docsBase } from './base.js'
 import { env } from './env.js'
@@ -390,7 +390,8 @@ export async function handleMcpRequest(
     store.listResources(tenant.id),
   ])
   const base = docsBase(tenant)
-  const server = buildServer(tenant, routes, resources, base)
+  // Sin cobros activos en mainnet, las herramientas con precio quedan gratis.
+  const server = buildServer(tenant, conPrecioVigente(tenant, routes), conPrecioVigente(tenant, resources), base)
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

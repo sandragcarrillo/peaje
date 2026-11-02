@@ -73,6 +73,8 @@ export async function creditPayment(ctx: ChargeContext, receipt: ReceiptInfo): P
     networkFee: ctx.networkFee ?? '0',
     // ---- pagos directos ----
     payoutAddress: split || exacto ? (ctx.payoutAddress ?? null) : null,
+    // El modo va explícito: el panel de mainnet no suma pagos de testnet.
+    testnet: env.testnet,
   })
 
   console.log('[charge] pago acreditado', {

@@ -27,6 +27,25 @@ export const dinero = {
     copiar: 'Copiar',
     copiado: 'Copiado',
 
+    // Cobros a agentes (mainnet): el negocio decide cuándo empieza a cobrar
+    cobrosAvisoTitulo: 'Los agentes ya pueden pagarte',
+    cobrosAvisoTexto:
+      'Peaje ya cobra con plata real. Mientras no actives los cobros, los agentes usan gratis tus rutas y links con precio. Cuando los actives, cada pago llega a tu wallet en el momento, menos el 2% de Peaje.',
+    cobrosSinWallet: 'Antes de activarlos, elige en Ingresos la wallet donde recibes los pagos.',
+    cobrosIrAIngresos: 'Ir a Ingresos',
+    cobrosTitulo: 'Cobros a agentes',
+    cobrosApagados: 'Están apagados, así que los agentes usan gratis tus rutas y links con precio.',
+    cobrosActivos: (desde: string | null) =>
+      desde
+        ? `Están activos desde el ${desde}, y cada pago llega a tu wallet en el momento, menos el 2% de Peaje.`
+        : 'Están activos, y cada pago llega a tu wallet en el momento, menos el 2% de Peaje.',
+    cobrosActivar: 'Activar cobros',
+    cobrosActivando: 'Activando…',
+    cobrosApagar: 'Apagar cobros',
+    cobrosApagando: 'Apagando…',
+    cobrosErrorSinWallet: 'Primero elige la wallet donde recibes los pagos.',
+    cobrosErrorGenerico: 'No se pudo guardar. Prueba de nuevo.',
+
     // Mi wallet
     miWallet: 'Mi wallet',
     sinWalletNegocio: 'Este sitio no tiene wallet configurada.',
@@ -75,6 +94,25 @@ export const dinero = {
       'Payments marked "before direct payouts" are from when Peaje held the balance. If anything is left there, write to us and we move it to your payout address.',
     copiar: 'Copy',
     copiado: 'Copied',
+
+    // Cobros a agentes (mainnet)
+    cobrosAvisoTitulo: 'Agents can now pay you',
+    cobrosAvisoTexto:
+      "Peaje now charges real money. Until you turn on payments, agents use your priced routes and links for free. Once you do, every payment lands in your wallet right away, minus Peaje's 2%.",
+    cobrosSinWallet: 'Before turning them on, choose in Revenue the wallet where you get paid.',
+    cobrosIrAIngresos: 'Go to Revenue',
+    cobrosTitulo: 'Payments from agents',
+    cobrosApagados: 'They are off, so agents use your priced routes and links for free.',
+    cobrosActivos: (desde: string | null) =>
+      desde
+        ? `They have been on since ${desde}, and every payment lands in your wallet right away, minus Peaje's 2%.`
+        : "They are on, and every payment lands in your wallet right away, minus Peaje's 2%.",
+    cobrosActivar: 'Turn on payments',
+    cobrosActivando: 'Turning on…',
+    cobrosApagar: 'Turn off payments',
+    cobrosApagando: 'Turning off…',
+    cobrosErrorSinWallet: 'First choose the wallet where you get paid.',
+    cobrosErrorGenerico: 'We could not save it. Try again.',
 
     // Mi wallet
     miWallet: 'My wallet',

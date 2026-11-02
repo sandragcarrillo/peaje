@@ -1,6 +1,7 @@
 import { reputationAverage } from '@peaje/shared'
 import { store } from '../store.js'
 import { env } from '../env.js'
+import { cobraEnEsteModo } from '../cobro.js'
 
 /**
  * Descubrimiento de servicios para un agente comprador. Dos fuentes que se
@@ -133,6 +134,8 @@ async function desdeElDirectorio(): Promise<Candidato[]> {
   const tenants = await store.listTenants()
   const out: Candidato[] = []
   for (const t of tenants) {
+    // Sin cobros activos en mainnet sus rutas son gratis: no hay nada que comprar.
+    if (!cobraEnEsteModo(t)) continue
     // Las rutas de API con precio también son comprables (GET sin parámetros
     // de path; la query la completa la capa de lenguaje sobre la misión).
     const routes = await store.listRoutes(t.id).catch(() => [])

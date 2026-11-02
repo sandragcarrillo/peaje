@@ -40,6 +40,7 @@ import type {
 } from './types'
 // ---- M6 ----
 import type { FollowupSnapshot, TaskFollowup } from './types'
+import { registroTestnet } from './red'
 import { aggregateVisits } from './visits'
 // ---- M7 ----
 import type { MysteryRun, NewMysteryRun } from './types'
@@ -121,6 +122,8 @@ export class MemoryStore implements Store {
       voiceProfile: null,
       voiceProfileAt: null,
       acquisitionSource: input.acquisitionSource ?? null,
+      cobrosActivos: false,
+      cobrosActivadosAt: null,
       createdAt: new Date().toISOString(),
     }
     this.#tenants.set(tenant.id, tenant)
@@ -249,6 +252,13 @@ export class MemoryStore implements Store {
   async setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void> {
     const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
     if (t) t.herramientas = herramientas
+  }
+
+  async setCobrosActivos(tenantId: string, activos: boolean): Promise<void> {
+    const t = [...this.#tenants.values()].find((x) => x.id === tenantId)
+    if (!t) return
+    t.cobrosActivos = activos
+    t.cobrosActivadosAt = activos ? new Date().toISOString() : null
   }
 
   // ---- OAuth del MCP del dueño ----
@@ -861,6 +871,7 @@ export class MemoryStore implements Store {
       networkFee: '0',
       payoutAddress: null,
       ...payment,
+      testnet: payment.testnet ?? registroTestnet(),
       id: this.#id('pay'),
       refundTx: null,
       createdAt: new Date().toISOString(),
@@ -918,22 +929,32 @@ export class MemoryStore implements Store {
 
   async refundedSince(since: string, tenantId?: string) {
     return this.#payments
-      .filter((p) => p.refundTx && p.createdAt >= since && (!tenantId || p.tenantId === tenantId))
+      .filter((p) => p.refundTx && p.testnet === registroTestnet() && p.createdAt >= since && (!tenantId || p.tenantId === tenantId))
       .reduce((n, p) => n + Number(p.amount) + Number(p.platformFee) + Number(p.networkFee), 0)
   }
 
+  /** Pagos del negocio en el modo del proceso. */
+  #pagosDe(tenantId: string) {
+    const testnet = registroTestnet()
+    return this.#payments.filter((p) => p.tenantId === tenantId && p.testnet === testnet)
+  }
+
+  /** Retiros de la custodia vieja: solo existieron en testnet. */
+  #retirosDe(tenantId: string) {
+    return registroTestnet() ? this.#withdrawals.filter((w) => w.tenantId === tenantId) : []
+  }
+
   async listPayments(tenantId: string, limit = 50) {
-    return this.#payments
-      .filter((p) => p.tenantId === tenantId)
+    return this.#pagosDe(tenantId)
       .slice(-limit)
       .reverse()
   }
 
   async balance(tenantId: string): Promise<Balance> {
-    const payments = this.#payments.filter((p) => p.tenantId === tenantId && !p.refundTx)
+    const payments = this.#pagosDe(tenantId).filter((p) => !p.refundTx)
     const revenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
-    const withdrawn = this.#withdrawals
-      .filter((w) => w.tenantId === tenantId && w.status !== 'failed')
+    const withdrawn = this.#retirosDe(tenantId)
+      .filter((w) => w.status !== 'failed')
       .reduce((acc, w) => acc + Number(w.amount), 0)
     return {
       revenue: revenue.toFixed(6),
@@ -945,15 +966,13 @@ export class MemoryStore implements Store {
 
   async balanceByNetwork(tenantId: string): Promise<NetworkBalance[]> {
     const networks = new Set<string>(['tempo', 'arc'])
-    for (const p of this.#payments) if (p.tenantId === tenantId) networks.add(p.network)
-    for (const w of this.#withdrawals) if (w.tenantId === tenantId) networks.add(w.network)
+    for (const p of this.#pagosDe(tenantId)) networks.add(p.network)
+    for (const w of this.#retirosDe(tenantId)) networks.add(w.network)
     return [...networks].sort().map((network) => {
-      const payments = this.#payments.filter(
-        (p) => p.tenantId === tenantId && p.network === network && !p.refundTx,
-      )
+      const payments = this.#pagosDe(tenantId).filter((p) => p.network === network && !p.refundTx)
       const revenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
-      const withdrawn = this.#withdrawals
-        .filter((w) => w.tenantId === tenantId && w.network === network && w.status !== 'failed')
+      const withdrawn = this.#retirosDe(tenantId)
+        .filter((w) => w.network === network && w.status !== 'failed')
         .reduce((acc, w) => acc + Number(w.amount), 0)
       return {
         network,
@@ -968,8 +987,8 @@ export class MemoryStore implements Store {
   async dailyRevenue(tenantId: string, days: number) {
     const buckets = new Map<string, { amount: number; count: number }>()
     const since = Date.now() - days * 86_400_000
-    for (const p of this.#payments) {
-      if (p.tenantId !== tenantId || p.refundTx) continue
+    for (const p of this.#pagosDe(tenantId)) {
+      if (p.refundTx) continue
       const time = new Date(p.createdAt).getTime()
       if (time < since) continue
       const date = p.createdAt.slice(0, 10)

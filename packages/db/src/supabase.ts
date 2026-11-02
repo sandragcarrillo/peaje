@@ -43,6 +43,7 @@ import type {
 } from './types'
 // ---- M6 ----
 import type { FollowupSnapshot, TaskFollowup } from './types'
+import { registroTestnet } from './red'
 import { aggregateVisits, type VisitRow } from './visits'
 // ---- pagos directos ----
 import type { NewSettlementStray, SettlementStray } from './types'
@@ -133,6 +134,9 @@ function tenantFrom(row: Row): Tenant {
     acquisitionSource: row.acquisition_source ?? null,
     // `??` hasta que corra la migración 20261028000000.
     herramientas: (row.herramientas ?? {}) as Record<string, HerramientaUsada>,
+    // `??` hasta que corra la migración 20261101000000.
+    cobrosActivos: row.cobros_activos ?? false,
+    cobrosActivadosAt: row.cobros_activados_at ?? null,
     createdAt: row.created_at,
   }
 }
@@ -283,6 +287,7 @@ function paymentFrom(row: Row): Payment {
     platformFee: String(row.platform_fee ?? '0'),
     networkFee: String(row.network_fee ?? '0'),
     payoutAddress: row.payout_address ?? null,
+    testnet: row.testnet ?? true,
     createdAt: row.created_at,
   }
 }
@@ -597,6 +602,14 @@ export class SupabaseStore implements Store {
   async setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void> {
     const { error } = await this.#db.from('tenants').update({ herramientas }).eq('id', tenantId)
     this.#fail('setTenantHerramientas', error)
+  }
+
+  async setCobrosActivos(tenantId: string, activos: boolean): Promise<void> {
+    const { error } = await this.#db
+      .from('tenants')
+      .update({ cobros_activos: activos, cobros_activados_at: activos ? new Date().toISOString() : null })
+      .eq('id', tenantId)
+    this.#fail('setCobrosActivos', error)
   }
 
   // ---- OAuth del MCP del dueño ----
@@ -1530,6 +1543,7 @@ export class SupabaseStore implements Store {
           network: payment.network,
           platform_fee: payment.platformFee ?? '0',
           network_fee: payment.networkFee ?? '0',
+          testnet: payment.testnet ?? registroTestnet(),
           // Solo si hay dato (ver recordPayment).
           ...(payment.payoutAddress ? { payout_address: payment.payoutAddress } : {}),
         },
@@ -1621,7 +1635,12 @@ export class SupabaseStore implements Store {
   }
 
   async refundedSince(since: string, tenantId?: string): Promise<number> {
-    let q = this.#db.from('payments').select('amount, platform_fee, network_fee').not('refund_tx', 'is', null).gte('created_at', since)
+    let q = this.#db
+      .from('payments')
+      .select('amount, platform_fee, network_fee')
+      .eq('testnet', registroTestnet())
+      .not('refund_tx', 'is', null)
+      .gte('created_at', since)
     if (tenantId) q = q.eq('tenant_id', tenantId)
     const { data, error } = await q
     this.#fail('refundedSince', error)
@@ -1633,6 +1652,7 @@ export class SupabaseStore implements Store {
       .from('payments')
       .select()
       .eq('tenant_id', tenantId)
+      .eq('testnet', registroTestnet())
       .order('created_at', { ascending: false })
       .limit(limit)
     this.#fail('listPayments', error)
@@ -1641,9 +1661,10 @@ export class SupabaseStore implements Store {
 
   async balance(tenantId: string): Promise<Balance> {
     const { data, error } = await this.#db
-      .from('tenant_balances')
+      .from('tenant_balances_red')
       .select()
       .eq('tenant_id', tenantId)
+      .eq('testnet', registroTestnet())
       .maybeSingle()
     this.#fail('balance', error)
     const row = (data ?? {}) as Row
@@ -1657,9 +1678,10 @@ export class SupabaseStore implements Store {
 
   async balanceByNetwork(tenantId: string): Promise<NetworkBalance[]> {
     const { data, error } = await this.#db
-      .from('tenant_network_balances')
+      .from('tenant_network_balances_red')
       .select()
       .eq('tenant_id', tenantId)
+      .eq('testnet', registroTestnet())
       .order('network', { ascending: true })
     this.#fail('balanceByNetwork', error)
     return ((data ?? []) as Row[]).map((row) => ({
@@ -1677,6 +1699,7 @@ export class SupabaseStore implements Store {
       .from('payments')
       .select('amount, created_at')
       .eq('tenant_id', tenantId)
+      .eq('testnet', registroTestnet())
       .gte('created_at', since)
     this.#fail('dailyRevenue', error)
     const buckets = new Map<string, { amount: number; count: number }>()

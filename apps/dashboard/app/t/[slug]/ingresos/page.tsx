@@ -6,6 +6,7 @@ import { getDict } from '@/lib/i18n'
 import { armarIngresos } from '@/lib/ingresos'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
+import { BotonCobros } from '../cobros'
 import { WalletForm } from '../wallet'
 
 /**
@@ -55,6 +56,25 @@ export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos
           <p className="my-2 font-mono text-lg">{tenant.payoutWallet ? shortWallet(tenant.payoutWallet) : d.panel.metricaCobroFalta}</p>
         </div>
       </div>
+
+      {/* Mainnet: el negocio decide cuándo cobra. Apagado, sus rutas con precio son gratis. */}
+      {!TESTNET ? (
+        <section className="flex flex-col justify-between gap-4 border border-border bg-bg p-5 sm:flex-row sm:items-center">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">{t.cobrosTitulo}</h2>
+            <p className="text-sm text-muted">
+              {tenant.cobrosActivos
+                ? t.cobrosActivos(
+                    tenant.cobrosActivadosAt
+                      ? new Date(tenant.cobrosActivadosAt).toLocaleDateString(t.fechaLocale, { day: 'numeric', month: 'long', year: 'numeric' })
+                      : null,
+                  )
+                : t.cobrosApagados}
+            </p>
+          </div>
+          <BotonCobros slug={tenant.slug} activos={tenant.cobrosActivos} />
+        </section>
+      ) : null}
 
       <WalletForm slug={tenant.slug} wallet={tenant.payoutWallet} ownerWallet={tenant.ownerWallet} tipo={tipoWalletCobro(tenant)} />
 

@@ -1,6 +1,6 @@
 import type { Tenant } from '@peaje/db'
 import { creditReceipt, refundOriginFailure } from './charge.js'
-import { origenCaido, respuestaNoLiquidada, respuestaSinDireccion, tieneDireccionDeCobro } from './cobro.js'
+import { cobraEnEsteModo, origenCaido, respuestaNoLiquidada, respuestaSinDireccion, tieneDireccionDeCobro } from './cobro.js'
 import { contextoCobro, nuevoContexto, prepararOrigen } from './contexto.js'
 import { cortado, registrarFalloOrigen, respuestaCortado } from './cortacircuito.js'
 import { mppx } from './mpp.js'
@@ -20,7 +20,10 @@ import { mppx } from './mpp.js'
  *   sirve una sola vez, marcado `pending-split` (cobro.ts).
  *
  * Sin dirección de cobro no hay ofertas: 503 con el aviso para el dueño. Con
- * el origen caído N veces en M minutos tampoco (cortacircuito.ts).
+ * el origen caído N veces en M minutos tampoco (cortacircuito.ts). Si el
+ * negocio no activó los cobros en mainnet, se sirve gratis sin 402: quien
+ * llama ya lo filtra con conPrecioVigente, y acá se repite para que ningún
+ * camino nuevo pueda cobrarle a un negocio que no lo pidió.
  */
 export async function cobrarYServir(o: {
   tenant: Tenant
@@ -36,6 +39,14 @@ export async function cobrarYServir(o: {
   mensajeCaido: string
 }): Promise<Response> {
   const { tenant } = o
+  if (!cobraEnEsteModo(tenant)) {
+    try {
+      return await o.pedirOrigen()
+    } catch (err) {
+      console.error('[cobro] el origen no respondió (sin cobros activos)', { tenant: tenant.slug, path: o.path, err })
+      return origenCaido(o.mensajeCaido)
+    }
+  }
   if (!tieneDireccionDeCobro(tenant)) return respuestaSinDireccion(tenant)
   // Origen caído varias veces seguidas: sin 402 hasta que pase el enfriamiento.
   const hasta = cortado(tenant.id)

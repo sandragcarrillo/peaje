@@ -82,3 +82,63 @@ test('testnet sin variables nuevas queda como antes: el 2% de Tempo a la treasur
   assert.equal(env.v3.arbitrum, '0xcd29503DEcd337Fe005ca07d1B0343AEE05CdF42')
   assert.equal(env.circle, true)
 })
+
+/** Corre un script en un proceso con el entorno de cargarEnv y devuelve su JSON. */
+function correr(script: string, extra: Record<string, string>) {
+  const r = spawnSync(process.execPath, ['--import', 'tsx', '-e', script], {
+    cwd: GATEWAY,
+    encoding: 'utf8',
+    env: {
+      PATH: process.env.PATH,
+      MPP_SECRET_KEY: 'prueba-red-mainnet-0123456789abcdef0123456789',
+      TREASURY_ADDRESS: TREASURY,
+      TREASURY_PRIVATE_KEY: '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356',
+      INTERNAL_API_SECRET: 'interno',
+      ...extra,
+    },
+  })
+  assert.equal(r.status, 0, r.stderr)
+  return JSON.parse(r.stdout.trim().split('\n').at(-1)!)
+}
+
+// Graba un pago de testnet y uno de mainnet en el mismo store y lee en el modo del proceso.
+const LEDGER = `
+const { MemoryStore } = await import('@peaje/db')
+const { cobraEnEsteModo, conPrecioVigente } = await import('./src/cobro.ts')
+const store = new MemoryStore()
+const t = await store.createTenant({ slug: 'x', name: 'x', originUrl: 'https://x.example', embedSecret: 'x', email: 'x@example.com' })
+const pago = (testnet, ref) => store.recordPayment({ tenantId: t.id, routeId: null, path: '/a', agentWallet: null, amount: '1', receiptRef: ref, method: 'evm', network: 'arbitrum', testnet })
+await pago(true, '0x01'); await pago(false, '0x02'); await pago(false, '0x03')
+// El store en memoria devuelve el mismo objeto: se mide antes de activar.
+const apagado = await store.getTenantById(t.id)
+const cobraApagado = cobraEnEsteModo(apagado)
+const precioApagado = conPrecioVigente(apagado, [{ priceUsd: '0.05' }])[0].priceUsd
+await store.setCobrosActivos(t.id, true)
+const prendido = await store.getTenantById(t.id)
+console.log(JSON.stringify({
+  pagos: (await store.listPayments(t.id)).map((p) => p.receiptRef).sort(),
+  revenue: (await store.balance(t.id)).revenue,
+  cobraApagado,
+  cobraPrendido: cobraEnEsteModo(prendido),
+  precioApagado,
+  activadoAt: !!prendido.cobrosActivadosAt,
+}))
+`
+
+test('mainnet: el registro solo ve pagos de mainnet, y sin cobros activos el precio que rige es 0', () => {
+  const r = correr(`(async () => {${LEDGER}})()`, { NEXT_PUBLIC_RED: 'mainnet', PEAJE_FEE_RECIPIENT: FRIA })
+  assert.deepEqual(r.pagos, ['0x02', '0x03'])
+  assert.equal(r.revenue, '2.000000')
+  assert.equal(r.cobraApagado, false)
+  assert.equal(r.cobraPrendido, true)
+  assert.equal(r.precioApagado, '0')
+  assert.equal(r.activadoAt, true)
+})
+
+test('testnet: el registro solo ve pagos de testnet, y todos cobran aunque no activen nada', () => {
+  const r = correr(`(async () => {${LEDGER}})()`, {})
+  assert.deepEqual(r.pagos, ['0x01'])
+  assert.equal(r.revenue, '1.000000')
+  assert.equal(r.cobraApagado, true)
+  assert.equal(r.precioApagado, '0.05')
+})

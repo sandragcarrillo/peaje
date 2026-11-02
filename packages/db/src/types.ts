@@ -81,6 +81,14 @@ export type Tenant = {
    * Vacío hasta la migración 20261028000000.
    */
   herramientas?: Record<string, HerramientaUsada>
+  // ---- cobros por negocio (20261101000000) ----
+  /**
+   * El negocio recibe pagos de agentes en mainnet. Apagado por defecto: sus
+   * rutas y links con precio se sirven gratis hasta que lo active. En testnet
+   * no cuenta (se cobra con tokens de prueba). false hasta la migración.
+   */
+  cobrosActivos: boolean
+  cobrosActivadosAt: string | null
   createdAt: string
 }
 
@@ -186,12 +194,14 @@ export type Payment = {
    * (PeajeSettlementV3 o split de Tempo). null en pagos anteriores al cambio.
    */
   payoutAddress: string | null
+  /** De testnet o de mainnet (migración 20261101000000). Los anteriores son todos de testnet. */
+  testnet: boolean
   createdAt: string
 }
 
 /** Alta de pago: las comisiones y la dirección de cobro son opcionales. */
-export type NewPayment = Omit<Payment, 'id' | 'createdAt' | 'refundTx' | 'platformFee' | 'networkFee' | 'payoutAddress'> &
-  Partial<Pick<Payment, 'platformFee' | 'networkFee' | 'payoutAddress'>>
+export type NewPayment = Omit<Payment, 'id' | 'createdAt' | 'refundTx' | 'platformFee' | 'networkFee' | 'payoutAddress' | 'testnet'> &
+  Partial<Pick<Payment, 'platformFee' | 'networkFee' | 'payoutAddress' | 'testnet'>>
 
 // ---- pagos directos: pagos adelantados (front-run) ----
 /**
@@ -898,6 +908,8 @@ export interface Store {
   setTenantApiKey(tenantId: string, hash: string, prefix: string): Promise<void>
   /** Reemplaza el registro de herramientas conectadas (ver Tenant.herramientas). */
   setTenantHerramientas(tenantId: string, herramientas: Record<string, HerramientaUsada>): Promise<void>
+  /** Prende o apaga los cobros de agentes del negocio en mainnet (ver Tenant.cobrosActivos). */
+  setCobrosActivos(tenantId: string, activos: boolean): Promise<void>
   // ---- OAuth del MCP del dueño ----
   createOauthClient(c: NewOauthClient): Promise<OauthClient>
   getOauthClient(id: string): Promise<OauthClient | null>
@@ -1049,7 +1061,8 @@ export interface Store {
   createResources(inputs: NewResource[]): Promise<Resource[]>
   deleteResource(tenantId: string, resourceId: string): Promise<void>
 
-  // ledger
+  // ledger: todo lo que se lee queda en el modo del proceso (registroTestnet en red.ts)
+  /** Sin `testnet`, el pago se graba en el modo del proceso. */
   recordPayment(payment: NewPayment): Promise<Payment>
   setPaymentWallet(paymentId: string, wallet: string): Promise<void>
   markPaymentRefunded(paymentId: string, txRef: string): Promise<void>

@@ -4,7 +4,8 @@
 // el 402 solo ofrece Arbitrum One y Tempo mainnet (nada de testnet, Robinhood
 // ni Arc), el 2% de Tempo va a PEAJE_FEE_RECIPIENT, el contrato arranca solo
 // con USDC (decisión del 1 nov 2026) y USDG aparece cuando el owner lo agrega,
-// y un pago en cada token llega al negocio en la misma tx.
+// un negocio sin cobros activos se sirve gratis, y un pago en cada token llega
+// al negocio en la misma tx y queda en el registro como de mainnet.
 //
 // Corre solo con FORK_ARBITRUM_ONE_RPC (un RPC de Arbitrum One); sin él se
 // salta. Necesita `anvil` (Foundry) con anvil_dealERC20 y `cd contracts && forge build`.
@@ -141,12 +142,39 @@ if (!FORK) {
   })
 
   let n = 0
-  async function negocio() {
+  /** Negocio con wallet de cobro y, salvo que se pida lo contrario, con los cobros activos. */
+  async function negocio({ cobros = true } = {}) {
     const slug = `mainnet-${++n}`
     const tenant = await store.createTenant({ slug, name: slug, originUrl: `https://${slug}.example`, embedSecret: 'x', email: `${slug}@example.com` })
     await store.setPayoutWallet(tenant.id, merchant.address)
+    if (cobros) await store.setCobrosActivos(tenant.id, true)
     return (await store.getTenantById(tenant.id))!
   }
+
+  test('sin cobros activos el negocio no cobra: la ruta con precio se sirve gratis, sin 402 ni pago', async () => {
+    const tenant = await negocio({ cobros: false })
+    assert.equal(tenant.cobrosActivos, false)
+    const antes = await saldo(USDC.token, merchant.address)
+    let llamadas = 0
+    const r = await cobrarYServir({
+      tenant,
+      cobrable: new Request(`https://${tenant.slug}.example/api/dato`),
+      priceUsd: '1',
+      description: 'dato',
+      routeId: null,
+      path: '/api/dato',
+      pedirOrigen: async () => {
+        llamadas++
+        return Response.json({ ok: true })
+      },
+      mensajeCaido: 'caído',
+    })
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('www-authenticate'), null)
+    assert.equal(llamadas, 1)
+    assert.equal((await store.listPayments(tenant.id)).length, 0)
+    assert.equal(await saldo(USDC.token, merchant.address), antes)
+  })
 
   function cobrar(tenant: Awaited<ReturnType<typeof negocio>>, headers: Record<string, string> = {}) {
     return cobrarYServir({
@@ -253,6 +281,7 @@ if (!FORK) {
       const [pago] = await store.listPayments(tenant.id)
       assert.ok(pago)
       assert.equal(pago.network, net)
+      assert.equal(pago.testnet, false)
       assert.equal(pago.payoutAddress?.toLowerCase(), merchant.address.toLowerCase())
       const tx = await lector.getTransactionReceipt({ hash: pago.receiptRef as Hex })
       assert.equal(tx.status, 'success')

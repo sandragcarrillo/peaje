@@ -7,7 +7,7 @@ import { generate } from 'mppx/discovery'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
 import { iniciarTrabajos } from './tareas/trabajos.js'
 import { usdcStatus } from './chainlink.js'
-import { origenCaido } from './cobro.js'
+import { conPrecioVigente, origenCaido } from './cobro.js'
 import { cobrarYServir } from './cobrar.js'
 import { env } from './env.js'
 import { iniciarCostoRed } from './costoRed.js'
@@ -81,7 +81,7 @@ app.get('/:slug/openapi.json', async (c) => {
   // El discovery de pagos solo lista lo que cobra; lo gratis va en llms.txt.
   // La forma `handler` toma la metadata compuesta de la instancia MPP: emite
   // una oferta por riel en `x-payment-info.offers`.
-  const routes = (await sellableRoutes(tenant.id)).filter((r) => Number(r.priceUsd) > 0)
+  const routes = (await sellableRoutes(tenant)).filter((r) => Number(r.priceUsd) > 0)
   const doc = generate(mppx, {
       info: { title: `${tenant.name} · Peaje`, version: '1.0.0' },
       routes: routes.map((route) => ({
@@ -179,13 +179,16 @@ const WELL_KNOWN: Record<string, { builder: (ctx: { tenant: Parameters<typeof wk
   '.well-known/mcp/server-card.json': { builder: wk.mcpServerCard, contentType: 'application/json' },
 }
 
-/** Rutas de API + links con precio, unificados para discovery y archivos. */
-async function sellableRoutes(tenantId: string) {
+/**
+ * Rutas de API + links con precio, unificados para discovery y archivos, con
+ * el precio que rige: 0 si el negocio no activó los cobros en mainnet.
+ */
+async function sellableRoutes(tenant: Tenant) {
   const [routes, resources] = await Promise.all([
-    store.listRoutes(tenantId),
-    store.listResources(tenantId),
+    store.listRoutes(tenant.id),
+    store.listResources(tenant.id),
   ])
-  return [
+  return conPrecioVigente(tenant, [
     ...routes,
     ...resources.map((r) => ({
       id: r.id,
@@ -196,14 +199,14 @@ async function sellableRoutes(tenantId: string) {
       description: resourceTitle(r),
       active: true,
     })),
-  ]
+  ])
 }
 
 for (const [path, def] of Object.entries(WELL_KNOWN)) {
   app.get(`/:slug/${path}`, async (c) => {
     const tenant = await store.getTenantBySlug(c.req.param('slug'))
     if (!tenant) return c.json({ error: 'Tenant not found' }, 404)
-    const routes = await sellableRoutes(tenant.id)
+    const routes = await sellableRoutes(tenant)
     const base = docsBase(tenant)
     const body = def.builder({ tenant, routes, base })
     // `c.json` pisaría el content-type con application/json, y estos archivos
@@ -221,7 +224,7 @@ for (const [path, def] of Object.entries(WELL_KNOWN)) {
 app.get('/:slug/llms.txt', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.text('Tenant not found', 404)
-  const routes = await sellableRoutes(tenant.id)
+  const routes = await sellableRoutes(tenant)
   const base = docsBase(tenant)
 
   // Si el negocio ya tenía su propio llms.txt, lo respetamos y le pegamos la
@@ -264,8 +267,10 @@ app.get('/:slug/r/:rslug', async (c) => {
     return new Response(upstream.body, { status: upstream.status, headers })
   }
 
-  // Precio 0 = link gratis: se sirve directo, sin 402.
-  if (Number(resource.priceUsd) <= 0) {
+  // Precio 0 = link gratis: se sirve directo, sin 402. Igual si el negocio
+  // no activó los cobros en mainnet (ver cobraEnEsteModo en cobro.ts).
+  const [vigente] = conPrecioVigente(tenant, [resource])
+  if (Number(vigente!.priceUsd) <= 0) {
     try {
       return await traer()
     } catch (err) {
@@ -293,7 +298,7 @@ app.get('/:slug/r/:rslug', async (c) => {
 app.get('/:slug/discovery/resources', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
-  const routes = await sellableRoutes(tenant.id)
+  const routes = await sellableRoutes(tenant)
   const base = docsBase(tenant)
   const limit = Number.parseInt(c.req.query('limit') ?? '', 10)
   const body = wk.bazaarResources(
@@ -310,7 +315,7 @@ app.get('/:slug/discovery/resources', async (c) => {
 app.get('/:slug/developers', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return problema(c, 404, 'not-found', 'Unknown merchant')
-  const routes = await sellableRoutes(tenant.id)
+  const routes = await sellableRoutes(tenant)
   return c.html(developersHtml({ tenant, routes, base: docsBase(tenant) }))
 })
 app.get('/:slug/docs', async (c) => {
@@ -356,7 +361,7 @@ app.post('/:slug/checkout_sessions', async (c) => {
     return c.json(acpError('invalid_request', 'invalid', 'Body must be JSON'), 400, cabecerasAcp(c))
   }
 
-  const resources = await store.listResources(tenant.id)
+  const resources = conPrecioVigente(tenant, await store.listResources(tenant.id))
   const r = crearCheckout(tenant, docsBase(tenant), resources, body.items ?? [])
   return r.ok
     ? c.json(r.sesion, 201, cabecerasAcp(c))
@@ -507,7 +512,8 @@ app.all('/:slug/*', async (c) => {
 
   const url = new URL(c.req.url)
   const path = url.pathname.slice(`/${slug}`.length) || '/'
-  const routes = await store.listRoutes(tenant.id)
+  // Con el precio que rige: sin cobros activos en mainnet, todas gratis.
+  const routes = conPrecioVigente(tenant, await store.listRoutes(tenant.id))
   const match = matchRoute(routes, c.req.method, path)
 
   // Sin ruta, o una ruta con precio 0 (gratis, como un link gratis): directo al origen, sin 402.

@@ -88,6 +88,26 @@ export async function guardarWallet(slug: string, formData: FormData): Promise<G
   }
 }
 
+export type CambiarCobrosResultado = { ok: true } | { ok: false; error: string }
+
+/**
+ * Prende o apaga los cobros de agentes del negocio en mainnet. Apagados, sus
+ * rutas y links con precio se sirven gratis. Para prenderlos hace falta la
+ * dirección de cobro: sin ella el gateway no tiene a dónde mandar el 98%.
+ */
+export async function cambiarCobros(slug: string, activos: boolean): Promise<CambiarCobrosResultado> {
+  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
+  if (activos && !tenant.payoutWallet) return { ok: false, error: d.dinero.cobrosErrorSinWallet }
+  try {
+    await store.setCobrosActivos(tenant.id, activos)
+  } catch (error) {
+    console.error('[cobros] no se pudo cambiar', { tenant: tenant.slug, activos }, error)
+    return { ok: false, error: d.dinero.cobrosErrorGenerico }
+  }
+  revalidatePath(`/t/${slug}`, 'layout')
+  return { ok: true }
+}
+
 export type ResumenWallet = {
   address: string
   balances: { network: string; symbol: string; amount: string }[]

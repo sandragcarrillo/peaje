@@ -1,5 +1,6 @@
 import type { Tenant } from '@peaje/db'
 import type { ContextoCobro, ResultadoOrigen } from './contexto.js'
+import { env } from './env.js'
 import { merchantDelCobro } from './methods.js'
 
 /**
@@ -8,6 +9,25 @@ import { merchantDelCobro } from './methods.js'
  */
 
 const panel = () => process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com'
+
+/**
+ * El negocio cobra de verdad en este modo. En testnet siempre (tokens de
+ * prueba, como antes). En mainnet solo si activó los cobros desde el panel:
+ * mientras no, sus rutas y links con precio se sirven gratis y no se mueve
+ * plata que el negocio no pidió (decisión de San, 1 nov 2026).
+ */
+export function cobraEnEsteModo(tenant: Pick<Tenant, 'cobrosActivos'>): boolean {
+  return env.testnet || tenant.cobrosActivos
+}
+
+/**
+ * Las rutas o links con el precio que rige para el agente: el que puso el
+ * dueño si el negocio cobra, 0 si no. Lo usan el 402, el MCP y los
+ * documentos, para que ninguno anuncie un cobro que no va a pasar.
+ */
+export function conPrecioVigente<T extends { priceUsd: string }>(tenant: Pick<Tenant, 'cobrosActivos'>, items: T[]): T[] {
+  return cobraEnEsteModo(tenant) ? items : items.map((x) => ({ ...x, priceUsd: '0' }))
+}
 
 /** El negocio tiene a dónde recibir el 98%. Sin esto no hay ninguna oferta. */
 export function tieneDireccionDeCobro(tenant: Pick<Tenant, 'payoutWallet'>): boolean {
