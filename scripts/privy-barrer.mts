@@ -86,13 +86,13 @@ function lector(network: NetworkId) {
 }
 
 async function saldo(network: NetworkId, address: `0x${string}`): Promise<bigint> {
-  return lector(network).readContract({ address: NETWORKS[network].token, abi: erc20Abi, functionName: 'balanceOf', args: [address] })
+  return lector(network).readContract({ address: NETWORKS[network].testnet.token, abi: erc20Abi, functionName: 'balanceOf', args: [address] })
 }
 
 async function claimable(network: NetworkId, address: `0x${string}`): Promise<bigint> {
   const contrato = SETTLEMENT_CONTRACTS[network]
   if (!contrato) return 0n
-  return lector(network).readContract({ address: contrato, abi: CLAIMABLE_ABI, functionName: 'claimable', args: [NETWORKS[network].token, address] })
+  return lector(network).readContract({ address: contrato, abi: CLAIMABLE_ABI, functionName: 'claimable', args: [NETWORKS[network].testnet.token, address] })
 }
 
 const eip3009Abi = parseAbi([
@@ -105,7 +105,7 @@ async function moverRelayado(network: NetworkId, firmante: LocalAccount, to: `0x
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 600)
   const nonce = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')}` as `0x${string}`
   const signature = await firmante.signTypedData({
-    domain: { ...def.eip3009!, chainId: chain.id, verifyingContract: def.token },
+    domain: { ...def.eip3009!, chainId: chain.id, verifyingContract: def.testnet.token },
     types: {
       TransferWithAuthorization: [
         { name: 'from', type: 'address' },
@@ -122,7 +122,7 @@ async function moverRelayado(network: NetworkId, firmante: LocalAccount, to: `0x
   const { r, s, v, yParity } = parseSignature(signature)
   const relayer = createWalletClient({ account: treasury!, chain, transport: http() })
   const hash = await relayer.writeContract({
-    address: def.token,
+    address: def.testnet.token,
     abi: eip3009Abi,
     functionName: 'transferWithAuthorization',
     args: [firmante.address, to, value, 0n, validBefore, nonce, v !== undefined ? Number(v) : yParity + 27, r, s],

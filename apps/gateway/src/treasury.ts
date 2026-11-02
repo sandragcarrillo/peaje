@@ -1,7 +1,7 @@
 import { isGatewayRail, isNetworkId, TOKEN_DECIMALS, type NetworkId } from '@peaje/shared'
 import { createClient, http, parseUnits } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { tempoModerato } from 'viem/chains'
+import { tempo, tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcTreasuryBalance, sendArcPayout } from './arc.js'
 import { sendTreasuryPayout, treasuryTokenBalance } from './settlement.js'
@@ -20,7 +20,7 @@ const account = privateKeyToAccount(env.treasuryPrivateKey)
  */
 const tempoWalletClient = createClient({
   account,
-  chain: { ...tempoModerato, feeToken: env.currency },
+  chain: { ...(env.testnet ? tempoModerato : tempo), feeToken: env.currency },
   transport: http(env.rpcUrl),
 })
 

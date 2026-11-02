@@ -49,7 +49,7 @@ const otraDelAtacante = cuenta(9)
 const pagadores = [10, 11, 12, 13].map(cuenta)
 
 const DEF = NETWORKS.arbitrum
-const TOKEN = DEF.token
+const TOKEN = DEF.testnet.token
 const PUERTO = 19_545 + Math.floor(Math.random() * 1000)
 const RPC = `http://127.0.0.1:${PUERTO}`
 const chain = defineChain({

@@ -1,5 +1,7 @@
 import type { Route, Tenant } from '@peaje/db'
-import { dominioVerificable, jsonParaScript, NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { cadena, dominioVerificable, jsonParaScript, NETWORKS } from '@peaje/shared'
+import { env } from './env.js'
+import { redesDocumentadas } from './settlement.js'
 
 /**
  * Portal de desarrolladores: la página HTML que un humano (o un juez, o el
@@ -8,8 +10,8 @@ import { dominioVerificable, jsonParaScript, NETWORKS, NETWORK_IDS } from '@peaj
  * ni una línea, el proxy del kit la reenvía como cualquier otra ruta.
  *
  * La sección de "API keys" que pide el chequeo existe, pero dice la verdad:
- * acá no hay keys, la credencial es el pago. Y el sandbox también es real:
- * hoy todo liquida en testnets con tokens de faucet.
+ * acá no hay keys, la credencial es el pago. En testnet el sandbox es la
+ * misma superficie con tokens de faucet; en mainnet la sección lo dice.
  *
  * Para los motores de respuesta (ChatGPT, Perplexity, AI Overviews) esta es
  * la página citable del negocio: HTML completo sin JS, `index,follow`
@@ -60,13 +62,14 @@ export function developersHtml({ tenant, routes, base, actualizado = new Date() 
     )
     .join('\n')
 
-  const redes = NETWORK_IDS.map((id) => {
+  const redes = redesDocumentadas().map((id) => {
     const n = NETWORKS[id]
+    const red = cadena(id, env.testnet)!
     return `<tr>
   <td>${esc(n.label)}</td>
   <td>${esc(n.tokenSymbol)}</td>
-  <td class="num">${n.testnet.chainId}</td>
-  <td><code>${esc(n.token)}</code></td>
+  <td class="num">${red.chainId}</td>
+  <td><code>${esc(red.token)}</code></td>
 </tr>`
   }).join('\n')
 
@@ -137,8 +140,8 @@ ${jsonParaScript(webPage)}
     <p>Three requests, no account. The whole flow is standard HTTP.</p>
     <div class="paso"><b>1</b><div><p>Ask for the resource. The 402 is not an error: it is the price, with one offer per network in <code>WWW-Authenticate</code>.</p>
 <pre><code>curl -i ${base}${esc(ejemplo)}
-# HTTP/2 402 · one offer per rail: ${precioEjemplo} in ${NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} (${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)})`).join(', ')}</code></pre></div></div>
-    <div class="paso"><b>2</b><div><p>Pay the challenge and retry. The reference client does both, testnet wallet included:</p>
+# HTTP/2 402 · one offer per rail: ${precioEjemplo} in ${redesDocumentadas().map((id) => `${NETWORKS[id].tokenSymbol} (${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)})`).join(', ')}</code></pre></div></div>
+    <div class="paso"><b>2</b><div><p>Pay the challenge and retry. The reference client does both${env.testnet ? ', testnet wallet included' : ''}:</p>
 <pre><code>npx mppx@latest ${base}${esc(ejemplo)}</code></pre></div></div>
     <div class="paso"><b>3</b><div><p>Read the resource. The response carries <code>Payment-Receipt</code> as proof. If the origin ever fails after you paid, the refund is automatic and on-chain.</p></div></div>
   </section>
@@ -173,7 +176,11 @@ ${filas}
 
   <section id="sandbox">
     <h2>Sandbox</h2>
-    <p class="nota">Everything above runs on testnets today, so the production surface IS the sandbox: same endpoints, same 402s, free faucet tokens. Nothing to break and no real money at risk while you integrate.</p>
+    <p class="nota">${
+      env.testnet
+        ? 'Everything above runs on testnets today, so the production surface IS the sandbox: same endpoints, same 402s, free faucet tokens. Nothing to break and no real money at risk while you integrate.'
+        : 'There is no separate sandbox: payments here are real and settle on mainnet in the stablecoins below. Most routes cost cents, so the cheapest one is the test.'
+    }</p>
     <table>
       <thead><tr><th scope="col">Network</th><th scope="col">Token</th><th scope="col">Chain id</th><th scope="col">Asset</th></tr></thead>
       <tbody>

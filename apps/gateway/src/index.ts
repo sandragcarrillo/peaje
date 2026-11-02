@@ -1,7 +1,7 @@
 import { serve, type HttpBindings } from '@hono/node-server'
 import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import type { Tenant } from '@peaje/db'
-import { CHAIN_LABELS, NETWORK_IDS, PEAJE_FETCH_HEADER } from '@peaje/shared'
+import { chainLabels, PEAJE_FETCH_HEADER, redesActivas } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 import { generate } from 'mppx/discovery'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
@@ -60,7 +60,7 @@ app.get('/health', async (c) => {
   return c.json({
     ok: true,
     network: env.testnet ? 'testnet' : 'mainnet',
-    settlementNetworks: NETWORK_IDS,
+    settlementNetworks: redesActivas(env.testnet),
     // Rieles de PeajeSettlementV3 prendidos (dirección + relayer) y Circle.
     settlementV3: Object.fromEntries(Object.entries(env.settlementV3).map(([red, dir]) => [red, !!dir && !!relayerAddress])),
     circleNanopayments: env.circleNanopayments,
@@ -383,7 +383,7 @@ app.post('/:slug/agentic_commerce/delegate_payment', async (c) => {
     acpError(
       'invalid_request',
       'unsupported_payment_method',
-      `${tenant.name} settles in stablecoin over HTTP 402, not cards. No card data is accepted or stored here. Call the resource, read the 402 terms, pay on any rail it lists (${CHAIN_LABELS.join(', ')}): ${base}/auth.md`,
+      `${tenant.name} settles in stablecoin over HTTP 402, not cards. No card data is accepted or stored here. Call the resource, read the 402 terms, pay on any rail it lists (${chainLabels(env.testnet).join(', ')}): ${base}/auth.md`,
       '$.payment_method.type',
     ),
     400,

@@ -82,9 +82,11 @@ El networkFee le devuelve al relayer el gas de `settle`. Lo elige el relayer en 
 
 | Red | Token | Tope | Costo real hoy de un settle (25 oct 2026) |
 |---|---|---|---|
-| Arbitrum One / Sepolia | USDC, USDG | 20.000 (US$0,02) | ~US$0,007 a 0,009 (150k a 190k gas a 0,02 gwei, ETH US$2.339) |
+| Arbitrum One / Sepolia | USDC, USDG (en Arbitrum One se lanza solo con USDC) | 20.000 (US$0,02) | ~US$0,007 a 0,009 (150k a 190k gas a 0,02 gwei, ETH US$2.339) |
 | Robinhood Chain / Testnet | USDG | 20.000 (US$0,02) | ~US$0,007 a 0,009 |
 | Arc / Testnet | USDC | 10.000 (US$0,01) | ~US$0,003 a 0,004 (gas en USDC) |
+
+Arbitrum One arranca solo con USDC (decisión de San, 1 nov 2026): el script de `arbitrum-one` despliega con USDC y nada más. Para sumar USDG después, el Safe firma `setAcceptedToken(0x004B506865409877C9fA29bfb1ebA929984B9bbC, true, 20000)`; el gateway lo ofrece solo, al minuto, porque las ofertas siguen a `isAcceptedToken` del contrato.
 
 La firma del pagador fija el `value` total, no cuánto es networkFee: el relayer lo elige hasta el tope. En pagos chicos (del orden del tope) el relayer podría dejar al negocio casi en nada, a favor del fee recipient (Peaje), no de sí mismo. El gateway lo cotiza con el gas y Chainlink y lo topa con `maxNetworkFee` del propio contrato (`costoRed.ts`). El tope no acota lo que un relayer comprometido le saca al negocio: ese riesgo es el merchant (ver arriba).
 

@@ -1,4 +1,4 @@
-import { fromBaseUnits, NETWORKS, type SettlementNetwork } from '@peaje/shared'
+import { cadena, fromBaseUnits, isSettlementNetwork, NETWORKS, redesActivas, type NetworkId, type SettlementNetwork } from '@peaje/shared'
 import {
   createPublicClient,
   createWalletClient,
@@ -54,20 +54,22 @@ function riel(network: SettlementNetwork): Riel {
   if (cached) return cached
 
   const def = NETWORKS[network]
+  const red = cadena(network, env.testnet)
   const rpcUrl = env.settlementRpcUrls[network]
+  if (!red || !rpcUrl) throw new Error(`${def.label} no tiene ${env.testnet ? 'testnet' : 'mainnet'}: el riel está apagado`)
   const chain = defineChain({
-    id: def.testnet.chainId,
-    name: `${def.label} Testnet`,
+    id: red.chainId,
+    name: env.testnet ? `${def.label} Testnet` : def.label,
     nativeCurrency: network === 'arc' ? { name: 'USDC', symbol: 'USDC', decimals: 18 } : { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl] } },
-    blockExplorers: { default: { name: def.label, url: def.testnet.explorerUrl } },
+    blockExplorers: { default: { name: def.label, url: red.explorerUrl } },
   })
   const nuevo: Riel = {
     chain,
     publicClient: createPublicClient({ chain, transport: http(rpcUrl) }),
     treasuryClient: walletClient(treasury, chain, rpcUrl),
     relayerClient: relayer ? walletClient(relayer, chain, rpcUrl) : null,
-    token: def.token,
+    token: red.token,
     decimals: def.decimals,
   }
   rieles.set(network, nuevo)
@@ -78,6 +80,42 @@ function riel(network: SettlementNetwork): Riel {
 export function contratoV3(network: SettlementNetwork): `0x${string}` | null {
   if (!relayer) return null
   return env.settlementV3[network]
+}
+
+/**
+ * Si el contrato acepta hoy el token del riel (`isAcceptedToken`). La oferta
+ * sigue al contrato: sumar o sacar un stablecoin es una transacción del Safe,
+ * sin tocar el env (en Arbitrum One se arranca solo con USDC, decisión del 1
+ * nov 2026). Se cachea un minuto. Si la lectura falla vale lo último que se
+ * leyó, o sí al arrancar: con el token fuera, la simulación del contrato
+ * rechaza el pago antes de pedir el origen y el agente no paga nada.
+ */
+const ACEPTADO_MS = 60_000
+const aceptados = new Map<SettlementNetwork, { valor: boolean; hasta: number }>()
+
+export async function aceptaToken(network: SettlementNetwork): Promise<boolean> {
+  const contrato = contratoV3(network)
+  if (!contrato) return false
+  const previo = aceptados.get(network)
+  if (previo && previo.hasta > Date.now()) return previo.valor
+  try {
+    const r = riel(network)
+    const valor = await r.publicClient.readContract({ address: contrato, abi: settlementV3Abi, functionName: 'isAcceptedToken', args: [r.token] })
+    aceptados.set(network, { valor, hasta: Date.now() + ACEPTADO_MS })
+    return valor
+  } catch (error) {
+    console.warn(`[settlement] ${NETWORKS[network].label}: no se pudo leer isAcceptedToken`, error instanceof Error ? error.message : error)
+    return previo?.valor ?? true
+  }
+}
+
+/**
+ * Redes de este modo para los documentos (llms.txt, auth.md, portal): sin las
+ * de contrato cuyo token el contrato no acepta, según la última lectura. Sin
+ * lectura todavía se listan. No mira si hay contrato: eso lo decide el 402.
+ */
+export function redesDocumentadas(): NetworkId[] {
+  return redesActivas(env.testnet).filter((id) => !isSettlementNetwork(id) || (aceptados.get(id)?.valor ?? true))
 }
 
 /** Address del relayer (pública): para /health y logs. Nunca la llave. */

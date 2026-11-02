@@ -73,19 +73,24 @@ Gateway (Railway):
 
 | Variable | Valor |
 |---|---|
+| `NEXT_PUBLIC_RED` | `testnet` (o sin poner) o `mainnet`, para todos los rieles a la vez. Mismo nombre en Vercel. Un valor distinto hace que el gateway no arranque. Reemplaza a `TEMPO_NETWORK`, que queda como respaldo. |
+| `PEAJE_FEE_RECIPIENT` | Destino del 2% del split de Tempo. Obligatorio en mainnet y distinto de la treasury: la dirección fría, una EOA (un Safe de Arbitrum no existe en Tempo). En testnet, la treasury si falta. |
 | `RELAYER_PRIVATE_KEY` | Llave de la EOA relayer (nueva, no la treasury; el gateway se niega a arrancar si es la misma). Solo gas nativo: ETH en Arbitrum Sepolia y Robinhood Testnet, USDC en Arc Testnet. |
 | `PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA` | v3 en Arbitrum Sepolia. Sirve a los rieles USDC y USDG (mismo contrato). |
 | `PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET` | v3 en Robinhood Chain Testnet (USDG). |
 | `PEAJE_SETTLEMENT_V3_ARC_TESTNET` | v3 en Arc Testnet (USDC). |
-| `PEAJE_SETTLEMENT_V3_ARBITRUM_ONE`, `PEAJE_SETTLEMENT_V3_ROBINHOOD_MAINNET`, `PEAJE_SETTLEMENT_V3_ARC_MAINNET` | Mainnet. Se validan, ningún riel las usa todavía (el gateway opera contra testnet). |
-| `CIRCLE_NANOPAYMENTS_ENABLED` | Sin poner (apagado). `true` vuelve a ofrecer Circle. |
+| `PEAJE_SETTLEMENT_V3_ARBITRUM_ONE` | v3 en Arbitrum One, para USDC y USDG. Solo con `NEXT_PUBLIC_RED=mainnet`; en mainnet Robinhood y Arc no ofrecen nada. |
+| `ARBITRUM_ONE_RPC_URL`, `TEMPO_RPC_URL` | RPC propios en mainnet (opcionales; el público de Arbitrum One limita pedidos). `ARBITRUM_ONE_RPC_URL` también en Vercel, para leer saldos. |
+| `CIRCLE_NANOPAYMENTS_ENABLED` | Sin poner (apagado). `true` vuelve a ofrecer Circle, solo en testnet. |
 | `ARBITRUM_SEPOLIA_RPC_URL`, `ROBINHOOD_TESTNET_RPC_URL`, `ARC_RPC_URL` | Opcionales; conviene un proveedor con más rate limit (el chequeo de adelantos usa `getLogs` en tramos de 10.000 bloques). |
 | `TEMPO_REFUND_MAX_USD`, `TEMPO_REFUND_DAILY_USD`, `TEMPO_REFUND_GLOBAL_DAILY_USD` | Topes de reembolso de Tempo (1, 5 y 20 por defecto). La treasury necesita pathUSD en Tempo para pagarlos. |
 | `ORIGIN_BREAKER_FAILURES`, `ORIGIN_BREAKER_WINDOW_MINUTES`, `ORIGIN_BREAKER_COOLDOWN_MINUTES` | Corte por origen caído (3 en 10 minutos, 15 de enfriamiento por defecto). |
 
-Sin dirección v3 (o con `off`) esa red no aparece en el 402: no hay vuelta a v2. Sin `RELAYER_PRIVATE_KEY` ninguna red de contrato aparece. `/health` muestra qué rieles están prendidos y `GET /_internal/treasury/balance` la address del relayer y el fee recipient de cada contrato (leído on-chain).
+Sin dirección v3 (o con `off`) esa red no aparece en el 402: no hay vuelta a v2. Con dirección, cada token sale en el 402 y en los documentos solo si el contrato lo acepta (`isAcceptedToken`, leído cada minuto): sumar o sacar un stablecoin es una transacción del Safe, sin tocar el env. Sin `RELAYER_PRIVATE_KEY` ninguna red de contrato aparece. `/health` muestra qué rieles están prendidos y `GET /_internal/treasury/balance` la address del relayer y el fee recipient de cada contrato (leído on-chain).
 
-Dashboard (Vercel): nada nuevo. `PEAJE_SUBGRAPH_URL` opcional, cuando el subgraph de v3 esté publicado.
+Dashboard (Vercel): `NEXT_PUBLIC_RED` igual que en Railway (cadenas, tokens, explorers y saldos del panel) y `ARBITRUM_ONE_RPC_URL` opcional. `PEAJE_SUBGRAPH_URL` opcional, cuando el subgraph de v3 esté publicado.
+
+Prueba de mainnet sin plata: `FORK_ARBITRUM_ONE_RPC=<rpc de Arbitrum One> pnpm --filter @peaje/gateway exec tsx --test test/mainnet-fork.test.ts` levanta anvil sobre una copia de Arbitrum One, despliega v3 con el USDC y el USDG reales y paga uno de cada uno por el gateway en modo mainnet. Las cuentas del mnemónico de prueba de Foundry tienen una delegación EIP-7702 en Arbitrum One y el USDC de Circle (v2.2, ERC-1271) rechaza su firma: el pagador del test es una wallet nueva. Un agente real con cuenta EIP-7702 paga USDC solo si su delegado valida firmas por ERC-1271.
 
 El ABI vive en `apps/gateway/src/abi/settlement-v3.ts`, copiado del artefacto: `cd contracts && forge build && pnpm --filter @peaje/gateway abi:v3`.
 

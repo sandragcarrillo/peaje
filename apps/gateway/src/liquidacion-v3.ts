@@ -164,7 +164,8 @@ export function motivoRevert(error: unknown): string {
   if (error instanceof BaseError) {
     const revert = error.walk((e) => e instanceof ContractFunctionRevertedError)
     if (revert instanceof ContractFunctionRevertedError) {
-      return revert.data?.errorName ?? revert.reason ?? revert.shortMessage
+      // Error(string) del token trae el texto en reason; errorName sería solo "Error".
+      return revert.reason ?? revert.data?.errorName ?? revert.shortMessage
     }
     return error.shortMessage
   }

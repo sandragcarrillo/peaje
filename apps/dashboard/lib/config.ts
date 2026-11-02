@@ -1,4 +1,4 @@
-import { CHAIN_LABELS } from '@peaje/shared'
+import { chainLabels, modoTestnet } from '@peaje/shared'
 export const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8787'
 
 export function money(value: string | number): string {
@@ -12,8 +12,14 @@ export function microMoney(value: string | number): string {
   return money(n)
 }
 
-/** Cadenas donde se cobra, una vez cada una (ver CHAIN_LABELS en @peaje/shared). */
-export const CHAINS = CHAIN_LABELS.map((c) => c.toUpperCase())
+/**
+ * Testnet o mainnet: NEXT_PUBLIC_RED, el mismo nombre que en Railway. Sin valor
+ * es testnet. Cambia las cadenas, los tokens y los explorers que muestra el panel.
+ */
+export const TESTNET = modoTestnet(process.env.NEXT_PUBLIC_RED)
+
+/** Cadenas donde se cobra en este modo, una vez cada una (ver chainLabels en @peaje/shared). */
+export const CHAINS = chainLabels(TESTNET).map((c) => c.toUpperCase())
 
 /** Rieles de cobro activos, para las etiquetas del panel. */
 export const RAILS_LABEL = CHAINS.join(' + ')

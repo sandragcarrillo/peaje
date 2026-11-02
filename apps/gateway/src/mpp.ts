@@ -1,5 +1,5 @@
 import { Mppx } from 'mppx/server'
-import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { cadena, NETWORKS, redesActivas } from '@peaje/shared'
 import { usdcStatus } from './chainlink.js'
 import { env } from './env.js'
 import { chargeMethods } from './methods.js'
@@ -12,7 +12,9 @@ import { chargeMethods } from './methods.js'
  * cobro (una oferta por red) viven en methods.ts, compartidos con la instancia MCP.
  */
 const USDC_TOKENS = new Set(
-  NETWORK_IDS.filter((id) => NETWORKS[id].tokenSymbol === 'USDC').map((id) => NETWORKS[id].token.toLowerCase()),
+  redesActivas(env.testnet)
+    .filter((id) => NETWORKS[id].tokenSymbol === 'USDC')
+    .map((id) => cadena(id, env.testnet)!.token.toLowerCase()),
 )
 
 export const mppx = Mppx.create({

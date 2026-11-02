@@ -2,10 +2,11 @@ import { PrivyClient } from '@privy-io/node'
 import { createViemAccount } from '@privy-io/node/viem'
 import { fromBaseUnits, isSettlementNetwork, NETWORKS, TOKENS, type NetworkId } from '@peaje/shared'
 import { createClient, http, parseUnits, type LocalAccount } from 'viem'
-import { tempoModerato } from 'viem/chains'
+import { tempo, tempoModerato } from 'viem/chains'
 import { Actions } from 'viem/tempo'
 import { arcPublicClient, arcTestnet } from '../arc.js'
 import { publicClient } from '../chain.js'
+import { env } from '../env.js'
 
 /**
  * Wallet de un agente comprador: una cuenta EVM de Privy controlada por la
@@ -86,8 +87,8 @@ export async function sweepAgent(
 
   const wallet = createClient({
     account,
-    chain: { ...tempoModerato, feeToken: TOKENS.pathUsd },
-    transport: http(),
+    chain: { ...(env.testnet ? tempoModerato : tempo), feeToken: TOKENS.pathUsd },
+    transport: http(env.rpcUrl),
   })
   return Actions.token.transfer(wallet, {
     to,

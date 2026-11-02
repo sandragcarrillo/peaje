@@ -84,7 +84,9 @@ contract DeployScriptV3Test is Test {
         assertEq(script.network("arc-mainnet").maxNetworkFees[0], 10_000);
         assertEq(script.network("arc-testnet").maxNetworkFees[0], 10_000);
         assertEq(script.network("arbitrum-one").maxNetworkFees[0], 20_000);
-        assertEq(script.network("arbitrum-one").maxNetworkFees[1], 20_000);
+        // Arbitrum One launches with USDC only (San, 2026-11-01); USDG is added later from the Safe.
+        assertEq(script.network("arbitrum-one").tokens.length, 1);
+        assertEq(script.network("arbitrum-one").tokens[0], 0xaf88d065e77c8cC2239327C5EDb3A432268e5831);
         assertEq(script.network("arbitrum-sepolia").maxNetworkFees[1], 20_000);
         assertEq(script.network("robinhood-mainnet").maxNetworkFees[0], 20_000);
         assertEq(script.network("robinhood-testnet").maxNetworkFees[0], 20_000);

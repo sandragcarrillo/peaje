@@ -1,7 +1,7 @@
 import type { Route, Tenant } from '@peaje/db'
-import { isSettlementNetwork, NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { cadena, isSettlementNetwork, NETWORKS } from '@peaje/shared'
 import { env } from './env.js'
-import { contratoV3 } from './settlement.js'
+import { contratoV3, redesDocumentadas } from './settlement.js'
 
 /**
  * Archivos de agent-readiness servidos por tenant. Cada uno mapea a un check
@@ -19,10 +19,10 @@ type Ctx = { tenant: Tenant; routes: Route[]; base: string }
 const queEs = (tenant: Tenant) => tenant.entityDescription?.trim() || null
 
 /** "pathUSD on Tempo, USDC on Arc, ... or USDG on Robinhood": para prosa de discovery. */
-const RAILS = (() => {
-  const rieles = NETWORK_IDS.map((id) => `${NETWORKS[id].tokenSymbol} on ${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)}`)
+const rails = () => {
+  const rieles = redesDocumentadas().map((id) => `${NETWORKS[id].tokenSymbol} on ${(NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)}`)
   return rieles.length > 1 ? `${rieles.slice(0, -1).join(', ')} or ${rieles.at(-1)}` : rieles.join('')
-})()
+}
 
 /**
  * Header con el que leemos el origen sin que el proxy del negocio nos
@@ -76,7 +76,7 @@ export function seccionPagos({ tenant, routes, base }: Ctx): string {
   return [
     '## Payments for agents',
     '',
-    `> ${tenant.name} charges per request via MPP (HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource.`,
+    `> ${tenant.name} charges per request via MPP (HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${rails()}) and receives the resource.`,
     '',
     '### When to use this',
     '',
@@ -110,8 +110,8 @@ export function llmsTxt({ tenant, routes, base }: Ctx): string {
     `# ${tenant.name}`,
     '',
     queEs(tenant)
-      ? `> ${queEs(tenant)} Priced routes are paid per request over HTTP 402 (MPP or x402) in stablecoin (${RAILS}), with no API key and no signup.`
-      : `> Pay-per-request API for agents (MPP over HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${RAILS}) and receives the resource. Use it when you need ${tenant.name} programmatically and only want to pay for what you consume.`,
+      ? `> ${queEs(tenant)} Priced routes are paid per request over HTTP 402 (MPP or x402) in stablecoin (${rails()}), with no API key and no signup.`
+      : `> Pay-per-request API for agents (MPP over HTTP 402). No API keys, no signup: the agent gets a 402, pays in stablecoin (${rails()}) and receives the resource. Use it when you need ${tenant.name} programmatically and only want to pay for what you consume.`,
     '',
     '## Resources',
     '',
@@ -140,7 +140,7 @@ export function pricingMd({ tenant, routes, base }: Ctx): string {
   return [
     `# ${tenant.name} pricing`,
     '',
-    `Pay per request via MPP (HTTP 402). No subscription, no API key, no minimums. Payable in ${RAILS}: the challenge carries one offer per network and the agent picks.`,
+    `Pay per request via MPP (HTTP 402). No subscription, no API key, no minimums. Payable in ${rails()}: the challenge carries one offer per network and the agent picks.`,
     '',
     '| Endpoint | Price |',
     '|---|---|',
@@ -229,9 +229,10 @@ export function authMd({ tenant, base }: Ctx): string {
     '',
     '## Payment networks',
     '',
-    ...NETWORK_IDS.map((id) => {
+    ...redesDocumentadas().map((id) => {
       const n = NETWORKS[id]
-      return `- **${n.label}** (testnet): ${n.tokenSymbol} · chainId ${n.testnet.chainId} · token \`${n.token}\``
+      const red = cadena(id, env.testnet)!
+      return `- **${n.label}**${env.testnet ? ' (testnet)' : ''}: ${n.tokenSymbol} · chainId ${red.chainId} · token \`${red.token}\``
     }),
     '',
     `Protocol spec: https://mpp.dev · Discovery: ${base}/openapi.json · x402 Bazaar: ${base}/discovery/resources`,
@@ -246,7 +247,7 @@ export function agentsMd({ tenant, routes, base }: Ctx): string {
     '## What this is',
     '',
     ...(queEs(tenant) ? [queEs(tenant)!, ''] : []),
-    `${queEs(tenant) ? 'Priced routes are' : `${tenant.name} exposes data through a pay-per-request API.`} paid per call in stablecoin (${RAILS}) via MPP/HTTP 402, with no prior signup.`,
+    `${queEs(tenant) ? 'Priced routes are' : `${tenant.name} exposes data through a pay-per-request API.`} paid per call in stablecoin (${rails()}) via MPP/HTTP 402, with no prior signup.`,
     '',
     '## When to use it',
     '',
@@ -465,22 +466,23 @@ export function bazaarResources(
   const ahora = new Date().toISOString()
 
   const accepts = (priceUsd: string, resource: string) =>
-    NETWORK_IDS.flatMap((id) => {
+    redesDocumentadas().flatMap((id) => {
       const n = NETWORKS[id]
+      const red = cadena(id, env.testnet)!
       // Mismo destino que el 402: el contrato v3 en las redes EVM, la wallet
       // de cobro del negocio en Tempo. Sin wallet de cobro no hay ofertas.
       const payTo = isSettlementNetwork(id) ? contratoV3(id) : tenant.payoutWallet
       if (!payTo || !tenant.payoutWallet) return []
       return {
         scheme: 'exact',
-        network: `eip155:${n.testnet.chainId}`,
+        network: `eip155:${red.chainId}`,
         maxAmountRequired: String(Math.round(Number(priceUsd) * 10 ** n.decimals)),
         resource,
         description: `Pay-per-call access to ${tenant.name}`,
         mimeType: 'application/json',
         payTo,
         maxTimeoutSeconds: 300,
-        asset: n.token,
+        asset: red.token,
         ...(n.eip3009
           ? { extra: { assetTransferMethod: 'eip3009', name: n.eip3009.name, version: n.eip3009.version } }
           : {}),

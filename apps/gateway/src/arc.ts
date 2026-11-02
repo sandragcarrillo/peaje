@@ -19,7 +19,7 @@ const chainInfo = ARC.testnet
 /**
  * Arc, la L1 de Circle. EVM estándar con una particularidad: USDC es el token
  * nativo de gas (18 decimales como nativo, 6 vía la interfaz ERC-20 en
- * `ARC.token`). Misma cuenta de treasury que en Tempo: es una key EVM normal.
+ * `chainInfo.token`). Misma cuenta de treasury que en Tempo: es una key EVM normal.
  */
 export const arcTestnet = defineChain({
   id: chainInfo.chainId,
@@ -59,7 +59,7 @@ export async function resolveArcPayer(txHash: string): Promise<string | null> {
 /** Retiro en Arc: transfer ERC-20 estándar del USDC de la treasury. */
 export async function sendArcPayout(to: `0x${string}`, amount: string): Promise<`0x${string}`> {
   return arcWalletClient.writeContract({
-    address: ARC.token,
+    address: chainInfo.token,
     abi: erc20Abi,
     functionName: 'transfer',
     args: [to, parseUnits(amount, ARC.decimals)],
@@ -69,7 +69,7 @@ export async function sendArcPayout(to: `0x${string}`, amount: string): Promise<
 /** Saldo USDC de la treasury en Arc, en decimal. */
 export async function arcTreasuryBalance(): Promise<string> {
   const raw = await arcPublicClient.readContract({
-    address: ARC.token,
+    address: chainInfo.token,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [account.address],

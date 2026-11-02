@@ -1,9 +1,9 @@
-import { NETWORKS, SETTLEMENT_NETWORKS, type SettlementNetwork } from '@peaje/shared'
+import { cadena, NETWORKS, SETTLEMENT_NETWORKS, type SettlementNetwork } from '@peaje/shared'
 import { createPublicClient, http } from 'viem'
 import { settlementV3Abi } from './abi/settlement-v3.js'
 import { ethUsd } from './chainlink.js'
 import { env } from './env.js'
-import { contratoV3 } from './settlement.js'
+import { aceptaToken, contratoV3 } from './settlement.js'
 
 /**
  * Costo de red por riel: lo que el relayer gasta en gas para liquidar UN pago
@@ -61,8 +61,14 @@ export function conCostoRed(precioUsd: string | number, network: SettlementNetwo
   return (micro / 1e6).toFixed(6)
 }
 
-async function calcular(network: SettlementNetwork): Promise<number> {
+function rpcDe(network: SettlementNetwork): string {
   const rpcUrl = env.settlementRpcUrls[network]
+  if (!rpcUrl) throw new Error(`${NETWORKS[network].label} no tiene RPC en este modo`)
+  return rpcUrl
+}
+
+async function calcular(network: SettlementNetwork): Promise<number> {
+  const rpcUrl = rpcDe(network)
   const gasPrice = await cliente(rpcUrl).getGasPrice()
   // En Arc el gas se paga en USDC nativo (18 decimales): el costo ya está en
   // dólares. En las demás redes es ETH y hay que convertirlo.
@@ -75,15 +81,18 @@ async function calcular(network: SettlementNetwork): Promise<number> {
 /** `maxNetworkFee` del contrato para el token del riel, en USD (stablecoin, sus decimales). */
 async function topeDelContrato(network: SettlementNetwork): Promise<number> {
   const contrato = contratoV3(network)
-  if (!contrato) return Number.POSITIVE_INFINITY
+  const red = cadena(network, env.testnet)
+  if (!contrato || !red) return Number.POSITIVE_INFINITY
   const def = NETWORKS[network]
-  const cap = await cliente(env.settlementRpcUrls[network]).readContract({ address: contrato, abi: settlementV3Abi, functionName: 'maxNetworkFee', args: [def.token as `0x${string}`] })
+  const cap = await cliente(rpcDe(network)).readContract({ address: contrato, abi: settlementV3Abi, functionName: 'maxNetworkFee', args: [red.token] })
   return Number(cap) / 10 ** def.decimals
 }
 
 async function refrescar(): Promise<void> {
   for (const network of SETTLEMENT_NETWORKS) {
     if (!contratoV3(network)) continue
+    // De paso mantiene fresca la lista de tokens aceptados (los documentos la leen sin esperar).
+    if (!(await aceptaToken(network))) continue
     try {
       costos.set(network, await calcular(network))
     } catch (error) {

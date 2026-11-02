@@ -46,7 +46,7 @@ const tercero = cuenta(6)
 const treasury = cuenta(7)
 
 const DEF = NETWORKS.arbitrum
-const TOKEN = DEF.token
+const TOKEN = DEF.testnet.token
 const PUERTO = 18_545 + Math.floor(Math.random() * 1000)
 const RPC = `http://127.0.0.1:${PUERTO}`
 const chain = defineChain({
@@ -206,8 +206,11 @@ test('el 402 ofrece Tempo con split y v3 por red, y nada de Circle', async () =>
   const tempo = ofertas.filter((o) => o.method === 'tempo')
   assert.equal(tempo.length, 1)
   assert.equal((tempo[0]!.request as { recipient: string }).recipient.toLowerCase(), merchant.address.toLowerCase())
-  // USDC y USDG de Arbitrum (mismo contrato). Robinhood y Arc sin dirección v3: sin oferta.
-  assert.equal(evm.length, 2)
+  // Solo USDC de Arbitrum: el contrato de la prueba no tiene USDG en su lista, y
+  // la oferta sigue al contrato (antes salía igual y el pago fallaba).
+  // Robinhood y Arc sin dirección v3: sin oferta.
+  assert.equal(evm.length, 1)
+  assert.equal((evm[0]!.request as { currency: string }).currency.toLowerCase(), TOKEN.toLowerCase())
   for (const o of evm) assert.equal((o.request as { recipient: string }).recipient.toLowerCase(), contrato.toLowerCase())
   // Circle apagado: ninguna oferta a la treasury ni con el dominio de Gateway.
   for (const o of ofertas) assert.notEqual((o.request as { recipient?: string }).recipient?.toLowerCase(), treasury.address.toLowerCase())

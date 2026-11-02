@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { GATEWAY_RAIL_IDS, NETWORK_IDS, railExplorerTxUrl, SETTLEMENT_NETWORKS } from '@peaje/shared'
+import { GATEWAY_RAIL_IDS, railExplorerTxUrl, redesActivas, SETTLEMENT_NETWORKS } from '@peaje/shared'
 import { env } from './env.js'
 import { contratoV3, feeRecipientV3, relayerAddress } from './settlement.js'
 import { store } from './store.js'
@@ -67,7 +67,7 @@ interno.post('/strays/:id/settled', async (c) => {
 interno.get('/treasury/balance', async (c) => {
   const balances = Object.fromEntries(
     await Promise.all(
-      [...NETWORK_IDS, ...GATEWAY_RAIL_IDS].map(async (network) => {
+      [...redesActivas(env.testnet), ...(env.circleNanopayments ? GATEWAY_RAIL_IDS : [])].map(async (network) => {
         const balance = await treasuryBalance(network).catch(() => null)
         return [network, balance] as const
       }),

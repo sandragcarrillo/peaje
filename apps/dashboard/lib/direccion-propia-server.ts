@@ -1,14 +1,15 @@
 import 'server-only'
-import { NETWORK_IDS, NETWORKS } from '@peaje/shared'
+import { cadena, redesActivas } from '@peaje/shared'
 import { createPublicClient, http } from 'viem'
+import { TESTNET } from './config'
 import { validarDireccionPropia, type ResultadoDireccion } from './direccion-propia'
 import { idWalletDeLaApp } from './privy'
 import { store } from './store'
 
-/** Un RPC por cadena (Arbitrum USDC y USDG comparten cadena). */
+/** Un RPC por cadena de este modo (Arbitrum USDC y USDG comparten cadena). */
 const RPC_POR_CADENA = new Map<string, string>()
-for (const id of NETWORK_IDS) {
-  const { chainId, rpcUrl } = NETWORKS[id].testnet
+for (const id of redesActivas(TESTNET)) {
+  const { chainId, rpcUrl } = cadena(id, TESTNET)!
   if (![...RPC_POR_CADENA.values()].includes(rpcUrl)) RPC_POR_CADENA.set(String(chainId), rpcUrl)
 }
 

@@ -1,7 +1,8 @@
 import { createHash, generateKeyPairSync, createSign, randomUUID } from 'node:crypto'
 import type { Resource, Tenant } from '@peaje/db'
-import { NETWORKS, NETWORK_IDS } from '@peaje/shared'
+import { cadena, NETWORKS } from '@peaje/shared'
 import { env } from './env.js'
+import { redesDocumentadas } from './settlement.js'
 
 /**
  * Los tres protocolos de comercio agéntico que el mercado terminó adoptando,
@@ -48,10 +49,10 @@ function jwsSeparado(payload: unknown): string {
 
 /** Perfil UCP del negocio (ucp-support, ap2-support). */
 export function ucpProfile(tenant: Tenant, base: string): Record<string, unknown> {
-  const instrumentos = NETWORK_IDS.map((id) => ({
+  const instrumentos = redesDocumentadas().map((id) => ({
     type: 'stablecoin',
-    network: `eip155:${NETWORKS[id].testnet.chainId}`,
-    asset: NETWORKS[id].token,
+    network: `eip155:${cadena(id, env.testnet)!.chainId}`,
+    asset: cadena(id, env.testnet)!.token,
     symbol: NETWORKS[id].tokenSymbol,
   }))
 

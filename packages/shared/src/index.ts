@@ -1,22 +1,24 @@
 /** Constantes y helpers compartidos entre gateway, dashboard y cliente demo. */
 
+/** Tokens TIP-20 soportados. Mismo address en mainnet y testnet. */
+export const TOKENS = {
+  pathUsd: '0x20c0000000000000000000000000000000000000',
+  usdc: '0x20C000000000000000000000b9537d11c60E8b50',
+} as const
+
 export const TEMPO = {
   mainnet: {
     chainId: 4217,
     rpcUrl: 'https://rpc.tempo.xyz',
     explorerUrl: 'https://explore.tempo.xyz',
+    token: TOKENS.pathUsd,
   },
   testnet: {
     chainId: 42431,
     rpcUrl: 'https://rpc.moderato.tempo.xyz',
     explorerUrl: 'https://explore.testnet.tempo.xyz',
+    token: TOKENS.pathUsd,
   },
-} as const
-
-/** Tokens TIP-20 soportados. Mismo address en mainnet y testnet. */
-export const TOKENS = {
-  pathUsd: '0x20c0000000000000000000000000000000000000',
-  usdc: '0x20C000000000000000000000b9537d11c60E8b50',
 } as const
 
 export const DEFAULT_CURRENCY = TOKENS.pathUsd
@@ -28,17 +30,21 @@ export const TOKEN_DECIMALS = 6
 /** Redes donde el gateway acepta pagos. La clave es la que se persiste en la DB. */
 export type NetworkId = 'tempo' | 'arc' | 'arbitrum' | 'arbitrum-usdg' | 'robinhood'
 
-type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string }
+/**
+ * Una red en un modo (testnet o mainnet). El token va acá y no en la red: el
+ * mismo stablecoin vive en otra dirección en cada cadena, y mezclarlos es
+ * cobrar en un token de faucet en producción.
+ */
+export type ChainInfo = { chainId: number; rpcUrl: string; explorerUrl: string; token: `0x${string}` }
 
 export type NetworkDef = {
   id: NetworkId
   label: string
-  /** Token con el que se cobra en esta red. */
-  token: `0x${string}`
   tokenSymbol: string
   decimals: number
-  /** Domain EIP-712 del token, para autorizaciones EIP-3009 (redes EVM genéricas). */
+  /** Domain EIP-712 del token, para autorizaciones EIP-3009 (redes EVM genéricas). Igual en las dos cadenas. */
   eip3009?: { name: string; version: string }
+  /** null: la red no tiene mainnet y su riel se apaga cuando el gateway corre en mainnet. */
   mainnet: ChainInfo | null
   testnet: ChainInfo
 }
@@ -47,18 +53,23 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
   arbitrum: {
     id: 'arbitrum',
     label: 'Arbitrum',
-    // USDC de Circle en Arbitrum Sepolia. En Arbitrum One vive en otra dirección,
-    // por eso mainnet queda en null hasta que el gateway opere allá.
-    token: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     tokenSymbol: 'USDC',
     decimals: 6,
-    // Leído on-chain: name() = "USD Coin", version() = "2" (distinto al USDC de Arc).
+    // Leído on-chain en Arbitrum Sepolia y en Arbitrum One (DOMAIN_SEPARATOR
+    // comparado el 1 nov 2026): name() = "USD Coin", version() = "2" (distinto al USDC de Arc).
     eip3009: { name: 'USD Coin', version: '2' },
-    mainnet: null,
+    // USDC nativo de Circle en cada cadena.
+    mainnet: {
+      chainId: 42161,
+      rpcUrl: 'https://arb1.arbitrum.io/rpc',
+      explorerUrl: 'https://arbiscan.io',
+      token: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    },
     testnet: {
       chainId: 421614,
       rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
       explorerUrl: 'https://sepolia.arbiscan.io',
+      token: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     },
   },
   'arbitrum-usdg': {
@@ -66,15 +77,22 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
     label: 'Arbitrum · USDG',
     // Mismo contrato y misma cadena que el riel USDC: cambia el stablecoin.
     // Un riel es (cadena, token), y el saldo del negocio se lleva por token.
-    token: '0xFFC95faa3d63Cde504a05B567C600B78C0b41892',
     tokenSymbol: 'USDG',
     decimals: 6,
+    // Dominio comparado contra DOMAIN_SEPARATOR en las dos cadenas (1 nov 2026).
     eip3009: { name: 'Global Dollar', version: '1' },
-    mainnet: null,
+    // USDG de Paxos en Arbitrum One.
+    mainnet: {
+      chainId: 42161,
+      rpcUrl: 'https://arb1.arbitrum.io/rpc',
+      explorerUrl: 'https://arbiscan.io',
+      token: '0x004B506865409877C9fA29bfb1ebA929984B9bbC',
+    },
     testnet: {
       chainId: 421614,
       rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
       explorerUrl: 'https://sepolia.arbiscan.io',
+      token: '0xFFC95faa3d63Cde504a05B567C600B78C0b41892',
     },
   },
   robinhood: {
@@ -82,21 +100,21 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
     label: 'Robinhood',
     // USDG de Paxos en Robinhood Chain Testnet (el "USDC" de esa testnet es un
     // mock sin EIP-3009). Leído on-chain: dominio "Global Dollar", versión "1".
-    token: '0x7E955252E15c84f5768B83c41a71F9eba181802F',
     tokenSymbol: 'USDG',
     decimals: 6,
     eip3009: { name: 'Global Dollar', version: '1' },
+    // Sin mainnet por ahora (decisión del 30 oct 2026): en mainnet este riel no se ofrece.
     mainnet: null,
     testnet: {
       chainId: 46630,
       rpcUrl: 'https://rpc.testnet.chain.robinhood.com',
       explorerUrl: 'https://explorer.testnet.chain.robinhood.com',
+      token: '0x7E955252E15c84f5768B83c41a71F9eba181802F',
     },
   },
   tempo: {
     id: 'tempo',
     label: 'Tempo',
-    token: TOKENS.pathUsd,
     tokenSymbol: 'pathUSD',
     decimals: 6,
     mainnet: TEMPO.mainnet,
@@ -105,8 +123,6 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
   arc: {
     id: 'arc',
     label: 'Arc',
-    // Interfaz ERC-20 del USDC nativo de Arc; el gas de la red se paga en ese mismo USDC.
-    token: '0x3600000000000000000000000000000000000000',
     tokenSymbol: 'USDC',
     decimals: 6,
     // Leído on-chain del contrato: name() = "USDC", version() = "2".
@@ -117,6 +133,8 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
       chainId: 5042002,
       rpcUrl: 'https://rpc.testnet.arc.io',
       explorerUrl: 'https://testnet.arcscan.app',
+      // Interfaz ERC-20 del USDC nativo de Arc; el gas de la red se paga en ese mismo USDC.
+      token: '0x3600000000000000000000000000000000000000',
     },
   },
 }
@@ -124,14 +142,37 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
 export const NETWORK_IDS = Object.keys(NETWORKS) as NetworkId[]
 
 /**
- * Cadenas con riel de cobro, una vez cada una y en el orden de NETWORK_IDS
- * (Arbitrum y Robinhood primero: es el orden en que se muestran).
+ * Modo del despliegue a partir de NEXT_PUBLIC_RED (mismo nombre en Railway y
+ * Vercel, como NEXT_PUBLIC_COBROS). Sin valor es testnet; cualquier otro
+ * valor que no sea testnet o mainnet es un error de configuración, no un default.
+ */
+export function modoTestnet(valor: string | undefined): boolean {
+  const red = valor?.trim() || 'testnet'
+  if (red !== 'testnet' && red !== 'mainnet') throw new Error(`NEXT_PUBLIC_RED tiene que ser testnet o mainnet, no "${red}"`)
+  return red === 'testnet'
+}
+
+/** La red en este modo, o null si no existe en él (su riel no ofrece nada). */
+export function cadena(id: NetworkId, testnet: boolean): ChainInfo | null {
+  return testnet ? NETWORKS[id].testnet : NETWORKS[id].mainnet
+}
+
+/** Redes que existen en este modo, en el orden de NETWORK_IDS. */
+export function redesActivas(testnet: boolean): NetworkId[] {
+  return NETWORK_IDS.filter((id) => cadena(id, testnet) !== null)
+}
+
+/**
+ * Cadenas con riel de cobro en este modo, una vez cada una y en el orden de
+ * NETWORK_IDS (Arbitrum y Robinhood primero: es el orden en que se muestran).
  * Arbitrum tiene dos rieles (USDC y USDG) pero es una sola cadena: las
  * etiquetas para personas cuentan cadenas, no tokens.
  */
-export const CHAIN_LABELS: string[] = [
-  ...new Map(NETWORK_IDS.map((id) => [NETWORKS[id].testnet.chainId, (NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label)])).values(),
-]
+export function chainLabels(testnet: boolean): string[] {
+  return [
+    ...new Map(redesActivas(testnet).map((id) => [cadena(id, testnet)!.chainId, NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label])).values(),
+  ]
+}
 
 /** Redes EVM donde los pagos se reparten en PeajeSettlementV3 (neto directo a la wallet del negocio). */
 export const SETTLEMENT_NETWORKS = [
@@ -286,8 +327,7 @@ export function isNetworkId(value: string): value is NetworkId {
 }
 
 export function networkChain(id: NetworkId, testnet: boolean): ChainInfo {
-  const def = NETWORKS[id]
-  const chain = testnet ? def.testnet : def.mainnet
+  const chain = cadena(id, testnet)
   if (!chain) throw new Error(`La red ${id} no tiene mainnet todavía`)
   return chain
 }

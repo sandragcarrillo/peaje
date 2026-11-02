@@ -1,17 +1,18 @@
 'use client'
 
 import type { TipoWalletCobro } from '@peaje/db'
-import { NETWORK_IDS, NETWORKS } from '@peaje/shared'
+import { cadena, NETWORKS, redesActivas } from '@peaje/shared'
 import { useState, useTransition } from 'react'
+import { TESTNET } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
 import { guardarWallet } from './actions'
 
-/** Un explorer por cadena (Arbitrum USDC y USDG comparten), en el orden de NETWORK_IDS. */
+/** Un explorer por cadena de este modo (Arbitrum USDC y USDG comparten), en el orden de NETWORK_IDS. */
 const EXPLORERS = [
   ...new Map(
-    NETWORK_IDS.map((id) => {
+    redesActivas(TESTNET).map((id) => {
       const label = NETWORKS[id].label.split(' · ')[0] ?? NETWORKS[id].label
-      return [NETWORKS[id].testnet.explorerUrl, label] as const
+      return [cadena(id, TESTNET)!.explorerUrl, label] as const
     }),
   ).entries(),
 ].map(([url, label]) => ({ url, label }))

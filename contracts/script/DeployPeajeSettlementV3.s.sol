@@ -81,9 +81,9 @@ contract DeployPeajeSettlementV3 is Script {
         } else if (id == keccak256("arc-testnet")) {
             n = _one(5042002, false, 0x3600000000000000000000000000000000000000, 10_000);
         } else if (id == keccak256("arbitrum-one")) {
-            n = _two(
-                42161, true, 0xaf88d065e77c8cC2239327C5EDb3A432268e5831, 0x004B506865409877C9fA29bfb1ebA929984B9bbC
-            );
+            // Solo USDC al lanzar (San, 2026-11-01). USDG (0x004B506865409877C9fA29bfb1ebA929984B9bbC,
+            // domain "Global Dollar"/"1", checked on-chain) is added later with setAcceptedToken from the Safe.
+            n = _one(42161, true, 0xaf88d065e77c8cC2239327C5EDb3A432268e5831, 20_000);
         } else if (id == keccak256("robinhood-mainnet")) {
             n = _one(4663, true, 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168, 20_000);
         } else if (id == keccak256("arc-mainnet")) {

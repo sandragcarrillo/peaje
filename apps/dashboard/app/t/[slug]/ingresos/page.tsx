@@ -1,6 +1,6 @@
 import { tipoWalletCobro } from '@peaje/db'
 import { PageHeader } from '@/components/chrome'
-import { COBROS_VISIBLES, microMoney, money, shortWallet } from '@/lib/config'
+import { COBROS_VISIBLES, microMoney, money, shortWallet, TESTNET } from '@/lib/config'
 import { redirect } from 'next/navigation'
 import { getDict } from '@/lib/i18n'
 import { armarIngresos } from '@/lib/ingresos'
@@ -25,7 +25,7 @@ export default async function Ingresos({ params }: PageProps<'/t/[slug]/ingresos
     getDict(),
   ])
   const t = d.dinero
-  const ingresos = armarIngresos(payments, balance)
+  const ingresos = armarIngresos(payments, balance, TESTNET)
   const fecha = (iso: string) =>
     new Date(iso).toLocaleString(t.fechaLocale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 

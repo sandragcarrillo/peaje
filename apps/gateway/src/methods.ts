@@ -1,6 +1,6 @@
-import { GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS, splitPrecio, TOKEN_DECIMALS } from '@peaje/shared'
+import { cadena, GATEWAY_RAIL_IDS, GATEWAY_RAILS, NETWORKS, SETTLEMENT_NETWORKS, splitPrecio, TOKEN_DECIMALS } from '@peaje/shared'
 import { evm, tempo } from 'mppx/server'
-import { contratoV3, settleAuthorization } from './settlement.js'
+import { aceptaToken, contratoV3, settleAuthorization } from './settlement.js'
 import { conCostoRed } from './costoRed.js'
 import { settleGateway } from './circle.js'
 import { formatUnits, parseUnits } from 'viem'
@@ -17,6 +17,8 @@ export function merchantDelCobro(contexto: Pick<ContextoCobro, 'merchant'> | und
   const merchant = contexto?.merchant
   if (!esDireccion(merchant)) return null
   if (merchant.toLowerCase() === env.treasuryAddress.toLowerCase()) return null
+  // Ni el destino del 2% de Tempo: el negocio no puede cobrar en la dirección de Peaje.
+  if (merchant.toLowerCase() === env.tempoFeeRecipient.toLowerCase()) return null
   return merchant
 }
 
@@ -68,29 +70,31 @@ export function chargeMethods() {
         ...opciones,
         recipient: merchant,
         ...(feeMicro > 0n
-          ? { splits: [{ recipient: env.treasuryAddress, amount: formatUnits(feeMicro, TOKEN_DECIMALS) }] }
+          ? { splits: [{ recipient: env.tempoFeeRecipient, amount: formatUnits(feeMicro, TOKEN_DECIMALS) }] }
           : {}),
       }
     },
   })
 
-  // Una oferta por red con PeajeSettlementV3 y relayer configurados. El
+  // Una oferta por red con PeajeSettlementV3, relayer y cadena en este modo. El
   // recipient es el contrato: el reparto negocio/Peaje ocurre on-chain en
   // `settle`, en la misma transacción. Los cobros de Peaje (planes) no usan
   // estos rieles: el contrato no acepta al fee recipient como merchant.
   const settlementRails = SETTLEMENT_NETWORKS.flatMap((network) => {
     const contrato = contratoV3(network)
-    if (!contrato) return []
+    const red = cadena(network, env.testnet)
+    if (!contrato || !red) return []
     const def = NETWORKS[network]
     const rail = evm.charge({
-      currency: def.token,
-      chainId: def.testnet.chainId,
+      currency: red.token,
+      chainId: red.chainId,
       decimals: def.decimals,
       authorization: def.eip3009!,
       recipient: contrato,
+      // Sin el token en la lista del contrato, la oferta no sale.
       canOffer: async () => {
         const contexto = contextoCobro.getStore()
-        return !!contexto && !contexto.propio && merchantDelCobro(contexto) !== null
+        return !!contexto && !contexto.propio && merchantDelCobro(contexto) !== null && (await aceptaToken(network))
       },
       settle: async ({ payload, request }) => {
         if (def.tokenSymbol === 'USDC') await depegGuard(def.label)

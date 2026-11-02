@@ -1,10 +1,17 @@
 import {
   DEFAULT_CURRENCY,
+  modoTestnet,
   NETWORKS,
   SETTLEMENT_CONTRACTS,
   tempoConfig,
   type SettlementNetwork,
 } from '@peaje/shared'
+
+/**
+ * Un solo interruptor para todos los rieles: NEXT_PUBLIC_RED=mainnet (el mismo
+ * nombre en Vercel). TEMPO_NETWORK queda como respaldo del nombre viejo.
+ */
+const testnet = modoTestnet(process.env.NEXT_PUBLIC_RED ?? process.env.TEMPO_NETWORK)
 
 /**
  * PeajeSettlementV3 de una red, solo desde el env. Sin dirección (o con
@@ -37,6 +44,27 @@ function required(name: string): string {
   return value
 }
 
+const treasuryAddress = required('TREASURY_ADDRESS') as `0x${string}`
+
+/**
+ * A quién le llega el 2% del split de Tempo. En testnet puede ser la
+ * treasury; en mainnet es obligatorio y tiene que ser la dirección fría (la
+ * misma que el fee recipient de PeajeSettlementV3), nunca la treasury, cuya
+ * llave vive en este servidor.
+ */
+function feeRecipientTempo(): `0x${string}` {
+  const value = process.env.PEAJE_FEE_RECIPIENT?.trim()
+  if (!value) {
+    if (testnet) return treasuryAddress
+    throw new Error('Falta PEAJE_FEE_RECIPIENT: en mainnet el 2% de Tempo va a la dirección fría')
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(value)) throw new Error('PEAJE_FEE_RECIPIENT no es una dirección válida')
+  if (!testnet && value.toLowerCase() === treasuryAddress.toLowerCase()) {
+    throw new Error('PEAJE_FEE_RECIPIENT no puede ser la treasury en mainnet')
+  }
+  return value as `0x${string}`
+}
+
 export const env = {
   port: Number(process.env.PORT ?? 8787),
   /**
@@ -47,11 +75,14 @@ export const env = {
   cobrosVisibles: process.env.NEXT_PUBLIC_COBROS === '1',
   /** Clave para firmar challenges MPP. 32+ bytes. */
   mppSecretKey: required('MPP_SECRET_KEY'),
-  /** Wallet de la plataforma que recibe todos los pagos. */
-  treasuryAddress: required('TREASURY_ADDRESS') as `0x${string}`,
+  /** Wallet de la plataforma: cobros propios de Peaje y reembolsos de Tempo. */
+  treasuryAddress,
+  /** Destino del 2% en el split de Tempo (en los rieles de contrato lo fija el contrato). */
+  tempoFeeRecipient: feeRecipientTempo(),
   currency: (process.env.MPP_CURRENCY ?? DEFAULT_CURRENCY) as `0x${string}`,
-  testnet: (process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet',
-  /** Clave de la treasury. Solo testnet. Firma lo que es de Peaje (relayar barridos de agentes). */
+  /** true en testnet. Lo decide NEXT_PUBLIC_RED, igual para todos los rieles. */
+  testnet,
+  /** Clave de la treasury. Firma lo que es de Peaje (reembolsos de Tempo, relayar barridos de agentes). */
   treasuryPrivateKey,
   /**
    * Relayer de PeajeSettlementV3: EOA aparte, con solo gas nativo, habilitada
@@ -60,42 +91,53 @@ export const env = {
   relayerPrivateKey,
   /** Secreto compartido entre dashboard y gateway para la API interna. */
   internalSecret: required('INTERNAL_API_SECRET'),
-  rpcUrl: tempoConfig((process.env.TEMPO_NETWORK ?? 'testnet') === 'testnet').rpcUrl,
+  rpcUrl: process.env.TEMPO_RPC_URL ?? tempoConfig(testnet).rpcUrl,
   /** RPC de Arc. Solo testnet: Arc no publica mainnet todavía. */
   arcRpcUrl: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
-  /** RPC por red con settlement on-chain (override opcional por variable de entorno). */
-  settlementRpcUrls: {
-    arbitrum: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl,
-    'arbitrum-usdg': process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS['arbitrum-usdg'].testnet.rpcUrl,
-    robinhood: process.env.ROBINHOOD_TESTNET_RPC_URL ?? NETWORKS.robinhood.testnet.rpcUrl,
-    arc: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
-  } satisfies Record<SettlementNetwork, string>,
   /**
-   * PeajeSettlementV3 por red (testnet hoy). USDC y USDG de Arbitrum comparten
-   * cadena y contrato. Ver docs/pagos-directos.md.
+   * RPC por red con settlement on-chain, en el modo del despliegue (override
+   * opcional por variable). null: la red no existe en este modo.
    */
-  settlementV3: {
-    arbitrum: settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
-    'arbitrum-usdg': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
-    robinhood: settlementV3('PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET'),
-    arc: settlementV3('PEAJE_SETTLEMENT_V3_ARC_TESTNET'),
-  } satisfies Record<SettlementNetwork, `0x${string}` | null>,
+  settlementRpcUrls: (testnet
+    ? {
+        arbitrum: process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS.arbitrum.testnet.rpcUrl,
+        'arbitrum-usdg': process.env.ARBITRUM_SEPOLIA_RPC_URL ?? NETWORKS['arbitrum-usdg'].testnet.rpcUrl,
+        robinhood: process.env.ROBINHOOD_TESTNET_RPC_URL ?? NETWORKS.robinhood.testnet.rpcUrl,
+        arc: process.env.ARC_RPC_URL ?? NETWORKS.arc.testnet.rpcUrl,
+      }
+    : {
+        // El RPC público de Arbitrum One tiene límite de pedidos: en producción va uno propio.
+        arbitrum: process.env.ARBITRUM_ONE_RPC_URL ?? NETWORKS.arbitrum.mainnet!.rpcUrl,
+        'arbitrum-usdg': process.env.ARBITRUM_ONE_RPC_URL ?? NETWORKS['arbitrum-usdg'].mainnet!.rpcUrl,
+        robinhood: null,
+        arc: null,
+      }) satisfies Record<SettlementNetwork, string | null>,
   /**
-   * Mainnet: se leen para validarlas, pero ningún riel las usa todavía (el
-   * gateway opera contra testnet). Se conectan cuando NETWORKS tenga mainnet.
+   * PeajeSettlementV3 por red, en el modo del despliegue. USDC y USDG de
+   * Arbitrum comparten cadena y contrato. En mainnet solo Arbitrum One:
+   * Robinhood y Arc no tienen mainnet en NETWORKS. Ver docs/pagos-directos.md.
    */
-  settlementV3Mainnet: {
-    'arbitrum-one': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_ONE'),
-    'robinhood-mainnet': settlementV3('PEAJE_SETTLEMENT_V3_ROBINHOOD_MAINNET'),
-    'arc-mainnet': settlementV3('PEAJE_SETTLEMENT_V3_ARC_MAINNET'),
-  },
+  settlementV3: (testnet
+    ? {
+        arbitrum: settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
+        'arbitrum-usdg': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA'),
+        robinhood: settlementV3('PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET'),
+        arc: settlementV3('PEAJE_SETTLEMENT_V3_ARC_TESTNET'),
+      }
+    : {
+        arbitrum: settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_ONE'),
+        'arbitrum-usdg': settlementV3('PEAJE_SETTLEMENT_V3_ARBITRUM_ONE'),
+        robinhood: null,
+        arc: null,
+      }) satisfies Record<SettlementNetwork, `0x${string}` | null>,
   /** PeajeSettlement v2 (guardaba saldos): solo para leer pagos viejos. */
   settlementV2: SETTLEMENT_CONTRACTS,
   /**
    * Circle Nanopayments (gateway-arbitrum, gateway-arc): junta los pagos en el
-   * saldo Gateway de la treasury y obliga a retirar. Apagado salvo `true`.
+   * saldo Gateway de la treasury y obliga a retirar. Apagado salvo `true`, y
+   * siempre en mainnet: el facilitador y los contratos son los de testnet.
    */
-  circleNanopayments: process.env.CIRCLE_NANOPAYMENTS_ENABLED === 'true',
+  circleNanopayments: testnet && process.env.CIRCLE_NANOPAYMENTS_ENABLED === 'true',
   /** URL pública del gateway (para links en MCP resources y discovery). */
   publicUrl: process.env.GATEWAY_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
   /** URL pública del dashboard: ahí vive la pantalla de permiso del inicio de sesión del MCP. */
