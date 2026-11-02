@@ -64,7 +64,7 @@ export function Pestanas({ agente, manual }: { agente: ReactNode; manual: ReactN
       role="tab"
       aria-selected={modo === valor}
       onClick={() => setModo(valor)}
-      className={`px-4 py-2.5 text-sm ${modo === valor ? 'border-b-2 border-accent font-medium text-text' : 'text-muted hover:text-text'}`}
+      className={`rounded-none px-4 py-2.5 text-sm ${modo === valor ? 'border-b-2 border-accent font-medium text-text' : 'text-muted hover:text-text'}`}
     >
       {label}
     </button>
