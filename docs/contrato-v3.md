@@ -315,3 +315,26 @@ Gas del relayer (desde la treasury, alcanza para unos 20 `settle` con margen de 
 | Arc Testnet | 0,3 USDC | [`0x5313bf40…2a8f5`](https://explorer.testnet.arc.io/tx/0x5313bf40ad3a601d47492824ae7e774354677781a9a7f7aa2c9a95aa3ed2a8f5) | 14,097 USDC |
 
 El guardian y el fee recipient quedan sin gas: el guardian necesita algo de gas nativo antes de poder llamar `pause()`. Direcciones del gateway en el `.env` raíz: `PEAJE_SETTLEMENT_V3_ARBITRUM_SEPOLIA`, `PEAJE_SETTLEMENT_V3_ROBINHOOD_TESTNET`, `PEAJE_SETTLEMENT_V3_ARC_TESTNET` y `RELAYER_PRIVATE_KEY`; el 29 oct el `.env` ya tiene las del redeploy y Railway tiene que recibir las mismas tres. Saldo del relayer el 29 oct, después de la prueba de pago: 0,000147 ETH en Arbitrum Sepolia, 0,0001 ETH en Robinhood Testnet y 0,3 USDC en Arc Testnet.
+
+## Deploy de mainnet: Arbitrum One (1 nov 2026)
+
+Desde el commit `172f790`, sin auditoría externa (decisión de San). Solo USDC al lanzar; USDG se suma desde el Safe con `setAcceptedToken`.
+
+| Dato | Valor |
+|---|---|
+| Contrato | [`0x2339369b423902281bF5c81d53AD1b59fd452020`](https://arbiscan.io/address/0x2339369b423902281bf5c81d53ad1b59fd452020) |
+| Tx de deploy | [`0xdcea13a5…f24d`](https://arbiscan.io/tx/0xdcea13a54f6b222c82c657fed59db16a247bcd28ce34e9928e90d8d082bdf24d), bloque 520.425.294, 1.836.652 de gas (0,0000368 ETH, ~US$0,08) |
+| Owner | Safe 2 de 3 `0x15Ec5d65c81E416Ba046A35aED7f8376f9cE4492` (SafeL2 1.5.0 oficial, sin módulos ni guard; probado con una transacción firmada 2 de 3) |
+| Guardian | `0x89EC85018b790a7D4B3B5fE8e47F04fACB4Fd115` (wallet del celular, con gas) |
+| Fee recipient | `0x93808E14D86840b87f0406F2DE85361bFc8c21E0` (Ledger; EOA, también recibe el 2% de Tempo) |
+| Relayer | `0x6ad39a2f145C49EfaeCd8b7d6785DbCe279a50e5` (llave nueva, solo en Railway) |
+| Deployer | `0x70CD1d15A45696886467BBcd8c0FAAbd9a142923` (sin rol después del deploy) |
+| Token | USDC `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`, tope 20.000 (US$0,02) |
+
+Verificación: Arbiscan ("Pass - Verified") y Sourcify `exact_match` (creación y runtime). El código desplegado es idéntico al de Arbitrum Sepolia `0xcd29503D…dF42` y al artefacto (keccak del runtime `0xc2d72b0c…25d3` en los tres).
+
+Chequeo on-chain: `owner()` = Safe, `pendingOwner()` = 0, `guardian()`, `feeRecipient()`, `isRelayer(relayer)` = true, `isRelayer(deployer)` = false, `isAcceptedToken(USDC)` = true con tope 20.000, `isAcceptedToken(USDG)` = false, `FEE_BPS()` = 200, `paused()` = false. Ninguna de las direcciones de roles tiene código ni está bloqueada por Circle en USDC.
+
+Pausar en una emergencia: el guardian entra a Arbiscan, pestaña "Write Contract" del contrato, conecta su wallet y llama `pause()`. Despausar lo hace solo el Safe.
+
+Todavía no recibe pagos: el gateway sigue en testnet hasta que Railway tenga `NEXT_PUBLIC_RED=mainnet`, `PEAJE_SETTLEMENT_V3_ARBITRUM_ONE`, `PEAJE_FEE_RECIPIENT` y las llaves de mainnet.
