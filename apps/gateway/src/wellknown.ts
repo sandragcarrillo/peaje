@@ -353,28 +353,50 @@ export function aiCatalog({ tenant, routes, base }: Ctx): Record<string, unknown
         displayName: `${tenant.name} agent card`,
         type: 'application/a2a-agent-card+json',
         url: `${base}/.well-known/agent-card.json`,
-        description: `A2A agent card for ${tenant.name}.`,
+        description: `A2A agent card for ${tenant.name}: what its agent can do and how to call it.`,
         tags: ['a2a', 'agent-card'],
+        representativeQueries: [`talk to the ${tenant.name} agent`, `what can the ${tenant.name} agent do`],
         trustManifest: identidad,
       },
-      ...routes.map((r) => ({
-        identifier: urn('capability', r.description ?? r.pathPattern),
-        displayName: r.description ?? `${r.method} ${r.pathPattern}`,
-        type: 'application/json',
-        url: `${base}${r.pathPattern}`,
-        description: `${r.method} ${r.pathPattern} — $${Number(r.priceUsd)} USD per request via MPP (HTTP 402).`,
-        tags: ['capability', 'paid'],
-        // `pricing` no es un miembro del esquema; los escalares van en metadata.
-        metadata: {
-          priceUsd: Number(r.priceUsd),
-          currency: 'USD',
-          pricingModel: 'per-request',
-          method: r.method,
-        },
-        trustManifest: identidad,
-      })),
+      ...routes.map((r) => {
+        // El precio llega ya ajustado (conPrecioVigente): 0 si el negocio no
+        // cobra. Una ruta en 0 no contesta 402, así que no se anuncia como paga.
+        const precio = Number(r.priceUsd)
+        const que = primeraFrase(r.description) ?? `${r.method} ${r.pathPattern}`
+        const condicion =
+          precio > 0
+            ? `${r.method} ${r.pathPattern}: $${precio} USD per request, paid over HTTP 402 (MPP or x402). No API key.`
+            : `${r.method} ${r.pathPattern}: free, no payment or API key.`
+        return {
+          // El identificador sale de la descripción completa, como siempre, para que no cambie.
+          identifier: urn('capability', r.description ?? r.pathPattern),
+          displayName: que,
+          type: 'application/json',
+          url: `${base}${r.pathPattern}`,
+          description: r.description?.trim() ? `${r.description.trim()} ${condicion}` : condicion,
+          tags: ['capability', precio > 0 ? 'paid' : 'free'],
+          // Lighthouse (ard-schema) y la spec piden 2 a 5: con esto el registro la indexa.
+          representativeQueries: [que, `${r.method} ${r.pathPattern} on ${tenant.name}`],
+          // `pricing` no es un miembro del esquema; los escalares van en metadata.
+          metadata: {
+            priceUsd: precio,
+            currency: 'USD',
+            pricingModel: 'per-request',
+            method: r.method,
+          },
+          trustManifest: identidad,
+        }
+      }),
     ],
   }
+}
+
+/** La primera oración de una descripción, sin el punto final y con tope de largo: el nombre corto de la ruta. */
+function primeraFrase(texto: string | null | undefined): string | null {
+  const limpio = texto?.trim()
+  if (!limpio) return null
+  const frase = (limpio.split(/(?<=[.!?])\s/)[0] ?? limpio).replace(/[.!?]+$/, '').trim()
+  return frase.length > 120 ? `${frase.slice(0, 117).trimEnd()}...` : frase
 }
 
 /** Dominio que ancla los `urn:air` y el `did:web`. */
