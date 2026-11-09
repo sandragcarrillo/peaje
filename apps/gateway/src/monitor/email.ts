@@ -88,9 +88,8 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
   const fallando = r.fallando.length
     ? `<p><strong>What to fix</strong></p><ul>${r.fallando.map((f) => `<li>${esc(NOMBRE_CHEQUEO[f.id] ?? f.id)}: ${esc(f.texto)}</li>`).join('')}</ul><pre style="${mono}">${esc(r.comando)}</pre>`
     : `<p><strong>Technical status</strong>: all ${r.chequeosTotal} checks pass. Nothing to fix.</p>`
-  const fmt = (n: number | null) => (n === null ? 'not measured yet' : String(n))
   const plan = r.plan
-    ? `<p><strong>Your plan</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <span style="color:#666">· ${esc(p.metrica.replace(/_/g, ' '))}: ${fmt(p.antes)} → ${fmt(p.ahora)} (target ${p.meta})</span></li>`).join('')}</ol>`
+    ? `<p><strong>Your plan</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <br><span style="color:#666">${esc(p.avance)}</span></li>`).join('')}</ol>`
     : `<p><strong>No plan yet.</strong> <a href="${esc(r.agenteUrl)}">Tell the agent your goal</a> and it builds one for this business.</p>`
   const pct = (x: number | null) => (x === null ? 'n/a' : `${Math.round(x * 100)}%`)
   const citacion = r.citacion

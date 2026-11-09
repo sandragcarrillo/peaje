@@ -5,7 +5,7 @@ import { asistentesMedidos, dominioVerificable, slugify, type Chequeo } from '@p
 import { store } from '../store.js'
 import { validarRuta } from '../rutas.js'
 import { MODEL } from '../monitor/reporte.js'
-import { generarPlan, medirMetricas, planConAvance } from './plan.js'
+import { generarPlan, medirMetricas, metricasVisibles, planConAvance } from './plan.js'
 import { buscarTareas, medirAhora, tareaPublica } from './router.js'
 import { maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
 import { competidoresCitados, paginasCitadas } from '../citacion/competidores.js'
@@ -134,10 +134,12 @@ const HERRAMIENTAS: Herramienta[] = [
         checks: checks.map((c) => ({ id: c.id, ok: c.ok, reason: c.ok ? undefined : c.motivo })),
         checkedAt: v?.runAt ?? null,
         score: v?.score ?? null,
-        metrics: metricas,
-        goalPlan: plan ? { goal: plan.goal, detail: plan.goalDetail, steps: plan.steps.map((s) => ({ title: s.title, metric: s.metric, current: s.current, target: s.target, done: s.done })) } : null,
+        metrics: metricasVisibles(metricas),
+        // `progress` trae la métrica en palabras, de dónde arrancó, dónde está y la meta.
+        goalPlan: plan ? { goal: plan.goal, detail: plan.goalDetail, steps: plan.steps.map((s) => ({ title: s.title, asked: s.deliverable, progress: s.progress, done: s.done })) } : null,
         tasks: { open: tareas.filter((t) => t.status === 'open').length, inProgress: tareas.filter((t) => t.status === 'in_progress').length, waitingDeploy: tareas.filter((t) => t.status === 'done').length, verified: tareas.filter((t) => t.status === 'verified').length },
-        last7Days: visitas ? { totals: visitas.totals, funnel: visitas.funnel } : null,
+        // Con los cobros en prueba, sin pagos ni el paso de pago: solo cuántas visitas hubo.
+        last7Days: visitas ? (env.cobrosVisibles ? { totals: visitas.totals, funnel: visitas.funnel } : { visits: visitas.totals.visits }) : null,
       }
     },
   },
@@ -551,7 +553,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
       ? 'This is your first conversation with them. Open with two or three sentences: who you are in one line, one specific thing you noticed on their site (read it first with read_site_page), and your first question. Do not list what you can do.'
       : '',
     tienePlan
-      ? 'The owner already has a plan (get_plan). Keep answers tied to it.'
+      ? 'The owner already has a plan (get_plan). Keep answers tied to it. When you say how the plan is going, use each step\'s progress line: what is measured in plain words, where it started, where it is now and the target. Never write only "goal met" or a number without saying what it counts. If what the step asked for is not what its number counts (a step about publishing pages measured by bot visits), say it in a few words.'
       : [
           'The owner has no plan yet. When they ask for a plan, or ask what to do, run a short friendly onboarding, one question per message, each with offer_choices:',
           env.cobrosVisibles

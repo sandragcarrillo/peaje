@@ -36,7 +36,7 @@ export type Reporte = {
   agenteUrl: string
   /** Avance del plan del dueño, paso por paso. Null si todavía no armó plan. */
   citacion: { share: number | null; previa: number | null; competidores: string[]; medido: string | null } | null
-  plan: { resumen: string; pasos: { titulo: string; metrica: string; antes: number | null; ahora: number | null; meta: number; hecho: boolean }[] } | null
+  plan: { resumen: string; pasos: { titulo: string; metrica: string; antes: number | null; ahora: number | null; meta: number; hecho: boolean; avance: string }[] } | null
   // ---- M6: qué se publicó o arregló y qué movió (seguimientos a 2 y 6 semanas) ----
   movido?: { titulo: string; tipo: string; url: string | null; linea: string }[]
   // ---- M7: comprador misterioso (última corrida de la semana) ----
@@ -205,7 +205,7 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
     plan: await planConAvance(tenant)
       .then((p) =>
         p
-          ? { resumen: p.summary, pasos: p.steps.map((s) => ({ titulo: s.title, metrica: s.metric, antes: s.baseline, ahora: s.current, meta: s.target, hecho: s.done })) }
+          ? { resumen: p.summary, pasos: p.steps.map((s) => ({ titulo: s.title, metrica: s.metric, antes: s.baseline, ahora: s.current, meta: s.target, hecho: s.done, avance: s.progress })) }
           : null,
       )
       .catch(() => null),
