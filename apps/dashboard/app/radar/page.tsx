@@ -38,7 +38,7 @@ const recienMedido = (jar: Awaited<ReturnType<typeof cookies>>, dominio: string)
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const [{ d: entrada }, { radar: t }, locale, jar] = await Promise.all([searchParams, getDict(), getLocale(), cookies()])
   const dominio = dominioDeRadar(entrada)
-  if (!dominio) return { title: t.metaTituloGeneral, description: t.metaDescripcionGeneral }
+  if (!dominio) return { title: t.metaTituloGeneral, description: t.metaDescripcionGeneral, alternates: { canonical: `${BASE}/radar` } }
   const score = await puntaje(dominio, recienMedido(jar, dominio))
   let linea = ''
   if (score) {

@@ -15,7 +15,7 @@ const COMISION_PCT = 2
 
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getDict()
-  return { title: d.precios.metaTitulo, description: d.precios.metaDescripcion }
+  return { title: d.precios.metaTitulo, description: d.precios.metaDescripcion, alternates: { canonical: '/precios' } }
 }
 
 /**

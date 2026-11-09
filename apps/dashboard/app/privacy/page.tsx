@@ -10,7 +10,7 @@ import { PrivacidadEs } from './es'
 
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getDict()
-  return { title: d.legal.privacidadTitulo, description: d.legal.privacidadMeta }
+  return { title: d.legal.privacidadTitulo, description: d.legal.privacidadMeta, alternates: { canonical: '/privacy' } }
 }
 
 export default async function Privacidad() {

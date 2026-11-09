@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CUPOS_FOUNDER, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD } from '@peaje/db'
 import { getDict, type Dict } from '@/lib/i18n'
@@ -12,6 +13,10 @@ import { ChatEjemplo } from './components/chat-ejemplo'
  */
 
 const COMISION_PCT = 2
+
+// Solo acá y no en el layout: las páginas hijas heredarían el canonical de la
+// portada. Sin esto Google ve usepeaje.com y www.usepeaje.com como duplicadas.
+export const metadata: Metadata = { alternates: { canonical: '/' } }
 
 type L = Dict['landing']
 

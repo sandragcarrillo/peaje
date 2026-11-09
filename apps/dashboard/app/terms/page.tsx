@@ -10,7 +10,7 @@ import { TerminosEs } from './es'
 
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getDict()
-  return { title: d.legal.terminosTitulo, description: d.legal.terminosMeta }
+  return { title: d.legal.terminosTitulo, description: d.legal.terminosMeta, alternates: { canonical: '/terms' } }
 }
 
 export default async function Terminos() {

@@ -8,7 +8,7 @@ type Mercado = Dict['mercado']
 
 export async function generateMetadata() {
   const d = await getDict()
-  return { title: d.mercado.metaTitulo, description: d.mercado.metaDescripcion }
+  return { title: d.mercado.metaTitulo, description: d.mercado.metaDescripcion, alternates: { canonical: '/mercado' } }
 }
 
 /**

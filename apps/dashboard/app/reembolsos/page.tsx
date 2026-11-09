@@ -10,7 +10,7 @@ import { ReembolsosEs } from './es'
 
 export async function generateMetadata(): Promise<Metadata> {
   const d = await getDict()
-  return { title: d.legal.reembolsosTitulo, description: d.legal.reembolsosMeta }
+  return { title: d.legal.reembolsosTitulo, description: d.legal.reembolsosMeta, alternates: { canonical: '/reembolsos' } }
 }
 
 export default async function Reembolsos() {

@@ -49,7 +49,9 @@ export function developersHtml({ tenant, routes, base, actualizado = new Date() 
     about: { '@id': `${origen}/#api` },
   }
   const vendibles = routes.filter((r) => Number(r.priceUsd) > 0)
-  const ejemplo = vendibles[0]?.pathPattern ?? '/r/example'
+  // Sin rutas con precio, un marcador y no una URL inventada: Google rastrea
+  // las URLs del texto y /r/example le daba 404 (Search Console).
+  const ejemplo = vendibles[0]?.pathPattern ?? '/<priced-route>'
   const precioEjemplo = vendibles[0] ? `$${Number(vendibles[0].priceUsd)}` : '$0.01'
 
   const filas = routes
@@ -81,6 +83,7 @@ export function developersHtml({ tenant, routes, base, actualizado = new Date() 
 <title>${nombre} · Developer portal</title>
 <meta name="description" content="Pay-per-request API from ${nombre}: HTTP 402, stablecoin settlement, no API keys. Quickstart, pricing, MCP and sandbox.">
 <meta name="robots" content="index,follow">
+<link rel="canonical" href="${base}/developers">
 <link rel="service-desc" type="application/openapi+json" href="${base}/openapi.json">
 <script type="application/ld+json">
 ${jsonParaScript(webPage)}
