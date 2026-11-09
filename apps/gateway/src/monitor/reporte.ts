@@ -5,6 +5,7 @@ import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
 import { asistentesMedidos, dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
+import { env } from '../env.js'
 import { TEXTO_MOTIVO } from './email.js'
 import { planConAvance } from '../tareas/plan.js'
 import { resumenCitacion } from '../citacion/medir.js'
@@ -19,6 +20,8 @@ import { resultados } from '../ciclo/seguimiento.js'
 
 export type Reporte = {
   dominio: string
+  /** Cobros a agentes fuera de prueba (env.cobrosVisibles). Sin eso el correo no habla de pagos. */
+  cobros: boolean
   kitUrl: string
   comando: string
   chequeosOk: number
@@ -184,6 +187,7 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
 
   return {
     dominio,
+    cobros: env.cobrosVisibles,
     kitUrl: `${DASHBOARD}/t/${tenant.slug}/kit`,
     comando,
     chequeosOk: chequeos.filter((c) => c.ok).length,

@@ -1261,6 +1261,22 @@ export class SupabaseStore implements Store {
     }
     return (data ?? []).length > 0
   }
+
+  // ---- reloj del monitor ----
+  async claimMonitorRun(job: string, period: string): Promise<boolean> {
+    const { data, error } = await this.#db.from('monitor_runs').upsert({ job, period }, { onConflict: 'job,period', ignoreDuplicates: true }).select()
+    this.#fail('claimMonitorRun', error)
+    return (data ?? []).length > 0
+  }
+
+  async finishMonitorRun(job: string, period: string, result: { ok: boolean; detail: Record<string, unknown> }): Promise<void> {
+    const { error } = await this.#db
+      .from('monitor_runs')
+      .update({ finished_at: new Date().toISOString(), ok: result.ok, detail: result.detail })
+      .eq('job', job)
+      .eq('period', period)
+    this.#fail('finishMonitorRun', error)
+  }
   // ---- fin Slack ----
 
   // ---- reportes programados ----

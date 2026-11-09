@@ -5,6 +5,8 @@ import { chainLabels, PEAJE_FETCH_HEADER, redesActivas } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
 import { iniciarTrabajos } from './tareas/trabajos.js'
+// El diario, el semanal y los reportes programados: los dispara el gateway (ver monitor/reloj.ts).
+import { iniciarReloj } from './monitor/reloj.js'
 import { usdcStatus } from './chainlink.js'
 import { conPrecioVigente, origenCaido } from './cobro.js'
 import { cobrarYServir } from './cobrar.js'
@@ -532,4 +534,5 @@ serve({ fetch: app.fetch, port: env.port }, (info) => {
   if (rieles.length && !relayerAddress) console.error('[gateway] hay PeajeSettlementV3 configurado pero falta RELAYER_PRIVATE_KEY: esos rieles no ofrecen nada')
   else console.log(`[gateway] PeajeSettlementV3: ${rieles.join(', ') || 'ninguno'} · relayer ${relayerAddress ?? '-'}`)
   iniciarTrabajos()
+  void iniciarReloj()
 })

@@ -80,10 +80,10 @@ ${fallos.length ? `<p>The fix, for your coding agent or your terminal:</p><pre s
 }
 
 export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html: string } {
-  const subject = `${tenant.name} this week: ${r.chequeosOk} of ${r.chequeosTotal} checks ok${r.score !== null ? `, score ${r.score}` : ''}, ${r.pagos.count} paid requests`
+  const subject = `${tenant.name} this week: ${r.chequeosOk} of ${r.chequeosTotal} checks ok${r.score !== null ? `, score ${r.score}` : ''}${r.cobros ? `, ${r.pagos.count} paid requests` : ''}`
   const filasRutas = r.pagos.porRuta.map((x) => `<tr><td style="padding:4px 8px">${esc(x.path)}</td><td style="padding:4px 8px;text-align:right">${x.count}</td><td style="padding:4px 8px;text-align:right">$${x.revenue}</td></tr>`).join('')
   const visitas = r.visitas
-    ? `<p><strong>Who visited</strong>: ${r.visitas.total} requests from agents, ${r.visitas.pagadas} paid. ${r.visitas.bots.length ? `AI bots that read your agent files: ${esc(r.visitas.bots.join(', '))}.` : 'No AI bot read your agent files this week.'}</p>`
+    ? `<p><strong>Who visited</strong>: ${r.visitas.total} requests from agents${r.cobros ? `, ${r.visitas.pagadas} paid` : ''}.${r.visitas.bots.length ? `AI bots that read your agent files: ${esc(r.visitas.bots.join(', '))}.` : 'No AI bot read your agent files this week.'}</p>`
     : ''
   const fallando = r.fallando.length
     ? `<p><strong>What to fix</strong></p><ul>${r.fallando.map((f) => `<li>${esc(NOMBRE_CHEQUEO[f.id] ?? f.id)}: ${esc(f.texto)}</li>`).join('')}</ul><pre style="${mono}">${esc(r.comando)}</pre>`
@@ -117,7 +117,7 @@ ${movido}
 ${plan}
 <p><strong>Agent-readiness score</strong>: ${r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} vs last week)` : ''}` : 'not available'}.</p>
 ${fallando}
-<p><strong>Payments</strong>: ${r.pagos.count} paid requests, $${r.pagos.revenue} for you${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}
+${r.cobros ? `<p><strong>Payments</strong>: ${r.pagos.count} paid requests, $${r.pagos.revenue} for you${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}` : ''}
 ${visitas}
 ${citacion}
 ${comprador}

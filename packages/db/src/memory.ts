@@ -703,6 +703,20 @@ export class MemoryStore implements Store {
   }
   // ---- fin Slack ----
 
+  // ---- reloj del monitor ----
+  #monitorRuns = new Map<string, { ok: boolean | null; detail: Record<string, unknown> | null }>()
+
+  async claimMonitorRun(job: string, period: string): Promise<boolean> {
+    const k = `${job}:${period}`
+    if (this.#monitorRuns.has(k)) return false
+    this.#monitorRuns.set(k, { ok: null, detail: null })
+    return true
+  }
+
+  async finishMonitorRun(job: string, period: string, result: { ok: boolean; detail: Record<string, unknown> }): Promise<void> {
+    this.#monitorRuns.set(`${job}:${period}`, result)
+  }
+
   // ---- reportes programados ----
   #schedules: ReportSchedule[] = []
 

@@ -24,7 +24,8 @@ import '../telegram/reportes.js'
 import '../slack/reportes.js'
 
 /**
- * Rutas internas del monitor (las llama el cron de Railway, ver docs/monitor.md):
+ * Rutas internas del monitor (para correrlas a mano; el reloj del gateway,
+ * monitor/reloj.ts, dispara solo el diario, el semanal y las agendas):
  *   POST /internal/monitor/run           corrida diaria de todos los negocios con dominio
  *   POST /internal/monitor/run/:slug     uno solo
  *   POST /internal/monitor/weekly        reporte semanal a los Pro
@@ -78,7 +79,8 @@ async function corridaConAlerta(slug: string) {
 
 monitorRouter.post('/run/:slug', async (c) => c.json(await corridaConAlerta(c.req.param('slug'))))
 
-monitorRouter.post('/run', async (c) => {
+/** La corrida diaria de todos los negocios con dominio. La llaman el reloj (monitor/reloj.ts) y POST /run. */
+export async function correrDiario() {
   const tenants = (await store.listTenants()).filter((t) => dominioVerificable(t.originUrl))
   const resultados: unknown[] = []
   // Secuencial: cada corrida hace ~12 GET al dominio del negocio y una segunda
@@ -92,10 +94,13 @@ monitorRouter.post('/run', async (c) => {
       resultados.push({ slug: t.slug, error: error instanceof Error ? error.message : String(error) })
     }
   }
-  return c.json({ tenants: tenants.length, resultados })
-})
+  return { tenants: tenants.length, resultados }
+}
 
-monitorRouter.post('/weekly', async (c) => {
+monitorRouter.post('/run', async (c) => c.json(await correrDiario()))
+
+/** El reporte semanal a los Pro. Lo llaman el reloj (monitor/reloj.ts) y POST /weekly. */
+export async function correrSemanal() {
   const tenants = (await store.listTenants()).filter((t) => esPro(t) && dominioVerificable(t.originUrl))
   const enviados: string[] = []
   const errores: { slug: string; error: string }[] = []
@@ -127,8 +132,10 @@ monitorRouter.post('/weekly', async (c) => {
       errores.push({ slug: t.slug, error: error instanceof Error ? error.message : String(error) })
     }
   }
-  return c.json({ enviados, errores })
-})
+  return { enviados, errores }
+}
+
+monitorRouter.post('/weekly', async (c) => c.json(await correrSemanal()))
 
 monitorRouter.get('/preview/:slug', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))

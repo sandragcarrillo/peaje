@@ -1013,6 +1013,11 @@ export interface Store {
   /** Marca el evento como visto. False si ya estaba (reintento de Slack). */
   claimSlackEvent(eventId: string): Promise<boolean>
   // ---- fin Slack ----
+  // ---- reloj del monitor ----
+  /** Toma la corrida (job, period). False si ya la tomó otra réplica o un reinicio. */
+  claimMonitorRun(job: string, period: string): Promise<boolean>
+  /** Cierra la corrida tomada con su resultado. */
+  finishMonitorRun(job: string, period: string, result: { ok: boolean; detail: Record<string, unknown> }): Promise<void>
   // ---- reportes programados ----
   listReportSchedules(tenantId: string): Promise<ReportSchedule[]>
   /** Con id edita ese; sin id, agent_visits pisa el del mismo (canal, destino) y custom crea uno nuevo. Conserva last_run_at. */
