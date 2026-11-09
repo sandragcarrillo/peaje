@@ -3,7 +3,6 @@ import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response'
 import type { Tenant } from '@peaje/db'
 import { chainLabels, PEAJE_FETCH_HEADER, redesActivas } from '@peaje/shared'
 import { Hono, type Context } from 'hono'
-import { generate } from 'mppx/discovery'
 // Trabajos largos del agente (borradores, series de páginas): el worker corre en este proceso.
 import { iniciarTrabajos } from './tareas/trabajos.js'
 import { usdcStatus } from './chainlink.js'
@@ -40,6 +39,7 @@ import { kitRouter } from './kit.js'
 import { indexNowRouter } from './indexnow.js'
 import { handleMcpRequest, resourceTitle } from './mcp.js'
 import { enriquecer } from './openapi.js'
+import { openapiConOfertas } from './ofertas-openapi.js'
 import { docsBase, gatewayBase } from './base.js'
 import { developersHtml } from './developers.js'
 import { problema } from './problem.js'
@@ -82,18 +82,8 @@ app.get('/:slug/openapi.json', async (c) => {
   // La forma `handler` toma la metadata compuesta de la instancia MPP: emite
   // una oferta por riel en `x-payment-info.offers`.
   const routes = (await sellableRoutes(tenant)).filter((r) => Number(r.priceUsd) > 0)
-  const doc = generate(mppx, {
-      info: { title: `${tenant.name} · Peaje`, version: '1.0.0' },
-      routes: routes.map((route) => ({
-        handler: mppx.charge({
-          amount: route.priceUsd,
-          description: route.description ?? `${route.method} ${route.pathPattern}`,
-        }),
-        method: route.method,
-        path: route.pathPattern,
-        summary: route.description ?? undefined,
-      })),
-    })
+  // Ofertas iguales a las del 402 (ver ofertas-openapi.ts).
+  const doc = openapiConOfertas(tenant, routes)
   // Los paths van sin el slug; la base la declara `servers`, como manda OpenAPI.
   const base = docsBase(tenant)
   const directo = gatewayBase(tenant)

@@ -227,6 +227,27 @@ if (!FORK) {
     for (const chainId of [421614, 46630, 5042002, 42431]) assert.doesNotMatch(todo, new RegExp(`"chainid":${chainId}\\b`))
   })
 
+  /** Las ofertas que anuncia openapi.json para una ruta con precio de este negocio. */
+  async function ofertasOpenapi(tenant: Awaited<ReturnType<typeof negocio>>) {
+    const { openapiConOfertas } = await import('../src/ofertas-openapi.js')
+    const doc = openapiConOfertas(tenant, [{ method: 'GET', pathPattern: '/api/dato', priceUsd: '1' }]) as {
+      paths: Record<string, { get: { 'x-payment-info': { offers: Record<string, unknown>[] } } }>
+    }
+    return doc.paths['/api/dato']!.get['x-payment-info'].offers
+  }
+
+  test('openapi.json anuncia las mismas ofertas que el 402: Tempo a la wallet del negocio, el contrato en Arbitrum, sin USDG ni treasury', async () => {
+    const ofertas = await ofertasOpenapi(await negocio())
+    const texto = JSON.stringify(ofertas).toLowerCase()
+    const tempo = ofertas.find((o) => o.method === 'tempo')!
+    // El reparto va en methodDetails, que mppx no publica en discovery: el 402 lo trae completo.
+    assert.equal(String(tempo.recipient).toLowerCase(), merchant.address.toLowerCase())
+    assert.doesNotMatch(texto, new RegExp(treasury.address.toLowerCase()))
+    for (const o of ofertas.filter((x) => x.method === 'evm')) assert.equal(String(o.recipient).toLowerCase(), contrato.toLowerCase())
+    const evm = ofertas.filter((o) => o.method === 'evm').map((o) => String(o.currency).toLowerCase())
+    assert.deepEqual(evm, [USDC.token.toLowerCase()])
+  })
+
   test('el owner agrega USDG al contrato y el 402 lo ofrece sin tocar el env', async () => {
     const wallet = createWalletClient({ account: owner, chain, transport: http(RPC) })
     const hash = await wallet.writeContract({ address: contrato, abi: v3Abi, functionName: 'setAcceptedToken', args: [USDG.token, true, 20_000n] })
