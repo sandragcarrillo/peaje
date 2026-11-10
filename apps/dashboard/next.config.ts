@@ -29,6 +29,22 @@ const nextConfig = {
         destination: "/blog/como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar",
         permanent: true,
       },
+      // Slugs que pidió el agente de Peaje para preguntas que ya responde el blog.
+      {
+        source: "/que-herramientas-de-geo-arreglan-mi-siti",
+        destination: "/blog/que-herramientas-geo-arreglan-tu-sitio-y-no-solo-lo-miden",
+        permanent: true,
+      },
+      {
+        source: "/que-herramientas-de-aeo-hay-en-espanol-p",
+        destination: "/blog/herramientas-de-aeo-en-espanol-cuales-existen-y-cuanto-cuestan",
+        permanent: true,
+      },
+      {
+        source: "/x402-o-mpp-cual-conviene-para-cobrar-a-a",
+        destination: "/blog/x402-vs-mpp-cual-protocolo-de-pago-para-agentes-de-ia-deberia-usar",
+        permanent: true,
+      },
     ];
   },
 } satisfies NextConfig;
