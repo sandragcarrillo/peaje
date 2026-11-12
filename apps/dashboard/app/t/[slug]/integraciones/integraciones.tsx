@@ -4,17 +4,18 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 import { SectionBar } from '@/components/chrome'
 import { Logo, marcaDe, type Marca } from '@/components/logos'
-import type { EstadoReportes, EstadoSlack, EstadoTelegram } from '@/lib/gateway'
+import type { EstadoGoogle, EstadoReportes, EstadoSlack, EstadoTelegram } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
 import { Copiable } from '../kit/comando'
 import { crearClaveAgente, desconectarHerramienta } from '../agente/actions'
+import { GooglePanel } from '../agente/google'
 import { SlackPanel } from '../agente/slack'
 import { Bloqueado } from '../agente/suscripcion'
 import { TelegramPanel } from '../agente/telegram'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
 
-type Id = 'telegram' | 'slack' | 'claudeapp' | 'chatgpt' | 'claude' | 'cursor' | 'codex' | 'lovable' | 'otras'
+type Id = 'telegram' | 'slack' | 'google' | 'claudeapp' | 'chatgpt' | 'claude' | 'cursor' | 'codex' | 'lovable' | 'otras'
 const HERRAMIENTAS: Id[] = ['claudeapp', 'chatgpt', 'claude', 'cursor', 'codex', 'lovable', 'otras']
 /** Las que se conectan con inicio de sesión (OAuth): no muestran la clave. */
 const CON_SESION: Id[] = ['claudeapp', 'chatgpt']
@@ -44,6 +45,7 @@ export function Integraciones({
   telegram,
   reportes,
   slack,
+  google,
   prefijo,
   herramientas,
   sesiones,
@@ -57,6 +59,7 @@ export function Integraciones({
   telegram: EstadoTelegram | null
   reportes: EstadoReportes | null
   slack: EstadoSlack | null
+  google: EstadoGoogle | null
   prefijo: string | null
   herramientas: { marca: string; nombre: string; dias: number }[]
   sesiones: { id: string; nombre: string; dias: number }[]
@@ -74,7 +77,7 @@ export function Integraciones({
   // Los enlaces con #telegram (Inicio, el correo de bienvenida) abren esa tarjeta.
   useEffect(() => {
     const id = window.location.hash.slice(1) as Id
-    if (['telegram', 'slack', ...HERRAMIENTAS].includes(id)) {
+    if (['telegram', 'slack', 'google', ...HERRAMIENTAS].includes(id)) {
       setAbierta(id)
       requestAnimationFrame(() => document.getElementById('integracion')?.scrollIntoView({ block: 'start' }))
     }
@@ -83,6 +86,7 @@ export function Integraciones({
   const tarjetas: { id: Id; marca: Marca; nombre: string; texto: string }[] = [
     { id: 'telegram', marca: 'telegram', nombre: 'Telegram', texto: t.intTelegram },
     ...(slack?.configured ? [{ id: 'slack' as const, marca: 'slack' as const, nombre: 'Slack', texto: t.intSlack }] : []),
+    ...(google?.configured ? [{ id: 'google' as const, marca: 'searchconsole' as const, nombre: 'Google Search Console', texto: t.intGoogle }] : []),
     { id: 'claudeapp', marca: 'claude', nombre: 'Claude', texto: t.intClaudeApp },
     { id: 'chatgpt', marca: 'chatgpt', nombre: 'ChatGPT', texto: t.intChatgpt },
     { id: 'claude', marca: 'claude', nombre: 'Claude Code', texto: t.intClaude },
@@ -95,6 +99,7 @@ export function Integraciones({
   const activas: { marca: Marca | null; texto: string; desconectar?: () => void }[] = [
     ...(telegram?.links ?? []).map((l) => ({ marca: 'telegram' as const, texto: t.activaTelegram(l.username) })),
     ...(slack?.links ?? []).map((l) => ({ marca: 'slack' as const, texto: t.activaSlack(l.teamName) })),
+    ...(google?.connection ? [{ marca: 'searchconsole' as const, texto: t.activaGoogle(google.connection.property) }] : []),
     // Solo las que de verdad se conectaron: una clave creada no es una herramienta activa.
     ...herramientas.map((h) => {
       const marca = h.marca in NOMBRES ? (h.marca as Marca) : null
@@ -171,6 +176,7 @@ export function Integraciones({
               pro ? <TelegramPanel slug={slug} estado={telegram} reportes={reportes} /> : <Bloqueado que="telegram" plan={planHref} />
             ) : null}
             {abierta === 'slack' ? pro ? <SlackPanel slug={slug} estado={slack} /> : <Bloqueado que="slack" plan={planHref} /> : null}
+            {abierta === 'google' ? pro ? <GooglePanel slug={slug} estado={google} /> : <Bloqueado que="google" plan={planHref} /> : null}
             {HERRAMIENTAS.includes(abierta) ? (
               <Herramienta id={abierta} slug={slug} pro={pro} prefijo={prefijo} clave={clave} setClave={setClave} mcpUrl={mcpUrl} gateway={gateway} />
             ) : null}

@@ -136,6 +136,27 @@ export async function quitarSlack(slug: string, canal?: { teamId: string; channe
 }
 // ---- fin Slack ----
 
+// ---- Google Search Console ----
+export async function conectarGoogle(slug: string) {
+  await requireTenant(slug)
+  const { enlaceGoogle } = await import('@/lib/gateway')
+  return enlaceGoogle(slug, (await getLocale()) === 'es' ? 'es' : 'en')
+}
+
+export async function elegirPropiedadGoogle(slug: string, property: string) {
+  await requireTenant(slug)
+  const { propiedadGoogle } = await import('@/lib/gateway')
+  await propiedadGoogle(slug, property)
+  revalidatePath(`/t/${slug}/integraciones`)
+}
+
+export async function quitarGoogle(slug: string) {
+  await requireTenant(slug)
+  const { desconectarGoogle } = await import('@/lib/gateway')
+  await desconectarGoogle(slug)
+  revalidatePath(`/t/${slug}/integraciones`)
+}
+
 // ---- reportes programados ----
 export async function programarReporte(slug: string, cambio: import('@/lib/gateway').CambioReporte) {
   await requireTenant(slug)

@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { SaldoInsuficiente } from './types'
 import type {
   Agent,
+  GoogleConnection,
   AgentRun,
   Balance,
   NewAgent,
@@ -1276,6 +1277,57 @@ export class SupabaseStore implements Store {
       .eq('job', job)
       .eq('period', period)
     this.#fail('finishMonitorRun', error)
+  }
+
+  // ---- Google Search Console ----
+  async saveGoogleConnection(c: Omit<GoogleConnection, 'connectedAt' | 'lastUsedAt' | 'lastError'>): Promise<void> {
+    const { error } = await this.#db.from('google_connections').upsert(
+      {
+        tenant_id: c.tenantId,
+        email: c.email,
+        property: c.property,
+        properties: c.properties,
+        refresh_token_enc: c.refreshTokenEnc,
+        scope: c.scope,
+        connected_at: new Date().toISOString(),
+        last_used_at: null,
+        last_error: null,
+      },
+      { onConflict: 'tenant_id' },
+    )
+    this.#fail('saveGoogleConnection', error)
+  }
+
+  async getGoogleConnection(tenantId: string): Promise<GoogleConnection | null> {
+    const { data, error } = await this.#db.from('google_connections').select('*').eq('tenant_id', tenantId).maybeSingle()
+    this.#fail('getGoogleConnection', error)
+    if (!data) return null
+    return {
+      tenantId: String(data.tenant_id),
+      email: data.email ?? null,
+      property: data.property ?? null,
+      properties: Array.isArray(data.properties) ? data.properties : [],
+      refreshTokenEnc: String(data.refresh_token_enc),
+      scope: String(data.scope ?? ''),
+      connectedAt: String(data.connected_at),
+      lastUsedAt: data.last_used_at ? String(data.last_used_at) : null,
+      lastError: data.last_error ?? null,
+    }
+  }
+
+  async updateGoogleConnection(tenantId: string, patch: Partial<Pick<GoogleConnection, 'property' | 'lastUsedAt' | 'lastError'>>): Promise<void> {
+    const fila: Record<string, unknown> = {}
+    if ('property' in patch) fila.property = patch.property
+    if ('lastUsedAt' in patch) fila.last_used_at = patch.lastUsedAt
+    if ('lastError' in patch) fila.last_error = patch.lastError
+    if (!Object.keys(fila).length) return
+    const { error } = await this.#db.from('google_connections').update(fila).eq('tenant_id', tenantId)
+    this.#fail('updateGoogleConnection', error)
+  }
+
+  async deleteGoogleConnection(tenantId: string): Promise<void> {
+    const { error } = await this.#db.from('google_connections').delete().eq('tenant_id', tenantId)
+    this.#fail('deleteGoogleConnection', error)
   }
   // ---- fin Slack ----
 

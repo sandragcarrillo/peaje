@@ -1,5 +1,5 @@
 import { marcaDeCliente } from '@peaje/shared/herramientas'
-import { siClaude, siCursor, siGithubcopilot, siReplit, siTelegram, siV0, siWindsurf } from 'simple-icons'
+import { siClaude, siCursor, siGithubcopilot, siGooglesearchconsole, siReplit, siTelegram, siV0, siWindsurf } from 'simple-icons'
 
 /**
  * Logos de las integraciones. Los que están en simple-icons (CC0) van con su
@@ -9,10 +9,11 @@ import { siClaude, siCursor, siGithubcopilot, siReplit, siTelegram, siV0, siWind
  * Slack no está en ninguno de los dos: va con su inicial hasta tener el archivo
  * de su kit de marca.
  */
-export type Marca = 'telegram' | 'slack' | 'claude' | 'cursor' | 'codex' | 'chatgpt' | 'grok' | 'lovable' | 'windsurf' | 'copilot' | 'v0' | 'replit'
+export type Marca = 'telegram' | 'slack' | 'searchconsole' | 'claude' | 'cursor' | 'codex' | 'chatgpt' | 'grok' | 'lovable' | 'windsurf' | 'copilot' | 'v0' | 'replit'
 
 const ICONOS = {
   telegram: siTelegram,
+  searchconsole: siGooglesearchconsole,
   claude: siClaude,
   cursor: siCursor,
   windsurf: siWindsurf,

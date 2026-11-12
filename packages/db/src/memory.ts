@@ -1,6 +1,7 @@
 import { SaldoInsuficiente } from './types'
 import type {
   Agent,
+  GoogleConnection,
   AgentRun,
   Balance,
   NetworkBalance,
@@ -715,6 +716,27 @@ export class MemoryStore implements Store {
 
   async finishMonitorRun(job: string, period: string, result: { ok: boolean; detail: Record<string, unknown> }): Promise<void> {
     this.#monitorRuns.set(`${job}:${period}`, result)
+  }
+
+  // ---- Google Search Console ----
+  #google = new Map<string, GoogleConnection>()
+
+  async saveGoogleConnection(c: Omit<GoogleConnection, 'connectedAt' | 'lastUsedAt' | 'lastError'>): Promise<void> {
+    this.#google.set(c.tenantId, { ...structuredClone(c), connectedAt: new Date().toISOString(), lastUsedAt: null, lastError: null })
+  }
+
+  async getGoogleConnection(tenantId: string): Promise<GoogleConnection | null> {
+    const c = this.#google.get(tenantId)
+    return c ? structuredClone(c) : null
+  }
+
+  async updateGoogleConnection(tenantId: string, patch: Partial<Pick<GoogleConnection, 'property' | 'lastUsedAt' | 'lastError'>>): Promise<void> {
+    const c = this.#google.get(tenantId)
+    if (c) Object.assign(c, patch)
+  }
+
+  async deleteGoogleConnection(tenantId: string): Promise<void> {
+    this.#google.delete(tenantId)
   }
 
   // ---- reportes programados ----

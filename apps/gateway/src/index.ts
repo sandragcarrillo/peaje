@@ -22,6 +22,7 @@ import { tareasRouter } from './tareas/router.js'
 import { oauthRouter } from './oauth.js'
 import { registrarWebhook, telegramRouter } from './telegram/router.js'
 import { slackRouter } from './slack/router.js'
+import { googleRouter } from './google/router.js'
 import { reportesRouter } from './reportes/router.js'
 // ---- M7: comprador misterioso ----
 import { compradorRouter } from './comprador/router.js'
@@ -117,6 +118,8 @@ app.route('/', tareasRouter)
 app.route('/', telegramRouter)
 // ---- Slack: mismo agente en los canales del equipo (antes de /:slug/*, que si no se come /slack/*) ----
 app.route('/', slackRouter)
+// Google Search Console: conectar la cuenta (OAuth, solo lectura) y su estado (antes de /:slug/*, que si no se come /google/*)
+app.route('/', googleRouter)
 // Reportes programados (Telegram hoy, Slack después): GET/PUT/DELETE /_internal/:slug/schedules
 app.route('/', reportesRouter)
 // ---- M9: cobro del agente Pro (antes de /:slug/*, que si no se come /_billing) ----

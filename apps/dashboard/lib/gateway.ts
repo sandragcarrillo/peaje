@@ -189,6 +189,36 @@ export function desconectarSlack(slug: string, canal?: { teamId: string; channel
   const q = canal ? `?team=${encodeURIComponent(canal.teamId)}&channel=${encodeURIComponent(canal.channelId)}` : ''
   return internal<{ ok: boolean }>(`/${slug}/slack${q}`, { method: 'DELETE' })
 }
+
+// ---- Google Search Console ----
+
+export type EstadoGoogle = {
+  configured: boolean
+  connection: {
+    email: string | null
+    property: string | null
+    properties: { siteUrl: string; permissionLevel: string }[]
+    connectedAt: string
+    lastUsedAt: string | null
+    lastError: string | null
+  } | null
+}
+
+export function leerGoogle(slug: string) {
+  return internal<EstadoGoogle>(`/${slug}/google`)
+}
+
+export function enlaceGoogle(slug: string, language: 'es' | 'en') {
+  return internal<{ url: string }>(`/${slug}/google/link`, { method: 'POST', body: JSON.stringify({ language }) })
+}
+
+export function propiedadGoogle(slug: string, property: string) {
+  return internal<{ ok: boolean; property: string }>(`/${slug}/google/property`, { method: 'PUT', body: JSON.stringify({ property }) })
+}
+
+export function desconectarGoogle(slug: string) {
+  return internal<{ ok: boolean }>(`/${slug}/google`, { method: 'DELETE' })
+}
 // ---- fin Slack ----
 
 // ---- reportes programados (Telegram hoy, Slack después) ----

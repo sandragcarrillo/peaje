@@ -591,6 +591,31 @@ export type TaskFollowup = {
 
 export type TelegramLink = { chatId: number; tenantId: string; username: string | null; language: string; linkedAt: string; active: boolean }
 
+// ---- Google Search Console ----
+
+/** Una propiedad de Search Console que ve la cuenta conectada. */
+export type GoogleProperty = { siteUrl: string; permissionLevel: string }
+
+/**
+ * La cuenta de Google conectada a un negocio para leer su Search Console. Una
+ * por negocio. `refreshTokenEnc` va cifrado por el gateway (GOOGLE_TOKEN_KEY).
+ */
+export type GoogleConnection = {
+  tenantId: string
+  /** Con qué cuenta se conectó, para mostrarla. */
+  email: string | null
+  /** La que Peaje lee: 'sc-domain:ejemplo.com' o 'https://ejemplo.com/'. null si la cuenta no tiene el sitio. */
+  property: string | null
+  /** Las que ve esa cuenta, para elegir otra. */
+  properties: GoogleProperty[]
+  refreshTokenEnc: string
+  scope: string
+  connectedAt: string
+  lastUsedAt: string | null
+  /** El último error de Google al leer (token revocado, sin permiso). null si la última lectura salió bien. */
+  lastError: string | null
+}
+
 // ---- Slack ----
 
 /** Una instalación de la app de Peaje en un workspace. `botTokenEnc` va cifrado por el gateway. */
@@ -1018,6 +1043,12 @@ export interface Store {
   claimMonitorRun(job: string, period: string): Promise<boolean>
   /** Cierra la corrida tomada con su resultado. */
   finishMonitorRun(job: string, period: string, result: { ok: boolean; detail: Record<string, unknown> }): Promise<void>
+  // ---- Google Search Console ----
+  /** Guarda o reemplaza la conexión del negocio (una por negocio). Limpia lastError. */
+  saveGoogleConnection(c: Omit<GoogleConnection, 'connectedAt' | 'lastUsedAt' | 'lastError'>): Promise<void>
+  getGoogleConnection(tenantId: string): Promise<GoogleConnection | null>
+  updateGoogleConnection(tenantId: string, patch: Partial<Pick<GoogleConnection, 'property' | 'lastUsedAt' | 'lastError'>>): Promise<void>
+  deleteGoogleConnection(tenantId: string): Promise<void>
   // ---- reportes programados ----
   listReportSchedules(tenantId: string): Promise<ReportSchedule[]>
   /** Con id edita ese; sin id, agent_visits pisa el del mismo (canal, destino) y custom crea uno nuevo. Conserva last_run_at. */

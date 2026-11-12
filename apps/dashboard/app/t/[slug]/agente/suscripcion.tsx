@@ -369,7 +369,7 @@ function Enlace({ etiqueta, url }: { etiqueta: string; url: string }) {
   )
 }
 
-export type SeccionPro = 'chat' | 'telegram' | 'slack' | 'citacion' | 'comprador' | 'plan'
+export type SeccionPro = 'chat' | 'telegram' | 'slack' | 'google' | 'citacion' | 'comprador' | 'plan'
 
 /** Lo que ven las secciones Pro sin Pro: qué hay ahí y cómo se activa, con el botón al plan. */
 /** `plan`: fuera de Mi agente (Integraciones, el chat), la dirección de Tu suscripción en Mi agente. */

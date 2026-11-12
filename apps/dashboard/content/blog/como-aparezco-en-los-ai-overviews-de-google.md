@@ -46,9 +46,11 @@ Sí, con los mismos controles que ya existen para los resultados:
 
 Bloquear a Google-Extended en tu robots.txt no te saca de los AI Overviews. Google-Extended controla el uso de tu contenido para entrenar y alimentar otros sistemas de IA de Google, y la búsqueda se controla con Googlebot.
 
+Si quieres sacar todo tu sitio de una vez, desde el 31 de agosto de 2026 Search Console tiene un control para eso en Ajustes, "IA generativa en la Búsqueda". Viene en incluir por defecto, y si eliges excluir tu sitio deja de salir en los AI Overviews, en el Modo IA y en las funciones de IA generativa de Discover.
+
 ## ¿Cómo sé si salgo y cuánto tráfico me trae?
 
-En Search Console, los clics y las impresiones de los AI Overviews y del Modo IA se cuentan dentro del informe de Rendimiento, en el tipo de búsqueda "Web", junto con el resto. Google no los separa en un informe aparte, así que la forma práctica de saberlo es buscar tus preguntas clave y mirar las fuentes del resumen. Peaje no mide los AI Overviews hoy: el radar y el agente miden ChatGPT y Claude.
+En Search Console, los clics y las impresiones de los AI Overviews y del Modo IA se cuentan dentro del informe de Rendimiento, en el tipo de búsqueda "Web", junto con el resto. Además, desde el 31 de agosto de 2026 todos los sitios tienen un informe aparte de IA generativa que muestra las impresiones en esas funciones por página, país, dispositivo y fecha. Paso a paso, y qué herramientas lo rastrean, en [cómo sé si mi sitio aparece en los AI Overviews](https://usepeaje.com/blog/como-se-si-mi-sitio-aparece-en-los-ai-overviews-de-google). Peaje no cuenta tus apariciones en los AI Overviews, y trabaja en ellas por otra vía: su kit permite a Googlebot por nombre, pone en tu home los datos que identifican a tu negocio y revisa que Googlebot pueda leerla.
 
 ## ¿Por dónde empiezo?
 
@@ -63,4 +65,6 @@ La diferencia entre lo que pide Google y lo que piden los demás asistentes la c
 - [Google Search Central: AI features and your website](https://developers.google.com/search/docs/appearance/ai-features)
 - [Google Search Central: controles de fragmentos](https://developers.google.com/search/docs/appearance/snippet)
 - [Google: rastreadores comunes, incluido Google-Extended](https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers)
+- [Google Search Central: informes de rendimiento de IA generativa](https://developers.google.com/search/blog/2026/06/gen-ai-performance-reports)
+- [Ayuda de Search Console: control de IA generativa en la Búsqueda](https://support.google.com/webmasters/answer/16908024)
 - [Radar gratis de Peaje](https://usepeaje.com/radar)

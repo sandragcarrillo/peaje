@@ -33,6 +33,9 @@ import { anotarCreditos, avisoCreditos, lineaSinCreditos, saldoCreditos, usoPubl
 import { clasificarTema } from './tema.js'
 import { completarTarea } from './verificar.js'
 import { env } from '../env.js'
+// ---- Google Search Console ----
+import { configurado as googleConfigurado } from '../google/api.js'
+import { inspeccionUrl, resumenConsola } from '../google/consola.js'
 
 const MAX_CUSTOM = 5
 
@@ -119,12 +122,13 @@ const HERRAMIENTAS: Herramienta[] = [
     description: 'Current state of the business: agent-readiness checks (and which fail), score, plan progress, task counts, and the last 7 days of agent traffic, the 402 funnel and payments.',
     input_schema: { type: 'object', properties: {} },
     async correr(_i, { tenant }) {
-      const [v, metricas, plan, tareas, visitas] = await Promise.all([
+      const [v, metricas, plan, tareas, visitas, google] = await Promise.all([
         store.lastVerification(tenant.id),
         medirMetricas(tenant),
         planConAvance(tenant),
         store.listTasks(tenant.id),
         store.visitStats(tenant.id, { days: 7 }).catch(() => null),
+        googleConfigurado() ? store.getGoogleConnection(tenant.id).catch(() => null) : Promise.resolve(null),
       ])
       const checks = (v?.checks ?? []) as Chequeo[]
       return {
@@ -140,6 +144,8 @@ const HERRAMIENTAS: Herramienta[] = [
         tasks: { open: tareas.filter((t) => t.status === 'open').length, inProgress: tareas.filter((t) => t.status === 'in_progress').length, waitingDeploy: tareas.filter((t) => t.status === 'done').length, verified: tareas.filter((t) => t.status === 'verified').length },
         // Con los cobros en prueba, sin pagos ni el paso de pago: solo cuántas visitas hubo.
         last7Days: visitas ? (env.cobrosVisibles ? { totals: visitas.totals, funnel: visitas.funnel } : { visits: visitas.totals.visits }) : null,
+        // Si está, get_search_console e inspect_url leen Google; si no, el dueño lo conecta en Integraciones.
+        googleSearchConsole: google ? { connected: true, property: google.property, error: google.lastError } : { connected: false },
       }
     },
   },
@@ -835,6 +841,41 @@ HERRAMIENTAS.push({
   },
 })
 ESTADOS.get_credits = { es: 'Mirando tus créditos…', en: 'Checking your credits…' }
+
+// ---- Google Search Console ----
+HERRAMIENTAS.push(
+  {
+    name: 'get_search_console',
+    description:
+      "The site's Google Search numbers from the owner's Search Console: clicks, impressions, CTR and average position for the period, the top searches and pages, and opportunities (searches and pages Google shows but nobody clicks; searches ranked 8 to 20). Also the sitemaps Google read. Optional filters: only searches containing a word, only pages whose URL contains a text. If it is not connected, it says so and gives the link to connect it. Use it for any question about Google search, impressions, clicks or rankings.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', enum: [7, 28, 90] },
+        query_contains: { type: 'string', description: 'Only searches that contain this text.' },
+        page_contains: { type: 'string', description: 'Only pages whose URL contains this text.' },
+      },
+    },
+    async correr(i, { tenant }) {
+      const dias = numero(i.days) === 7 ? 7 : numero(i.days) === 90 ? 90 : 28
+      const texto = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : undefined)
+      return resumenConsola(tenant, { dias, consulta: texto(i.query_contains), pagina: texto(i.page_contains) })
+    },
+  },
+  {
+    name: 'inspect_url',
+    description:
+      "What Google knows about one URL of the site, from Search Console's URL Inspection: whether it is indexed, coverage, last crawl, whether Google could fetch it, robots and noindex, the canonical Google chose versus the declared one, and which sitemaps list it. Use it to check a page after a deploy or when a page does not show up in Google.",
+    input_schema: { type: 'object', properties: { url: { type: 'string', description: 'A full https URL on the business site.' } }, required: ['url'] },
+    async correr(i, { tenant, idioma }) {
+      const url = urlDelSitio(tenant, i.url)
+      if (!url) return { error: 'The URL must be an https URL on the business domain.' }
+      return inspeccionUrl(tenant, url, idioma)
+    },
+  },
+)
+ESTADOS.get_search_console = { es: 'Mirando tu Search Console…', en: 'Checking your Search Console…' }
+ESTADOS.inspect_url = { es: 'Preguntándole a Google por esa página…', en: 'Asking Google about that page…' }
 
 /**
  * Qué cobra cada herramienta. 'gratis' no cobra nunca. Una entrega cobra su

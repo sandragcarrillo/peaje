@@ -3,7 +3,7 @@ import { claveAgente, hashApiKey, salDeClave } from '@peaje/shared'
 import { gatewayUrl } from '@/lib/config'
 import { PageHeader } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
-import { leerReportes, leerSlack, leerTelegram } from '@/lib/gateway'
+import { leerGoogle, leerReportes, leerSlack, leerTelegram } from '@/lib/gateway'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Integraciones } from './integraciones'
@@ -17,10 +17,12 @@ export default async function IntegracionesPage({ params }: { params: Promise<{ 
   const { slug } = await params
   const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
   const t = d.miAgente
-  const [telegram, reportes, slack, clave] = await Promise.all([
+  const [telegram, reportes, slack, google, clave] = await Promise.all([
     leerTelegram(tenant.slug).catch(() => null),
     leerReportes(tenant.slug).catch(() => null),
     leerSlack(tenant.slug).catch(() => null),
+    // Sin GOOGLE_* en el gateway o sin la migración 20261111000000: sin tarjeta.
+    leerGoogle(tenant.slug).catch(() => null),
     claveVisible(tenant),
   ])
   // Antes de la migración 20261028100000 la tabla no existe: sin conexiones.
@@ -35,6 +37,7 @@ export default async function IntegracionesPage({ params }: { params: Promise<{ 
         telegram={telegram}
         reportes={reportes}
         slack={slack}
+        google={google}
         prefijo={tenant.apiKeyPrefix}
         herramientas={conectadas(tenant)}
         sesiones={sesiones.map((s) => ({ id: s.id, nombre: s.clientName || 'MCP', dias: diasDesde(s.lastUsedAt ?? s.createdAt) }))}

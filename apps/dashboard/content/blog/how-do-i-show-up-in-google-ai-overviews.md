@@ -46,9 +46,11 @@ Yes, with the same controls that already exist for results:
 
 Blocking Google-Extended in your robots.txt does not take you out of AI Overviews. Google-Extended controls whether your content is used to train and ground other Google AI systems, and Search is controlled through Googlebot.
 
+If you want to take your whole site out at once, since August 31, 2026 Search Console has a control for that under Settings, "Search generative AI". It is set to include by default, and if you choose to exclude your site it stops appearing in AI Overviews, AI Mode and the generative AI features in Discover.
+
 ## How do I know if I show up and how much traffic it brings?
 
-In Search Console, clicks and impressions from AI Overviews and AI Mode are counted in the Performance report, under the "Web" search type, together with everything else. Google does not split them into a separate report, so the practical way to know is to search your key questions and look at the sources in the summary. Peaje does not measure AI Overviews today: the radar and the agent measure ChatGPT and Claude.
+In Search Console, clicks and impressions from AI Overviews and AI Mode are counted in the Performance report, under the "Web" search type, together with everything else. Since August 31, 2026, every site also has a separate generative AI report that shows impressions in those features by page, country, device and date. The step by step, and which tools track it, is in [how to check if your site appears in AI Overviews](https://usepeaje.com/blog/how-do-i-check-if-my-site-appears-in-googles-ai-overviews). Peaje does not count your appearances in AI Overviews, and it works on them another way: its kit allows Googlebot by name, puts the data that identifies your business on your home page and checks that Googlebot can read it.
 
 ## Where do I start?
 
@@ -63,4 +65,6 @@ We explain the difference between what Google asks for and what the other assist
 - [Google Search Central: AI features and your website](https://developers.google.com/search/docs/appearance/ai-features)
 - [Google Search Central: snippet controls](https://developers.google.com/search/docs/appearance/snippet)
 - [Google: common crawlers, Google-Extended included](https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers)
+- [Google Search Central: generative AI performance reports](https://developers.google.com/search/blog/2026/06/gen-ai-performance-reports)
+- [Search Console Help: Search generative AI control](https://support.google.com/webmasters/answer/16908024)
 - [Peaje free radar](https://usepeaje.com/radar)
