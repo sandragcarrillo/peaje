@@ -24,6 +24,14 @@ const nextConfig = {
   // Slugs del blog que cambiaron después de publicarse: el viejo lleva al nuevo.
   async redirects() {
     return [
+      // Un solo host para Google: www.usepeaje.com respondía 200 y Search
+      // Console lo contaba como otra página. El apex es el canónico.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.usepeaje.com" }],
+        destination: "https://usepeaje.com/:path*",
+        permanent: true,
+      },
       {
         source: "/blog/como-monto-un-servidor-mcp-para-mi-tienda-sin-saber-programar",
         destination: "/blog/como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar",

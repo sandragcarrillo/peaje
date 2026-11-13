@@ -29,7 +29,7 @@ export const RUTAS_PROXY = [
   { path: '/checkout_sessions', nota: 'checkout ACP (el de OpenAI)' },
   { path: '/agentic_commerce/delegate_payment', nota: 'delegate payment ACP' },
   { path: '/developers', nota: 'portal de desarrolladores, renderizado con tus precios' },
-  { path: '/.well-known/peaje-indexnow.txt', nota: 'clave IndexNow: avisa a Bing y Copilot cuando cambian precios' },
+  { path: '/peaje-indexnow.txt', nota: 'clave IndexNow: avisa a Bing cuando cambian precios (en la raíz, para que cubra todo el dominio)' },
   // Los auditores prueban /docs y /developers; el gateway redirige uno al otro.
   { path: '/docs', nota: 'alias del portal: los auditores prueban ambos' },
 ] as const

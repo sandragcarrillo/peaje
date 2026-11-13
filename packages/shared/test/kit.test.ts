@@ -10,6 +10,7 @@ import {
   headJsonLd,
   HOST_IDS,
   INDEXNOW_KEY_PATH,
+  pingIndexNow,
   installMd,
   jsonLdOrganization,
   jsonLdWebApi,
@@ -217,6 +218,41 @@ test('la clave IndexNow es determinística, de 32 hex, y su ruta está en el pro
   assert.match(a, /^[0-9a-f]{32}$/)
   assert.notEqual(a, await claveIndexNow('otro'))
   assert.ok(RUTAS_PROXY.some((r) => r.path === INDEXNOW_KEY_PATH))
+})
+
+test('IndexNow: la clave vive en la raíz y el aviso usa el host donde responde', async () => {
+  assert.equal(INDEXNOW_KEY_PATH, '/peaje-indexnow.txt')
+  const key = await claveIndexNow('secreto')
+  const original = globalThis.fetch
+  const enviados: { host: string; keyLocation: string; urlList: string[] }[] = []
+  try {
+    // El apex redirige a www: la clave responde en www, y el aviso tiene que ir con ese host.
+    globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === 'https://ejemplo.com/peaje-indexnow.txt') {
+        const r = new Response(key, { status: 200 })
+        Object.defineProperty(r, 'url', { value: 'https://www.ejemplo.com/peaje-indexnow.txt' })
+        return r
+      }
+      if (url === 'https://api.indexnow.org/indexnow') {
+        enviados.push(JSON.parse(String(init?.body)))
+        return new Response(null, { status: 202 })
+      }
+      return new Response('no', { status: 404 })
+    }) as typeof fetch
+    assert.equal(await pingIndexNow('ejemplo.com', ['https://ejemplo.com/developers'], key), true)
+    assert.deepEqual(enviados[0], {
+      host: 'www.ejemplo.com',
+      key,
+      keyLocation: 'https://www.ejemplo.com/peaje-indexnow.txt',
+      urlList: ['https://www.ejemplo.com/developers'],
+    })
+    // Sin la clave en la raíz (proxy viejo) no se avisa.
+    assert.equal(await pingIndexNow('otro.com', ['https://otro.com/developers'], key), false)
+    assert.equal(enviados.length, 1)
+  } finally {
+    globalThis.fetch = original
+  }
 })
 
 test('el Worker lee el manifiesto y conserva la lista embebida como respaldo', () => {
