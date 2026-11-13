@@ -6,40 +6,49 @@ import type { EstadoGoogle } from '@/lib/gateway'
 import { useDict } from '@/lib/i18n/client'
 import { conectarGoogle, elegirPropiedadGoogle, quitarGoogle } from './actions'
 
-/** Google Search Console en Integraciones: conectar la cuenta, ver qué sitio lee, cambiarlo, desconectar. Mismo patrón que Slack. */
+/** Cómo terminó la conexión: el gateway vuelve a Integraciones con ?google=<resultado> (apps/gateway/src/google/router.ts). */
+type Resultado = 'connected' | 'permission' | 'cancelled' | 'failed' | 'expired' | 'pro'
+const RESULTADOS: string[] = ['connected', 'permission', 'cancelled', 'failed', 'expired', 'pro']
+
+/** 'sc-domain:ejemplo.com' → 'ejemplo.com'; 'https://ejemplo.com/' → 'https://ejemplo.com'. */
+export const sitioLegible = (propiedad: string) => propiedad.replace(/^sc-domain:/, '').replace(/\/$/, '')
+
+/** Google Search Console en Integraciones: conectar la cuenta, ver qué sitio lee, cambiarlo, desconectar. */
 export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoogle | null }) {
   const { miAgente: t } = useDict()
-  const [enlace, setEnlace] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<Resultado | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const router = useRouter()
-  // Al volver de Google, la página relee el estado y muestra la cuenta conectada.
+
+  // Al volver de Google: se muestra el resultado una vez y se limpia de la URL.
   useEffect(() => {
-    const alVolver = () => document.visibilityState === 'visible' && router.refresh()
-    document.addEventListener('visibilitychange', alVolver)
-    return () => document.removeEventListener('visibilitychange', alVolver)
-  }, [router])
+    const url = new URL(window.location.href)
+    const r = url.searchParams.get('google')
+    if (!r) return
+    if (RESULTADOS.includes(r)) setResultado(r as Resultado)
+    url.searchParams.delete('google')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+  }, [])
   if (!estado?.configured) return null
   const con = estado.connection
 
-  // La pestaña se abre en el gesto del usuario (si no, el navegador la bloquea) y se le pone el enlace cuando llega.
-  const conectar = () => {
-    const ventana = window.open('', '_blank')
+  // En la misma pestaña: Google vuelve directo acá.
+  const conectar = () =>
     start(async () => {
       setError(null)
+      setResultado(null)
       try {
         const { url } = await conectarGoogle(slug)
-        if (ventana) ventana.location.href = url
-        else setEnlace(url)
+        window.location.assign(url)
       } catch (e) {
-        ventana?.close()
         setError(e instanceof Error ? e.message : String(e))
       }
     })
-  }
   const correr = (fn: () => Promise<void>) =>
     start(async () => {
       setError(null)
+      setResultado(null)
       try {
         await fn()
         router.refresh()
@@ -47,6 +56,18 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
         setError(e instanceof Error ? e.message : String(e))
       }
     })
+
+  const mensaje = !resultado
+    ? null
+    : {
+        // Sin el sitio en la cuenta no hay "listo": abajo sale el aviso para elegir otro.
+        connected: con?.property ? t.gsListo(sitioLegible(con.property)) : null,
+        permission: t.gsFaltaPermiso,
+        cancelled: t.gsCancelada,
+        failed: t.gsNoConecto,
+        expired: t.gsVencio,
+        pro: null,
+      }[resultado]
 
   const aviso = !con
     ? null
@@ -62,7 +83,12 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
   const dias = con?.lastUsedAt ? Math.floor((Date.now() - Date.parse(con.lastUsedAt)) / 86_400_000) : null
 
   return (
-    <div className="space-y-3 border border-border p-4">
+    <div className="space-y-4 border border-border p-4">
+      {mensaje ? (
+        <p role="status" className={`border-l-2 bg-panel-2 px-3 py-2 text-sm ${resultado === 'connected' ? 'border-l-accent' : 'border-l-red-600'}`}>
+          {mensaje}
+        </p>
+      ) : null}
       <p className="text-sm text-muted">{t.gsIntro}</p>
       {con ? (
         <div className="space-y-3">
@@ -71,7 +97,7 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
             <label className="block space-y-1 text-sm">
               <span className="text-muted">{t.gsSitio}</span>
               <select
-                className="block w-full max-w-md border border-border bg-panel px-3 py-2 font-mono text-xs"
+                className="block w-full max-w-md border border-border bg-panel px-3 py-2 text-sm"
                 value={con.property ?? ''}
                 disabled={pending}
                 onChange={(e) => e.target.value && correr(() => elegirPropiedadGoogle(slug, e.target.value))}
@@ -79,7 +105,7 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
                 {!con.property ? <option value="">—</option> : null}
                 {con.properties.map((p) => (
                   <option key={p.siteUrl} value={p.siteUrl}>
-                    {p.siteUrl}
+                    {sitioLegible(p.siteUrl)}
                   </option>
                 ))}
               </select>
@@ -90,16 +116,11 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
           {!aviso && con.property ? <p className="text-xs text-muted">{t.gsPrueba}</p> : null}
         </div>
       ) : null}
+      {!con || con.lastError?.startsWith('reconnect') ? <p className="text-sm">{t.gsMarcar}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
-        {enlace ? (
-          <a href={enlace} target="_blank" rel="noreferrer" className="btn btn-primario">
-            {t.gsAbrir}
-          </a>
-        ) : (
-          <button disabled={pending} onClick={conectar} className={con ? 'btn btn-secundario btn-chico' : 'btn btn-primario'}>
-            {con ? t.gsOtraCuenta : t.gsConectar}
-          </button>
-        )}
+        <button disabled={pending} onClick={conectar} className={con ? 'btn btn-secundario btn-chico' : 'btn btn-primario'}>
+          {con ? t.gsOtraCuenta : t.gsConectar}
+        </button>
         {con ? (
           <button disabled={pending} onClick={() => correr(() => quitarGoogle(slug))} className="btn btn-secundario btn-chico hover:text-red-600">
             {t.gsQuitar}

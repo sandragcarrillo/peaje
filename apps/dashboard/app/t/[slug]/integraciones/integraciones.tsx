@@ -32,9 +32,12 @@ const NOMBRES: Partial<Record<Marca, string>> = {
   replit: 'Replit',
 }
 
+/** De la marca que anota el gateway a la integración de la lista. */
+const DE_MARCA: Partial<Record<string, Id>> = { claude: 'claude', cursor: 'cursor', codex: 'codex', lovable: 'lovable', windsurf: 'otras', copilot: 'otras', v0: 'otras', replit: 'otras' }
+
 /**
- * Integraciones: arriba lo que ya está conectado, abajo una tarjeta por
- * integración con su logo. Tocar una abre su instalación debajo de la grilla.
+ * Integraciones: arriba lo que ya está conectado; abajo, la lista de
+ * integraciones a la izquierda y la elegida a la derecha (en celular, debajo).
  * Claude (la app) y ChatGPT entran con inicio de sesión; las demás, con la clave.
  * La clave del agente vive acá arriba (en el estado) para que siga igual al
  * cambiar de herramienta. Sale tapada, con el ojito, como el secreto del origen.
@@ -69,19 +72,33 @@ export function Integraciones({
   planHref: string
 }) {
   const { miAgente: t } = useDict()
-  const [abierta, setAbierta] = useState<Id | null>(null)
+  const [abierta, setAbierta] = useState<Id>('telegram')
   const [clave, setClave] = useState<string | null>(claveGuardada)
   const [desconectando, startDesconectar] = useTransition()
   const router = useRouter()
 
-  // Los enlaces con #telegram (Inicio, el correo de bienvenida) abren esa tarjeta.
+  // Los enlaces con #telegram (Inicio, el correo de bienvenida) abren esa integración.
+  // También si cambia solo el # sin recargar (replaceState de elegir() no dispara hashchange).
   useEffect(() => {
-    const id = window.location.hash.slice(1) as Id
-    if (['telegram', 'slack', 'google', ...HERRAMIENTAS].includes(id)) {
+    const abrir = () => {
+      const id = window.location.hash.slice(1) as Id
+      if (!['telegram', 'slack', 'google', ...HERRAMIENTAS].includes(id)) return
       setAbierta(id)
-      requestAnimationFrame(() => document.getElementById('integracion')?.scrollIntoView({ block: 'start' }))
+      requestAnimationFrame(() => document.getElementById('integraciones')?.scrollIntoView({ block: 'start' }))
     }
+    abrir()
+    window.addEventListener('hashchange', abrir)
+    return () => window.removeEventListener('hashchange', abrir)
   }, [])
+
+  const elegir = (id: Id) => {
+    setAbierta(id)
+    window.history.replaceState(null, '', `#${id}`)
+    // En pantallas chicas el detalle queda debajo de la lista: se trae a la vista.
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      requestAnimationFrame(() => document.getElementById('integracion')?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+    }
+  }
 
   const tarjetas: { id: Id; marca: Marca; nombre: string; texto: string }[] = [
     { id: 'telegram', marca: 'telegram', nombre: 'Telegram', texto: t.intTelegram },
@@ -117,6 +134,20 @@ export function Integraciones({
     })),
   ]
 
+  // Las que ya tienen algo conectado llevan un punto en la lista.
+  const conectadas = new Set<Id>([
+    ...(telegram?.links?.length ? (['telegram'] as const) : []),
+    ...(slack?.links?.length ? (['slack'] as const) : []),
+    ...(google?.connection ? (['google'] as const) : []),
+    ...herramientas.map((h) => DE_MARCA[h.marca] ?? 'otras'),
+    ...sesiones.flatMap((s) => {
+      const m = marcaDe(s.nombre)
+      const id = m === 'chatgpt' ? 'chatgpt' : m === 'claude' ? 'claudeapp' : m ? DE_MARCA[m] : undefined
+      return id ? [id] : []
+    }),
+  ])
+  const actual = tarjetas.find((c) => c.id === abierta) ?? tarjetas[0]
+
   return (
     <div className="space-y-8">
       {activas.length > 0 ? (
@@ -140,48 +171,62 @@ export function Integraciones({
         </section>
       ) : null}
 
-      <section className="space-y-3">
+      <section id="integraciones" className="scroll-mt-6 space-y-3">
         <SectionBar label={t.agregarTitulo} />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {tarjetas.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setAbierta(abierta === c.id ? null : c.id)}
-              aria-expanded={abierta === c.id}
-              aria-controls="integracion"
-              className={`flex flex-col gap-3 rounded-lg border bg-panel p-4 text-left transition-colors ${abierta === c.id ? 'border-accent' : 'border-border hover:border-text/40'}`}
-            >
-              <span className="flex items-center gap-3">
-                {c.id === 'otras' ? (
-                  <span className="flex gap-1">
-                    {(['windsurf', 'copilot', 'v0', 'replit'] as const).map((m) => (
-                      <Logo key={m} marca={m} className="h-5 w-5" />
-                    ))}
-                  </span>
-                ) : (
-                  <Logo marca={c.marca} className="h-7 w-7" />
-                )}
-                <span className="font-medium">{c.nombre}</span>
-              </span>
-              <span className="text-sm text-muted">{c.texto}</span>
-              <span className="mt-auto font-mono text-xs text-accent">{abierta === c.id ? t.intCerrar : t.intConectar} →</span>
-            </button>
-          ))}
-        </div>
+        <div className="grid items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border lg:sticky lg:top-6">
+            {tarjetas.map((c) => {
+              const elegida = actual.id === c.id
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => elegir(c.id)}
+                    aria-current={elegida ? 'true' : undefined}
+                    aria-controls="integracion"
+                    className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${elegida ? 'border-l-accent bg-panel-2 font-medium' : 'border-l-transparent hover:bg-panel'}`}
+                  >
+                    {c.id === 'otras' ? <IconoHerramienta /> : <Logo marca={c.marca} className="h-5 w-5 shrink-0" />}
+                    <span className="min-w-0 truncate">{c.nombre}</span>
+                    {conectadas.has(c.id) ? (
+                      <span title={t.intConectada} className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-accent">
+                        <span className="sr-only">{t.intConectada}</span>
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
 
-        {abierta ? (
-          <div id="integracion" className="space-y-4 rounded-lg border border-border p-4">
-            {abierta === 'telegram' ? (
+          <div id="integracion" className="min-w-0 scroll-mt-6 space-y-4">
+            <div className="flex items-start gap-3">
+              {actual.id === 'otras' ? (
+                <span className="flex shrink-0 gap-1 pt-1">
+                  {(['windsurf', 'copilot', 'v0', 'replit'] as const).map((m) => (
+                    <Logo key={m} marca={m} className="h-5 w-5" />
+                  ))}
+                </span>
+              ) : (
+                <Logo marca={actual.marca} className="h-8 w-8 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <h2 className="text-lg font-medium">{actual.nombre}</h2>
+                <p className="text-sm text-muted">{actual.texto}</p>
+              </div>
+            </div>
+            {actual.id === 'telegram' ? (
               pro ? <TelegramPanel slug={slug} estado={telegram} reportes={reportes} /> : <Bloqueado que="telegram" plan={planHref} />
             ) : null}
-            {abierta === 'slack' ? pro ? <SlackPanel slug={slug} estado={slack} /> : <Bloqueado que="slack" plan={planHref} /> : null}
-            {abierta === 'google' ? pro ? <GooglePanel slug={slug} estado={google} /> : <Bloqueado que="google" plan={planHref} /> : null}
-            {HERRAMIENTAS.includes(abierta) ? (
-              <Herramienta id={abierta} slug={slug} pro={pro} prefijo={prefijo} clave={clave} setClave={setClave} mcpUrl={mcpUrl} gateway={gateway} />
+            {actual.id === 'slack' ? pro ? <SlackPanel slug={slug} estado={slack} /> : <Bloqueado que="slack" plan={planHref} /> : null}
+            {actual.id === 'google' ? pro ? <GooglePanel slug={slug} estado={google} /> : <Bloqueado que="google" plan={planHref} /> : null}
+            {HERRAMIENTAS.includes(actual.id) ? (
+              <div className="border border-border p-4">
+                <Herramienta id={actual.id} slug={slug} pro={pro} prefijo={prefijo} clave={clave} setClave={setClave} mcpUrl={mcpUrl} gateway={gateway} />
+              </div>
             ) : null}
           </div>
-        ) : null}
+        </div>
       </section>
     </div>
   )

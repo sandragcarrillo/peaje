@@ -101,7 +101,9 @@ async function conectar(slug: string, opciones: { scope?: string; sinRefresh?: b
     return { status: 404, json: {} }
   }
   const vuelta = await googleRouter.request(`/google/oauth/callback?code=codigo&state=${encodeURIComponent(state)}`, { headers: { cookie } })
-  return { vuelta, html: await vuelta.text() }
+  // El callback siempre vuelve a Integraciones con ?google=<resultado>.
+  const destinoFinal = vuelta.headers.get('location') ?? ''
+  return { vuelta, resultado: new URL(destinoFinal, 'https://x.test').searchParams.get('google'), destinoFinal }
 }
 
 test('conectar: solo Pro; el callback exige la cookie y el permiso de Search Console; el token queda cifrado', async () => {
@@ -109,20 +111,21 @@ test('conectar: solo Pro; el callback exige la cookie y el permiso de Search Con
   assert.equal(link?.status, 403)
 
   const otraCookie = await conectar('gsc-prueba', { cookie: 'peaje_google_state=otro' })
-  assert.equal(otraCookie.vuelta?.status, 400)
+  assert.equal(otraCookie.vuelta?.status, 302)
+  assert.equal(otraCookie.resultado, 'expired')
   assert.equal(await store.getGoogleConnection(tenant.id), null)
 
   const sinPermiso = await conectar('gsc-prueba', { scope: 'openid email' })
-  assert.equal(sinPermiso.vuelta?.status, 400)
-  assert.match(sinPermiso.html!, /Falta un permiso/)
+  assert.equal(sinPermiso.resultado, 'permission')
   assert.equal(await store.getGoogleConnection(tenant.id), null)
 
   const sinRefresh = await conectar('gsc-prueba', { sinRefresh: true })
-  assert.equal(sinRefresh.vuelta?.status, 502)
+  assert.equal(sinRefresh.resultado, 'failed')
 
   const ok = await conectar('gsc-prueba')
-  assert.equal(ok.vuelta?.status, 200)
-  assert.match(ok.html!, /sc-domain:ejemplo\.co/)
+  assert.equal(ok.vuelta?.status, 302)
+  assert.equal(ok.resultado, 'connected')
+  assert.match(ok.destinoFinal!, /\/t\/gsc-prueba\/integraciones\?google=connected#google$/)
   const con = await store.getGoogleConnection(tenant.id)
   assert.ok(con)
   assert.equal(con.email, 'duena@ejemplo.co')

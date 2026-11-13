@@ -8,7 +8,7 @@ import { canjearCodigo, cifrar, configurado, elegirPropiedad, firmarEstado, leer
 
 /**
  *   GET    /google/install?state=…          pone la cookie y redirige al consentimiento de Google
- *   GET    /google/oauth/callback           canjea el código, elige la propiedad del sitio, guarda la conexión
+ *   GET    /google/oauth/callback           canjea el código, elige la propiedad del sitio, guarda la conexión y vuelve a Integraciones (?google=)
  *   POST   /_internal/:slug/google/link     enlace para conectar (state firmado, 30 min)
  *   GET    /_internal/:slug/google          estado de la conexión
  *   PUT    /_internal/:slug/google/property cambia la propiedad entre las que ve la cuenta
@@ -22,71 +22,59 @@ const seguro = () => env.publicUrl.startsWith('https://')
 
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+// Solo para un enlace vencido o sin configurar, cuando no se sabe de qué negocio es. Colores de Peaje, claro y oscuro.
 const pagina = (titulo: string, cuerpo: string, idioma: 'es' | 'en') => `<!doctype html>
 <html lang="${idioma}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(titulo)}</title>
-<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:64px auto;padding:0 16px;line-height:1.5;color:#111;background:#fff}
-a.b{display:inline-block;margin-top:12px;margin-right:12px;padding:10px 16px;border-radius:8px;background:#111;color:#fff;text-decoration:none}
-code{background:#f2f2f2;padding:2px 6px;border-radius:4px}</style></head>
-<body><h1>${esc(titulo)}</h1>${cuerpo}</body></html>`
-
-const volver = (idioma: 'es' | 'en', slug?: string) =>
-  `<a class="b" href="${esc(slug ? `${DASHBOARD}/t/${slug}/integraciones#google` : DASHBOARD)}">${idioma === 'es' ? 'Volver a Peaje' : 'Back to Peaje'}</a>`
+<meta name="color-scheme" content="light dark"><title>${esc(titulo)}</title>
+<style>:root{--bg:#fdf9f0;--panel:#f7f3ea;--borde:#cbc6bd;--texto:#1c1c16;--suave:#494740;--acento:#1f7280;--sobre:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#161512;--panel:#201f1c;--borde:#38362f;--texto:#f4f0e7;--suave:#a49e92;--acento:#a2dae2;--sobre:#1c1b19}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:var(--bg);color:var(--texto);font:16px/1.55 ui-sans-serif,system-ui,sans-serif}
+main{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:28px}
+.marca{font:600 13px/1 ui-monospace,monospace;color:var(--suave);margin:0 0 20px}h1{font-size:22px;line-height:1.25;margin:0 0 8px}p{margin:0;color:var(--suave)}
+a{display:inline-block;margin-top:20px;padding:10px 16px;border-radius:8px;background:var(--acento);color:var(--sobre);text-decoration:none;font-weight:500}</style></head>
+<body><main><p class="marca">Peaje</p><h1>${esc(titulo)}</h1>${cuerpo}<a href="${esc(DASHBOARD)}">${idioma === 'es' ? 'Volver a Peaje' : 'Back to Peaje'}</a></main></body></html>`
 
 googleRouter.get('/google/install', (c) => {
   const state = c.req.query('state') ?? ''
   const estado = state ? leerEstado(state) : null
   if (!configurado() || !estado) {
-    return c.html(pagina('Link expired', '<p>This link expired. Tap "Connect Google" again in Peaje.</p><p>Este enlace venció. Vuelve a tocar "Conectar Google" en Peaje.</p>', 'en'), 410)
+    return c.html(pagina('Este enlace venció', '<p>Vuelve a Integraciones en Peaje y toca "Conectar Google" otra vez.</p><p lang="en" style="margin-top:8px">This link expired. Go back to Integrations in Peaje and tap "Connect Google" again.</p>', 'es'), 410)
   }
   // La cookie ata el consentimiento a este navegador: un state copiado a otro no sirve.
   setCookie(c, COOKIE, state, { httpOnly: true, secure: seguro(), sameSite: 'Lax', path: '/google', maxAge: 30 * 60 })
   return c.redirect(urlAutorizar(state), 302)
 })
 
+/** Cómo terminó la conexión. El dashboard lee ?google= y muestra el mensaje en Integraciones. */
+export type ResultadoGoogle = 'connected' | 'permission' | 'cancelled' | 'failed' | 'expired' | 'pro'
+
 googleRouter.get('/google/oauth/callback', async (c) => {
   const state = c.req.query('state') ?? ''
   const estado = state ? leerEstado(state) : null
-  const idioma = estado?.idioma ?? 'en'
-  const es = idioma === 'es'
-  if (!estado || getCookie(c, COOKIE) !== state) {
-    return c.html(pagina(es ? 'No se pudo conectar' : 'Could not connect', `<p>${es ? 'El enlace venció o se abrió en otro navegador. Vuelve a tocar "Conectar Google" en Integraciones.' : 'The link expired or was opened in another browser. Tap "Connect Google" again in Integrations.'}</p>${volver(idioma)}`, idioma), 400)
-  }
+  const tenant = estado ? await store.getTenantById(estado.tenantId) : null
+  // Sin un state válido no se sabe de qué negocio es.
+  if (!estado || !tenant) return c.redirect(DASHBOARD, 302)
+  const volver = (r: ResultadoGoogle) => c.redirect(`${DASHBOARD}/t/${tenant.slug}/integraciones?google=${r}#google`, 302)
+
+  if (getCookie(c, COOKIE) !== state) return volver('expired')
   setCookie(c, COOKIE, '', { path: '/google', maxAge: 0 })
-  const tenant = await store.getTenantById(estado.tenantId)
-  if (!tenant) return c.html(pagina('Not found', '<p>Business not found.</p>', idioma), 404)
-  if (c.req.query('error')) {
-    return c.html(pagina(es ? 'Conexión cancelada' : 'Connection cancelled', `<p>${es ? 'No se conectó nada. Puedes intentarlo de nuevo cuando quieras.' : 'Nothing was connected. You can try again anytime.'}</p>${volver(idioma, tenant.slug)}`, idioma))
-  }
-  const bloqueo = sinPro(tenant, idioma)
-  if (bloqueo) return c.html(pagina('Peaje Pro', `<p>${esc(bloqueo.message)}</p>${volver(idioma, tenant.slug)}`, idioma), 403)
+  if (c.req.query('error')) return volver('cancelled')
+  if (sinPro(tenant, estado.idioma)) return volver('pro')
 
   let canje
   try {
     canje = await canjearCodigo(c.req.query('code') ?? '')
   } catch (e) {
     console.warn('[google] token', e instanceof Error ? e.message : e)
-    return c.html(pagina(es ? 'No se pudo conectar' : 'Could not connect', `<p>${es ? 'Google no confirmó la conexión. Inténtalo de nuevo.' : 'Google did not confirm the connection. Try again.'}</p>${volver(idioma, tenant.slug)}`, idioma), 502)
+    return volver('failed')
   }
-  // Google deja desmarcar cada permiso en la pantalla de consentimiento.
-  if (!canje.scope.split(' ').includes(SCOPE_CONSOLA)) {
-    return c.html(
-      pagina(
-        es ? 'Falta un permiso' : 'One permission missing',
-        `<p>${es ? 'Para leer tu Search Console, Peaje necesita el permiso "Ver los datos de Search Console de tus sitios verificados". Vuelve a conectar y déjalo marcado.' : 'To read your Search Console, Peaje needs the permission "View Search Console data for your verified sites". Connect again and keep it checked.'}</p>${volver(idioma, tenant.slug)}`,
-        idioma,
-      ),
-      400,
-    )
-  }
+  // Google muestra una casilla por permiso y deja seguir sin marcar la de Search Console.
+  if (!canje.scope.split(' ').includes(SCOPE_CONSOLA)) return volver('permission')
   // Sin refresh token no hay lectura después de una hora. Con prompt=consent Google siempre lo manda; si no vino, mejor no guardar.
-  if (!canje.refreshToken) {
-    return c.html(pagina(es ? 'No se pudo conectar' : 'Could not connect', `<p>${es ? 'Google no entregó el acceso permanente. Vuelve a conectar.' : 'Google did not hand over lasting access. Connect again.'}</p>${volver(idioma, tenant.slug)}`, idioma), 502)
-  }
+  if (!canje.refreshToken) return volver('failed')
 
   const propiedades = await listarPropiedades(canje.accessToken).catch(() => [])
-  const dominio = dominioVerificable(tenant.originUrl)
-  const propiedad = elegirPropiedad(propiedades, dominio)
+  const propiedad = elegirPropiedad(propiedades, dominioVerificable(tenant.originUrl))
   // Con otra cuenta, la anterior se revoca. Con la misma no: revocar corta el permiso entero, también el token nuevo.
   const anterior = await store.getGoogleConnection(tenant.id)
   if (anterior?.email && canje.email && anterior.email !== canje.email) void revocar(anterior.refreshTokenEnc).catch(() => undefined)
@@ -98,19 +86,8 @@ googleRouter.get('/google/oauth/callback', async (c) => {
     refreshTokenEnc: cifrar(canje.refreshToken),
     scope: canje.scope,
   })
-
-  const cuenta = canje.email ? ` (<b>${esc(canje.email)}</b>)` : ''
-  if (propiedad) {
-    const cuerpo = es
-      ? `<p>Peaje ya lee el Search Console de <b>${esc(propiedad)}</b> con tu cuenta de Google${cuenta}. Solo lectura: Peaje no cambia nada en tu Search Console.</p><p>Pregúntale al agente, por ejemplo: <code>¿en qué búsquedas aparezco y nadie hace clic?</code></p>${volver(idioma, tenant.slug)}`
-      : `<p>Peaje now reads Search Console for <b>${esc(propiedad)}</b> with your Google account${cuenta}. Read only: Peaje changes nothing in your Search Console.</p><p>Ask the agent, for example: <code>which searches show my site but get no clicks?</code></p>${volver(idioma, tenant.slug)}`
-    return c.html(pagina(es ? 'Search Console conectado' : 'Search Console connected', cuerpo, idioma))
-  }
-  const lista = propiedades.length ? `<ul>${propiedades.map((p) => `<li><code>${esc(p.siteUrl)}</code></li>`).join('')}</ul>` : ''
-  const cuerpo = es
-    ? `<p>Tu cuenta de Google quedó conectada${cuenta}, pero no tiene <b>${esc(dominio ?? tenant.originUrl)}</b> en Search Console.${propiedades.length ? ' Estas son las que tiene:' : ''}</p>${lista}<p>Agrega tu sitio en <a href="https://search.google.com/search-console">Search Console</a> o elige una de la lista en Integraciones. Si el sitio está en otra cuenta, desconecta y conecta esa.</p>${volver(idioma, tenant.slug)}`
-    : `<p>Your Google account is connected${cuenta}, but it does not have <b>${esc(dominio ?? tenant.originUrl)}</b> in Search Console.${propiedades.length ? ' These are the ones it has:' : ''}</p>${lista}<p>Add your site in <a href="https://search.google.com/search-console">Search Console</a> or pick one from the list in Integrations. If the site is in another account, disconnect and connect that one.</p>${volver(idioma, tenant.slug)}`
-  return c.html(pagina(es ? 'Falta tu sitio' : 'Your site is missing', cuerpo, idioma))
+  // Si la cuenta no tiene el sitio, el dashboard lo dice y deja elegir uno de la lista.
+  return volver('connected')
 })
 
 googleRouter.use('/_internal/:slug/google/*', async (c, next) => {
