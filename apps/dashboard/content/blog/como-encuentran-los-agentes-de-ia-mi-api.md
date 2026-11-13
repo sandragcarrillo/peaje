@@ -16,7 +16,7 @@ De tres formas: leyendo archivos conocidos en tu propio dominio, como `llms.txt`
 
 Actualizado: noviembre de 2026
 
-El kit gratis de Peaje publica esos archivos en tu dominio, y cada ruta que agregas en tu panel entra en ellos al instante. El [radar gratis](https://usepeaje.com/radar) revisa, entre otras cosas, si tu servidor MCP aparece en un directorio.
+El kit gratis de Peaje publica esos archivos en tu dominio, y cada ruta que agregas en tu panel entra en ellos al instante. El [radar gratis](https://usepeaje.com/radar) revisa, entre otras cosas, si tu servidor MCP aparece en un directorio ([qué es MCP y en qué se diferencia de una API](https://usepeaje.com/blog/que-es-mcp-y-en-que-se-diferencia-de-una-api)).
 
 ## ¿Qué archivos busca un agente en mi dominio?
 

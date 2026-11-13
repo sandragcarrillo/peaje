@@ -16,7 +16,7 @@ You do not have to write code: Peaje generates your site's MCP server and makes 
 
 Updated: October 2026
 
-The free kit includes the MCP server, llms.txt, openapi.json, agent cards and JSON-LD generated for your site, plus a log of agent visits and a daily monitor, with no card and no expiry date ([pricing](https://usepeaje.com/precios)).
+The free kit includes the MCP server, llms.txt, openapi.json, agent cards and JSON-LD generated for your site, plus a log of agent visits and a daily monitor, with no card and no expiry date ([pricing](https://usepeaje.com/precios)). If the term is new to you, start with [what MCP is and how it differs from an API](https://usepeaje.com/blog/what-is-mcp-and-how-is-it-different-from-an-api).
 
 ## What steps do I follow to set it up?
 

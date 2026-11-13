@@ -31,7 +31,7 @@ In your dashboard, open "My agent" and go to Integrations. Your key is there, al
 - **Cursor:** tap "Add to Cursor". The first time, Cursor asks you to sign in to Peaje and pick the business, with no key to paste. If you prefer the key, it goes in your project's `.cursor/mcp.json`.
 - **Codex:** in the terminal, save your key with `export PEAJE_AGENT_KEY=<your key>` and then run `codex mcp add peaje --url https://api.usepeaje.com/_owner/mcp --bearer-token-env-var PEAJE_AGENT_KEY`. That way the key is not written into Codex's config.
 - **Claude and ChatGPT (the chat apps):** you add them as a custom connector with the URL shown in Integrations, and when you connect you pick your business and allow it, with no key. In ChatGPT you have to turn on developer mode first. They are for asking your agent; the code changes are made by your coding tool.
-- **Others:** Lovable, Windsurf, GitHub Copilot, v0, Replit and any tool that takes MCP. Integrations shows you how to connect each one.
+- **Others:** Lovable, Windsurf, GitHub Copilot, v0, Replit and any tool that takes MCP ([what MCP is](https://usepeaje.com/blog/what-is-mcp-and-how-is-it-different-from-an-api)). Integrations shows you how to connect each one.
 
 ## What do I ask it afterwards?
 

@@ -1,5 +1,5 @@
 ---
-title: "How do I show up in Google's AI Overviews?"
+title: "How to get in Google AI Overviews"
 description: What Google asks for so your site shows up in AI Overviews and AI Mode, how to limit what it shows from your pages, how to measure it and what you do not need.
 date: 2026-11-03
 slug: how-do-i-show-up-in-google-ai-overviews
@@ -10,9 +10,9 @@ portada_titulo: Your site in AI Overviews
 traduccion: como-aparezco-en-los-ai-overviews-de-google
 ---
 
-# How do I show up in Google's AI Overviews?
+# How to get in Google AI Overviews
 
-With the same SEO as always. Google says that to appear in AI Overviews and AI Mode your page has to be indexed and eligible to show with a snippet in the results, and that there are no additional requirements. What decides whether you get used is the usual: Google can crawl your site, your important content is in text and it answers well what people search for.
+To get in Google AI Overviews you need the same SEO as always. Google says that to appear in AI Overviews and AI Mode your page has to be indexed and eligible to show with a snippet in the results, and that there are no additional requirements. What decides whether you get used is the usual: Google can crawl your site, your important content is in text and it answers well what people search for.
 
 Updated: November 2026
 

@@ -16,7 +16,7 @@ In three ways: by reading well-known files on your own domain, like `llms.txt`, 
 
 Updated: November 2026
 
-Peaje's free kit publishes those files on your domain, and every route you add in your dashboard goes into them right away. The [free radar](https://usepeaje.com/radar) checks, among other things, whether your MCP server is listed in a directory.
+Peaje's free kit publishes those files on your domain, and every route you add in your dashboard goes into them right away. The [free radar](https://usepeaje.com/radar) checks, among other things, whether your MCP server is listed in a directory ([what MCP is and how it differs from an API](https://usepeaje.com/blog/what-is-mcp-and-how-is-it-different-from-an-api)).
 
 ## What files does an agent look for on my domain?
 

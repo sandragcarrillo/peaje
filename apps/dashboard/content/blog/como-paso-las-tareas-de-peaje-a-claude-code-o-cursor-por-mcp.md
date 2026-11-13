@@ -31,7 +31,7 @@ En tu panel, abre "Mi agente" y entra a Integraciones. Ahí está tu clave y la 
 - **Cursor:** toca "Agregar a Cursor". La primera vez, Cursor te pide iniciar sesión en Peaje y elegir el negocio, sin pegar ninguna clave. Si prefieres la clave, va en `.cursor/mcp.json` de tu proyecto.
 - **Codex:** en la terminal, guarda tu clave con `export PEAJE_AGENT_KEY=<tu clave>` y después corre `codex mcp add peaje --url https://api.usepeaje.com/_owner/mcp --bearer-token-env-var PEAJE_AGENT_KEY`. Así la clave no queda escrita en la configuración de Codex.
 - **Claude y ChatGPT (las apps de chat):** se agregan como conector personalizado con la URL que aparece en Integraciones, y al conectar eliges tu negocio y das permiso, sin clave. En ChatGPT primero hay que prender el modo desarrollador. Sirven para preguntarle a tu agente; los cambios en el código los hace tu herramienta de código.
-- **Otras:** Lovable, Windsurf, GitHub Copilot, v0, Replit y cualquier herramienta que acepte MCP. Integraciones te muestra cómo conectar cada una.
+- **Otras:** Lovable, Windsurf, GitHub Copilot, v0, Replit y cualquier herramienta que acepte MCP ([qué es MCP](https://usepeaje.com/blog/que-es-mcp-y-en-que-se-diferencia-de-una-api)). Integraciones te muestra cómo conectar cada una.
 
 ## ¿Qué le pido después?
 

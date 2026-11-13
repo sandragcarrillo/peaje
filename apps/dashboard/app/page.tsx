@@ -207,6 +207,25 @@ export default async function Landing() {
         </section>
       </Sangre>
 
+      {/* ── Guías del blog ───────────────────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <div className="mx-auto max-w-5xl px-6 py-8">
+          <span className="etiqueta font-bold text-accent">{t.guiasEtiqueta}</span>
+          <ul className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+            {t.guias.map((g) => (
+              <li key={g.slug} className="min-w-0">
+                <Link href={`/blog/${g.slug}`} className="text-text underline underline-offset-4 hover:text-muted">
+                  {g.titulo}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link href="/blog" className="mt-4 inline-block py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text">
+            {t.guiasTodas} →
+          </Link>
+        </div>
+      </Sangre>
+
       {/* ── Para devs ────────────────────────────────────────── */}
       <Sangre className="isla-tinta border-t border-border bg-bg text-text">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-sm">

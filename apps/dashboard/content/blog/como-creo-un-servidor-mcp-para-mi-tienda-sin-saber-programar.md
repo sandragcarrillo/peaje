@@ -16,7 +16,7 @@ No tienes que escribir código: Peaje genera el servidor MCP de tu sitio y lo de
 
 Actualizado: octubre de 2026
 
-El kit gratis incluye el servidor MCP, llms.txt, openapi.json, agent cards y JSON-LD generados para tu sitio, más el registro de visitas de agentes y un monitor diario, sin tarjeta y sin fecha de vencimiento ([precios](https://usepeaje.com/precios)).
+El kit gratis incluye el servidor MCP, llms.txt, openapi.json, agent cards y JSON-LD generados para tu sitio, más el registro de visitas de agentes y un monitor diario, sin tarjeta y sin fecha de vencimiento ([precios](https://usepeaje.com/precios)). Si el término es nuevo para ti, empieza por [qué es MCP y en qué se diferencia de una API](https://usepeaje.com/blog/que-es-mcp-y-en-que-se-diferencia-de-una-api).
 
 ## ¿Qué pasos sigo para crearlo?
 

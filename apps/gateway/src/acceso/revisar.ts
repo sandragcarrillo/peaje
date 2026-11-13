@@ -25,7 +25,7 @@ export const BOTS: { bot: string; producto: string; proposito: Proposito; ua: st
   { bot: 'Claude-User', producto: 'Claude (when a user asks it to open a page)', proposito: 'user-fetch', ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +https://www.anthropic.com)' },
   { bot: 'ClaudeBot', producto: 'Anthropic model training', proposito: 'training', ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)' },
   { bot: 'Googlebot', producto: 'Google search and AI Overviews', proposito: 'answers', ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/130.0.0.0 Safari/537.36' },
-  { bot: 'bingbot', producto: 'Bing, which ChatGPT search leans on', proposito: 'answers', ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/130.0.0.0 Safari/537.36' },
+  { bot: 'bingbot', producto: 'Bing search and Microsoft Copilot', proposito: 'answers', ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/130.0.0.0 Safari/537.36' },
 ]
 
 export type EstadoBot = {

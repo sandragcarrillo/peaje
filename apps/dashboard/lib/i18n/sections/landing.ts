@@ -165,6 +165,16 @@ export const landing = {
     devsEtiqueta: 'Para devs',
     devsTexto: 'Instala Peaje en tu proyecto con',
     devsPortal: 'Portal para desarrolladores',
+
+    // Guías del blog (enlaces internos para buscadores y para quien llega)
+    guiasEtiqueta: 'Guías',
+    guias: [
+      { titulo: '¿Cómo aparezco en los AI Overviews de Google?', slug: 'como-aparezco-en-los-ai-overviews-de-google' },
+      { titulo: '¿Cómo aparezco en los resultados de búsqueda con IA?', slug: 'como-aparezco-en-los-resultados-de-busqueda-con-ia' },
+      { titulo: '¿Qué es MCP y en qué se diferencia de una API?', slug: 'que-es-mcp-y-en-que-se-diferencia-de-una-api' },
+      { titulo: '¿Cómo encuentran los agentes de IA mi API?', slug: 'como-encuentran-los-agentes-de-ia-mi-api' },
+    ],
+    guiasTodas: 'Todo el blog',
   },
   en: {
     ctaAgente: 'Start with my agent',
@@ -299,5 +309,14 @@ export const landing = {
     devsEtiqueta: 'For devs',
     devsTexto: 'Install Peaje in your project with',
     devsPortal: 'Developer portal',
+
+    guiasEtiqueta: 'Guides',
+    guias: [
+      { titulo: 'How to get in Google AI Overviews', slug: 'how-do-i-show-up-in-google-ai-overviews' },
+      { titulo: 'How do I show up in AI search results?', slug: 'how-do-i-show-up-in-ai-search-results' },
+      { titulo: 'What is MCP and how is it different from an API?', slug: 'what-is-mcp-and-how-is-it-different-from-an-api' },
+      { titulo: 'How do AI agents find my API?', slug: 'how-do-ai-agents-find-my-api' },
+    ],
+    guiasTodas: 'All guides',
   },
 }
