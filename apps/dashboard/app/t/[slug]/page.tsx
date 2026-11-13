@@ -3,13 +3,11 @@ import Link from 'next/link'
 import { barras, leer, type Barra } from '@/app/radar/datos'
 import { textoLlanoDe } from '@/app/radar/textos'
 import { ScoreColumnas } from '@/components/score-columnas'
-import { COBROS_VISIBLES, money, TESTNET } from '@/lib/config'
+import { COBROS_VISIBLES, money } from '@/lib/config'
 import { getDict, getLocale } from '@/lib/i18n'
-import type { Dict } from '@/lib/i18n/dict'
 import { cachedScore, scannableDomain } from '@/lib/ora'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
-import { BotonCobros } from './cobros'
 import { BotonScore } from './kit/partes'
 
 /**
@@ -68,15 +66,8 @@ export default async function Inicio({ params }: PageProps<'/t/[slug]'>) {
   }
 
   // El checklist va primero: es lo que el dueño tiene que hacer. Cuando está todo hecho, desaparece.
-  // En mainnet, antes que nada, el aviso de cobros hasta que el negocio los active.
-  const checklist = (
-    <>
-      {!TESTNET && COBROS_VISIBLES && !tenant.cobrosActivos ? (
-        <AvisoCobros slug={tenant.slug} conWallet={!!tenant.payoutWallet} t={d.dinero} />
-      ) : null}
-      <SiguientePaso pasos={pasos} titulo={t.pasosTitulo} hecho={t.pasoHecho} />
-    </>
-  )
+  // El aviso de cobros a agentes vive en el Kit, dentro de "Implementa Peaje".
+  const checklist = <SiguientePaso pasos={pasos} titulo={t.pasosTitulo} hecho={t.pasoHecho} />
   const despues = <EstaSemana datos={semana} titulo={t.semanaTitulo} />
 
   if (!domain) {
@@ -188,35 +179,6 @@ function FilaBarra({ barra, etiqueta, sinMedir }: { barra: Barra; etiqueta: stri
         {pct !== null ? <div className="h-full bg-accent" style={{ width: `${pct}%` }} /> : null}
       </div>
     </li>
-  )
-}
-
-/**
- * Mainnet: Peaje ya cobra con plata real, pero cada negocio decide cuándo.
- * Mientras no los active, sus rutas con precio son gratis para los agentes.
- * Sin wallet de cobro el botón lleva a Ingresos, donde se elige.
- */
-function AvisoCobros({ slug, conWallet, t }: { slug: string; conWallet: boolean; t: Dict['dinero'] }) {
-  return (
-    <div className="flex flex-col justify-between gap-4 border border-accent bg-panel p-5 sm:flex-row sm:items-center">
-      <div className="space-y-1.5">
-        <p className="text-sm font-semibold">{t.cobrosAvisoTitulo}</p>
-        <p className="text-sm text-muted">
-          {t.cobrosAvisoTexto}{' '}
-          <Link href={t.cobrosArticulo} className="underline underline-offset-4 hover:text-text">
-            {t.cobrosConoceMas}
-          </Link>
-        </p>
-        {conWallet ? null : <p className="text-sm text-muted">{t.cobrosSinWallet}</p>}
-      </div>
-      {conWallet ? (
-        <BotonCobros slug={slug} activos={false} />
-      ) : (
-        <Link href={`/t/${slug}/ingresos`} className="btn btn-primario btn-chico shrink-0 self-start sm:self-center">
-          {t.cobrosIrAIngresos}
-        </Link>
-      )}
-    </div>
   )
 }
 

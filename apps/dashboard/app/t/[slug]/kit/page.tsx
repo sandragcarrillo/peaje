@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { gatewayUrl } from '@/lib/config'
+import { COBROS_VISIBLES, gatewayUrl, TESTNET } from '@/lib/config'
 import { PageHeader } from '@/components/chrome'
 import { getDict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
@@ -12,7 +12,8 @@ import {
   type Oferta,
 } from './bloques'
 import { MotoresDeRespuesta } from './motores'
-import { ImplementarPeaje, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
+import { ImplementarPeaje, PromptSegunKit, ToggleBlock, VerificacionProvider, type Pieza } from './partes'
+import { AvisoCobros } from './aviso-cobros'
 import { BloqueProxy } from './proxy'
 import { UltimaVerificacion } from './ultima-verificacion'
 import { Copiable, Pestanas, PromptAgente } from './comando'
@@ -20,7 +21,8 @@ import { generarProxy, RUTAS_DINAMICAS, RUTAS_PROXY, secretoOrigen, type Entidad
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
-  const { kit: d } = await getDict()
+  const dict = await getDict()
+  const d = dict.kit
   const tenant = await tenantIfMine(slug)
   if (!tenant) {
     return (
@@ -88,21 +90,13 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
     sinEntrenamiento: tenant.robotsBlockTraining,
   })
 
-  return (
-    <VerificacionProvider slug={tenant.slug}>
-      <div className="max-w-3xl space-y-8">
-        <PageHeader
-          eyebrow={`KIT / ${originHost}`}
-          titulo={d.titulo}
-          sub={
-            <>
-              {d.subtituloInicio}
-              <strong className="text-text">{originHost}</strong>
-              {d.subtituloFin}
-            </>
-          }
-        />
+  // Kit puesto según la última verificación guardada (la misma regla que el Inicio):
+  // decide si el prompt va arriba antes de que termine la medición en vivo.
+  const ultima = await store.lastVerification(tenant.id).catch(() => null)
+  const propios = ((ultima?.checks ?? []) as { id: string; ok: boolean }[]).filter((c) => c.id !== 'bots')
+  const kitListo = propios.length > 0 && propios.every((c) => c.ok)
 
+  const prompt = (
         <Pestanas
           agente={
             <section className="space-y-4 border border-accent/40 bg-panel p-5">
@@ -145,6 +139,26 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             </section>
           }
         />
+  )
+
+  return (
+    <VerificacionProvider slug={tenant.slug}>
+      <div className="max-w-3xl space-y-8">
+        <PageHeader
+          eyebrow={`KIT / ${originHost}`}
+          titulo={d.titulo}
+          sub={
+            <>
+              {d.subtituloInicio}
+              <strong className="text-text">{originHost}</strong>
+              {d.subtituloFin}
+            </>
+          }
+        />
+
+        <PromptSegunKit inicialListo={kitListo} donde="arriba">
+          {prompt}
+        </PromptSegunKit>
 
         <UltimaVerificacion tenantId={tenant.id} />
 
@@ -178,11 +192,21 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
             audit: domain ? d.promptAuditConDominio(domain) : d.promptAuditSinDominio,
             referencia: d.promptReferencia,
           }}
+          cobros={
+            !TESTNET && COBROS_VISIBLES && !tenant.cobrosActivos ? (
+              <AvisoCobros slug={tenant.slug} conWallet={!!tenant.payoutWallet} t={dict.dinero} />
+            ) : null
+          }
         />
 
         <details className="border border-border">
           <summary className="cursor-pointer px-4 py-3 text-sm text-muted hover:text-text">{d.avanzado}</summary>
           <div className="space-y-8 border-t border-border p-4">
+        {/* Con el kit puesto, el prompt queda acá por si hay que reinstalar. */}
+        <PromptSegunKit inicialListo={kitListo} donde="avanzado">
+          {prompt}
+        </PromptSegunKit>
+
         <MotoresDeRespuesta
           slug={tenant.slug}
           nombre={tenant.name}

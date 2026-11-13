@@ -156,7 +156,7 @@ export type MarcoPrompt = {
  * si ya conectaste el dominio, volver a mandarle a un agente las reglas del
  * proxy es pedirle que toque algo que ya está bien. Acá se ve el delta.
  */
-export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: MarcoPrompt }) {
+export function ImplementarPeaje({ piezas, marco, cobros }: { piezas: Pieza[]; marco: MarcoPrompt; cobros?: React.ReactNode }) {
   const { kit: d } = useDict()
   const { resultados, corriendo, verificar } = useVerificacion()
   const [copiado, setCopiado] = useState(false)
@@ -325,8 +325,24 @@ export function ImplementarPeaje({ piezas, marco }: { piezas: Pieza[]; marco: Ma
               </div>
             </div>
           )}
+
+          {/* Los cobros van con el kit completo: el 402 vive en el proxy, no en "solo motores". */}
+          {soloAeo ? null : cobros}
         </>
       )}
     </section>
   )
+}
+
+/**
+ * El prompt para instalar el kit se ve arriba solo mientras falta algo. Con el
+ * kit puesto pasa a "Avanzado" (por si hay que reinstalar) y arriba queda
+ * "Implementa Peaje" con todo en verde. Antes de la medición en vivo manda la
+ * última verificación guardada, para que la página no salte al cargar.
+ */
+export function PromptSegunKit({ inicialListo, donde, children }: { inicialListo: boolean; donde: 'arriba' | 'avanzado'; children: React.ReactNode }) {
+  const { resultados } = useVerificacion()
+  const propios = (resultados ?? []).filter((r) => r.id !== 'bots')
+  const listo = resultados === null ? inicialListo : propios.length > 0 && propios.every((r) => r.ok)
+  return (donde === 'arriba') === !listo ? <>{children}</> : null
 }
