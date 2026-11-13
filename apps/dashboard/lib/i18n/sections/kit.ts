@@ -193,6 +193,28 @@ npx @ora-ai/ax@latest audit ${domain}
     implementaVer: 'Ver el prompt',
     verificarDeNuevo: 'Verificar de nuevo',
 
+    // version-kit.tsx: qué versión del paquete de Peaje corre el sitio
+    versionUltima: 'última versión',
+    versionNueva: (paquete: string, ultima: string) => `Hay una versión más nueva de ${paquete}: ${ultima}.`,
+    versionAnterior: (nuevas: { paquete: string; ultima: string }[]) =>
+      `Tu sitio no dice qué versión de Peaje usa. Si usa ${nuevas.map((n) => n.paquete).join(' o ')}, es una versión vieja y ya salió una más nueva: ${nuevas.map((n) => `${n.paquete} ${n.ultima}`).join(', ')}.`,
+    versionVerPrompt: 'Ver el prompt para actualizar',
+    promptActualizar: ({ paquetes, conocido, kitUrl }: { paquetes: { paquete: string; ultima: string }[]; conocido: boolean; kitUrl: string }) => {
+      const uno = conocido && paquetes.length === 1 ? paquetes[0] : undefined
+      const pv = uno ? `${uno.paquete}@${uno.ultima}` : '<paquete>@<versión>'
+      return [
+        uno
+          ? `Actualiza ${uno.paquete} a la versión ${uno.ultima} en el repo de este sitio (es el paquete de Peaje, usepeaje.com).`
+          : `Actualiza el paquete de Peaje (usepeaje.com) en el repo de este sitio. Mira en el package.json del sitio si usa ${paquetes.map((p) => `${p.paquete} (versión nueva: ${p.ultima})`).join(' o ')}. Actualiza el que use a esa versión; si usa los dos, los dos. Si no usa ninguno, no cambies nada y avísame: el proxy está en la config del hosting y no hay paquete que actualizar.`,
+        `Instálalo con el gestor de paquetes que muestra el lockfile: package-lock.json → \`npm install ${pv}\`, pnpm-lock.yaml → \`pnpm add ${pv}\`, yarn.lock → \`yarn add ${pv}\`, bun.lock o bun.lockb → \`bun add ${pv}\`.`,
+        'No cambies nada más: ni la config, ni el código, ni otras dependencias. Si el build falla por la actualización, no lo arregles tocando código: dime qué falló.',
+        'Corre el build y avísame si pasó. No hagas commit ni deploy: eso lo hago yo.',
+        `Cuando esté en vivo, abre ${kitUrl} y presiona "Verificar de nuevo" (si no puedes abrirla, pídemelo). ${
+          uno ? `Debe mostrar ${uno.paquete} ${uno.ultima}.` : 'Debe mostrar el paquete con su versión nueva.'
+        }`,
+      ].join('\n\n')
+    },
+
     chequeoProxy: 'Tu dominio conectado',
     chequeoProxyOk: 'MCP, catálogos y 402 responden desde tu dominio.',
     chequeoProxyFalta: 'Todavía no: tu dominio no reenvía ninguna ruta al gateway.',
@@ -488,6 +510,28 @@ npx @ora-ai/ax@latest audit ${domain}
     implementaCopiado: 'Prompt copied',
     implementaVer: 'View the prompt',
     verificarDeNuevo: 'Verify again',
+
+    // version-kit.tsx: which version of the Peaje package the site runs
+    versionUltima: 'latest version',
+    versionNueva: (paquete: string, ultima: string) => `There is a newer version of ${paquete}: ${ultima}.`,
+    versionAnterior: (nuevas: { paquete: string; ultima: string }[]) =>
+      `Your site does not say which Peaje version it runs. If it uses ${nuevas.map((n) => n.paquete).join(' or ')}, that version is old and a newer one is out: ${nuevas.map((n) => `${n.paquete} ${n.ultima}`).join(', ')}.`,
+    versionVerPrompt: 'View the update prompt',
+    promptActualizar: ({ paquetes, conocido, kitUrl }: { paquetes: { paquete: string; ultima: string }[]; conocido: boolean; kitUrl: string }) => {
+      const uno = conocido && paquetes.length === 1 ? paquetes[0] : undefined
+      const pv = uno ? `${uno.paquete}@${uno.ultima}` : '<package>@<version>'
+      return [
+        uno
+          ? `Update ${uno.paquete} to version ${uno.ultima} in this site's repo (it is the Peaje package, usepeaje.com).`
+          : `Update the Peaje (usepeaje.com) package in this site's repo. Check the site's package.json for ${paquetes.map((p) => `${p.paquete} (new version: ${p.ultima})`).join(' or ')}. Update the one it uses to that version; if it uses both, update both. If it uses neither, change nothing and tell me: the proxy lives in the hosting config and there is no package to update.`,
+        `Install it with the package manager the lockfile shows: package-lock.json → \`npm install ${pv}\`, pnpm-lock.yaml → \`pnpm add ${pv}\`, yarn.lock → \`yarn add ${pv}\`, bun.lock or bun.lockb → \`bun add ${pv}\`.`,
+        'Change nothing else: not the config, not the code, not other dependencies. If the build fails because of the update, do not fix it by editing code: tell me what failed.',
+        'Run the build and tell me if it passed. Do not commit or deploy: I do that.',
+        `Once it is live, open ${kitUrl} and press "Verify again" (if you cannot open it, ask me to). ${
+          uno ? `It should show ${uno.paquete} ${uno.ultima}.` : 'It should show the package with its new version.'
+        }`,
+      ].join('\n\n')
+    },
 
     chequeoProxy: 'Your domain connected',
     chequeoProxyOk: 'MCP, catalogs and 402 all answer from your domain.',

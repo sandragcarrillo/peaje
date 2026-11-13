@@ -6,6 +6,7 @@
  * el coding agent tenía que reproducirlo con seis curl y adivinar.
  */
 import { PEAJE_VERIFICADOR_HEADER } from './bots'
+import { PEAJE_KIT_HEADER } from './rutas'
 
 export type ChequeoId = 'dominio' | 'proxy' | 'frescura' | 'json-ld' | 'links' | 'robots' | 'bots'
 
@@ -24,6 +25,20 @@ export type Motivo =
   | 'bots-sin-html'
   | 'bots-challenge'
 
+/** Los paquetes del kit que se instalan desde npm. */
+export type PaqueteKit = '@peaje/next' | '@peaje/proxy'
+
+export const PAQUETES_KIT: PaqueteKit[] = ['@peaje/next', '@peaje/proxy']
+
+/**
+ * Primera versión de cada paquete que manda `x-peaje-kit`. Un proxy que
+ * funciona sin el header es anterior a esa, o no usa ningún paquete (reglas
+ * pegadas a mano en vercel.json, nginx, Caddy o un Worker).
+ */
+export const KIT_CON_HEADER: Record<PaqueteKit, string> = { '@peaje/next': '0.3.3', '@peaje/proxy': '0.2.3' }
+
+export type KitInstalado = { paquete: PaqueteKit; version: string }
+
 export type Chequeo = {
   id: ChequeoId
   ok: boolean
@@ -31,6 +46,12 @@ export type Chequeo = {
   /** Para el proxy: rutas que no responden. Para frescura: copias que tapan. */
   faltantes?: string[]
   total?: number
+  /**
+   * Solo en el proxy, y solo si pasa: qué paquete y versión dice servir el
+   * dominio. `'anterior'`: responde pero sin `x-peaje-kit`. Sin el campo: no
+   * se sabe (proxy caído, o un header que esta versión no entiende).
+   */
+  kit?: KitInstalado | 'anterior'
 }
 
 export type Sonda = { path: string; esperado: number; post?: boolean }
@@ -98,7 +119,7 @@ async function sonda(
   url: string,
   init?: RequestInit,
   userAgent = USER_AGENT_VERIFICADOR,
-): Promise<{ status: number; text: string; delGateway: boolean }> {
+): Promise<{ status: number; text: string; delGateway: boolean; kit: string | null }> {
   try {
     const res = await fetch(url, {
       cache: 'no-store',
@@ -107,10 +128,103 @@ async function sonda(
       headers: { 'user-agent': userAgent, ...(init?.headers ?? {}) },
     })
     const text = res.status < 400 ? await res.text() : ''
-    return { status: res.status, text, delGateway: res.headers.has('ratelimit-policy') }
+    return {
+      status: res.status,
+      text,
+      delGateway: res.headers.has('ratelimit-policy'),
+      kit: res.headers.get(PEAJE_KIT_HEADER),
+    }
   } catch {
-    return { status: 0, text: '', delGateway: false }
+    return { status: 0, text: '', delGateway: false, kit: null }
   }
+}
+
+const KIT_VALOR = /^(@peaje\/(?:next|proxy))@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/
+
+/**
+ * `@peaje/next@0.3.3` → paquete y versión. Si dos capas lo ponen, `get` los
+ * junta con coma: vale el primero que se entienda.
+ */
+export function parsearKit(valor: string | null | undefined): KitInstalado | null {
+  for (const parte of (valor ?? '').split(',')) {
+    const m = KIT_VALOR.exec(parte.trim())
+    if (m) return { paquete: m[1] as PaqueteKit, version: m[2] as string }
+  }
+  return null
+}
+
+/**
+ * El kit que dice servir el dominio, con los `x-peaje-kit` de las sondas del
+ * proxy que respondieron. Ninguno: `'anterior'`. Uno que no se entiende es de
+ * un paquete más nuevo que esta verificación: sin dato, nunca "anterior".
+ */
+export function kitDeSondas(valores: (string | null)[]): KitInstalado | 'anterior' | undefined {
+  for (const v of valores) {
+    const kit = parsearKit(v)
+    if (kit) return kit
+  }
+  return valores.some((v) => (v ?? '').trim() !== '') ? undefined : 'anterior'
+}
+
+function partirVersion(v: string): { nums: number[]; pre: string } {
+  const sinBuild = v.trim().replace(/^v/, '').split('+')[0] ?? ''
+  const guion = sinBuild.indexOf('-')
+  const nucleo = guion === -1 ? sinBuild : sinBuild.slice(0, guion)
+  return {
+    nums: nucleo.split('.').map((n) => Number.parseInt(n, 10) || 0),
+    pre: guion === -1 ? '' : sinBuild.slice(guion + 1),
+  }
+}
+
+/** Orden de `x.y.z`: negativo si `a` es anterior. Una prerelease va antes que su versión. */
+export function compararVersiones(a: string, b: string): number {
+  const x = partirVersion(a)
+  const y = partirVersion(b)
+  for (let i = 0; i < 3; i++) {
+    const d = (x.nums[i] ?? 0) - (y.nums[i] ?? 0)
+    if (d !== 0) return Math.sign(d)
+  }
+  if (x.pre === y.pre) return 0
+  if (!x.pre) return 1
+  if (!y.pre) return -1
+  return x.pre < y.pre ? -1 : 1
+}
+
+/** Última versión publicada de cada paquete; el que falta es que npm no respondió. */
+export type UltimasVersionesKit = Partial<Record<PaqueteKit, string>>
+
+export type EstadoVersionKit =
+  | { tipo: 'al-dia'; paquete: PaqueteKit; version: string }
+  | { tipo: 'nueva'; paquete: PaqueteKit; version: string; ultima: string }
+  /** Se sabe la instalada pero no hay con qué compararla: solo se muestra. */
+  | { tipo: 'instalada'; paquete: PaqueteKit; version: string }
+  /** Sin header: si el sitio usa alguno de estos paquetes, hay una más nueva. */
+  | { tipo: 'anterior'; nuevas: { paquete: PaqueteKit; ultima: string }[] }
+
+/**
+ * Qué decirle al dueño sobre la versión del kit. Antes que un "actualiza"
+ * equivocado, nada: sin la última de npm no se compara, y una instalada más
+ * nueva que la última (cache de npm) se muestra sin juicio. Para un sitio sin
+ * header solo cuentan los paquetes cuya última ya lo manda: si npm todavía
+ * tiene la anterior, ese sitio puede estar al día.
+ */
+export function estadoVersionKit(
+  kit: KitInstalado | 'anterior' | undefined,
+  ultimas: UltimasVersionesKit,
+): EstadoVersionKit | null {
+  if (!kit) return null
+  if (kit === 'anterior') {
+    const nuevas = PAQUETES_KIT.flatMap((paquete) => {
+      const ultima = ultimas[paquete]
+      return ultima && compararVersiones(ultima, KIT_CON_HEADER[paquete]) >= 0 ? [{ paquete, ultima }] : []
+    })
+    return nuevas.length > 0 ? { tipo: 'anterior', nuevas } : null
+  }
+  const ultima = ultimas[kit.paquete]
+  if (!ultima) return { tipo: 'instalada', ...kit }
+  const orden = compararVersiones(kit.version, ultima)
+  if (orden < 0) return { tipo: 'nueva', ...kit, ultima }
+  return orden === 0 ? { tipo: 'al-dia', ...kit } : { tipo: 'instalada', ...kit }
 }
 
 const BLOQUEA_TODO = /^Disallow:\s*\/\s*$/m
@@ -181,25 +295,22 @@ export async function verificarIntegracion(originUrl: string): Promise<Chequeo[]
 
   const [proxy, frescura, home, robots, bots] = await Promise.all([
     Promise.all(
-      SONDAS_PROXY.map(async (s) => ({
-        path: s.path,
-        ok:
-          (
-            await sonda(
-              `${site}${s.path}`,
-              s.post
-                ? {
-                    method: 'POST',
-                    headers: {
-                      'content-type': 'application/json',
-                      accept: 'application/json, text/event-stream',
-                    },
-                    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-                  }
-                : undefined,
-            )
-          ).status === s.esperado,
-      })),
+      SONDAS_PROXY.map(async (s) => {
+        const r = await sonda(
+          `${site}${s.path}`,
+          s.post
+            ? {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  accept: 'application/json, text/event-stream',
+                },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+              }
+            : undefined,
+        )
+        return { path: s.path, ok: r.status === s.esperado, kit: r.kit }
+      }),
     ),
     Promise.all(
       TAPABLES.map(async (path) => {
@@ -214,6 +325,8 @@ export async function verificarIntegracion(originUrl: string): Promise<Chequeo[]
   ])
 
   const faltantes = proxy.filter((p) => !p.ok).map((p) => p.path)
+  // La versión sale de las mismas sondas: todas son rutas que el proxy reenvía.
+  const kit = faltantes.length === 0 ? kitDeSondas(proxy.map((p) => p.kit)) : undefined
   const viejas = frescura.filter((f) => f.vieja).map((f) => f.path)
   const html = home.text
   const tieneJsonLd = html.includes('application/ld+json')
@@ -229,6 +342,7 @@ export async function verificarIntegracion(originUrl: string): Promise<Chequeo[]
         faltantes.length === 0 ? 'ok' : faltantes.length === SONDAS_PROXY.length ? 'proxy-nada' : 'proxy-parcial',
       faltantes,
       total: SONDAS_PROXY.length,
+      ...(kit ? { kit } : {}),
     },
     { id: 'frescura', ok: viejas.length === 0, motivo: viejas.length === 0 ? 'ok' : 'copias-viejas', faltantes: viejas },
     { id: 'json-ld', ok: tieneJsonLd, motivo: tieneJsonLd ? 'ok' : 'jsonld-falta' },

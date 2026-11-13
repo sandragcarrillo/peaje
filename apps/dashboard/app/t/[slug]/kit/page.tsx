@@ -5,6 +5,7 @@ import { getDict } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
+import { ultimasVersionesKit } from '@/lib/versiones-kit'
 import {
   construirBloques,
   primeraRutaPaga,
@@ -35,9 +36,12 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
     )
   }
 
+  // Cacheada una hora y la misma para todos: arranca ya y se espera abajo.
+  const ultimas = ultimasVersionesKit()
   const base = `${gatewayUrl}/${tenant.slug}`
   const secreto = await secretoOrigen(tenant.embedSecret)
   const dashboardUrl = process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com'
+  const kitUrl = `${dashboardUrl}/t/${tenant.slug}/kit`
   const domain = scannableDomain(tenant.originUrl)
   // El kit se aplica en el WEBSITE del negocio (dominio raíz), no en el host de la API.
   const originHost = domain ?? new URL(tenant.originUrl).hostname
@@ -95,6 +99,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const ultima = await store.lastVerification(tenant.id).catch(() => null)
   const propios = ((ultima?.checks ?? []) as { id: string; ok: boolean }[]).filter((c) => c.id !== 'bots')
   const kitListo = propios.length > 0 && propios.every((c) => c.ok)
+  const versiones = await ultimas
 
   const prompt = (
         <Pestanas
@@ -106,7 +111,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
               </div>
               {/* El secreto no va en el prompt: el coding agent no lo necesita y así no
                   queda en su historial. El dueño lo copia aparte, tapado, para su hosting. */}
-              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, `${dashboardUrl}/t/${tenant.slug}/kit`, rutasPeaje)} />
+              <PromptAgente texto={d.promptAgente(originHost, base, tenant.slug, kitUrl, rutasPeaje)} />
               <p className="text-sm text-muted">{d.agentePermisos}</p>
               <div className="space-y-2">
                 <p className="text-sm">{d.agenteClave}</p>
@@ -197,6 +202,8 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
               <AvisoCobros slug={tenant.slug} conWallet={!!tenant.payoutWallet} t={dict.dinero} />
             ) : null
           }
+          ultimas={versiones}
+          kitUrl={kitUrl}
         />
 
         <details className="border border-border">

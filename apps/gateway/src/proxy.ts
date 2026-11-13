@@ -1,5 +1,5 @@
 import type { Tenant } from '@peaje/db'
-import { PEAJE_ORIGIN_HEADER, secretoOrigen } from '@peaje/shared'
+import { PEAJE_KIT_HEADER, PEAJE_ORIGIN_HEADER, secretoOrigen } from '@peaje/shared'
 
 /** Headers que no se reenvían al origin del tenant. */
 const STRIP = new Set([
@@ -12,6 +12,9 @@ const STRIP = new Set([
   // puede someter por fuera y el agente pierde la plata.
   'payment-signature',
   'x-payment',
+  // Next copia los headers de respuesta del middleware al request que reenvía:
+  // la versión del kit llega acá y no es asunto del handler del sitio.
+  PEAJE_KIT_HEADER,
 ])
 
 /**
@@ -59,6 +62,8 @@ export async function proxyToOrigin(
   const responseHeaders = new Headers(response.headers)
   responseHeaders.delete('content-encoding')
   responseHeaders.delete('content-length')
+  // La versión del kit la pone el proxy del sitio: si la respuesta trae una, Next se queda con esa en vez de la suya.
+  responseHeaders.delete(PEAJE_KIT_HEADER)
 
   // Response nuevo: el original queda inmutable y no podríamos sellarle el receipt.
   return new Response(response.body, {

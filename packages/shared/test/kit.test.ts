@@ -2,10 +2,17 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   claveIndexNow,
+  compararVersiones,
   construirKit,
+  estadoVersionKit,
   filtrarChequeos,
+  kitDeSondas,
   parsearCapas,
+  parsearKit,
   evaluarBots,
+  PEAJE_KIT_HEADER,
+  SONDAS_PROXY,
+  verificarIntegracion,
   generarProxy,
   headJsonLd,
   HOST_IDS,
@@ -210,6 +217,98 @@ test('el chequeo bots ordena los motivos por gravedad y lista cada caso', () => 
 
   const soloChallenge = evaluarBots([{ bot: 'Googlebot', path: '/', status: 403, challenge: true, sinHtml: false }])
   assert.equal(soloChallenge.motivo, 'bots-challenge')
+})
+
+test('x-peaje-kit: paquete y versión, o nada si no se entiende', () => {
+  assert.deepEqual(parsearKit('@peaje/next@0.3.3'), { paquete: '@peaje/next', version: '0.3.3' })
+  assert.deepEqual(parsearKit(' @peaje/proxy@0.2.3-beta.1 '), { paquete: '@peaje/proxy', version: '0.2.3-beta.1' })
+  // Dos capas que lo ponen: `Headers.get` los junta con coma.
+  assert.deepEqual(parsearKit('basura, @peaje/proxy@0.2.4'), { paquete: '@peaje/proxy', version: '0.2.4' })
+  assert.equal(parsearKit('@peaje/astro@1.0.0'), null)
+  assert.equal(parsearKit('@peaje/next@latest'), null)
+  assert.equal(parsearKit(null), null)
+
+  assert.deepEqual(kitDeSondas([null, '@peaje/next@0.3.3', null]), { paquete: '@peaje/next', version: '0.3.3' })
+  assert.equal(kitDeSondas([null, null]), 'anterior')
+  // Un header de un paquete que no conocemos no es "anterior": es sin dato.
+  assert.equal(kitDeSondas([null, '@peaje/astro@1.0.0']), undefined)
+})
+
+test('compararVersiones ordena x.y.z numérico y la prerelease antes que su versión', () => {
+  assert.equal(compararVersiones('0.3.3', '0.3.3'), 0)
+  assert.equal(compararVersiones('0.3.3', '0.3.10'), -1)
+  assert.equal(compararVersiones('0.10.0', '0.9.9'), 1)
+  assert.equal(compararVersiones('1.0.0-beta.1', '1.0.0'), -1)
+  assert.equal(compararVersiones('1.0.0', '1.0.0-rc-1'), 1)
+  assert.equal(compararVersiones('v0.2.3', '0.2.3'), 0)
+})
+
+test('estadoVersionKit nunca avisa de una versión nueva sin la última de npm', () => {
+  const next = { paquete: '@peaje/next' as const, version: '0.3.3' }
+  assert.deepEqual(estadoVersionKit(next, { '@peaje/next': '0.3.3' }), { tipo: 'al-dia', ...next })
+  assert.deepEqual(estadoVersionKit(next, { '@peaje/next': '0.3.4' }), { tipo: 'nueva', ...next, ultima: '0.3.4' })
+  // npm no respondió, o su cache va detrás del sitio: se muestra la versión, sin juicio.
+  assert.deepEqual(estadoVersionKit(next, {}), { tipo: 'instalada', ...next })
+  assert.deepEqual(estadoVersionKit(next, { '@peaje/next': '0.3.2' }), { tipo: 'instalada', ...next })
+  assert.equal(estadoVersionKit(undefined, { '@peaje/next': '0.3.4' }), null)
+
+  // Sin header: solo cuentan los paquetes cuya última ya lo manda.
+  assert.equal(estadoVersionKit('anterior', { '@peaje/next': '0.3.2', '@peaje/proxy': '0.2.2' }), null)
+  assert.equal(estadoVersionKit('anterior', {}), null)
+  assert.deepEqual(estadoVersionKit('anterior', { '@peaje/next': '0.3.4', '@peaje/proxy': '0.2.2' }), {
+    tipo: 'anterior',
+    nuevas: [{ paquete: '@peaje/next', ultima: '0.3.4' }],
+  })
+  assert.deepEqual(estadoVersionKit('anterior', { '@peaje/next': '0.3.3', '@peaje/proxy': '0.2.3' }), {
+    tipo: 'anterior',
+    nuevas: [
+      { paquete: '@peaje/next', ultima: '0.3.3' },
+      { paquete: '@peaje/proxy', ultima: '0.2.3' },
+    ],
+  })
+})
+
+test('la verificación lee x-peaje-kit de las sondas del proxy, sin fetches de más', async () => {
+  const original = globalThis.fetch
+  const proxeadas = new Set(SONDAS_PROXY.map((s) => s.path))
+  let llamadas = 0
+  // `header`: qué manda el proxy en las rutas que reenvía. `caido`: el proxy no responde.
+  const sitio = (header: (path: string) => string | null, caido = false) =>
+    (async (input: string | URL) => {
+      llamadas++
+      const { pathname } = new URL(String(input))
+      if (proxeadas.has(pathname)) {
+        if (caido) return new Response('no', { status: 404 })
+        const h = new Headers({ 'ratelimit-policy': '"default";q=60;w=60' })
+        const v = header(pathname)
+        if (v) h.set(PEAJE_KIT_HEADER, v)
+        return new Response('{}', { status: 200, headers: h })
+      }
+      return new Response('<title>Café</title>', { status: 200 })
+    }) as typeof fetch
+  const proxyDe = async () => (await verificarIntegracion('https://cafe.example')).find((c) => c.id === 'proxy')!
+  try {
+    globalThis.fetch = sitio((p) => (p === '/mcp' ? '@peaje/next@0.3.3' : null))
+    const conHeader = await proxyDe()
+    assert.equal(conHeader.ok, true)
+    assert.deepEqual(conHeader.kit, { paquete: '@peaje/next', version: '0.3.3' })
+
+    globalThis.fetch = sitio(() => null)
+    assert.equal((await proxyDe()).kit, 'anterior')
+
+    globalThis.fetch = sitio(() => '@peaje/astro@1.0.0')
+    assert.equal('kit' in (await proxyDe()), false)
+
+    llamadas = 0
+    globalThis.fetch = sitio(() => '@peaje/proxy@0.2.3', true)
+    const caido = await proxyDe()
+    assert.equal(caido.ok, false)
+    assert.equal('kit' in caido, false)
+    // Las mismas sondas de siempre: 6 del proxy, 4 de frescura, home, robots y 6 de bots.
+    assert.equal(llamadas, 18)
+  } finally {
+    globalThis.fetch = original
+  }
 })
 
 test('la clave IndexNow es determinística, de 32 hex, y su ruta está en el proxy', async () => {

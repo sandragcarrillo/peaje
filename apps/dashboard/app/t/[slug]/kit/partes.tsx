@@ -1,8 +1,10 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import type { UltimasVersionesKit } from '@peaje/shared'
 import { useDict } from '@/lib/i18n/client'
 import type { ChequeoIntegracion } from './actions'
+import { VersionKit } from './version-kit'
 
 /**
  * Una sola medición del dominio para toda la página. "Implementa Peaje" y
@@ -156,7 +158,21 @@ export type MarcoPrompt = {
  * si ya conectaste el dominio, volver a mandarle a un agente las reglas del
  * proxy es pedirle que toque algo que ya está bien. Acá se ve el delta.
  */
-export function ImplementarPeaje({ piezas, marco, cobros }: { piezas: Pieza[]; marco: MarcoPrompt; cobros?: React.ReactNode }) {
+export function ImplementarPeaje({
+  piezas,
+  marco,
+  cobros,
+  ultimas = {},
+  kitUrl,
+}: {
+  piezas: Pieza[]
+  marco: MarcoPrompt
+  cobros?: React.ReactNode
+  /** Última versión en npm de cada paquete del kit; vacío si npm no respondió. */
+  ultimas?: UltimasVersionesKit
+  /** Esta página, para que el prompt de actualizar mande a verificar acá. */
+  kitUrl: string
+}) {
   const { kit: d } = useDict()
   const { resultados, corriendo, verificar } = useVerificacion()
   const [copiado, setCopiado] = useState(false)
@@ -177,6 +193,8 @@ export function ImplementarPeaje({ piezas, marco, cobros }: { piezas: Pieza[]; m
     .filter((p) => faltan.some((f) => f.id === p.id))
     .map((p) => (soloAeo ? { ...p, contenido: p.contenidoAeo ?? p.contenido } : p))
   const faltaProxy = !soloAeo && faltan.some((f) => f.id === 'proxy')
+  // La versión del paquete solo dice algo con el proxy andando: es él quien la informa.
+  const proxy = soloAeo ? undefined : propios.find((r) => r.id === 'proxy' && r.ok)
   // Copias que le ganan al proxy: se nombran una por una, con la ruta exacta,
   // para que el agente borre esas y no se ponga a adivinar.
   const tapadas = faltan.find((f) => f.id === 'frescura')?.faltantes ?? []
@@ -272,6 +290,8 @@ export function ImplementarPeaje({ piezas, marco, cobros }: { piezas: Pieza[]; m
               </div>
             ))}
           </div>
+
+          {proxy ? <VersionKit instalado={proxy.kit} ultimas={ultimas} kitUrl={kitUrl} /> : null}
 
           {listo ? (
             <div className="mt-5 border border-accent bg-bg p-4">

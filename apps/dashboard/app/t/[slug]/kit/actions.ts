@@ -30,6 +30,8 @@ export type ChequeoIntegracion = {
   detalle: string
   /** Para el proxy: las rutas que todavía no responden desde el dominio. */
   faltantes?: string[]
+  /** Para el proxy que pasa: qué paquete y versión del kit dice servir el dominio. */
+  kit?: Chequeo['kit']
 }
 
 /**
@@ -81,6 +83,7 @@ function conTexto(c: Chequeo, d: Awaited<ReturnType<typeof getDict>>['kit']): Ch
               ? d.chequeoProxyFalta
               : d.chequeoProxyParcial(faltantes?.length ?? 0, c.total ?? 0),
         faltantes,
+        ...(c.kit ? { kit: c.kit } : {}),
       }
     case 'frescura':
       return {
