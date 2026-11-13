@@ -257,10 +257,25 @@ const HERRAMIENTAS: Herramienta[] = [
   {
     name: 'get_competitors',
     description:
-      'The sites AI assistants cite instead of the business, one by one, from the latest measurement: how many answers each wins, for which questions and engines, and the pages that win (title, URL, format). formatNotes says what the winning pages of each format have in common. Use it for any question about competitors or what content works for them.',
+      'The sites AI assistants cite instead of the business, one by one, from the latest measurement: how many answers each wins, for which questions and engines, and the pages that win (title, URL, format). formatNotes says what the winning pages of each format have in common. yourPages lists the pages the business already has (from its sitemap), so a question others win is checked against them before calling it a page to create. Use it for any question about competitors or what content works for them.',
     input_schema: { type: 'object', properties: {} },
     async correr(_i, { tenant }) {
-      return competidoresCitados(tenant)
+      // Las páginas propias van junto a lo que ganan otros: sin ellas el agente proponía como nuevo lo ya publicado.
+      const dominio = dominioVerificable(tenant.originUrl)
+      const [competidores, sitio] = await Promise.all([
+        competidoresCitados(tenant),
+        dominio ? paginasDelSitio(dominio).catch(() => null) : Promise.resolve(null),
+      ])
+      return {
+        ...competidores,
+        yourPages: sitio?.encontrado
+          ? {
+              note: 'Pages the site already has. A question others win is not a page to create when one of these covers its topic, in any wording or language: propose improving that page instead.',
+              total: sitio.paginas.length,
+              paths: sitio.paginas.slice(0, 250).map((p) => (p.lastmod ? `${p.path} (${p.lastmod.slice(0, 10)})` : p.path)),
+            }
+          : null,
+      }
     },
   },
   {
@@ -580,7 +595,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
     'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat on its own: how long it took, a short summary with the missing facts as questions, its card and the page as a .md file. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
-    'For "what else can we do", "find me more opportunities" or "what should I publish": look at get_competitors, list_tasks (including dismissed), get_overview and list_site_pages, and give four or five (fewer only if the data has no more), ranked by how much they can move recommendations, one line each with the reason from their data. Start with the list itself: competitors only appear inside a reason, never as a summary before it. Mix three kinds when the data supports it: pages to create (a question where others win and list_site_pages shows no page on that topic, in any wording or language), fixes on their own site (what Peaje checks and fails, in plain words), and places to get mentioned (the lists, comparisons or forums AI cites for their questions: ask to be included, or answer there). Leave out dismissed ones without saying so; if they ask for more after that, call refresh_tasks. Not being cited is not the same as having no page: when a page on that topic exists but AI does not cite it, propose improving that page (only if it is more than a few weeks old; newer pages need time), never writing it again. Then call open_report with "opportunities", and offer_choices with starting the first one.',
+    'For "what else can we do", "find me more opportunities" or "what should I publish": look at get_competitors, list_tasks (including dismissed), get_overview and list_site_pages, and give four or five (fewer only if the data has no more), ranked by how much they can move recommendations, one line each with the reason from their data. Start with the list itself: competitors only appear inside a reason, never as a summary before it. Mix three kinds when the data supports it: pages to create (a question where others win and no path in get_competitors\' yourPages covers that topic, in any wording or language; check each idea against that list before writing it, even ideas you gave earlier in this conversation), fixes on their own site (what Peaje checks and fails, in plain words), and places to get mentioned (the lists, comparisons or forums AI cites for their questions: ask to be included, or answer there). Leave out dismissed ones without saying so; if they ask for more after that, call refresh_tasks. Not being cited is not the same as having no page: when a page on that topic exists but AI does not cite it, propose improving that page (only if it is more than a few weeks old; newer pages need time), never writing it again. Then call open_report with "opportunities", and offer_choices with starting the first one.',
     'Answer here, full report behind a card: when you answer about what to publish, follow the line above, then call open_report with "opportunities". When you answer about who AI cites instead of them, give the summary above, then call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. The reply is the summary; the card holds the complete lists and tables.',
     'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
     // M7: comprador misterioso (apagado hasta mainnet)
