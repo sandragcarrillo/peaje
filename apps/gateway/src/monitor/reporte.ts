@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { PAGE_FORMATS, type PageFormat, type Tenant, type Verificacion } from '@peaje/db'
 import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
+import { paginasDelSitio } from '../acceso/revisar.js'
 import { asistentesMedidos, dominioVerificable, type Chequeo } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
@@ -111,12 +112,27 @@ function evidenciaDeFormatos(f: FormatosCitados | null): string {
   return `Formats AI assistants cited for this business's questions (last ${f.rounds} measurement rounds, ${f.answers} answers with pages, not counting the business's own site):\n${lineas.join('\n')}\n\n`
 }
 
+/** Lo que ya existe, ya está pedido o el dueño descartó: páginas del sitemap y tareas de contenido. Texto para el prompt. */
+async function temasCubiertos(tenant: Tenant, dominio: string): Promise<string> {
+  const [sitio, tareas] = await Promise.all([
+    paginasDelSitio(dominio).catch(() => ({ encontrado: false, paginas: [] })),
+    store.listTasks(tenant.id, { statuses: ['open', 'in_progress', 'done', 'verified', 'dismissed'] }).catch(() => []),
+  ])
+  const paginas = sitio.paginas.map((p) => p.path).filter((p) => p !== '/')
+  const planeadas = tareas.filter((t) => t.kind === 'content').map((t) => t.title)
+  return [
+    paginas.length ? `Pages the site already has (${paginas.length}):\n${paginas.map((p) => `- ${p}`).join('\n')}\n\n` : '',
+    planeadas.length ? `Pages already planned, published through Peaje or turned down by the owner:\n${planeadas.map((t) => `- ${t}`).join('\n')}\n\n` : '',
+  ].join('')
+}
+
 export async function sugerirContenido(tenant: Tenant, dominio: string): Promise<Reporte['contenido']> {
   if (!process.env.ANTHROPIC_API_KEY) return []
   try {
     const texto = await leerSitio(dominio)
     if (texto.length < 200) return []
     const formatos = await formatosCitados(tenant).catch(() => null)
+    const yaHechas = await temasCubiertos(tenant, dominio)
     anthropic ??= new Anthropic()
     const res = await anthropic.messages.parse({
       model: MODEL,
@@ -124,12 +140,13 @@ export async function sugerirContenido(tenant: Tenant, dominio: string): Promise
       system: [
         'You advise small businesses on answer-engine optimization: pages that AI assistants such as ' + asistentesMedidos('en') + ' cite when a user asks a question the business can answer. Propose 3 to 5 pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
         'Each page has a format: guide, roundup (best options, top N, alternatives), comparison (X vs Y), research (original data or a benchmark), docs, forum, video, news, product or other.',
+        'You also get the pages the site already has (from its sitemap: the URL words say the topic) and the pages already planned or turned down. Never propose a page whose question one of them already answers, whatever the wording or language. Only new topics; if there are fewer than 3, return fewer.',
         'When you are given the formats AI assistants actually cite for this business\'s questions, prefer the questions where those formats win, pick the format that won for that question, and set "modelo" to the URL of one cited example to emulate. Without that evidence, pick the format that fits the question and leave "modelo" empty. Never put a URL in "modelo" that was not in the evidence.',
       ].join('\n'),
       messages: [
         {
           role: 'user',
-          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
+          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}${yaHechas}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
         },
       ],
       output_config: { format: zodOutputFormat(SugerenciasSchema) },

@@ -12,7 +12,7 @@ import { competidoresCitados, paginasCitadas } from '../citacion/competidores.js
 // ---- M9 ----
 import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
 import { LIMITES } from '@peaje/db'
-import { revisarAcceso } from '../acceso/revisar.js'
+import { paginasDelSitio, revisarAcceso } from '../acceso/revisar.js'
 // ---- M6 ----
 import { completarBorrador, MARCA_BORRADOR, slugDePregunta } from '../ciclo/borrador.js'
 import { resultados } from '../ciclo/seguimiento.js'
@@ -580,7 +580,7 @@ function sistema(tenant: Tenant, idioma: 'es' | 'en', tienePlan: boolean, primer
     'You cannot change the site or Peaje on your own. Site changes become tasks (create_task) for their developer or AI coding tool. Route and price changes are proposals (propose_route_change) the owner approves under your message. Never say something changed when it was only proposed.',
     // M6: borrador y resultados
     'When the owner wants a page for a question, use draft_page (not create_task): it writes the full page from their site, in their voice, and saves it as a task. For a whole topic ("a set of pages about X", "cover this topic"), use draft_page_series: one main page plus 3 to 5 supporting pages linked to each other. Both run in the background: your whole reply is the sayToOwner sentence from the result, nothing else (no three parts, no offer_choices). The finished page arrives later in this same chat on its own: how long it took, a short summary with the missing facts as questions, its card and the page as a .md file. For "did it work?" or "what changed?", use get_results: Peaje measures again 2 and 6 weeks after each verified task.',
-    'For "what else can we do", "find me more opportunities" or "what should I publish": look at get_competitors, list_tasks (including dismissed) and get_overview, and give four or five (fewer only if the data has no more), ranked by how much they can move recommendations, one line each with the reason from their data. Start with the list itself: competitors only appear inside a reason, never as a summary before it. Mix three kinds when the data supports it: pages to create (a question where others win and they have nothing), fixes on their own site (what Peaje checks and fails, in plain words), and places to get mentioned (the lists, comparisons or forums AI cites for their questions: ask to be included, or answer there). Leave out dismissed ones without saying so; if they ask for more after that, call refresh_tasks. Then call open_report with "opportunities", and offer_choices with starting the first one.',
+    'For "what else can we do", "find me more opportunities" or "what should I publish": look at get_competitors, list_tasks (including dismissed), get_overview and list_site_pages, and give four or five (fewer only if the data has no more), ranked by how much they can move recommendations, one line each with the reason from their data. Start with the list itself: competitors only appear inside a reason, never as a summary before it. Mix three kinds when the data supports it: pages to create (a question where others win and list_site_pages shows no page on that topic, in any wording or language), fixes on their own site (what Peaje checks and fails, in plain words), and places to get mentioned (the lists, comparisons or forums AI cites for their questions: ask to be included, or answer there). Leave out dismissed ones without saying so; if they ask for more after that, call refresh_tasks. Not being cited is not the same as having no page: when a page on that topic exists but AI does not cite it, propose improving that page (only if it is more than a few weeks old; newer pages need time), never writing it again. Then call open_report with "opportunities", and offer_choices with starting the first one.',
     'Answer here, full report behind a card: when you answer about what to publish, follow the line above, then call open_report with "opportunities". When you answer about who AI cites instead of them, give the summary above, then call open_report with "citations". When you mention a specific task, call open_report with "task" and its id. The reply is the summary; the card holds the complete lists and tables.',
     'Drafts follow the business\'s voice profile (get_voice_profile). When the owner corrects how they write ("we say usted", "no English words", "more formal"), call update_voice_profile with that change and confirm in one sentence.',
     // M7: comprador misterioso (apagado hasta mainnet)
@@ -875,6 +875,24 @@ HERRAMIENTAS.push(
   },
 )
 ESTADOS.get_search_console = { es: 'Mirando tu Search Console…', en: 'Checking your Search Console…' }
+
+// ---- Páginas que el sitio ya tiene ----
+HERRAMIENTAS.push({
+  name: 'list_site_pages',
+  description:
+    "Every content page the site already has, from its sitemap: the path (its words say the topic) and the last update date when the sitemap gives it. Optional filter: only paths containing a text. Call it before proposing a page or an article to create: a page on that topic may already exist under other words or in another language, even if AI assistants do not cite it yet.",
+  input_schema: { type: 'object', properties: { contains: { type: 'string', description: 'Only paths that contain this text, for example "blog" or "mcp".' } } },
+  async correr(i, { tenant }) {
+    const dominio = dominioVerificable(tenant.originUrl)
+    if (!dominio) return { error: 'The business has no verifiable domain.' }
+    const { encontrado, paginas } = await paginasDelSitio(dominio)
+    if (!encontrado) return { sitemapFound: false, pages: [], note: 'The site has no sitemap.xml; read the pages with read_site_page instead.' }
+    const filtro = typeof i.contains === 'string' && i.contains.trim() ? i.contains.trim().toLowerCase() : null
+    const lista = filtro ? paginas.filter((p) => p.path.toLowerCase().includes(filtro)) : paginas
+    return { sitemapFound: true, total: paginas.length, matching: lista.length, pages: lista.slice(0, 250).map((p) => ({ path: p.path, updated: p.lastmod?.slice(0, 10) ?? null })) }
+  },
+})
+ESTADOS.list_site_pages = { es: 'Revisando qué páginas ya tienes…', en: 'Checking which pages you already have…' }
 ESTADOS.inspect_url = { es: 'Preguntándole a Google por esa página…', en: 'Asking Google about that page…' }
 
 /**

@@ -128,19 +128,56 @@ export function fechaDePagina(html: string): { fecha: string; fuente: 'visible' 
   return metaFecha ? { fecha: metaFecha.toISOString().slice(0, 10), fuente: 'meta' } : null
 }
 
-async function leerSitemap(sitio: string): Promise<{ encontrado: boolean; urls: { loc: string; lastmod: string | null }[] }> {
+/** Las URLs del sitemap. Un índice de sitemaps se sigue hasta `hijos` sitemaps. */
+async function leerSitemap(sitio: string, hijos = 1): Promise<{ encontrado: boolean; urls: { loc: string; lastmod: string | null }[] }> {
   const primero = await traer(`${sitio}/sitemap.xml`)
   if (primero.status !== 200 || !/<(urlset|sitemapindex)/i.test(primero.texto)) return { encontrado: false, urls: [] }
-  let xml = primero.texto
-  if (/<sitemapindex/i.test(xml)) {
-    const hijo = /<loc>\s*([^<]+?)\s*<\/loc>/i.exec(xml)?.[1]
-    xml = hijo ? (await traer(hijo)).texto : ''
+  let xmls = [primero.texto]
+  if (/<sitemapindex/i.test(primero.texto)) {
+    const locs = [...primero.texto.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((m) => m[1]!).slice(0, hijos)
+    xmls = await Promise.all(locs.map(async (l) => (await traer(l)).texto))
   }
-  const urls = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/gi)].map((m) => ({
-    loc: /<loc>\s*([^<]+?)\s*<\/loc>/i.exec(m[1]!)?.[1] ?? '',
-    lastmod: /<lastmod>\s*([^<]+?)\s*<\/lastmod>/i.exec(m[1]!)?.[1] ?? null,
-  }))
+  const urls = xmls.flatMap((xml) =>
+    [...xml.matchAll(/<url>([\s\S]*?)<\/url>/gi)].map((m) => ({
+      loc: /<loc>\s*([^<]+?)\s*<\/loc>/i.exec(m[1]!)?.[1] ?? '',
+      lastmod: /<lastmod>\s*([^<]+?)\s*<\/lastmod>/i.exec(m[1]!)?.[1] ?? null,
+    })),
+  )
   return { encontrado: true, urls: urls.filter((u) => u.loc) }
+}
+
+// Legales, cuentas y carrito no son páginas que un asistente vaya a citar.
+const NO_CONTENIDO = /\/(terms|privacy|legal|cookies?|login|signin|signup|register|account|cart|checkout|terminos|privacidad|politica|aviso-legal)(\/|$)/i
+
+export type PaginaDelSitio = { path: string; lastmod: string | null }
+const inventarios = new Map<string, { vence: number; valor: { encontrado: boolean; paginas: PaginaDelSitio[] } }>()
+
+/**
+ * Las páginas de contenido que el sitio ya tiene, según su sitemap (hasta 5
+ * sitemaps hijos y 400 páginas). Sirve para no proponer como nueva una página
+ * que ya existe. Se guarda 15 minutos por dominio.
+ */
+export async function paginasDelSitio(dominio: string): Promise<{ encontrado: boolean; paginas: PaginaDelSitio[] }> {
+  const guardado = inventarios.get(dominio)
+  if (guardado && guardado.vence > Date.now()) return guardado.valor
+  const sm = await leerSitemap(`https://${dominio}`, 5)
+  const vistas = new Set<string>()
+  const paginas: PaginaDelSitio[] = []
+  for (const u of sm.urls) {
+    let path: string
+    try {
+      path = new URL(u.loc).pathname
+    } catch {
+      continue
+    }
+    if (dominioVerificable(u.loc) !== dominio || /\.(xml|pdf|jpe?g|png|webp|svg)$/i.test(path) || NO_CONTENIDO.test(path) || vistas.has(path)) continue
+    vistas.add(path)
+    paginas.push({ path, lastmod: u.lastmod })
+    if (paginas.length >= 400) break
+  }
+  const valor = { encontrado: sm.encontrado, paginas }
+  inventarios.set(dominio, { vence: Date.now() + 15 * 60_000, valor })
+  return valor
 }
 
 export async function revisarAcceso(tenant: Tenant): Promise<Acceso | null> {
@@ -169,8 +206,6 @@ export async function revisarAcceso(tenant: Tenant): Promise<Acceso | null> {
 
   // Frescura: la home y hasta 7 páginas del sitemap, las de ruta más corta primero.
   const sm = await leerSitemap(sitio)
-  // Legales, cuentas y carrito no son páginas que un asistente vaya a citar.
-  const NO_CONTENIDO = /\/(terms|privacy|legal|cookies?|login|signin|signup|register|account|cart|checkout|terminos|privacidad|politica|aviso-legal)(\/|$)/i
   const candidatas = sm.urls
     .filter((u) => dominioVerificable(u.loc) === dominio && !/\.(xml|pdf|jpg|png)$/i.test(u.loc) && !NO_CONTENIDO.test(new URL(u.loc).pathname))
     .sort((a, b) => new URL(a.loc).pathname.length - new URL(b.loc).pathname.length)
