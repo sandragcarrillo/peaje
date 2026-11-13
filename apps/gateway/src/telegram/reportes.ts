@@ -30,13 +30,16 @@ registrarCanal('telegram', {
           chat_id: chatId,
           text: aHtml(partes[i]!),
           parse_mode: 'HTML',
+          // Un nombre de bot puede parecer un dominio (agent-tools.cloud): sin la tarjeta de vista previa.
+          link_preview_options: { is_disabled: true },
           ...(ultima && entrega.botones.length ? { reply_markup: { inline_keyboard: entrega.botones.map((b) => [b]) } } : {}),
         })
       }
       return
     }
     // Pedido programado: primero lo que pidió (como cuando toca una opción), después la respuesta.
-    await tg('sendMessage', { chat_id: chatId, text: `› ${entrega.pedido}` })
+    // Por aHtml: una ruta del pedido ("revisa /llms.txt") no sale como comando tocable.
+    await tg('sendMessage', { chat_id: chatId, text: aHtml(`› ${entrega.pedido}`), parse_mode: 'HTML' })
     // Los botones del chat (opciones, aplicar) leen el negocio activo: solo van si es este.
     const activo = (links.find((l) => l.active) ?? links[0])?.tenantId === tenant.id
     await enviarRespuesta(chatId, entrega.mensaje, idioma, varios ? tenant.name : undefined, activo)

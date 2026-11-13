@@ -5,7 +5,7 @@ export { SupabaseStore } from './supabase'
 export * from './planes'
 // ---- app de Privy propia ----
 export * from './wallet-dueno'
-export { noEsVisita, quienEs } from './visits'
+export { grupoDe, noEsVisita, quienEs } from './visits'
 export { registroTestnet } from './red'
 
 import { MemoryStore } from './memory'

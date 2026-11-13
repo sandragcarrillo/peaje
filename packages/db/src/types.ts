@@ -799,6 +799,16 @@ export type QuienVisita =
   | { tipo: 'agente' | 'script' | 'desconocido'; nombre: string }
   | { tipo: 'navegador' | 'sin-ua'; nombre: null }
 
+/**
+ * Qué clase de visitante es, cuando no hay una marca que lo diga (ver
+ * `grupoDe`). `otros`: bots sin marca ni clase, escáneres y lo que no dice
+ * quién es.
+ */
+export type ClaseVisita = 'openai-entrenamiento' | 'pago' | 'directorios' | 'mcp' | 'sdk' | 'scripts' | 'previas' | 'seo' | 'otros'
+
+/** "Quién vino" en los reportes: una marca (ChatGPT, Claude, Apple...) o la clase de visitante. */
+export type GrupoVisita = { marca: string } | { clase: ClaseVisita }
+
 export type VisitStats = {
   days: number
   totals: { visits: number; paid: number; unpaid: number; revenue: string }
@@ -808,6 +818,13 @@ export type VisitStats = {
    * (ver `quienEs`): agentes y bots con nombre, y lo que no se puede atribuir.
    */
   otros: (QuienVisita & { visits: number })[]
+  /**
+   * Todas las visitas por grupo, de mayor a menor, para los reportes (ver
+   * `grupoDe`): los tipos propios y "otros" juntos, por marca o por clase.
+   * `nombres`: los que más visitas hicieron dentro del grupo (hasta 5), con
+   * el nombre de `quienEs`; vacío para los tipos propios.
+   */
+  grupos: (GrupoVisita & { visits: number; nombres: { nombre: string; visits: number }[] })[]
   /**
    * Visitas desde un navegador sin nombre de bot: personas, o agentes que
    * navegan como una. No entran en ningún otro número de visitas.

@@ -1,4 +1,4 @@
-import type { AgentKind, NewVisit, QuienVisita, VisitStats } from './types'
+import type { AgentKind, ClaseVisita, GrupoVisita, NewVisit, QuienVisita, VisitStats } from './types'
 
 /** Una visita ya persistida más, si pagó, la wallet que sale del ledger. */
 export type VisitRow = NewVisit & { agentWallet?: string | null }
@@ -30,61 +30,156 @@ export function noEsVisita(path: string, ua: string | null | undefined): boolean
  * Agentes y bots con nombre que no tienen tipo propio en `agent_kind` (ese
  * tipo es un check de la base; agregar uno pide migración). Se reconocen por
  * el user-agent al leer, así que sirven también para las visitas viejas. El
- * nombre es la marca, igual en los dos idiomas.
+ * nombre es la marca, igual en los dos idiomas. El grupo es para los
+ * reportes (ver `grupoDe`): la marca junta al bot con tipo propio (ClaudeBot)
+ * con los suyos que no lo tienen (Claude-User, Claude Code).
  */
-const AGENTES_CON_NOMBRE: [RegExp, string | ((m: string) => string)][] = [
-  [/ChatGPT-User/i, 'ChatGPT (ChatGPT-User)'],
-  [/Claude-User/i, 'Claude (Claude-User)'],
-  [/Claude-SearchBot/i, 'Claude (Claude-SearchBot)'],
-  [/Perplexity-User/i, 'Perplexity (Perplexity-User)'],
-  [/claude-code/i, 'Claude Code'],
-  [/bingbot/i, 'Bing'],
-  [/Applebot/i, 'Apple'],
-  [/meta-external\w*/i, 'Meta'],
-  [/facebookexternalhit|facebookcatalog/i, 'Facebook'],
-  [/LinkedInBot/i, 'LinkedIn'],
-  [/Twitterbot/i, 'X'],
-  [/WhatsApp/i, 'WhatsApp'],
-  [/Slackbot|Slack-ImgProxy/i, 'Slack'],
-  [/TelegramBot/i, 'Telegram'],
-  [/Discordbot/i, 'Discord'],
-  [/Amazonbot/i, 'Amazon'],
-  [/DuckAssistBot|DuckDuckBot/i, 'DuckDuckGo'],
-  [/Bytespider/i, 'ByteDance'],
-  [/CCBot/i, 'Common Crawl'],
-  [/MistralAI-User/i, 'Mistral'],
-  [/cohere-ai/i, 'Cohere'],
-  [/GoogleOther|Google-InspectionTool|Storebot-Google|AdsBot-Google/i, (m) => `Google (${m})`],
-  [/AhrefsBot/i, 'Ahrefs'],
-  [/SemrushBot/i, 'Semrush'],
-  [/YandexBot/i, 'Yandex'],
-  [/Baiduspider/i, 'Baidu'],
+const AGENTES_CON_NOMBRE: [RegExp, string | ((m: string) => string), GrupoVisita][] = [
+  // Asistentes de IA y sus agentes.
+  [/ChatGPT-User/i, 'ChatGPT (ChatGPT-User)', { marca: 'ChatGPT' }],
+  [/openai-mcp/i, 'ChatGPT (openai-mcp)', { marca: 'ChatGPT' }],
+  [/Claude-User/i, 'Claude (Claude-User)', { marca: 'Claude' }],
+  [/Claude-SearchBot/i, 'Claude (Claude-SearchBot)', { marca: 'Claude' }],
+  [/claude-code/i, 'Claude Code', { marca: 'Claude' }],
+  [/Perplexity-User/i, 'Perplexity (Perplexity-User)', { marca: 'Perplexity' }],
+  [
+    /GoogleOther|Google-InspectionTool|Google-CloudVertexBot|Google-NotebookLM|Google-Read-Aloud|Google-Site-Verification|Storebot-Google|AdsBot-Google|FeedFetcher-Google|APIs-Google/i,
+    (m) => `Google (${m})`,
+    { marca: 'Google' },
+  ],
+  // Buscadores, laboratorios de IA y sus rastreadores.
+  [/bingbot|BingPreview|msnbot|adidxbot/i, 'Bing', { marca: 'Bing' }],
+  [/Applebot/i, 'Apple', { marca: 'Apple' }],
+  [/meta-external\w*|FacebookBot/i, 'Meta', { marca: 'Meta' }],
+  [/Amazonbot|Amzn-SearchBot|Amzn-User/i, 'Amazon', { marca: 'Amazon' }],
+  [/DuckAssistBot|DuckDuckBot/i, 'DuckDuckGo', { marca: 'DuckDuckGo' }],
+  [/Bytespider|TikTokSpider/i, 'ByteDance', { marca: 'ByteDance' }],
+  [/CCBot/i, 'Common Crawl', { marca: 'Common Crawl' }],
+  [/MistralAI/i, 'Mistral', { marca: 'Mistral' }],
+  [/cohere-ai|cohere-training-data-crawler/i, 'Cohere', { marca: 'Cohere' }],
+  [/YouBot/i, 'You.com', { marca: 'You.com' }],
+  [/Diffbot/i, 'Diffbot', { marca: 'Diffbot' }],
+  [/ExaBot|ExaUser|ExaSearchBot|crawler\.exa\.ai/i, 'Exa', { marca: 'Exa' }],
+  [/ElevenlabsCrawler|ElevenLabs/i, 'ElevenLabs', { marca: 'ElevenLabs' }],
+  [/Reflectionbot/i, 'Reflection AI', { marca: 'Reflection AI' }],
+  [/AI2Bot/i, 'Ai2', { marca: 'Ai2' }],
+  [/Timpibot/i, 'Timpi', { marca: 'Timpi' }],
+  [/PetalBot/i, 'Huawei (PetalBot)', { marca: 'Huawei' }],
+  [/YandexBot|YandexAdditional/i, 'Yandex', { marca: 'Yandex' }],
+  [/Baiduspider/i, 'Baidu', { marca: 'Baidu' }],
+  // Vistas previas de un enlace que alguien compartió en una red o un chat.
+  [/facebookexternalhit|facebookcatalog/i, 'Facebook', { clase: 'previas' }],
+  [/LinkedInBot/i, 'LinkedIn', { clase: 'previas' }],
+  [/Twitterbot/i, 'X', { clase: 'previas' }],
+  [/WhatsApp/i, 'WhatsApp', { clase: 'previas' }],
+  [/Slackbot|Slack-ImgProxy/i, 'Slack', { clase: 'previas' }],
+  [/TelegramBot/i, 'Telegram', { clase: 'previas' }],
+  [/Discordbot/i, 'Discord', { clase: 'previas' }],
+  [/redditbot/i, 'Reddit', { clase: 'previas' }],
+  [/Pinterestbot/i, 'Pinterest', { clase: 'previas' }],
+  [/SkypeUriPreview/i, 'Skype', { clase: 'previas' }],
+  [/Iframely/i, 'Iframely', { clase: 'previas' }],
+  [/Embedly/i, 'Embedly', { clase: 'previas' }],
+  [/Bluesky Cardyb/i, 'Bluesky', { clase: 'previas' }],
+  // Herramientas de SEO.
+  [/AhrefsBot|AhrefsSiteAudit/i, 'Ahrefs', { clase: 'seo' }],
+  [/SemrushBot|SiteAuditBot|SplitSignalBot/i, 'Semrush', { clase: 'seo' }],
+  [/SERankingBacklinksBot|SE Ranking/i, 'SE Ranking', { clase: 'seo' }],
+  [/\bDotBot\b|rogerbot/i, 'Moz', { clase: 'seo' }],
+  [/MJ12bot/i, 'Majestic', { clase: 'seo' }],
+  [/Barkrowler/i, 'Babbar', { clase: 'seo' }],
+  [/DataForSeoBot/i, 'DataForSEO', { clase: 'seo' }],
+  [/Screaming Frog/i, 'Screaming Frog', { clase: 'seo' }],
+  [/Sitebulb/i, 'Sitebulb', { clase: 'seo' }],
+  [/serpstatbot/i, 'Serpstat', { clase: 'seo' }],
+  [/SeobilityBot/i, 'Seobility', { clase: 'seo' }],
+  [/SEOJuice/i, 'SEOJuice', { clase: 'seo' }],
+  [/BLEXBot/i, 'BLEXBot', { clase: 'seo' }],
+  [/Dataprovider/i, 'Dataprovider', { clase: 'seo' }],
 ]
 
-const SCRIPTS = /^(curl|wget|node|undici|python-requests|python-httpx|python-urllib|aiohttp|go-http-client|axios|postmanruntime|okhttp|java|deno|bun|node-fetch|httpie|ruby|php|libwww-perl)\b/i
+/**
+ * Clases sin marca que se reconocen por palabras del user-agent, en este
+ * orden: los clientes MCP genéricos (los de una marca van arriba con su
+ * marca), los SDKs de agentes y de pago, y los directorios y registros de
+ * agentes y de servidores MCP (leen el agent card, el MCP y llms.txt para
+ * listar el sitio: BrickBlueBot, WellknownBot, llms.txt-directory).
+ */
+const CLASES_POR_UA: [RegExp, ClaseVisita][] = [
+  [/mcp-remote|mcp-client|mcp-inspector|modelcontextprotocol|fastmcp|mcp-use\b|mcp-proxy/i, 'mcp'],
+  [/x402|mppx|agentcash|agentkit|langchain|llama[-_]?index|crewai|autogen|smolagents|pydantic-ai|browser-use|openai-agents/i, 'sdk'],
+  [
+    /registry|director(?:y|io)|\bindex(?:er)?\b|catalog|\ba2a\b|mcp|agentic|agent[-_.]?(?:card|web|scout|probe|index|tools|map|list)|llms\.?txt|well-?known|discovery/i,
+    'directorios',
+  ],
+]
+
+const SCRIPTS =
+  /^(curl|wget|node|undici|python-requests|python-httpx|python-urllib|python|aiohttp|go-http-client|axios|got|ky|reqwest|dart|apache-httpclient|guzzlehttp|faraday|postmanruntime|insomnia|okhttp|java|deno|bun|node-fetch|httpie|ruby|php|libwww-perl|scrapy)\b/i
+
+const OTROS: GrupoVisita = { clase: 'otros' }
 
 /**
- * Quién es una visita de tipo `other`, por su user-agent. Primero los que
- * tienen nombre conocido; después cualquiera que se presente como bot o
- * lector (`CreoraPublicReader/1.0`); después scripts y herramientas (curl,
- * node), navegadores (lo más probable, una persona) y el resto por el primer
- * nombre de su user-agent.
+ * Quién es una visita de tipo `other` y en qué grupo va. Primero los que
+ * tienen nombre conocido; después los navegadores sin nombre de bot (lo más
+ * probable, una persona); las clases por palabras del user-agent; cualquiera
+ * que se presente con nombre ("compatible; Barkrowler/0.9", "QlyzeBot/1.0",
+ * "CreoraPublicReader/1.0"); scripts y herramientas (curl, node); y el resto
+ * por el primer nombre de su user-agent.
  */
-export function quienEs(ua: string | null | undefined): QuienVisita {
+function identificar(ua: string | null | undefined): { quien: QuienVisita; grupo: GrupoVisita } {
   const u = (ua ?? '').trim()
-  if (!u) return { tipo: 'sin-ua', nombre: null }
-  for (const [patron, nombre] of AGENTES_CON_NOMBRE) {
+  if (!u) return { quien: { tipo: 'sin-ua', nombre: null }, grupo: OTROS }
+  for (const [patron, nombre, grupo] of AGENTES_CON_NOMBRE) {
     const m = u.match(patron)
-    if (m) return { tipo: 'agente', nombre: typeof nombre === 'string' ? nombre : nombre(m[0]) }
+    if (m) return { quien: { tipo: 'agente', nombre: typeof nombre === 'string' ? nombre : nombre(m[0]) }, grupo }
   }
-  const bot = u.match(/([A-Za-z][\w.-]*(?:bot|crawler|spider|reader|fetcher))\b/i)
-  if (bot?.[1]) return { tipo: 'agente', nombre: bot[1].slice(0, 40) }
+  const compatible = u.match(/compatible; ([A-Za-z][\w.-]{1,39})\//i)?.[1]
+  const bot = u.match(/([A-Za-z][\w.-]*(?:bot|crawler|spider|reader|fetcher))\b/i)?.[1]?.slice(0, 40)
+  const nombre = (compatible && !/^Mozilla$/i.test(compatible) ? compatible : undefined) ?? bot
+  // Un navegador, también el de una app (Messenger, Instagram en iOS: sin "Safari/").
+  const navegador = /(Chrome|Safari|Firefox|Edg)\//.test(u) || /AppleWebKit\/[\d.]+ \(KHTML, like Gecko\) Mobile\//.test(u)
+  if (!nombre && /^Mozilla\/5\.0/.test(u) && navegador) return { quien: { tipo: 'navegador', nombre: null }, grupo: OTROS }
+  // "Mozilla" no es un nombre.
+  const primero = u.split(/[\s/;(]/)[0]?.slice(0, 40) || u.slice(0, 40)
+  const nombrePropio = nombre ?? (/^Mozilla$/i.test(primero) ? null : primero)
+  for (const [patron, clase] of CLASES_POR_UA) {
+    if (!patron.test(u)) continue
+    return { quien: nombrePropio ? { tipo: 'agente', nombre: nombrePropio } : { tipo: 'sin-ua', nombre: null }, grupo: { clase } }
+  }
+  if (nombre) return { quien: { tipo: 'agente', nombre }, grupo: OTROS }
   const script = u.match(SCRIPTS)
-  if (script?.[1]) return { tipo: 'script', nombre: script[1].toLowerCase() }
-  if (/^Mozilla\/5\.0/.test(u) && /(Chrome|Safari|Firefox|Edg)\//.test(u)) return { tipo: 'navegador', nombre: null }
-  // "Mozilla/5.0" sin navegador ni bot: alguien que no dice quién es. "Mozilla" no es un nombre.
-  if (/^Mozilla\//.test(u)) return { tipo: 'sin-ua', nombre: null }
-  return { tipo: 'desconocido', nombre: u.split(/[\s/;(]/)[0]?.slice(0, 40) || u.slice(0, 40) }
+  if (script?.[1]) return { quien: { tipo: 'script', nombre: script[1].toLowerCase() }, grupo: { clase: 'scripts' } }
+  // "Mozilla/5.0" sin navegador ni bot: alguien que no dice quién es.
+  if (/^Mozilla\//.test(u)) return { quien: { tipo: 'sin-ua', nombre: null }, grupo: OTROS }
+  return { quien: { tipo: 'desconocido', nombre: primero }, grupo: OTROS }
+}
+
+/** Quién es una visita de tipo `other`, por su user-agent (ver `identificar`). */
+export function quienEs(ua: string | null | undefined): QuienVisita {
+  return identificar(ua).quien
+}
+
+/** El grupo de cada tipo propio: el bot de búsqueda va con su marca. */
+const GRUPO_DEL_TIPO: Record<AgentKind, GrupoVisita> = {
+  'openai-searchbot': { marca: 'ChatGPT' },
+  gptbot: { clase: 'openai-entrenamiento' },
+  claudebot: { marca: 'Claude' },
+  perplexitybot: { marca: 'Perplexity' },
+  googlebot: { marca: 'Google' },
+  'mpp-client': { clase: 'pago' },
+  'x402-client': { clase: 'pago' },
+  other: OTROS,
+}
+
+/**
+ * "Quién vino" en los reportes: una marca (ChatGPT junta OAI-SearchBot y
+ * ChatGPT-User) o, sin marca, la clase de visitante (directorios de agentes,
+ * scripts, SEO). Un navegador sin nombre de bot no es visita: queda en `otros`
+ * acá, pero `aggregateVisits` lo cuenta aparte.
+ */
+export function grupoDe(kind: AgentKind, ua: string | null | undefined): GrupoVisita {
+  return kind === 'other' ? identificar(ua).grupo : GRUPO_DEL_TIPO[kind] ?? OTROS
 }
 
 /**
@@ -102,6 +197,7 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
   const notFound = new Map<string, number>()
   const wallets = new Set<string>()
   const otros = new Map<string, { quien: QuienVisita; visits: number }>()
+  const grupos = new Map<string, { grupo: GrupoVisita; visits: number; nombres: Map<string, number> }>()
   let navegadores = 0
   let visits = 0
   let paid = 0
@@ -115,7 +211,8 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
     if (noEsVisita(r.path, r.userAgent)) continue
     // Un navegador sin nombre de bot es, lo más probable, una persona (o un agente
     // que navega como una): no se puede decir que sea un agente. Se cuenta aparte.
-    const quien = r.agentKind === 'other' ? quienEs(r.userAgent) : null
+    const id = r.agentKind === 'other' ? identificar(r.userAgent) : null
+    const quien = id?.quien ?? null
     if (quien?.tipo === 'navegador') {
       navegadores += 1
       continue
@@ -136,6 +233,13 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
       o.visits += 1
       otros.set(clave, o)
     }
+
+    const grupo = id?.grupo ?? GRUPO_DEL_TIPO[r.agentKind] ?? OTROS
+    const claveGrupo = 'marca' in grupo ? `marca:${grupo.marca}` : `clase:${grupo.clase}`
+    const g = grupos.get(claveGrupo) ?? { grupo, visits: 0, nombres: new Map<string, number>() }
+    g.visits += 1
+    if (quien?.nombre) g.nombres.set(quien.nombre, (g.nombres.get(quien.nombre) ?? 0) + 1)
+    grupos.set(claveGrupo, g)
 
     const es402 = r.status === 402
     if (es402) served402 += 1
@@ -176,6 +280,16 @@ export function aggregateVisits(rows: VisitRow[], days: number, range?: { from: 
       .map(([kind, v]) => ({ kind, ...v }))
       .sort((a, b) => b.visits - a.visits),
     otros: [...otros.values()].map((o) => ({ ...o.quien, visits: o.visits })).sort((a, b) => b.visits - a.visits),
+    grupos: [...grupos.values()]
+      .map((g) => ({
+        ...g.grupo,
+        visits: g.visits,
+        nombres: [...g.nombres.entries()]
+          .map(([nombre, visits]) => ({ nombre, visits }))
+          .sort((a, b) => b.visits - a.visits)
+          .slice(0, 5),
+      }))
+      .sort((a, b) => b.visits - a.visits),
     navegadores,
     topPaths: [...byPath.entries()]
       .map(([path, v]) => ({ path, visits: v.visits, served402: v.served402, attempted: v.attempted, paid: v.paid, revenue: v.revenue.toFixed(6) }))

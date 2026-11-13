@@ -1,4 +1,4 @@
-import type { AgentKind, ReportFrequency, Tenant } from '@peaje/db'
+import type { ClaseVisita, ReportFrequency, Tenant, VisitStats } from '@peaje/db'
 import type { Chequeo, Motivo } from '@peaje/shared'
 import { store } from '../store.js'
 import { largoNominal } from './agenda.js'
@@ -7,9 +7,10 @@ import { largoNominal } from './agenda.js'
  * El reporte programado de visitas de agentes: qué pasó desde el último
  * envío (o en el largo de la frecuencia, la primera vez), quién vino, pagos,
  * lo más visitado y el cambio contra el período anterior del mismo largo.
- * Texto corto con el markdown mínimo que entienden los canales (**negrita**
- * y viñetas "- "). Solo números que salen del store; con cero visitas, una
- * cosa concreta para hacer.
+ * Texto corto con el markdown mínimo que entienden los canales (**negrita**,
+ * viñetas "- " y `código`). Las rutas van como código: Telegram convierte en
+ * comando tocable un "/mcp" suelto. Solo números que salen del store; con
+ * cero visitas, una cosa concreta para hacer.
  */
 
 type Idioma = 'es' | 'en'
@@ -17,18 +18,17 @@ type Idioma = 'es' | 'en'
 const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com').replace(/\/$/, '')
 export const urlVisitas = (slug: string) => `${DASHBOARD}/t/${slug}/agentes-visitas`
 
-type Grupo = 'chatgpt' | 'perplexity' | 'claude' | 'google' | 'gptbot' | 'pago' | 'otros'
-const GRUPO: Record<AgentKind, Grupo> = {
-  'openai-searchbot': 'chatgpt',
-  perplexitybot: 'perplexity',
-  claudebot: 'claude',
-  googlebot: 'google',
-  gptbot: 'gptbot',
-  'mpp-client': 'pago',
-  'x402-client': 'pago',
-  other: 'otros',
-}
-const ORDEN: Grupo[] = ['chatgpt', 'perplexity', 'claude', 'google', 'gptbot', 'pago', 'otros']
+/**
+ * "Quién vino": los grupos de `grupoDe` (@peaje/db), el mismo clasificador del
+ * panel. Los asistentes principales, los que pagan y cada clase tienen su
+ * línea; las demás marcas, la suya mientras haya lugar (MAX_LINEAS) y si no
+ * van juntas en "otros rastreadores de IA y buscadores". Los escáneres y bots
+ * sin marca ni clase, al final.
+ */
+const PRINCIPALES = new Set(['marca:ChatGPT', 'marca:Claude', 'marca:Perplexity', 'marca:Google', 'clase:openai-entrenamiento', 'clase:pago'])
+const MAX_LINEAS = 8
+// Cuántos nombres van entre paréntesis en una línea de clase.
+const NOMBRES = 3
 
 const T = {
   es: {
@@ -43,7 +43,18 @@ const T = {
     igual: (ant: string) => `igual que ${ant}`,
     antesCero: (ant: string) => `${ant} no hubo ninguna`,
     quien: 'Quién vino:',
-    grupos: { chatgpt: 'ChatGPT', perplexity: 'Perplexity', claude: 'Claude', google: 'Google', gptbot: 'Rastreador de entrenamiento de OpenAI', pago: 'Agentes que pagan', otros: 'Otros' } as Record<Grupo, string>,
+    clases: {
+      'openai-entrenamiento': 'Rastreador de entrenamiento de OpenAI',
+      pago: 'Agentes que pagan',
+      directorios: 'Directorios de agentes y MCP',
+      mcp: 'Clientes MCP',
+      sdk: 'SDKs de agentes y x402',
+      scripts: 'Scripts y herramientas',
+      previas: 'Enlaces compartidos en redes y chats',
+      seo: 'Herramientas de SEO',
+      otros: 'Escáneres y otros bots',
+    } as Record<ClaseVisita, string>,
+    otrasMarcas: 'Otros rastreadores de IA y buscadores',
     pagos: (n: string, monto: string) => `Pagos: ${n} ${n === '1' ? 'pedido pagado' : 'pedidos pagados'}, ${monto}.`,
     top: 'Lo más visitado:',
     cero: (periodo: string) => `No hubo visitas de agentes ${periodo}.`,
@@ -62,7 +73,18 @@ const T = {
     igual: (ant: string) => `the same as ${ant}`,
     antesCero: (ant: string) => `none ${ant}`,
     quien: 'Who came:',
-    grupos: { chatgpt: 'ChatGPT', perplexity: 'Perplexity', claude: 'Claude', google: 'Google', gptbot: 'OpenAI training crawler', pago: 'Paying agents', otros: 'Other' } as Record<Grupo, string>,
+    clases: {
+      'openai-entrenamiento': 'OpenAI training crawler',
+      pago: 'Paying agents',
+      directorios: 'Agent and MCP directories',
+      mcp: 'MCP clients',
+      sdk: 'Agent and x402 SDKs',
+      scripts: 'Scripts and tools',
+      previas: 'Links shared on social and chat apps',
+      seo: 'SEO tools',
+      otros: 'Scanners and other bots',
+    } as Record<ClaseVisita, string>,
+    otrasMarcas: 'Other AI crawlers and search engines',
     pagos: (n: string, monto: string) => `Payments: ${n} paid ${n === '1' ? 'request' : 'requests'}, ${monto}.`,
     top: 'Most visited:',
     cero: (periodo: string) => `No agent visits ${periodo}.`,
@@ -160,6 +182,48 @@ function periodo(frecuencia: ReportFrequency, desde: number, hasta: number, zona
   return { texto: t.desde(fecha), anterior: t.anteriorLibre }
 }
 
+/** Una ruta como código: sin backticks que la rompan y con largo acotado (las de escáneres pueden ser largas). */
+export function rutaComoCodigo(path: string): string {
+  const limpia = path.replace(/[`\r\n]/g, '')
+  return `\`${limpia.length > 80 ? `${limpia.slice(0, 79)}…` : limpia}\``
+}
+
+// Un nombre sale del user-agent: sin los caracteres que el markdown de los canales interpreta.
+const nombreLimpio = (n: string) => n.replace(/[*`~<>|[\]]/g, '').trim()
+
+type Linea = { texto: string; visits: number; nombres: { nombre: string; visits: number }[] }
+
+/** Las líneas de "quién vino", de mayor a menor, con las dos que juntan el resto al final. */
+export function lineasQuien(grupos: VisitStats['grupos'], idioma: Idioma): string[] {
+  const t = T[idioma]
+  const clave = (g: VisitStats['grupos'][number]) => ('marca' in g ? `marca:${g.marca}` : `clase:${g.clase}`)
+  const conLinea = (g: VisitStats['grupos'][number]) => !('marca' in g) || PRINCIPALES.has(clave(g))
+  const ordenados = grupos.filter((g) => g.visits > 0 && !('clase' in g && g.clase === 'otros'))
+  const lineas: Linea[] = ordenados
+    .filter(conLinea)
+    .map((g) => ({ texto: 'marca' in g ? g.marca : t.clases[g.clase], visits: g.visits, nombres: 'marca' in g ? [] : g.nombres }))
+  const marcas = ordenados.filter((g) => !conLinea(g))
+  const lugar = Math.max(0, MAX_LINEAS - lineas.length)
+  // Si sobra una sola marca, va con su nombre: una línea que junta una sola no aclara nada.
+  const conNombre = marcas.length - lugar <= 1 ? marcas : marcas.slice(0, lugar)
+  const resto = marcas.slice(conNombre.length)
+  for (const g of conNombre) lineas.push({ texto: 'marca' in g ? g.marca : '', visits: g.visits, nombres: [] })
+  lineas.sort((a, b) => b.visits - a.visits)
+  if (resto.length) {
+    lineas.push({
+      texto: t.otrasMarcas,
+      visits: resto.reduce((n, g) => n + g.visits, 0),
+      nombres: resto.map((g) => ({ nombre: 'marca' in g ? g.marca : '', visits: g.visits })),
+    })
+  }
+  const otros = grupos.find((g) => 'clase' in g && g.clase === 'otros')
+  if (otros && otros.visits > 0) lineas.push({ texto: t.clases.otros, visits: otros.visits, nombres: otros.nombres })
+  return lineas.map((l) => {
+    const nombres = l.nombres.map((n) => nombreLimpio(n.nombre)).filter(Boolean).slice(0, NOMBRES)
+    return `- ${l.texto}: ${num(l.visits, idioma)}${nombres.length ? ` (${nombres.join(', ')})` : ''}`
+  })
+}
+
 export type ReporteVisitas = { texto: string; botones: { text: string; url: string }[]; visitas: number; previas: number }
 
 /** Arma el reporte de [desde, hasta) contra [desde - largo, desde). */
@@ -199,15 +263,12 @@ export async function reporteVisitas(
   const inicio = p.texto.charAt(0).toUpperCase() + p.texto.slice(1)
   lineas.push(`${inicio}: ${t.visitas(num(total, idioma))}, ${cambio}.`)
 
-  const porGrupo = new Map<Grupo, number>()
-  for (const k of ahora.byKind) porGrupo.set(GRUPO[k.kind] ?? 'otros', (porGrupo.get(GRUPO[k.kind] ?? 'otros') ?? 0) + k.visits)
-  const grupos = ORDEN.filter((g) => (porGrupo.get(g) ?? 0) > 0).sort((a, b) => (porGrupo.get(b) ?? 0) - (porGrupo.get(a) ?? 0) || ORDEN.indexOf(a) - ORDEN.indexOf(b))
-  lineas.push('', t.quien, ...grupos.map((g) => `- ${t.grupos[g]}: ${num(porGrupo.get(g) ?? 0, idioma)}`))
+  lineas.push('', t.quien, ...lineasQuien(ahora.grupos, idioma))
 
   if (ahora.totals.paid > 0) lineas.push('', t.pagos(num(ahora.totals.paid, idioma), dinero(Number(ahora.totals.revenue))))
 
   const top = ahora.topPaths.slice(0, 3)
-  if (top.length) lineas.push('', t.top, ...top.map((x) => `- ${x.path}: ${num(x.visits, idioma)}`))
+  if (top.length) lineas.push('', t.top, ...top.map((x) => `- ${rutaComoCodigo(x.path)}: ${num(x.visits, idioma)}`))
 
   return { texto: lineas.join('\n'), botones, visitas: total, previas }
 }

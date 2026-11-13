@@ -78,13 +78,43 @@ export async function nombreBot(): Promise<string> {
   return usuarioBot
 }
 
-/** Markdown del agente → HTML de Telegram (lo único que soporta sin escapar todo). */
+/** Los comandos de verdad del bot (ver setMyCommands y procesarUpdate): esos sí quedan tocables. */
+const COMANDOS_DEL_BOT = new Set(['start', 'stop', 'help', 'negocios', 'businesses'])
+
+/**
+ * Lo que Telegram toma por comando: "/" que no sigue a una letra, número, "_",
+ * "/", "<", ">" o "\", hasta 64 letras, números o "_", y que no sigue con
+ * ninguno de esos (la regla de tdlib, match_bot_commands). Así "/mcp" y el
+ * "/robots" de "/robots.txt" salían en azul y, al tocarlos, le mandaban ese
+ * comando al bot. Atrapa la ruta entera ("/robots.txt"), sin la puntuación
+ * del final.
+ */
+const PARECE_COMANDO = /(?<![\p{L}\p{N}_/<>\\])\/([A-Za-z0-9_]{1,64})(?![\p{L}\p{N}_/<>\\])[^\s`*\uE000\uE001]*/gu
+
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * Markdown del agente → HTML de Telegram (lo único que soporta sin escapar
+ * todo). El código va primero y aparte, así una negrita no se mete adentro.
+ * Una ruta suelta que Telegram tomaría por comando sale como código: dentro
+ * de <code> Telegram no busca comandos. Los comandos del bot quedan como están.
+ */
 export function aHtml(texto: string): string {
-  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return esc(texto)
+  const codigos: string[] = []
+  const guardar = (html: string) => `\uE000${codigos.push(html) - 1}\uE001`
+  const conMarcas = texto
+    .replace(/[\uE000\uE001]/g, '')
+    .replace(/```(?:[\w-]+\n)?([\s\S]*?)```/g, (_m, c: string) => guardar(`<pre>${esc(c.replace(/^\n|\n$/g, ''))}</pre>`))
+    .replace(/`([^`]+)`/g, (_m, c: string) => guardar(`<code>${esc(c)}</code>`))
+    .replace(PARECE_COMANDO, (m: string, comando: string) => {
+      if (COMANDOS_DEL_BOT.has(comando.toLowerCase())) return m
+      const ruta = m.replace(/[.,:;!?)\]»"'’]+$/u, '')
+      return guardar(`<code>${esc(ruta)}</code>`) + m.slice(ruta.length)
+    })
+  return esc(conMarcas)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^\s*[-*]\s+/gm, '• ')
+    .replace(/^[ \t]*[-*][ \t]+/gm, '• ')
+    .replace(/\uE000(\d+)\uE001/g, (_m, i: string) => codigos[Number(i)] ?? '')
 }
 
 /** Telegram corta a 4096 caracteres: se parte por párrafos. */
