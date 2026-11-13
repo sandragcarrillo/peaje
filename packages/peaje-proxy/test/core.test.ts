@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
 import { _reiniciarAviso, baseDe, crearPeaje, GATEWAY_POR_DEFECTO, peajeFetch } from '../src/index'
-import { levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
+import { KIT, KIT_DEL_GATEWAY, levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
 
 let gw: Awaited<ReturnType<typeof levantarGateway>>
 before(async () => {
@@ -148,4 +148,60 @@ test('un bot leyendo una página de la app se reporta al gateway (en waitUntil s
   const apagado = peajeFetch({ slug: SLUG, gateway: gw.url, reportBotVisits: false })
   assert.equal(await apagado(req('/blog/hola', { headers: { 'user-agent': gptbot } }), (p) => void esperas.push(p)), null)
   assert.equal(esperas.length, 1, 'ni la persona ni con reportBotVisits: false')
+})
+
+// ---- x-peaje-kit: qué paquete y versión sirve el dominio ----
+
+test('x-peaje-kit: el valor sale del package.json del paquete', () => {
+  assert.match(KIT, /^@peaje\/proxy@\d+\.\d+\.\d+$/)
+  assert.deepEqual(crearPeaje({ slug: SLUG, gateway: gw.url }).headersRespuesta, { 'x-peaje-kit': KIT })
+})
+
+test('x-peaje-kit: toda respuesta reenviada del gateway lo lleva, y pisa el que mande el gateway', async () => {
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO })
+  const casos: [string, RequestInit?][] = [
+    ['/llms.txt'],
+    ['/openapi.json'],
+    ['/.well-known/mcp'],
+    ['/.well-known/agent-card.json'],
+    ['/r/menu?x=1'],
+    ['/api/forecast?city=bogota'],
+    ['/api/gzip'],
+    ['/api/batch/a', { method: 'POST', body: '{}' }],
+    ['/llms.txt', { method: 'HEAD' }],
+  ]
+  for (const [path, init] of casos) {
+    const res = await peaje(req(path, init))
+    assert.ok(res, path)
+    assert.equal(res.headers.get('x-peaje-kit'), KIT, `${init?.method ?? 'GET'} ${path}`)
+    assert.notEqual(res.headers.get('x-peaje-kit'), KIT_DEL_GATEWAY)
+    await res.body?.cancel()
+  }
+  const cobro = await peaje(req('/api/forecast'))
+  assert.equal(cobro?.status, 402, 'también en el 402')
+  assert.equal(cobro?.headers.get('x-peaje-kit'), KIT)
+  await cobro?.body?.cancel()
+})
+
+test('x-peaje-kit: un stream (/mcp) lo lleva y llega por partes', async () => {
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url })
+  const res = await peaje(req('/mcp', { method: 'POST', body: '{"jsonrpc":"2.0"}' }))
+  assert.equal(res?.status, 200)
+  assert.equal(res?.headers.get('content-type'), 'text/event-stream')
+  assert.equal(res?.headers.get('x-peaje-kit'), KIT)
+  const lector = res!.body!.getReader()
+  const primera = new TextDecoder().decode((await lector.read()).value)
+  assert.equal(primera, 'data: uno\n\n', 'la primera parte llega sola, antes del final')
+  let resto = ''
+  for (let r = await lector.read(); !r.done; r = await lector.read()) resto += new TextDecoder().decode(r.value)
+  assert.match(resto, /"path":"\/cafe-andino\/mcp"/)
+})
+
+test('x-peaje-kit: lo que atiende la app no pasa por Peaje, y el que inventa un cliente no llega al gateway', async () => {
+  const peaje = peajeFetch({ slug: SLUG, gateway: gw.url, secret: SECRETO })
+  assert.equal(await peaje(req('/blog/hola')), null)
+  assert.equal(await peaje(req('/api/forecast', { headers: { 'x-peaje-origin': SECRETO } })), null, 'la entrega pagada la atiende la app')
+  const res = await peaje(req('/api/forecast', { headers: { 'x-peaje-kit': '@peaje/proxy@0.0.1' } }))
+  assert.equal(((await res!.json()) as Eco).kit, null)
+  assert.equal(res!.headers.get('x-peaje-kit'), KIT)
 })

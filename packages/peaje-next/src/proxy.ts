@@ -30,12 +30,22 @@
  * le avisa al gateway en segundo plano (`waitUntil`) con la ruta y el
  * user-agent del bot, para que el registro de visitas la cuente. Las visitas
  * de personas no se reportan. Se apaga con `reportBotVisits: false`.
+ *
+ * Desde 0.3.3 cada respuesta que el proxy reenvía del gateway (discovery,
+ * `/mcp`, links `/r/`, rutas de API con precio, el 402) lleva
+ * `x-peaje-kit: @peaje/next@<versión>`, para que el dashboard le avise al dueño
+ * cuando hay una versión más nueva. Las páginas del sitio no lo llevan.
  */
 import { crearProxyRuntime, HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER, PREFIJOS_API_POR_DEFECTO, type ProxyRuntime } from '@peaje/shared'
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server'
+// tsup lo bundlea: en el dist quedan solo el nombre y la versión, como texto.
+import { name, version } from '../package.json'
 import { baseDe, type OpcionesPeaje } from './index'
 
 type Middleware = (req: NextRequest, ev: NextFetchEvent) => Response | undefined | void | Promise<Response | undefined | void>
+
+/** `@peaje/next@<versión>`, del package.json de este paquete al compilar: no se desfasa. */
+const PEAJE_KIT = `${name}@${version}`
 
 const runtimes = new Map<string, ProxyRuntime>()
 
@@ -43,7 +53,7 @@ function runtimeDe(base: string, secreto: string | null, prefijosApi: readonly s
   const clave = `${base}|${secreto ? 'con' : 'sin'}|${prefijosApi.join(',')}`
   let r = runtimes.get(clave)
   if (!r) {
-    r = crearProxyRuntime({ base, secreto, prefijosApi })
+    r = crearProxyRuntime({ base, secreto, prefijosApi, kit: PEAJE_KIT })
     runtimes.set(clave, r)
   }
   return r
@@ -121,7 +131,13 @@ export function peajeProxy(opciones: OpcionesProxy, siguiente?: Middleware): Mid
       headers.set('x-forwarded-host', req.nextUrl.host)
       headers.set(PEAJE_HOST_HEADER, req.nextUrl.host)
       headers.set('x-forwarded-proto', req.nextUrl.protocol.replace(':', ''))
-      return NextResponse.rewrite(new URL(decision.destino), { request: { headers } })
+      // x-peaje-kit va como header de respuesta del rewrite: Next lo aplica a
+      // lo que devuelve el gateway, sea el 402 o un stream. El que trajera el
+      // cliente sale con HEADERS_NO_REENVIADOS. Ojo: `next start` copia los
+      // headers de respuesta del middleware también a la request reenviada,
+      // así que el gateway recibe el nuestro; y si la respuesta del gateway
+      // trae uno, gana el del gateway.
+      return NextResponse.rewrite(new URL(decision.destino), { request: { headers }, headers: runtime.headersRespuesta })
     }
     // Una página que el sitio sirve solo: el gateway no la ve, así que si la
     // leyó un bot se la contamos. Fuera del camino de la respuesta.

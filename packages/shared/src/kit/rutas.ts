@@ -106,6 +106,15 @@ export const PEAJE_FETCH_HEADER = 'x-peaje-fetch'
 export const PEAJE_HOST_HEADER = 'x-peaje-forwarded-host'
 
 /**
+ * Qué paquete y versión del kit sirve el dominio: `@peaje/next@0.3.3`,
+ * `@peaje/proxy@0.2.3`. El proxy lo pone en cada respuesta que reenvía del
+ * gateway (no en las páginas propias del sitio), y la verificación lo lee para
+ * decirle al dueño si hay una versión más nueva. Las versiones anteriores no lo
+ * mandan: un proxy que funciona sin este header es anterior a la que lo agregó.
+ */
+export const PEAJE_KIT_HEADER = 'x-peaje-kit'
+
+/**
  * Una ruta de API con precio del negocio (tabla `routes`), tal como la publica
  * el manifiesto: método y patrón (`/api/x`, `/api/x/:id`, `/api/x/*`). El proxy
  * la reenvía al gateway para que el 402 salga en el dominio del negocio.

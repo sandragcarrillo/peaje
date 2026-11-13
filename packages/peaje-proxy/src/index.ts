@@ -23,10 +23,20 @@
  * avisa al gateway en segundo plano con la ruta y el user-agent del bot, para
  * que el registro de visitas la cuente. Las visitas de personas no se
  * reportan. Se apaga con `reportBotVisits: false`.
+ *
+ * Desde 0.2.3 cada respuesta que el proxy reenvía del gateway (discovery,
+ * `/mcp`, links `/r/`, rutas de API con precio, el 402) lleva
+ * `x-peaje-kit: @peaje/proxy@<versión>`, para que el dashboard le avise al
+ * dueño cuando hay una versión más nueva. Lo que sirve la app no lo lleva.
  */
 import { crearProxyRuntime, HEADERS_NO_REENVIADOS, PEAJE_HOST_HEADER, PREFIJOS_API_POR_DEFECTO, type ProxyRuntime } from '@peaje/shared'
+// tsup lo bundlea: en el dist quedan solo el nombre y la versión, como texto.
+import { name, version } from '../package.json'
 
 export const GATEWAY_POR_DEFECTO = 'https://api.usepeaje.com'
+
+/** `@peaje/proxy@<versión>`, del package.json de este paquete al compilar: no se desfasa. */
+const PEAJE_KIT = `${name}@${version}`
 
 export type OpcionesPeaje = {
   /** El slug del negocio en Peaje (el mismo del dashboard). */
@@ -62,12 +72,19 @@ export type EntradaDecision = { method: string; url: URL; headers: Headers }
 export type Peaje = {
   /** `${gateway}/${slug}` sin barra final. */
   base: string
+  /**
+   * Los headers que lleva cada respuesta reenviada del gateway:
+   * `x-peaje-kit: @peaje/proxy@<versión>`. `reenviar` ya los pone; un
+   * adaptador que no pasa por `reenviar` (Vercel) los agrega él.
+   */
+  headersRespuesta: Readonly<Record<string, string>>
   /** URL del gateway a la que va la request, o null si no es de Peaje. */
   decidir(entrada: EntradaDecision): Promise<string | null>
   /**
    * Reenvía al gateway. Pone `x-forwarded-host` y `x-forwarded-proto` con el
    * host del negocio: el gateway arma con ellos la URL del challenge 402, y
-   * sin ellos los clientes x402 estrictos abortan el pago.
+   * sin ellos los clientes x402 estrictos abortan el pago. La respuesta
+   * vuelve con `headersRespuesta`.
    */
   reenviar(destino: string, entrada: EntradaDecision & { body: BodyInit | null }): Promise<Response>
   /**
@@ -126,11 +143,12 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
   const base = baseDe(opciones)
   const secreto = opciones.secret ?? env('PEAJE_ORIGIN_SECRET') ?? null
   const fetchImpl = opciones.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
-  const runtime = crearProxyRuntime({ base, secreto, fetchImpl, prefijosApi: opciones.apiPrefixes ?? PREFIJOS_API_POR_DEFECTO })
+  const runtime = crearProxyRuntime({ base, secreto, fetchImpl, prefijosApi: opciones.apiPrefixes ?? PREFIJOS_API_POR_DEFECTO, kit: PEAJE_KIT })
   const reportar = opciones.reportBotVisits !== false
 
   return {
     base,
+    headersRespuesta: runtime.headersRespuesta,
     async decidir({ method, url, headers }) {
       if (!avisado) {
         avisado = true
@@ -162,6 +180,9 @@ export function crearPeaje(opciones: OpcionesPeaje): Peaje {
       vuelta.delete('content-length')
       vuelta.delete('transfer-encoding')
       vuelta.delete('connection')
+      // Con set: pisa un x-peaje-kit que trajera la respuesta del gateway (o
+      // del origen que el gateway reenvía después del pago).
+      for (const [clave, valor] of Object.entries(runtime.headersRespuesta)) vuelta.set(clave, valor)
       return new Response(method === 'HEAD' ? null : res.body, { status: res.status, statusText: res.statusText, headers: vuelta })
     },
     reportarLectura({ method, url, headers }) {

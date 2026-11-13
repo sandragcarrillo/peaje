@@ -94,6 +94,8 @@ export default { fetch: async (req: Request) => (await peaje(req)) ?? app(req) }
 
 The forwarded request keeps method, body, query and `authorization` (the MPP credential), and carries `x-forwarded-host` and `x-forwarded-proto` so the 402 challenge names your domain (strict x402 clients abort when it does not). It leaves out the `cookie` header: your visitors' session cookies never leave your domain, and a priced route's handler no longer receives cookies through Peaje. If the gateway is unreachable, the catalog paths are still forwarded; priced API routes resume when the manifest loads.
 
+Since 0.2.3, every response forwarded from the gateway (discovery files, `/mcp`, `/r/` links, priced API routes, the 402) carries `x-peaje-kit: @peaje/proxy@<version>`, so your Peaje dashboard can tell you when a newer version is out. Responses your app serves itself never carry it.
+
 ### What the manifest cannot do (since 0.2.0)
 
 - Add fixed paths or prefixes. Those come only from the list bundled in this package; anything extra in the manifest is ignored.

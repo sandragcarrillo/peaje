@@ -2,14 +2,26 @@
  * Gateway de mentira: sirve el manifiesto y contesta 402 a todo lo demás bajo
  * `/{slug}/`, con un JSON que cuenta qué le llegó (método, path, query, body y
  * los headers que importan). `/{slug}/api/gzip` responde comprimido para probar
- * que el proxy no reenvía un content-encoding que ya no es cierto.
+ * que el proxy no reenvía un content-encoding que ya no es cierto. `/{slug}/mcp`
+ * contesta un stream SSE en dos partes. Toda respuesta trae un x-peaje-kit
+ * falso (`KIT_DEL_GATEWAY`): el proxy tiene que pisarlo con el suyo.
  */
+import { readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { gzipSync } from 'node:zlib'
 
 export const SLUG = 'cafe-andino'
 export const SECRETO = 'a'.repeat(64)
+
+/** Lo que tiene que llegar en x-peaje-kit: nombre y versión del package.json en disco. */
+export const KIT = (() => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { name: string; version: string }
+  return `${pkg.name}@${pkg.version}`
+})()
+
+/** El x-peaje-kit que manda este gateway en sus respuestas, para probar que no se cuela. */
+export const KIT_DEL_GATEWAY = '@peaje/falso@9.9.9'
 
 export const MANIFIESTO = {
   version: 'test',
@@ -39,6 +51,7 @@ export type Eco = {
   origin: string | null
   cookie: string | null
   authorization: string | null
+  kit: string | null
 }
 
 export async function levantarGateway(): Promise<{ url: string; cerrar: () => Promise<void>; pedidos: string[] }> {
@@ -46,6 +59,7 @@ export async function levantarGateway(): Promise<{ url: string; cerrar: () => Pr
   const server: Server = createServer((req, res) => {
     const u = new URL(req.url ?? '/', 'http://gw')
     pedidos.push(`${req.method} ${u.pathname}`)
+    res.setHeader('x-peaje-kit', KIT_DEL_GATEWAY)
     if (u.pathname === `/${SLUG}/kit/manifest.json`) {
       res.setHeader('content-type', 'application/json')
       res.end(JSON.stringify(MANIFIESTO))
@@ -65,6 +79,15 @@ export async function levantarGateway(): Promise<{ url: string; cerrar: () => Pr
         origin: (req.headers['x-peaje-origin'] as string | undefined) ?? null,
         cookie: (req.headers.cookie as string | undefined) ?? null,
         authorization: (req.headers.authorization as string | undefined) ?? null,
+        kit: (req.headers['x-peaje-kit'] as string | undefined) ?? null,
+      }
+      if (u.pathname === `/${SLUG}/mcp`) {
+        // Un stream: la primera parte sale antes de que exista la segunda.
+        res.statusCode = 200
+        res.setHeader('content-type', 'text/event-stream')
+        res.write('data: uno\n\n')
+        setTimeout(() => res.end(`data: ${JSON.stringify(eco)}\n\n`), 30)
+        return
       }
       const json = Buffer.from(JSON.stringify(eco))
       res.statusCode = 402

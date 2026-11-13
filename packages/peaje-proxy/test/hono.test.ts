@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
 import { Hono } from 'hono'
 import { peajeHono } from '../src/hono'
-import { levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
+import { KIT, levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
 
 let gw: Awaited<ReturnType<typeof levantarGateway>>
 let app: Hono
@@ -44,4 +44,18 @@ test('hono: POST reenvía body; entregado con secreto, el handler lo lee', async
   assert.equal(((await cobro.json()) as Eco).body, '{"k":1}')
   const pagado = await app.request(u('/api/batch/1'), { method: 'POST', body: '{"k":1}', headers: { 'content-type': 'application/json', 'x-peaje-origin': SECRETO } })
   assert.deepEqual(await pagado.json(), { desde: 'app', body: { k: 1 } })
+})
+
+test('hono: x-peaje-kit en lo reenviado (402, discovery, stream); no en lo que sirve la app', async () => {
+  for (const path of ['/api/forecast', '/llms.txt', '/r/x']) {
+    const res = await app.request(u(path))
+    assert.equal(res.status, 402, path)
+    assert.equal(res.headers.get('x-peaje-kit'), KIT, path)
+    await res.body?.cancel()
+  }
+  const mcp = await app.request(u('/mcp'), { method: 'POST', body: '{}' })
+  assert.equal(mcp.headers.get('x-peaje-kit'), KIT)
+  assert.match(await mcp.text(), /^data: uno\n\n/)
+  assert.equal((await app.request(u('/blog'))).headers.get('x-peaje-kit'), null)
+  assert.equal((await app.request(u('/api/forecast'), { headers: { 'x-peaje-origin': SECRETO } })).headers.get('x-peaje-kit'), null)
 })

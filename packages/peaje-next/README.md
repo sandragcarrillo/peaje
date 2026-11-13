@@ -62,6 +62,8 @@ Cookies: the requests the proxy forwards to the gateway leave out the `cookie` h
 
 Bot visits (since 0.3.1): when a known AI bot (GPTBot, ClaudeBot, OAI-SearchBot, PerplexityBot, Googlebot) reads a page your site serves itself, such as your home page or a blog post, the proxy tells the gateway in the background (`waitUntil`, 3 s timeout, never in the way of the page), so the read shows up in your agent visits. The gateway never sees those requests otherwise. It sends only the path, without the query string, and the bot's user agent: no IP, no cookies, and visits from people are never reported. Turn it off with `peajeProxy({ slug, reportBotVisits: false })`.
 
+Version header (since 0.3.3): every response the proxy forwards from the gateway (discovery files, `/mcp`, `/r/` links, priced API routes, the 402) carries `x-peaje-kit: @peaje/next@<version>`, so your Peaje dashboard can tell you when a newer version is out. Pages your site serves itself never carry it.
+
 With your own middleware: `export default peajeProxy({ slug }, myMiddleware)`. Peaje runs first; when the request is not one of its routes, yours runs.
 
 Options: `slug` (required), `gateway`, `secret` (default `process.env.PEAJE_ORIGIN_SECRET`), `apiPrefixes` (default `['/api/', '/v1/']`) and `reportBotVisits` (default `true`).

@@ -2,6 +2,7 @@ import { MAX_PATH_LECTURA, MAX_UA_LECTURA, NO_ES_PAGINA, PEAJE_VERIFICADOR_HEADE
 import {
   PATHS_RESERVADOS,
   PEAJE_FETCH_HEADER,
+  PEAJE_KIT_HEADER,
   PREFIJOS_API_POR_DEFECTO,
   RUTAS_DINAMICAS,
   RUTAS_PROXY,
@@ -83,14 +84,25 @@ export type OpcionesProxyRuntime = {
    * gateway. Por defecto `PREFIJOS_API_POR_DEFECTO`.
    */
   prefijosApi?: readonly string[]
+  /**
+   * `<paquete>@<versión>` del kit que corre este runtime (`@peaje/next@0.3.3`),
+   * leído por cada paquete de su package.json al compilar: shared no conoce ni
+   * el nombre ni la versión. Va en PEAJE_KIT_HEADER en cada respuesta que el
+   * proxy reenvía del gateway (`headersRespuesta`), nunca en las páginas del
+   * sitio. Sin él no se agrega nada.
+   */
+  kit?: string | null
 }
 
 /**
  * Headers que no viajan del sitio al gateway. Las cookies del dominio del
  * negocio (la sesión de quien navega) no le sirven al gateway y no tienen por
  * qué salir del sitio; `authorization` sí viaja: ahí va la credencial MPP.
+ * PEAJE_KIT_HEADER es de la respuesta y lo pone el proxy: uno que venga en la
+ * request (un cliente que lo inventa) no sigue al gateway ni, de ahí, al
+ * origen del negocio.
  */
-export const HEADERS_NO_REENVIADOS: readonly string[] = ['cookie']
+export const HEADERS_NO_REENVIADOS: readonly string[] = ['cookie', PEAJE_KIT_HEADER]
 
 /** Path canónico en minúsculas contra la lista de reservados. */
 export function esReservado(path: string): boolean {
@@ -223,6 +235,7 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
   const rutas = [...(opciones.fijas?.rutas ?? RUTAS_PROXY.map((r) => r.path))]
   const prefijos = [...(opciones.fijas?.prefijos ?? RUTAS_DINAMICAS.map((r) => r.prefijo))]
   const prefijosApi = prefijosApiValidos(opciones.prefijosApi ?? PREFIJOS_API_POR_DEFECTO)
+  const headersRespuesta: Readonly<Record<string, string>> = Object.freeze(opciones.kit ? { [PEAJE_KIT_HEADER]: opciones.kit } : ({} as Record<string, string>))
   let cache: { at: number; patrones: Patron[] } = { at: 0, patrones: [] }
   let refrescando: Promise<void> | null = null
 
@@ -258,6 +271,13 @@ export function crearProxyRuntime(opciones: OpcionesProxyRuntime) {
   return {
     /** Los prefijos de API efectivos, normalizados (para los avisos). */
     prefijosApi,
+    /**
+     * Los headers que lleva cada respuesta que el proxy reenvía del gateway:
+     * PEAJE_KIT_HEADER con `kit`. Donde el paquete arma la respuesta
+     * (`@peaje/proxy`) pisan los del mismo nombre que traiga el gateway.
+     * Nunca van en una request que pasa al sitio.
+     */
+    headersRespuesta,
     /** Rutas de API con precio que este sitio no puede cobrar por falta de secreto. */
     async sinSecreto(): Promise<Patron[]> {
       if (opciones.secreto) return []

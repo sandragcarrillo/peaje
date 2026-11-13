@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { after, before, test } from 'node:test'
 import express from 'express'
 import { peajeExpress } from '../src/express'
-import { levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
+import { KIT, levantarGateway, SECRETO, SLUG, type Eco } from './gateway-falso'
 
 let gw: Awaited<ReturnType<typeof levantarGateway>>
 const servidores: Server[] = []
@@ -101,4 +101,23 @@ test('express: HEAD a discovery no manda body', async () => {
   const res = await fetch(`${url}/llms.txt`, { method: 'HEAD' })
   assert.equal(res.status, 402)
   assert.equal(await res.text(), '')
+})
+
+test('express: x-peaje-kit en lo reenviado (402, discovery, stream); no en lo que sirve la app', async () => {
+  for (const path of ['/api/forecast', '/llms.txt', '/.well-known/mcp', '/r/menu']) {
+    const res = await fetch(`${url}${path}`)
+    assert.equal(res.status, 402, path)
+    assert.equal(res.headers.get('x-peaje-kit'), KIT, path)
+    await res.body?.cancel()
+  }
+  const mcp = await fetch(`${url}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(mcp.headers.get('x-peaje-kit'), KIT)
+  assert.match(await mcp.text(), /^data: uno\n\ndata: \{/)
+  const blog = await fetch(`${url}/blog`)
+  assert.equal(blog.headers.get('x-peaje-kit'), null)
+  await blog.body?.cancel()
+  const pagado = await fetch(`${url}/api/forecast`, { headers: { 'x-peaje-origin': SECRETO } })
+  assert.equal(pagado.status, 200)
+  assert.equal(pagado.headers.get('x-peaje-kit'), null, 'la entrega pagada la responde el handler de la app')
+  await pagado.body?.cancel()
 })

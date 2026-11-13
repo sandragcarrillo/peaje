@@ -5,12 +5,14 @@ import {
   crearProxyRuntime,
   esReservado,
   generarProxy,
+  HEADERS_NO_REENVIADOS,
   lecturaDeBot,
   manifiestoProxy,
   patronARegex,
   patronANext,
   patronPermitido,
   patronReenviable,
+  PEAJE_KIT_HEADER,
   prefijosApiValidos,
   reglasNext,
   secretoOrigen,
@@ -226,4 +228,20 @@ test('reportarLectura: un POST al gateway con la lectura; null si no hay nada qu
 
   const caido = crearProxyRuntime({ base, fetchImpl: async () => Promise.reject(new Error('sin red')) })
   await caido.reportarLectura({ method: 'GET', pathname: '/', headers: new Headers({ 'user-agent': GPTBOT }) })
+})
+
+// ---- x-peaje-kit: el paquete y la versión que sirven el dominio ----
+
+test('headersRespuesta: x-peaje-kit con el kit que pasa el paquete; sin kit, nada', () => {
+  assert.equal(PEAJE_KIT_HEADER, 'x-peaje-kit')
+  assert.deepEqual(crearProxyRuntime({ base, kit: '@peaje/next@1.2.3' }).headersRespuesta, { 'x-peaje-kit': '@peaje/next@1.2.3' })
+  assert.deepEqual(crearProxyRuntime({ base }).headersRespuesta, {})
+  assert.deepEqual(crearProxyRuntime({ base, kit: null }).headersRespuesta, {})
+  assert.ok(Object.isFrozen(crearProxyRuntime({ base, kit: '@peaje/next@1.2.3' }).headersRespuesta))
+})
+
+test('HEADERS_NO_REENVIADOS: la cookie y un x-peaje-kit de la request no viajan al gateway', () => {
+  assert.ok(HEADERS_NO_REENVIADOS.includes('cookie'))
+  assert.ok(HEADERS_NO_REENVIADOS.includes(PEAJE_KIT_HEADER))
+  assert.ok(!HEADERS_NO_REENVIADOS.includes('authorization'), 'la credencial MPP sí viaja')
 })

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { NextRequest } from 'next/server'
 import { peajeProxy } from '../src/proxy'
+
+/** Lo que tiene que llegar en x-peaje-kit: nombre y versión del package.json en disco. */
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { name: string; version: string }
+const KIT = `${pkg.name}@${pkg.version}`
 
 const slug = 'cafe-andino'
 const gateway = 'https://gateway.invalid'
@@ -115,5 +120,50 @@ test('un bot leyendo una página del sitio se reporta al gateway en waitUntil; u
     assert.equal(esperas.length, 1, 'reportBotVisits: false no reporta')
   } finally {
     server.close()
+  }
+})
+
+test('x-peaje-kit: el rewrite al gateway lo lleva como header de respuesta, con la versión de package.json', async () => {
+  assert.match(KIT, /^@peaje\/next@\d+\.\d+\.\d+$/)
+  const { createServer } = await import('node:http')
+  const server = createServer((_req, res) => {
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ patrones: [{ method: 'GET', path: '/api/forecast' }] }))
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const gw = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  try {
+    const mw = peajeProxy({ slug, gateway: gw, secret: 'a'.repeat(64) })
+    for (const path of ['/llms.txt', '/mcp', '/.well-known/mcp', '/openapi.json', '/r/menu', '/api/forecast']) {
+      // Un x-peaje-kit inventado por el cliente no sigue al gateway.
+      const res = await mw(req(path, { 'x-peaje-kit': '@peaje/next@0.0.1' }), ev)
+      assert.ok(res?.headers.get('x-middleware-rewrite'), path)
+      assert.equal(res?.headers.get('x-peaje-kit'), KIT, path)
+      assert.equal(res?.headers.get('x-middleware-request-x-peaje-kit'), null, path)
+      assert.ok(!(res?.headers.get('x-middleware-override-headers') ?? '').split(',').includes('x-peaje-kit'), path)
+    }
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()))
+  }
+})
+
+test('x-peaje-kit: lo que pasa al sitio no lo lleva, ni en la respuesta ni en la request del middleware propio', async () => {
+  const secreto = 'a'.repeat(64)
+  const vistas: NextRequest[] = []
+  const conPropio = peajeProxy({ slug, gateway, secret: secreto }, (r) => {
+    vistas.push(r)
+    return undefined
+  })
+  assert.equal(await conPropio(req('/blog/hola'), ev), undefined)
+  assert.equal(await conPropio(req('/api/forecast', { 'x-peaje-origin': secreto }), ev), undefined, 'la entrega pagada pasa al handler')
+  assert.equal(vistas.length, 2)
+  for (const r of vistas) assert.equal(r.headers.get('x-peaje-kit'), null)
+
+  const solo = peajeProxy({ slug, gateway, secret: secreto })
+  for (const r of [req('/blog/hola'), req('/llms.txt', { 'x-peaje-fetch': '1' }), req('/api/forecast', { 'x-peaje-origin': secreto })]) {
+    const res = await solo(r, ev)
+    assert.equal(res?.headers.get('x-middleware-next'), '1', r.nextUrl.pathname)
+    assert.equal(res?.headers.get('x-peaje-kit'), null, r.nextUrl.pathname)
+    assert.equal(res?.headers.get('x-middleware-request-x-peaje-kit') ?? null, null)
   }
 })

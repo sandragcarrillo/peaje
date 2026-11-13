@@ -54,7 +54,10 @@ export function peajeVercel(opciones: OpcionesPeaje, siguiente?: MiddlewareVerce
       // Railway (donde corre el gateway) pisa X-Forwarded-Host: el host del negocio va también acá.
       headers.set(PEAJE_HOST_HEADER, url.host)
       headers.set('x-forwarded-proto', url.protocol.replace(':', ''))
-      return respuestaMiddleware({ 'x-middleware-rewrite': destino }, headers)
+      // x-peaje-kit como header de respuesta del rewrite (lo que hace
+      // `rewrite(destino, { headers })`): Vercel lo aplica a lo que devuelve
+      // el gateway. No entra en el override de la request.
+      return respuestaMiddleware({ ...peaje.headersRespuesta, 'x-middleware-rewrite': destino }, headers)
     }
     // Una página que la app sirve sola: si la leyó un bot, el gateway no la
     // vio y se la contamos, en waitUntil para no demorar la respuesta.
