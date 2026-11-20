@@ -110,9 +110,17 @@ export function prioridadPagina(s: { pregunta: string; porQue: string }, conBorr
 const busquedas = (o: Oportunidad, idioma: Idioma) => {
   const top = o.consultas.slice(0, 2).map((c) => `"${c.texto}"`)
   if (top.length === 0) return ''
-  return idioma === 'es' ? ` La buscan como ${top.join(' y ')}.` : ` People find it searching ${top.join(' and ')}.`
+  return idioma === 'es' ? ` La gente llega buscando ${top.join(' y ')}.` : ` People get there searching ${top.join(' and ')}.`
 }
 
+/** En qué página de resultados de Google cae un puesto promedio: 6.5 es la primera, 68.1 la séptima. */
+export const paginaDeGoogle = (posicion: number) => Math.max(1, Math.ceil(posicion / 10))
+
+/**
+ * Lo que Peaje midió en Search Console, dicho para alguien que no sabe de SEO:
+ * cuántas veces mostró Google la página, en qué página de resultados y cuánta
+ * gente entró. Nada de "puesto promedio" ni "impresiones".
+ */
 export function prioridadBusqueda(o: Oportunidad): TaskPriority {
   const impact: TaskPriority['impact'] = o.parte >= 0.2 ? 'high' : o.parte >= 0.05 ? 'medium' : 'low'
   const pct = Math.max(1, Math.round(o.parte * 100))
@@ -121,21 +129,22 @@ export function prioridadBusqueda(o: Oportunidad): TaskPriority {
       score: o.puntaje,
       impact,
       effort: 'small',
-      label: { es: `Cambiar el título de ${o.ruta}`, en: `Rewrite the title of ${o.ruta}` },
+      label: { es: `Cambiar el título y la descripción de ${o.ruta}`, en: `Rewrite the title and description of ${o.ruta}` },
       why: {
-        es: `Google la mostró ${o.impresiones} veces en 28 días, en el puesto ${o.posicion}, y ${o.clics === 0 ? 'nadie entró' : `solo entraron ${o.clics}`}. Ya está en la primera página: lo que no convence es el título o la descripción.${busquedas(o, 'es')}`,
-        en: `Google showed it ${o.impresiones} times in 28 days, at position ${o.posicion}, and ${o.clics === 0 ? 'nobody clicked' : `only ${o.clics} clicked`}. It is already on the first page: the title or the description is not convincing.${busquedas(o, 'en')}`,
+        es: `En los últimos 28 días Google mostró esta página ${o.impresiones} veces en su primera página de resultados y ${o.clics === 0 ? 'nadie hizo clic' : o.clics === 1 ? 'solo 1 persona hizo clic' : `solo ${o.clics} personas hicieron clic`}. Lo que la gente ve ahí es el título y la descripción, así que conviene reescribirlos.${busquedas(o, 'es')}`,
+        en: `In the last 28 days Google showed this page ${o.impresiones} times on its first page of results and ${o.clics === 0 ? 'nobody clicked' : o.clics === 1 ? 'only 1 person clicked' : `only ${o.clics} people clicked`}. What people see there is the title and the description, so those are worth rewriting.${busquedas(o, 'en')}`,
       },
     }
   }
+  const pagina = paginaDeGoogle(o.posicion)
   return {
     score: o.puntaje,
     impact,
     effort: 'medium',
     label: { es: `Mejorar ${o.ruta}`, en: `Improve ${o.ruta}` },
     why: {
-      es: `Es el ${pct}% de las veces que Google muestra tu sitio (${o.impresiones} en 28 días) y sale en el puesto ${o.posicion}, donde casi nadie llega.${busquedas(o, 'es')}`,
-      en: `It is ${pct}% of the times Google shows your site (${o.impresiones} in 28 days) and it ranks at position ${o.posicion}, where almost nobody looks.${busquedas(o, 'en')}`,
+      es: `En los últimos 28 días Google mostró esta página ${o.impresiones} veces, pero en la página ${pagina} de sus resultados, donde casi nadie llega. Es el ${pct}% de todas las veces que Google muestra tu sitio.${busquedas(o, 'es')}`,
+      en: `In the last 28 days Google showed this page ${o.impresiones} times, but on page ${pagina} of its results, where almost nobody looks. It is ${pct}% of all the times Google shows your site.${busquedas(o, 'en')}`,
     },
   }
 }
