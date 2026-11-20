@@ -74,8 +74,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
       '@peaje/next':
-        specifier: ^0.3.1
-        version: 0.3.1(next@16.3.1(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        specifier: ^0.3.3
+        version: 0.3.3(next@16.3.1(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@peaje/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -1196,8 +1196,8 @@ packages:
     resolution: {integrity: sha512-IHnV6A+zxU7XwmKFinmYjUcwlyK9+xkG3/s9KcQhI9BjQKycrJ1JRO+FbNYPwZiPKW3je/DR0k7w8/gLa5eaxQ==}
     deprecated: 'Switch to "qr" (new package name) for security updates: npm install qr'
 
-  '@peaje/next@0.3.1':
-    resolution: {integrity: sha512-n853pSV0r7JdZ7nkAkWxPH0SkYiZxne2QF9Ft5LOjsMA7qxGLYriTt+4rNIVZD0xKtyews34Jvy1pixrqyArtg==}
+  '@peaje/next@0.3.3':
+    resolution: {integrity: sha512-TqXPDD29HXpoENoS9s2L/3tHEOKalXEQFEgKMgFzyBsoeqyIVX2iZKZ/GrbdM3zCendYKfCx7XRnlDr3VJvLYw==}
     peerDependencies:
       next: '>=14'
       react: '>=18'
@@ -5603,7 +5603,7 @@ snapshots:
 
   '@paulmillr/qr@0.2.1': {}
 
-  '@peaje/next@0.3.1(next@16.3.1(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
+  '@peaje/next@0.3.3(next@16.3.1(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     optionalDependencies:
       next: 16.3.1(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
