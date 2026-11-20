@@ -353,7 +353,7 @@ export class MemoryStore implements Store {
     const ahora = new Date().toISOString()
     if (previa) {
       if (previa.status !== 'open') return { task: previa, created: false }
-      Object.assign(previa, { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance, updatedAt: ahora })
+      Object.assign(previa, { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance, ...(task.priority ? { priority: task.priority } : {}), updatedAt: ahora })
       return { task: previa, created: false }
     }
     const nueva: AgentTask = {
@@ -365,6 +365,7 @@ export class MemoryStore implements Store {
       summary: task.summary,
       body: task.body,
       acceptance: task.acceptance,
+      priority: task.priority ?? null,
       status: 'open',
       source: task.source ?? 'agent',
       note: null,

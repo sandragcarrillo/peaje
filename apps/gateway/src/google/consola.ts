@@ -102,6 +102,31 @@ export async function resumenConsola(tenant: Tenant, op: { dias: 7 | 28 | 90; co
   }
 }
 
+export type DatosDeBusqueda = { desde: string; hasta: string; paginas: Fila[]; pares: Fila[]; consultas: Fila[] }
+
+/**
+ * Las filas de 28 días que usa el generador de tareas (google/oportunidades.ts)
+ * sin que nadie pregunte. Null si el negocio no conectó Search Console o Google
+ * falló: el generador sigue con sus otras fuentes.
+ */
+export async function datosDeBusqueda(tenant: Tenant, ahora = new Date()): Promise<DatosDeBusqueda | null> {
+  const c = await conexion(tenant)
+  if ('connected' in c) return null
+  const { desde, hasta } = rango(28, ahora)
+  try {
+    const [paginas, pares, consultas] = await Promise.all([
+      rendimiento(c.con, c.propiedad, { desde, hasta, dimensiones: ['page'], filas: 250 }),
+      rendimiento(c.con, c.propiedad, { desde, hasta, dimensiones: ['query', 'page'], filas: 500 }),
+      rendimiento(c.con, c.propiedad, { desde, hasta, dimensiones: ['query'], filas: 50 }),
+    ])
+    await usada(tenant)
+    return { desde, hasta, paginas, pares, consultas }
+  } catch (e) {
+    await fallo(tenant, e)
+    return null
+  }
+}
+
 /** Qué sabe Google de una URL del sitio: si está indexada, cuándo pasó, qué canónica eligió. */
 export async function inspeccionUrl(tenant: Tenant, url: string, idioma: 'es' | 'en') {
   const c = await conexion(tenant)

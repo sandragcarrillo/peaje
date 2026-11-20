@@ -259,6 +259,9 @@ export const miAgente = {
     repQuitar: 'Quitar',
     // ---- fin reportes programados ----
     tarjetaPorQue: 'Por qué te lo sugerimos',
+    impacto: { high: 'impacto alto', medium: 'impacto medio', low: 'impacto bajo' } as Record<string, string>,
+    esfuerzo: { small: 'poco trabajo', medium: 'trabajo medio', large: 'mucho trabajo' } as Record<string, string>,
+    primeroEsta: 'Empieza por esta',
     tarjetaEsperamos: 'Qué esperamos',
     tarjetaComo: 'Cómo hacerlo',
     porQueGenerico: {
@@ -679,6 +682,9 @@ export const miAgente = {
     repQuitar: 'Remove',
     // ---- fin reportes programados ----
     tarjetaPorQue: 'Why we suggest it',
+    impacto: { high: 'high impact', medium: 'medium impact', low: 'low impact' } as Record<string, string>,
+    esfuerzo: { small: 'small effort', medium: 'medium effort', large: 'large effort' } as Record<string, string>,
+    primeroEsta: 'Start with this one',
     tarjetaEsperamos: 'What we expect',
     tarjetaComo: 'How to do it',
     porQueGenerico: {

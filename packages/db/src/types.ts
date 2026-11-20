@@ -406,6 +406,22 @@ export type TaskCheck =
   | { type: 'check'; id: string }
   | { type: 'url'; url: string; contains?: string; notStatus?: number }
 
+/**
+ * Qué tanto conviene una tarea y por qué, para ordenar la cola y proponerle al
+ * dueño "las de esta semana". `impact` es relativo al propio sitio, nunca un
+ * pronóstico. `label` y `why` van en palabras del dueño, en los dos idiomas:
+ * el cuerpo de la tarea es para el coding agent y está en inglés.
+ */
+export type TaskPriority = {
+  /** 0 a 100. Ordena la cola: más alto, primero. */
+  score: number
+  impact: 'high' | 'medium' | 'low'
+  effort: 'small' | 'medium' | 'large'
+  label: { es: string; en: string }
+  /** La evidencia: qué midió Peaje para proponerla. */
+  why: { es: string; en: string }
+}
+
 export type AgentTask = {
   id: string
   tenantId: string
@@ -415,6 +431,8 @@ export type AgentTask = {
   summary: string
   body: string
   acceptance: TaskCheck[]
+  /** Null en las tareas de antes de que existiera la prioridad. */
+  priority: TaskPriority | null
   status: TaskStatus
   source: string
   note: string | null
@@ -425,7 +443,7 @@ export type AgentTask = {
   verifiedAt: string | null
 }
 
-export type NewAgentTask = Pick<AgentTask, 'tenantId' | 'key' | 'kind' | 'title' | 'summary' | 'body' | 'acceptance'> & { source?: string }
+export type NewAgentTask = Pick<AgentTask, 'tenantId' | 'key' | 'kind' | 'title' | 'summary' | 'body' | 'acceptance'> & { source?: string; priority?: TaskPriority }
 
 export type AgentTaskPatch = Partial<Pick<AgentTask, 'status' | 'note' | 'doneUrl' | 'doneAt' | 'verifiedAt'>>
 

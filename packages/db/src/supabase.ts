@@ -30,6 +30,7 @@ import type {
   AgentTaskPatch,
   NewAgentTask,
   TaskCheck,
+  TaskPriority,
   TaskStatus,
   AgentPlan,
   NewAgentPlan,
@@ -164,6 +165,7 @@ function taskFrom(row: Row): AgentTask {
     summary: row.summary ?? '',
     body: row.body,
     acceptance: (row.acceptance ?? []) as TaskCheck[],
+    priority: (row.priority ?? null) as TaskPriority | null,
     status: row.status,
     source: row.source ?? 'agent',
     note: row.note ?? null,
@@ -768,7 +770,8 @@ export class SupabaseStore implements Store {
       .eq('key', task.key)
       .maybeSingle()
     this.#fail('upsertTask(select)', e1)
-    const contenido = { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance }
+    // La prioridad solo viaja cuando viene: una tarea sin ella no pisa la que ya tenía.
+    const contenido = { kind: task.kind, title: task.title, summary: task.summary, body: task.body, acceptance: task.acceptance, ...(task.priority ? { priority: task.priority } : {}) }
     if (previa) {
       // Solo se refresca el contenido de una tarea que nadie tomó todavía.
       if ((previa as Row).status !== 'open') return { task: taskFrom(previa as Row), created: false }

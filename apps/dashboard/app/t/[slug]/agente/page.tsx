@@ -47,7 +47,8 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   // reales de este sitio (los mismos que /t/[slug]/listo). Sin score, sin números.
   const arranque = pro ? null : await arranqueDe(tenant.originUrl)
 
-  const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress')
+  // En el orden en que conviene hacerlas: la prioridad la pone el agente con lo que midió.
+  const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress').sort((a, b) => (b.priority?.score ?? 50) - (a.priority?.score ?? 50))
   const esperando = tareas.filter((x) => x.status === 'done')
   const cerradas = tareas.filter((x) => x.status === 'verified' || x.status === 'dismissed').slice(0, 20)
 

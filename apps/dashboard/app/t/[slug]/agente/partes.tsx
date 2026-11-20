@@ -63,8 +63,8 @@ export function ListaTareas({
     <div>
       <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{titulo}</span>
       <ul className="mt-2 divide-y divide-border border border-border">
-        {tareas.map((x) => (
-          <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
+        {tareas.map((x, i) => (
+          <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} primera={!cerradas && i === 0 && tareas.length > 1} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
         ))}
       </ul>
       {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
@@ -72,8 +72,10 @@ export function ListaTareas({
   )
 }
 
-function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: AgentTask; cerrada: boolean; seguimientos: TaskFollowup[] }) {
+function Tarea({ slug, tarea, cerrada, primera = false, seguimientos }: { slug: string; tarea: AgentTask; cerrada: boolean; primera?: boolean; seguimientos: TaskFollowup[] }) {
   const { miAgente: t } = useDict()
+  const locale = useLocale() === 'es' ? 'es' : 'en'
+  const p = tarea.priority
   const [abierto, setAbierto] = useState(false)
   const [modo, setModo] = useState<'nada' | 'hecha' | 'descartar'>('nada')
   const [valor, setValor] = useState('')
@@ -116,12 +118,18 @@ function Tarea({ slug, tarea, cerrada, seguimientos }: { slug: string; tarea: Ag
     <li className="space-y-3 px-4 py-4 text-sm">
       <div>
         <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
-        <span className="font-medium">{tarea.title}</span>
+        <span className="font-medium">{p?.label[locale] ?? tarea.title}</span>
+        {p ? (
+          <span className="ml-2 text-xs text-muted">
+            · {t.impacto[p.impact]} · {t.esfuerzo[p.effort]}
+          </span>
+        ) : null}
+        {primera ? <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-xs">{t.primeroEsta}</span> : null}
         {tarea.status !== 'open' ? <span className="ml-2 text-xs text-muted">· {t.estados[tarea.status] ?? tarea.status}</span> : null}
       </div>
       <dl className="grid gap-2 text-sm md:grid-cols-[10rem_1fr]">
         <dt className="text-xs text-muted">{t.tarjetaPorQue}</dt>
-        <dd>{tarea.summary || t.porQueGenerico[tarea.kind]}</dd>
+        <dd>{p?.why[locale] || tarea.summary || t.porQueGenerico[tarea.kind]}</dd>
         <dt className="text-xs text-muted">{t.tarjetaEsperamos}</dt>
         <dd>{t.esperamos[tarea.kind]}</dd>
         <dt className="text-xs text-muted">{t.tarjetaComo}</dt>

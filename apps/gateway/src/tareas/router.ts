@@ -18,6 +18,7 @@ import { correrRonda, maxPreguntas, resumenCitacion, sugerirPrompts } from '../c
 import { accesoPro, sinPro } from '../billing/acceso.js'
 import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
 import { cobrarAccion } from './creditos.js'
+import { ordenar, prioridadDe } from './prioridad.js'
 
 /**
  * Tareas del agente Pro.
@@ -80,6 +81,8 @@ export function tareaPublica(t: AgentTask, completa = false) {
     status: t.status,
     note: t.note,
     doneUrl: t.doneUrl,
+    // Por qué conviene y cuánto cuesta: la lista sale ordenada por esto.
+    priority: (({ score, impact, effort, why }) => ({ score, impact, effort, why: why.en }))(prioridadDe(t)),
     createdAt: t.createdAt,
     ...(completa ? { prompt: t.body, acceptance: t.acceptance } : {}),
   }
@@ -94,7 +97,7 @@ function estados(q: string | undefined) {
 tareasRouter.get('/_owner/tasks', async (c) => {
   const tenant = c.get('tenant')
   const tasks = await store.listTasks(tenant.id, { statuses: estados(c.req.query('status')) })
-  return c.json({ business: tenant.slug, tasks: tasks.map((t) => tareaPublica(t)) })
+  return c.json({ business: tenant.slug, tasks: ordenar(tasks).map((t) => tareaPublica(t)) })
 })
 
 tareasRouter.get('/_owner/tasks/:id', async (c) => {

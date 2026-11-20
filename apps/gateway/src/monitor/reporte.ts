@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import { PAGE_FORMATS, type PageFormat, type Tenant, type Verificacion } from '@peaje/db'
+import { PAGE_FORMATS, type AgentTask, type PageFormat, type Tenant, type Verificacion } from '@peaje/db'
 import { formatosCitados, type FormatosCitados } from '../citacion/formatos.js'
 import { paginasDelSitio } from '../acceso/revisar.js'
 import { asistentesMedidos, dominioVerificable, type Chequeo } from '@peaje/shared'
@@ -12,6 +12,8 @@ import { planConAvance } from '../tareas/plan.js'
 import { resumenCitacion } from '../citacion/medir.js'
 // ---- M6 ----
 import { resultados } from '../ciclo/seguimiento.js'
+import { lasDeLaSemana, ordenar, type Propuesta } from '../tareas/prioridad.js'
+import { tarjetaTarea } from '../tareas/tarjetas.js'
 
 /**
  * El reporte semanal del agente de Peaje para un negocio: estado técnico con
@@ -27,7 +29,10 @@ export type Reporte = {
   comando: string
   chequeosOk: number
   chequeosTotal: number
-  fallando: { id: string; texto: string; detalle: string[] }[]
+  fallando: { id: string; motivo: string; texto: string; detalle: string[] }[]
+  idioma: 'es' | 'en'
+  /** Lo que Peaje propone trabajar esta semana: pocas, ordenadas, con la evidencia y su enlace. Vacío: todo en orden. */
+  semana: (Propuesta & { url: string })[]
   score: number | null
   scorePrevio: number | null
   previaAt: string | null
@@ -126,7 +131,14 @@ async function temasCubiertos(tenant: Tenant, dominio: string): Promise<string> 
   ].join('')
 }
 
-export async function sugerirContenido(tenant: Tenant, dominio: string): Promise<Reporte['contenido']> {
+/** Las búsquedas de Search Console como texto para el prompt; vacío si no hay conexión. */
+function evidenciaDeBusquedas(b: { texto: string; impresiones: number; posicion: number }[] | undefined): string {
+  const filas = (b ?? []).filter((x) => x.texto).slice(0, 20)
+  if (filas.length === 0) return ''
+  return `Google searches where this site was shown in the last 28 days (Search Console):\n${filas.map((x) => `- "${x.texto}": ${x.impresiones} impressions, average position ${x.posicion}`).join('\n')}\n\n`
+}
+
+export async function sugerirContenido(tenant: Tenant, dominio: string, evidencia: { busquedas?: { texto: string; impresiones: number; posicion: number }[] } = {}): Promise<Reporte['contenido']> {
   if (!process.env.ANTHROPIC_API_KEY) return []
   try {
     const texto = await leerSitio(dominio)
@@ -141,12 +153,13 @@ export async function sugerirContenido(tenant: Tenant, dominio: string): Promise
         'You advise small businesses on answer-engine optimization: pages that AI assistants such as ' + asistentesMedidos('en') + ' cite when a user asks a question the business can answer. Propose 3 to 5 pages the site does not have yet, each answering one concrete question a customer would type. Be specific to this business; no generic advice. Write in the language of the site. Keep each field short: the question under 15 words, the answer outline under 40 words, the reason under 25 words.',
         'Each page has a format: guide, roundup (best options, top N, alternatives), comparison (X vs Y), research (original data or a benchmark), docs, forum, video, news, product or other.',
         'You also get the pages the site already has (from its sitemap: the URL words say the topic) and the pages already planned or turned down. Never propose a page whose question one of them already answers, whatever the wording or language. Only new topics; if there are fewer than 3, return fewer.',
+        'When you are given the Google searches where the site was shown, treat them as real demand: prefer questions close to a search that no existing page answers well (a search ranking past position 10 with no page built for it). Do not propose a page for a search an existing page already targets; improving that page is a separate task.',
         'When you are given the formats AI assistants actually cite for this business\'s questions, prefer the questions where those formats win, pick the format that won for that question, and set "modelo" to the URL of one cited example to emulate. Without that evidence, pick the format that fits the question and leave "modelo" empty. Never put a URL in "modelo" that was not in the evidence.',
       ].join('\n'),
       messages: [
         {
           role: 'user',
-          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}${yaHechas}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
+          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}${evidenciaDeBusquedas(evidencia.busquedas)}${yaHechas}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
         },
       ],
       output_config: { format: zodOutputFormat(SugerenciasSchema) },
@@ -160,12 +173,27 @@ export async function sugerirContenido(tenant: Tenant, dominio: string): Promise
   }
 }
 
-export async function armarReporte(tenant: Tenant, actual: Verificacion, opciones: { conContenido?: boolean } = {}): Promise<Reporte> {
+/** El idioma en que Peaje le escribe al dueño: el de su plan, o el del chat que conectó. Sin ninguno, inglés. */
+export async function idiomaDelDueno(tenant: Tenant): Promise<'es' | 'en'> {
+  const plan = await store.getPlan(tenant.id).catch(() => null)
+  if (plan?.language) return plan.language.toLowerCase().startsWith('es') ? 'es' : 'en'
+  const chats = await store.listTelegramLinks(tenant.id).catch(() => [])
+  return chats.some((l) => l.language === 'es') ? 'es' : 'en'
+}
+
+/** Las propuestas de la semana con el enlace a cada una, en un idioma. */
+export function semanaDe(tenant: Tenant, abiertas: AgentTask[], idioma: 'es' | 'en'): Reporte['semana'] {
+  return lasDeLaSemana(abiertas, idioma).map((p) => ({ ...p, url: tarjetaTarea(tenant, { id: p.id, title: p.titulo, kind: p.kind }, idioma).url }))
+}
+
+export async function armarReporte(tenant: Tenant, actual: Verificacion, opciones: { conContenido?: boolean; idioma?: 'es' | 'en' } = {}): Promise<Reporte> {
   const dominio = dominioVerificable(tenant.originUrl) ?? tenant.originUrl
+  const idioma = opciones.idioma ?? (await idiomaDelDueno(tenant))
+  const abiertas = await store.listTasks(tenant.id, { statuses: ['open', 'in_progress', 'done'] }).catch(() => [])
   const chequeos = actual.checks as Chequeo[]
   const fallando = chequeos
     .filter((c) => !c.ok)
-    .map((c) => ({ id: c.id, texto: TEXTO_MOTIVO[c.motivo] ?? c.motivo, detalle: c.faltantes ?? [] }))
+    .map((c) => ({ id: c.id, motivo: c.motivo, texto: TEXTO_MOTIVO[c.motivo] ?? c.motivo, detalle: c.faltantes ?? [] }))
 
   const desde = Date.now() - DIAS * 86_400_000
   const historial = await store.verificationHistory(tenant.id, 60)
@@ -210,13 +238,15 @@ export async function armarReporte(tenant: Tenant, actual: Verificacion, opcione
     chequeosOk: chequeos.filter((c) => c.ok).length,
     chequeosTotal: chequeos.length,
     fallando,
+    idioma,
+    semana: semanaDe(tenant, abiertas, idioma),
     score: actual.score,
     scorePrevio: previa?.score ?? null,
     previaAt: historial[1]?.runAt ?? null,
     pagos: { count: pagos.length, revenue: pagos.reduce((s, p) => s + Number(p.amount), 0).toFixed(4), porRuta },
     visitas,
     contenido: opciones.conContenido ? await sugerirContenido(tenant, dominio) : [],
-    tareas: (await store.listTasks(tenant.id, { statuses: ['open', 'in_progress', 'done'] }).catch(() => []))
+    tareas: ordenar(abiertas)
       .slice(0, 8)
       .map((t) => ({ titulo: t.title, tipo: t.kind, estado: t.status })),
     agenteUrl: `${DASHBOARD}/t/${tenant.slug}/agente`,

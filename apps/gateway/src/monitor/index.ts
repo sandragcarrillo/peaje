@@ -5,11 +5,11 @@ import { dominioVerificable } from '@peaje/shared'
 import { env } from '../env.js'
 import { store } from '../store.js'
 import { correrTenant, eventosAlertables } from './correr.js'
-import { enviarCorreo, htmlAlerta, htmlSemanal } from './email.js'
-import { armarReporte } from './reporte.js'
+import { enviarCorreo, htmlAlerta, htmlSemanal, textoSemana } from './email.js'
+import { armarReporte, semanaDe } from './reporte.js'
 import { generarTareas, reverificarHechas, sincronizarFixes } from '../tareas/generar.js'
 import { tocaCorreo } from '../tareas/plan.js'
-import { avisarPorTelegram } from '../telegram/bot.js'
+import { avisarPorTelegram, proponerPorTelegram } from '../telegram/bot.js'
 import { correrRonda } from '../citacion/medir.js'
 // ---- M6 ----
 import { procesarSeguimientos } from '../ciclo/seguimiento.js'
@@ -103,15 +103,15 @@ monitorRouter.post('/run', async (c) => c.json(await correrDiario()))
 export async function correrSemanal() {
   const tenants = (await store.listTenants()).filter((t) => esPro(t) && dominioVerificable(t.originUrl))
   const enviados: string[] = []
+  /** Trabajados sin mensaje: su cadencia dice que esta semana no se les escribe. */
+  const callados: string[] = []
   const errores: { slug: string; error: string }[] = []
   for (const t of tenants) {
     try {
       const actual = (await store.lastVerification(t.id)) ?? (await correrTenant(t))?.verificacion
       if (!actual) continue
-      // La cadencia la eligió el dueño en su plan: quincenal o solo a pedido no reciben todas las semanas.
-      if (!tocaCorreo(await store.getPlan(t.id))) continue
-      // Las sugerencias de contenido entran como tareas (una sola llamada a Opus);
-      // el correo lista las tareas abiertas.
+      // Las sugerencias de contenido y las de Search Console entran como tareas
+      // (una sola llamada a Opus); el mensaje abre con las de más prioridad.
       await generarTareas(t, { conContenido: true })
       // Citación: una ronda por semana con las preguntas del negocio (si tiene).
       if ((await store.listCitationPrompts(t.id)).length > 0) await correrRonda(t).catch((e) => console.warn('[monitor] citación', t.slug, e instanceof Error ? e.message : e))
@@ -119,20 +119,27 @@ export async function correrSemanal() {
       const objetivo = (await store.getPlan(t.id))?.goal
       if (env.cobrosVisibles && (objetivo === 'agent-sales' || objetivo === 'both')) await correrComprador(t).catch((e) => console.warn('[monitor] comprador misterioso', t.slug, e instanceof Error ? e.message : e))
       // ---- fin M7 ----
+      // La cadencia que eligió el dueño decide solo si se le escribe esta semana
+      // (quincenal, o nunca con "a pedido"). Peaje igual midió y dejó las tareas listas.
+      if (!tocaCorreo(await store.getPlan(t.id))) {
+        callados.push(t.slug)
+        continue
+      }
       const reporte = await armarReporte(t, actual)
       const { subject, html } = htmlSemanal(t, reporte)
       await enviarCorreo(t.email!, subject, html)
-      // Resumen corto por Telegram: el avance del plan y lo abierto, con el enlace.
-      const pasos = reporte.plan?.pasos.map((p) => `${p.hecho ? '✓' : '·'} ${p.titulo}`).join('\n') ?? ''
-      await avisarPorTelegram(t.id, [subject, reporte.plan ? `\n**Plan**\n${pasos}` : '', reporte.tareas.length ? `\n${reporte.tareas.length} tareas abiertas / open tasks` : ''].filter(Boolean).join('\n'), [
-        { text: 'Mi agente / My agent', url: reporte.agenteUrl },
-      ]).catch(() => 0)
+      const abiertas = await store.listTasks(t.id, { statuses: ['open'] }).catch(() => [])
+      // Lo mismo por Telegram, corto: las propuestas de la semana, cada una con su botón, en el idioma de cada chat.
+      await proponerPorTelegram(t.id, (idioma) => {
+        const r = idioma === reporte.idioma ? reporte : { ...reporte, idioma, semana: semanaDe(t, abiertas, idioma) }
+        return { texto: textoSemana(r), propuestas: r.semana.map((p) => ({ id: p.id, url: p.url })), pie: { text: idioma === 'es' ? 'Mi agente' : 'My agent', url: reporte.agenteUrl } }
+      }).catch(() => 0)
       enviados.push(t.slug)
     } catch (error) {
       errores.push({ slug: t.slug, error: error instanceof Error ? error.message : String(error) })
     }
   }
-  return { enviados, errores }
+  return { enviados, callados, errores }
 }
 
 monitorRouter.post('/weekly', async (c) => c.json(await correrSemanal()))

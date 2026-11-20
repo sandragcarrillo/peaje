@@ -1,5 +1,8 @@
 import type { Tenant } from '@peaje/db'
+import type { Motivo } from '@peaje/shared'
 import type { Reporte } from './reporte.js'
+import { ARREGLO } from '../reportes/visitas.js'
+import { TEXTO_ESFUERZO, TEXTO_IMPACTO } from '../tareas/prioridad.js'
 
 /**
  * Correos del monitor por Resend: la alerta (un evento, qué se rompió y el
@@ -79,51 +82,148 @@ ${fallos.length ? `<p>The fix, for your coding agent or your terminal:</p><pre s
   return { subject, html }
 }
 
+const NOMBRE_CHEQUEO_ES: Record<string, string> = {
+  dominio: 'dominio público',
+  proxy: 'el kit de Peaje',
+  frescura: 'copias viejas',
+  'json-ld': 'datos del negocio (JSON-LD)',
+  links: 'enlaces para agentes',
+  robots: 'robots.txt',
+  bots: 'los bots de búsqueda pueden leer el sitio',
+}
+
+const S = {
+  es: {
+    asuntoSemana: (n: string, k: number) => `${n}: ${k === 1 ? '1 cosa' : `${k} cosas`} para probar esta semana`,
+    asuntoOrden: (n: string) => `${n}: todo en orden esta semana`,
+    hola: (d: string) => `Tu semana en <strong>${d}</strong>.`,
+    semana: (k: number) => (k === 1 ? 'Esta semana probemos con esto' : `Esta semana probemos con ${k === 2 ? 'estas 2' : `estas ${k}`}`),
+    semanaPie: 'Están en el orden en que conviene hacerlas. Si alguna no va, descártala desde su página y la próxima semana te propongo otra.',
+    ver: 'Ver la tarea',
+    orden: 'No hay nada que te convenga cambiar esta semana. Sigo midiendo y te aviso cuando algo se mueva.',
+    movido: 'Qué se movió',
+    plan: 'Tu plan',
+    sinPlan: (url: string) => `<strong>Todavía no tienes un plan.</strong> <a href="${url}">Cuéntale tu objetivo al agente</a> y arma uno para tu negocio.`,
+    puntaje: 'Qué tan listo está tu sitio para los agentes',
+    vsSemana: 'frente a la semana pasada',
+    sinPuntaje: 'sin dato',
+    arreglar: 'Qué arreglar',
+    tecnico: (t: number) => `<strong>Estado técnico</strong>: las ${t} revisiones pasan. No hay nada que arreglar.`,
+    pagos: (c: number, r: string) => `<strong>Pagos</strong>: ${c} pedidos pagados, $${r} para ti`,
+    visitas: (t: number, pagadas: string) => `<strong>Quién te visitó</strong>: ${t} pedidos de agentes${pagadas}.`,
+    pagadas: (p: number) => `, ${p} pagados`,
+    bots: (b: string) => ` Bots de IA que leyeron tus archivos para agentes: ${b}.`,
+    sinBots: ' Ningún bot de IA leyó tus archivos para agentes esta semana.',
+    citas: (s: string, previa: string | null) => `<strong>Asistentes de IA</strong>: citan tu sitio en ${s} de las respuestas a tus preguntas${previa ? ` (${previa} la vez anterior)` : ''}.`,
+    enLugar: (c: string) => ` En tu lugar aparecen: ${c}.`,
+    comprador: '¿Te elegiría un agente que compra?',
+    tareas: (k: number) => `<strong>Todas las tareas abiertas</strong> (${k}). Conecta Claude Code o Cursor a Peaje una vez y pídele "trabaja las tareas de Peaje": lee cada una, la aplica en tu código y Peaje la revisa en el sitio publicado.`,
+    esperando: ' · esperando que se publique',
+    enCurso: ' · en curso',
+    verTareas: 'Ver las tareas y cómo conectar',
+    pie: (url: string) => `<a href="${url}">Abrir tu dashboard</a>. Responde este correo si quieres que el agente de Peaje revise algo puntual.`,
+    tipo: { content: 'contenido', route: 'ruta', fix: 'arreglo' } as Record<string, string>,
+  },
+  en: {
+    asuntoSemana: (n: string, k: number) => `${n}: ${k === 1 ? '1 thing' : `${k} things`} to try this week`,
+    asuntoOrden: (n: string) => `${n}: all clear this week`,
+    hola: (d: string) => `Your week at <strong>${d}</strong>.`,
+    semana: (k: number) => (k === 1 ? 'This week, let us try this' : `This week, let us try these ${k}`),
+    semanaPie: 'They are in the order worth doing them. If one does not fit, dismiss it from its page and I will propose another next week.',
+    ver: 'See the task',
+    orden: 'There is nothing worth changing this week. I keep measuring and will tell you when something moves.',
+    movido: 'What moved',
+    plan: 'Your plan',
+    sinPlan: (url: string) => `<strong>No plan yet.</strong> <a href="${url}">Tell the agent your goal</a> and it builds one for this business.`,
+    puntaje: 'Agent-readiness score',
+    vsSemana: 'vs last week',
+    sinPuntaje: 'not available',
+    arreglar: 'What to fix',
+    tecnico: (t: number) => `<strong>Technical status</strong>: all ${t} checks pass. Nothing to fix.`,
+    pagos: (c: number, r: string) => `<strong>Payments</strong>: ${c} paid requests, $${r} for you`,
+    visitas: (t: number, pagadas: string) => `<strong>Who visited</strong>: ${t} requests from agents${pagadas}.`,
+    pagadas: (p: number) => `, ${p} paid`,
+    bots: (b: string) => ` AI bots that read your agent files: ${b}.`,
+    sinBots: ' No AI bot read your agent files this week.',
+    citas: (s: string, previa: string | null) => `<strong>Answer engines</strong>: they cite your site in ${s} of the answers to your questions${previa ? ` (${previa} last time)` : ''}.`,
+    enLugar: (c: string) => ` Showing up instead: ${c}.`,
+    comprador: 'Would a buying agent pick you?',
+    tareas: (k: number) => `<strong>All open tasks</strong> (${k}). Connect Claude Code or Cursor to Peaje once and ask it to "work through the Peaje tasks": it reads each one, applies it in your repo, and Peaje checks it on the live site.`,
+    esperando: ' · waiting for the deploy',
+    enCurso: ' · in progress',
+    verTareas: 'See the tasks and how to connect',
+    pie: (url: string) => `<a href="${url}">Open your dashboard</a>. Reply to this email if you want the Peaje agent to look at something specific.`,
+    tipo: { content: 'content', route: 'route', fix: 'fix' } as Record<string, string>,
+  },
+}
+
+/** Las propuestas de la semana como texto corto (Telegram, Slack): markdown mínimo. */
+export function textoSemana(r: Reporte): string {
+  const s = S[r.idioma]
+  if (r.semana.length === 0) return s.orden
+  return [
+    `**${s.semana(r.semana.length)}**`,
+    ...r.semana.map((p, i) => `${i + 1}. **${p.titulo}** (${TEXTO_IMPACTO[r.idioma][p.impacto]}, ${TEXTO_ESFUERZO[r.idioma][p.esfuerzo]})\n${p.porQue}`),
+  ].join('\n\n')
+}
+
+/**
+ * El correo de la semana. Abre con lo que Peaje propone hacer (pocas cosas, en
+ * orden, cada una con lo que midió para proponerla); los números van después.
+ * En el idioma del dueño. Los textos que vienen de otros módulos (avance del
+ * plan, seguimientos) todavía salen en inglés.
+ */
 export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html: string } {
-  const subject = `${tenant.name} this week: ${r.chequeosOk} of ${r.chequeosTotal} checks ok${r.score !== null ? `, score ${r.score}` : ''}${r.cobros ? `, ${r.pagos.count} paid requests` : ''}`
+  const s = S[r.idioma]
+  const es = r.idioma === 'es'
+  const subject = r.semana.length ? s.asuntoSemana(tenant.name, r.semana.length) : s.asuntoOrden(tenant.name)
+  const semana = r.semana.length
+    ? `<p style="font-size:17px"><strong>${s.semana(r.semana.length)}</strong></p><ol>${r.semana
+        .map(
+          (p) =>
+            `<li style="margin-bottom:12px"><strong>${esc(p.titulo)}</strong> <span style="color:#666">· ${TEXTO_IMPACTO[r.idioma][p.impacto]} · ${TEXTO_ESFUERZO[r.idioma][p.esfuerzo]}</span><br>${esc(p.porQue)}<br><a href="${esc(p.url)}">${s.ver}</a></li>`,
+        )
+        .join('')}</ol><p style="color:#666;font-size:13px">${s.semanaPie}</p>`
+    : `<p style="font-size:17px"><strong>${s.orden}</strong></p>`
   const filasRutas = r.pagos.porRuta.map((x) => `<tr><td style="padding:4px 8px">${esc(x.path)}</td><td style="padding:4px 8px;text-align:right">${x.count}</td><td style="padding:4px 8px;text-align:right">$${x.revenue}</td></tr>`).join('')
-  const visitas = r.visitas
-    ? `<p><strong>Who visited</strong>: ${r.visitas.total} requests from agents${r.cobros ? `, ${r.visitas.pagadas} paid` : ''}.${r.visitas.bots.length ? `AI bots that read your agent files: ${esc(r.visitas.bots.join(', '))}.` : 'No AI bot read your agent files this week.'}</p>`
-    : ''
+  const visitas = r.visitas ? `<p>${s.visitas(r.visitas.total, r.cobros ? s.pagadas(r.visitas.pagadas) : '')}${r.visitas.bots.length ? s.bots(esc(r.visitas.bots.join(', '))) : s.sinBots}</p>` : ''
+  const nombre = (id: string) => (es ? NOMBRE_CHEQUEO_ES[id] : NOMBRE_CHEQUEO[id]) ?? id
+  const motivo = (f: Reporte['fallando'][number]) => (es ? (ARREGLO[f.motivo as Motivo]?.es ?? f.texto) : f.texto)
   const fallando = r.fallando.length
-    ? `<p><strong>What to fix</strong></p><ul>${r.fallando.map((f) => `<li>${esc(NOMBRE_CHEQUEO[f.id] ?? f.id)}: ${esc(f.texto)}</li>`).join('')}</ul><pre style="${mono}">${esc(r.comando)}</pre>`
-    : `<p><strong>Technical status</strong>: all ${r.chequeosTotal} checks pass. Nothing to fix.</p>`
+    ? `<p><strong>${s.arreglar}</strong></p><ul>${r.fallando.map((f) => `<li>${esc(nombre(f.id))}: ${esc(motivo(f))}</li>`).join('')}</ul><pre style="${mono}">${esc(r.comando)}</pre>`
+    : `<p>${s.tecnico(r.chequeosTotal)}</p>`
   const plan = r.plan
-    ? `<p><strong>Your plan</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <br><span style="color:#666">${esc(p.avance)}</span></li>`).join('')}</ol>`
-    : `<p><strong>No plan yet.</strong> <a href="${esc(r.agenteUrl)}">Tell the agent your goal</a> and it builds one for this business.</p>`
+    ? `<p><strong>${s.plan}</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <br><span style="color:#666">${esc(p.avance)}</span></li>`).join('')}</ol>`
+    : `<p>${s.sinPlan(esc(r.agenteUrl))}</p>`
   const pct = (x: number | null) => (x === null ? 'n/a' : `${Math.round(x * 100)}%`)
   const citacion = r.citacion
-    ? `<p><strong>Answer engines</strong>: they cite your site in ${pct(r.citacion.share)} of the answers to your questions${r.citacion.previa !== null ? ` (${pct(r.citacion.previa)} last time)` : ''}.${r.citacion.competidores.length ? ` Showing up instead: ${esc(r.citacion.competidores.join(', '))}.` : ''}</p>`
+    ? `<p>${s.citas(pct(r.citacion.share), r.citacion.previa !== null ? pct(r.citacion.previa) : null)}${r.citacion.competidores.length ? s.enLugar(esc(r.citacion.competidores.join(', '))) : ''}</p>`
     : ''
   const tareas = r.tareas.length
-    ? `<p><strong>Tasks for your coding agent</strong> (${r.tareas.length} open). Connect Claude Code or Cursor to Peaje once and ask it to "work through the Peaje tasks": it reads each one, applies it in your repo, and Peaje checks it on the live site.</p><ol>${r.tareas.map((t) => `<li>${esc(t.titulo)} <span style="color:#666">· ${esc(t.tipo)}${t.estado === 'done' ? ' · waiting for the deploy' : t.estado === 'in_progress' ? ' · in progress' : ''}</span></li>`).join('')}</ol><p><a href="${esc(r.agenteUrl)}">See the tasks and how to connect</a></p>`
+    ? `<p>${s.tareas(r.tareas.length)}</p><ol>${r.tareas.map((t) => `<li>${esc(t.titulo)} <span style="color:#666">· ${esc(s.tipo[t.tipo] ?? t.tipo)}${t.estado === 'done' ? s.esperando : t.estado === 'in_progress' ? s.enCurso : ''}</span></li>`).join('')}</ol><p><a href="${esc(r.agenteUrl)}">${s.verTareas}</a></p>`
     : ''
-  const contenido = r.contenido.length
-    ? `<p><strong>Content to create</strong> (pages answer engines would cite):</p><ol>${r.contenido.map((c) => `<li><strong>${esc(c.pregunta)}</strong><br>${esc(c.respuesta)}<br><span style="color:#666">${esc(c.porQue)} · <a href="${esc(c.fuente)}">source</a></span></li>`).join('')}</ol>`
-    : ''
-  // ---- M6: qué se publicó o arregló y qué movió, al frente ----
+  // ---- M6: qué se publicó o arregló y qué movió ----
   const movido = r.movido?.length
-    ? `<p><strong>What moved</strong></p><ul>${r.movido.map((m) => `<li><strong>${m.url ? `<a href="${esc(m.url)}">${esc(m.titulo)}</a>` : esc(m.titulo)}</strong><br>${esc(m.linea)}</li>`).join('')}</ul>`
+    ? `<p><strong>${s.movido}</strong></p><ul>${r.movido.map((m) => `<li><strong>${m.url ? `<a href="${esc(m.url)}">${esc(m.titulo)}</a>` : esc(m.titulo)}</strong><br>${esc(m.linea)}</li>`).join('')}</ul>`
     : ''
-  // ---- fin M6 ----
   // ---- M7: comprador misterioso, un párrafo ----
   const comprador = r.comprador
-    ? `<p><strong>Would a buying agent pick you?</strong> ${esc(r.comprador.resumen)}${r.comprador.veredictos[0] ? ` For example: ${esc(r.comprador.veredictos.find((v) => !v.includes('would buy from you')) ?? r.comprador.veredictos[0])}` : ''}${r.comprador.problemas[0] ? ` Most urgent fix: ${esc(r.comprador.problemas[0])}` : ''}</p>`
+    ? `<p><strong>${s.comprador}</strong> ${esc(r.comprador.resumen)}${r.comprador.veredictos[0] ? ` ${esc(r.comprador.veredictos.find((v) => !v.includes('would buy from you')) ?? r.comprador.veredictos[0])}` : ''}${r.comprador.problemas[0] ? ` ${esc(r.comprador.problemas[0])}` : ''}</p>`
     : ''
-  // ---- fin M7 ----
+  const score = r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} ${s.vsSemana})` : ''}` : s.sinPuntaje
   const html = `<div style="${estilo}">
-<p>Your week at <strong>${esc(r.dominio)}</strong>.</p>
+<p>${s.hola(esc(r.dominio))}</p>
+${semana}
 ${movido}
 ${plan}
-<p><strong>Agent-readiness score</strong>: ${r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} vs last week)` : ''}` : 'not available'}.</p>
+<p><strong>${s.puntaje}</strong>: ${score}.</p>
 ${fallando}
-${r.cobros ? `<p><strong>Payments</strong>: ${r.pagos.count} paid requests, $${r.pagos.revenue} for you${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}` : ''}
+${r.cobros ? `<p>${s.pagos(r.pagos.count, r.pagos.revenue)}${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}` : ''}
 ${visitas}
 ${citacion}
 ${comprador}
 ${tareas}
-${contenido}
-<p><a href="${esc(r.kitUrl)}">Open your dashboard</a>. Reply to this email if you want the Peaje agent to look at something specific.</p>
+<p>${s.pie(esc(r.kitUrl))}</p>
 </div>`
   return { subject, html }
 }

@@ -9,6 +9,7 @@ import { scoreOra } from '../monitor/correr.js'
 import { store } from '../store.js'
 import { buscarTareasDelDueno, tareaPublica, urlValida } from './router.js'
 import { completarTarea } from './verificar.js'
+import { ordenar } from './prioridad.js'
 import { planConAvance } from './plan.js'
 import { conversar } from './agente.js'
 
@@ -70,14 +71,14 @@ export function construir(tenant: Tenant): McpServer {
   server.registerTool(
     'peaje_list_tasks',
     {
-      description: 'List the tasks Peaje left for this site. Default: open, in progress and waiting verification.',
+      description: 'List the tasks Peaje left for this site, most worth doing first: each has a priority (impact, effort and the evidence behind it). Default: open, in progress and waiting verification.',
       inputSchema: { status: z.enum(['open', 'in_progress', 'done', 'verified', 'dismissed', 'all']).optional().describe('Filter by status') },
       annotations: { readOnlyHint: true },
     },
     async ({ status }) => {
       const statuses = !status ? (['open', 'in_progress', 'done'] as const) : status === 'all' ? [] : [status]
       const tasks = await store.listTasks(tenant.id, { statuses: [...statuses] })
-      return texto(tasks.map((t) => tareaPublica(t)))
+      return texto(ordenar(tasks).map((t) => tareaPublica(t)))
     },
   )
 

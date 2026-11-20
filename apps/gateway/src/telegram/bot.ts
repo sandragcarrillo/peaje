@@ -2,6 +2,7 @@ import type { AgentMessage, Tenant } from '@peaje/db'
 import { randomBytes } from 'node:crypto'
 import { store } from '../store.js'
 import { conversar } from '../tareas/agente.js'
+import { prioridadDe } from '../tareas/prioridad.js'
 import { resolverAccion } from '../tareas/acciones.js'
 import { anotarAviso } from '../tareas/trabajos.js'
 import { aHtml, nombreBot, partir, tg } from './api.js'
@@ -32,7 +33,8 @@ type Mensaje = {
   video_note?: unknown
   sticker?: unknown
 }
-type Callback = { id: string; data?: string; message?: { chat: Chat; message_id: number }; from?: { language_code?: string } }
+type Boton = { text: string; callback_data?: string; url?: string }
+type Callback = { id: string; data?: string; message?: { chat: Chat; message_id: number; reply_markup?: { inline_keyboard?: Boton[][] } }; from?: { language_code?: string } }
 export type Update = { message?: Mensaje; callback_query?: Callback }
 
 const idiomaDe = (codigo?: string): 'es' | 'en' => (codigo?.toLowerCase().startsWith('es') ? 'es' : 'en')
@@ -54,6 +56,9 @@ const T = {
     descartar: 'Descartar',
     aplicado: 'Aplicado.',
     descartado: 'Descartado.',
+    noVa: (n: number) => `${n} · No va`,
+    verTarea: (n: number) => `${n} · Ver`,
+    sacada: (t: string) => `Listo, saqué "${t}" de tu lista. La próxima semana te propongo otra.`,
     error: 'No pude responder ahora. Prueba de nuevo en un momento.',
     botonViejo: 'Ese botón ya no sirve. Escríbeme tu respuesta y sigo.',
     soloTexto: 'Todavía no puedo ver imágenes, audios ni archivos. Escríbeme lo que quieres decir y sigo.',
@@ -75,6 +80,9 @@ const T = {
     descartar: 'Dismiss',
     aplicado: 'Applied.',
     descartado: 'Dismissed.',
+    noVa: (n: number) => `${n} · Not now`,
+    verTarea: (n: number) => `${n} · See`,
+    sacada: (t: string) => `Done, I took "${t}" off your list. I will propose another next week.`,
     error: 'I could not answer right now. Try again in a moment.',
     botonViejo: 'That button no longer works. Type your answer and I will continue.',
     soloTexto: 'I cannot see images, audio or files yet. Type what you want to say and I will continue.',
@@ -228,6 +236,22 @@ async function procesarBoton(c: Callback): Promise<void> {
   const tenant = await store.getTenantById(link.tenantId)
   if (!tenant) return
   const idioma = (link.language as 'es' | 'en') ?? 'en'
+  // "t:<tarea>:n": el dueño dice que una propuesta de la semana no va. Se descarta
+  // (no se vuelve a proponer) y solo se saca su fila: las otras siguen vivas.
+  if (data.startsWith('t:')) {
+    const id = data.split(':')[1] ?? ''
+    for (const l of await store.listTelegramChat(chatId)) {
+      const tarea = await store.getTask(l.tenantId, id).catch(() => null)
+      if (!tarea) continue
+      if (tarea.status === 'open') await store.updateTask(l.tenantId, id, { status: 'dismissed', note: 'Declined by the owner from the weekly proposal (Telegram).' })
+      const filas = (c.message?.reply_markup?.inline_keyboard ?? []).filter((f) => !f.some((b) => b.callback_data === data))
+      if (c.message) await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: c.message.message_id, reply_markup: { inline_keyboard: filas } })
+      const propia = l.language === 'es' ? 'es' : 'en'
+      await tg('sendMessage', { chat_id: chatId, text: T[propia].sacada(prioridadDe(tarea).label[propia]) })
+      return
+    }
+    return
+  }
   // Los botones quedan usados: se sacan del mensaje para que no se toquen dos veces.
   if (c.message) await tg('editMessageReplyMarkup', { chat_id: chatId, message_id: c.message.message_id, reply_markup: { inline_keyboard: [] } })
 
@@ -318,6 +342,32 @@ export async function enlaceParaConectar(tenant: Tenant): Promise<{ url: string;
 }
 
 /** Mensaje proactivo a todos los chats ligados al negocio (resumen semanal, alertas). */
+/**
+ * Las propuestas de la semana, a cada chat del negocio en su idioma. Cada
+ * propuesta lleva dos botones: abrirla en el dashboard y decir que no va.
+ */
+export async function proponerPorTelegram(tenantId: string, armar: (idioma: 'es' | 'en') => { texto: string; propuestas: { id: string; url: string }[]; pie?: { text: string; url: string } }): Promise<number> {
+  const links = await store.listTelegramLinks(tenantId)
+  const tenant = await store.getTenantById(tenantId)
+  for (const l of links) {
+    const idioma = l.language === 'es' ? 'es' : 'en'
+    const m = armar(idioma)
+    const filas: Boton[][] = [
+      ...m.propuestas.map((p, i) => [
+        ...(/^https:\/\//.test(p.url) ? [{ text: T[idioma].verTarea(i + 1), url: p.url }] : []),
+        { text: T[idioma].noVa(i + 1), callback_data: `t:${p.id}:n` },
+      ]),
+      ...(m.pie && /^https:\/\//.test(m.pie.url) ? [[m.pie]] : []),
+    ]
+    const partes = partir(tenant ? `**${tenant.name}**\n${m.texto}` : m.texto)
+    for (let i = 0; i < partes.length; i++) {
+      const ultima = i === partes.length - 1
+      await tg('sendMessage', { chat_id: l.chatId, text: aHtml(partes[i]!), parse_mode: 'HTML', ...(ultima && filas.length ? { reply_markup: { inline_keyboard: filas } } : {}) })
+    }
+  }
+  return links.length
+}
+
 export async function avisarPorTelegram(tenantId: string, texto: string, botones?: { text: string; url: string }[]): Promise<number> {
   const links = await store.listTelegramLinks(tenantId)
   const tenant = await store.getTenantById(tenantId)

@@ -36,6 +36,7 @@ function tarea(x: Partial<AgentTask> = {}): AgentTask {
     summary: 'Nadie publica precios en pesos.',
     body: instrucciones(),
     acceptance: [{ type: 'url', url: 'https://clima.test/cuanto-cuesta' }],
+    priority: null,
     status: 'open',
     source: 'agent',
     note: null,

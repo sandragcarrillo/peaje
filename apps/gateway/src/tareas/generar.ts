@@ -11,13 +11,20 @@ import { completarTarea } from './verificar.js'
 import { revisarAcceso } from '../acceso/revisar.js'
 import { cuerpoConBorrador, MAX_BORRADORES, redactarBorrador, slugDePregunta, tieneBorrador } from '../ciclo/borrador.js'
 import { agendarSeguimientos } from '../ciclo/seguimiento.js'
+import { datosDeBusqueda } from '../google/consola.js'
+import { oportunidades, type Oportunidad } from '../google/oportunidades.js'
+import { prioridadBloqueo, prioridadBusqueda, prioridadFix, prioridadFrescura, prioridadPagina, prioridadRuta } from './prioridad.js'
 
 /**
- * Las tareas que el agente deja para el coding agent del dueño. Tres fuentes:
+ * Las tareas que el agente deja para el coding agent del dueño. Tres tipos:
  *
  *   fix      un chequeo del verificador que falla (proxy, robots, bots...)
- *   content  una página que los motores de respuesta citarían y el sitio no tiene
+ *   content  una página que los motores de respuesta citarían y el sitio no
+ *            tiene, o una que Google ya muestra y no rinde (Search Console)
  *   route    un path que los agentes pidieron y el origen no tiene (404)
+ *
+ * Cada una lleva su prioridad (tareas/prioridad.ts): con eso la cola se ordena
+ * y Peaje propone las de la semana.
  *
  * El agente nunca toca el sitio: cada tarea es un prompt completo, con los
  * criterios que Peaje revisa al marcarla hecha. `key` deduplica.
@@ -151,6 +158,62 @@ function promptFrescura(url: string, fecha: string | null): string {
   ].join('\n')
 }
 
+const lineasDeBusquedas = (o: Oportunidad) =>
+  o.consultas.length ? ['', 'Searches where Google shows this page (last 28 days):', '', ...o.consultas.map((c) => `- "${c.texto}": ${c.impresiones} impressions, average position ${c.posicion}`)] : []
+
+function promptTitulo(o: Oportunidad): string {
+  return [
+    `# Rewrite the title and description of ${o.ruta}`,
+    '',
+    `Google Search Console, last 28 days: ${o.url} was shown ${o.impresiones} times at average position ${o.posicion} and got ${o.clics} clicks. It is already on the first page, so the ranking is not the problem: people read the result and do not click.`,
+    ...lineasDeBusquedas(o),
+    '',
+    '## What to do',
+    '',
+    '1. Read the page and the searches above. Decide what the person searching wants to know.',
+    '2. Rewrite the `<title>` (under 60 characters) so it names that thing in the words people search with, and says what the page gives them. No clickbait and nothing the page does not deliver.',
+    '3. Rewrite the meta description (under 155 characters) as the direct answer or the concrete result, with one real number from the page if it has one.',
+    "4. Check the first paragraph answers the top search directly. Google often builds the snippet from it.",
+    '5. Keep the URL. Do not change the H1 unless it contradicts the new title.',
+    '6. Show the owner the old and new title and description before deploying.',
+    '',
+    '## When done',
+    '',
+    'Deploy and mark this task done. Peaje compares clicks for this page over the following weeks.',
+  ].join('\n')
+}
+
+function promptMejorar(o: Oportunidad): string {
+  return [
+    `# Improve ${o.ruta} so it ranks higher`,
+    '',
+    `Google Search Console, last 28 days: ${o.url} was shown ${o.impresiones} times at average position ${o.posicion}. Google already matches it to real searches, but it sits behind pages that answer them better. This page is ${Math.max(1, Math.round(o.parte * 100))}% of all the times Google shows this site.`,
+    ...lineasDeBusquedas(o),
+    '',
+    '## What to do',
+    '',
+    '1. Search the top queries above and read the three pages that rank first. Note what they cover that this page does not (a definition, steps, a comparison, numbers, an example).',
+    '2. Make the first paragraph answer the top search directly, in two or three sentences.',
+    '3. Add the missing sections, each under a heading phrased the way people search. Use only real facts from this business and its repo; never invent numbers.',
+    '4. Add what the other pages cannot have: this business\'s own data, an example from its product, a price, a limit.',
+    '5. If several searches above ask different things, give each its own section instead of one mixed answer.',
+    '6. Link to this page from two or three related pages of the site, with anchor text close to the search.',
+    '7. Update the visible "Updated <date>" line and the sitemap `<lastmod>`.',
+    '8. Keep the URL. Show the owner the diff before deploying.',
+    '',
+    '## When done',
+    '',
+    'Deploy and mark this task done. Peaje compares the position and clicks for this page over the following weeks.',
+  ].join('\n')
+}
+
+/** Cuántas tareas de Search Console pueden estar abiertas a la vez: más que eso es una lista que nadie hace. */
+const MAX_BUSQUEDA_ABIERTAS = 6
+/** Cuántas propone por corrida. */
+const MAX_BUSQUEDA_NUEVAS = 3
+
+export const claveDeBusqueda = (o: Pick<Oportunidad, 'tipo' | 'ruta'>) => `content:${o.tipo === 'titulo' ? 'snippet' : 'improve'}:${o.ruta}`
+
 /** Tareas de arreglo: una por chequeo que falla; las que ya pasan se cierran solas. */
 export async function sincronizarFixes(tenant: Tenant): Promise<{ creadas: number; cerradas: number }> {
   const v = await store.lastVerification(tenant.id)
@@ -168,6 +231,7 @@ export async function sincronizarFixes(tenant: Tenant): Promise<{ creadas: numbe
       summary: TEXTO_MOTIVO[c.motivo] ?? c.motivo,
       body: promptFix(tenant, c, soloAeo),
       acceptance: [{ type: 'check', id: c.id }],
+      priority: prioridadFix(c),
       source: 'monitor',
     }
     const r = await store.upsertTask(nueva)
@@ -223,6 +287,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         summary: b.por === 'robots' ? `robots.txt tells ${b.bot} not to read the site, so ${b.producto} cannot cite it.` : `${b.bot} gets blocked at the edge, so ${b.producto} cannot read or cite the site.`,
         body: promptBloqueo(dominio, b.bot, b.producto, b.por),
         acceptance: [{ type: 'check', id: 'bots' }],
+        priority: prioridadBloqueo(b),
         source: 'access',
       })
       r.created ? (creadas += 1) : (actualizadas += 1)
@@ -237,6 +302,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         summary: p.fecha ? `The page looks ${Math.round((p.dias ?? 0) / 30)} months old; AI assistants favor recent pages.` : 'No readable date on the page; AI assistants favor pages that show when they were updated.',
         body: promptFrescura(p.url, p.fecha),
         acceptance: [{ type: 'url', url: p.url }],
+        priority: prioridadFrescura({ ruta, fecha: p.fecha }),
         source: 'access',
       })
       r.created ? (creadas += 1) : (actualizadas += 1)
@@ -254,13 +320,45 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         summary: `Agents requested ${nf.path} and got a 404.`,
         body: promptRuta(tenant, dominio, nf.path, nf.visits),
         acceptance: [{ type: 'url', url: `https://${dominio}${nf.path}`, notStatus: 404 }],
+        priority: prioridadRuta({ path: nf.path, visitas: nf.visits }),
         source: 'visits',
       })
       r.created ? (creadas += 1) : (actualizadas += 1)
     }
 
+    // Search Console: páginas que Google ya muestra y no rinden. Sin conexión no hay filas y sigue.
+    const busqueda = await datosDeBusqueda(tenant).catch(() => null)
+    if (busqueda) {
+      const previas = new Map((await store.listTasks(tenant.id)).map((t) => [t.key, t]))
+      const abiertas = [...previas.values()].filter((t) => t.source === 'search-console' && t.status === 'open').length
+      let nuevas = 0
+      for (const o of oportunidades(busqueda.paginas, busqueda.pares)) {
+        const previa = previas.get(claveDeBusqueda(o))
+        // Tomada, hecha o descartada: no se vuelve a proponer.
+        if (previa && previa.status !== 'open') continue
+        if (!previa && (nuevas >= MAX_BUSQUEDA_NUEVAS || abiertas + nuevas >= MAX_BUSQUEDA_ABIERTAS)) continue
+        const p = prioridadBusqueda(o)
+        const r = await store.upsertTask({
+          tenantId: tenant.id,
+          key: claveDeBusqueda(o),
+          kind: 'content',
+          title: p.label.en,
+          summary: p.why.en,
+          body: o.tipo === 'titulo' ? promptTitulo(o) : promptMejorar(o),
+          acceptance: [{ type: 'url', url: o.url }],
+          priority: p,
+          source: 'search-console',
+        })
+        if (r.created) {
+          creadas += 1
+          nuevas += 1
+        } else actualizadas += 1
+      }
+    }
+
     if (opciones.conContenido) {
-      const sugerencias = await sugerirContenido(tenant, dominio)
+      // Las búsquedas donde Google ya muestra el sitio le dicen al modelo qué pregunta la gente de verdad.
+      const sugerencias = await sugerirContenido(tenant, dominio, { busquedas: busqueda?.consultas.map((f) => ({ texto: f.keys[0] ?? '', impresiones: f.impressions, posicion: Math.round(f.position * 10) / 10 })) })
       const previas = new Map((await store.listTasks(tenant.id)).map((t) => [t.key, t]))
       // Borrador completo para hasta MAX_BORRADORES preguntas nuevas (o abiertas
       // sin borrador), en paralelo; el resto queda con instrucciones.
@@ -300,6 +398,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
           summary: s.porQue,
           body,
           acceptance: [{ type: 'url', url: `https://${dominio}/${slug}` }],
+          priority: prioridadPagina(s, !!b || (!!previa && tieneBorrador(previa))),
           source: 'agent',
         })
         r.created ? (creadas += 1) : (actualizadas += 1)
