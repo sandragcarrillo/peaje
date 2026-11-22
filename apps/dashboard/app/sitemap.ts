@@ -7,7 +7,7 @@ import { articulos } from '@/lib/blog'
  * van. /developers lo sirve el gateway en este mismo dominio.
  */
 const BASE = 'https://usepeaje.com'
-// /mercado queda fuera mientras los cobros de agentes no se muestran: casi toda la página habla de pagos.
+// /mercado se retiró del sitio (redirige a /radar).
 const PAGINAS = ['/', '/radar', '/precios', '/blog', '/developers', '/terms', '/privacy', '/reembolsos']
 /** Último cambio real del contenido público (landing y legales nuevos). Subirla cuando cambie el copy. */
 const ACTUALIZADO = '2026-10-24'

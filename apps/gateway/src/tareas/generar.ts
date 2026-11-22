@@ -325,6 +325,12 @@ export async function reverificarHechas(tenant: Tenant): Promise<number> {
   return verificadas
 }
 
+/** Una página sobre cobrarle a los agentes: pagos, protocolos de pago, wallets o el comprador misterioso. */
+export function esDeCobros(titulo: string): boolean {
+  return /\bcobr(ar|o|os|as|e)\b|\bpag(o|os|ar|a)\b|\bx402\b|\bmpp\b|\busdc\b|\bpathusd\b|\bwallets?\b|\bbilletera|mystery shopper|comprador misterioso|\bcharg(e|es|ing)\b|\bpay(ment|ments|ing)?\b|\bpaid\b/i.test(titulo)
+}
+const NOTA_COBROS = 'Charging AI agents is not offered to the public right now, so Peaje put this page aside.'
+
 /** La nota de una propuesta que Peaje retiró sola al volver a leer el sitio. */
 const NOTA_OBSOLETA = 'Peaje read the site again and this page no longer fits what it offers today.'
 
@@ -447,6 +453,16 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
           creadas += 1
           nuevas += 1
         } else actualizadas += 1
+      }
+    }
+
+    // Con los cobros a agentes escondidos, las propuestas abiertas sobre cobrar no se le muestran al dueño:
+    // se retiran por regla, sin depender del modelo. Solo las que no empezó.
+    if (!env.cobrosVisibles) {
+      for (const t of await store.listTasks(tenant.id, { statuses: ['open'] })) {
+        if (t.kind !== 'content' || !esDeCobros(t.title)) continue
+        await store.updateTask(tenant.id, t.id, { status: 'dismissed', note: NOTA_COBROS })
+        retiradas += 1
       }
     }
 

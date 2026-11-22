@@ -1,7 +1,6 @@
 import { nav } from './sections/nav'
 import { landing } from './sections/landing'
 import { acceso } from './sections/acceso'
-import { mercado } from './sections/mercado'
 import { panel } from './sections/panel'
 import { dinero } from './sections/dinero'
 import { kit } from './sections/kit'
@@ -38,7 +37,7 @@ export const LOCALE_LABELS: Record<Locale, string> = { en: 'EN', es: 'ES' }
 /** Cada sección declara los dos idiomas; el tipo sale del español. */
 type Seccion<T> = { es: T; en: T }
 
-const SECCIONES = { nav, landing, acceso, mercado, panel, dinero, kit, visitas, miAgente, radar, radarCorreo, agenteReportes, contenido, legal, precios, pago, walletPropia, blog, oauth }
+const SECCIONES = { nav, landing, acceso, panel, dinero, kit, visitas, miAgente, radar, radarCorreo, agenteReportes, contenido, legal, precios, pago, walletPropia, blog, oauth }
 
 export type Dict = {
   [K in keyof typeof SECCIONES]: (typeof SECCIONES)[K] extends Seccion<infer T> ? T : never

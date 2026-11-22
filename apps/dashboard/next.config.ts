@@ -32,6 +32,12 @@ const nextConfig = {
         destination: "https://usepeaje.com/:path*",
         permanent: true,
       },
+      // /mercado se retiró del sitio: los links viejos van al Radar.
+      {
+        source: "/mercado",
+        destination: "/radar",
+        permanent: true,
+      },
       {
         source: "/blog/como-monto-un-servidor-mcp-para-mi-tienda-sin-saber-programar",
         destination: "/blog/como-creo-un-servidor-mcp-para-mi-tienda-sin-saber-programar",

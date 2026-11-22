@@ -23,7 +23,7 @@ Object.assign(process.env, {
 const { store } = await import('../src/store.js')
 const { oportunidades } = await import('../src/google/oportunidades.js')
 const { esDeCompra, lasDeLaSemana, ordenar, prioridadBloqueo, prioridadBusqueda, prioridadDe, prioridadMencion, prioridadPagina } = await import('../src/tareas/prioridad.js')
-const { claveDeMencion, generarTareas, MAX_MENCIONES } = await import('../src/tareas/generar.js')
+const { claveDeMencion, esDeCobros, generarTareas, MAX_MENCIONES } = await import('../src/tareas/generar.js')
 const { completarTarea, SIN_CRITERIOS } = await import('../src/tareas/verificar.js')
 const { preguntasSinCita } = await import('../src/citacion/competidores.js')
 
@@ -213,4 +213,10 @@ test('marcarla hecha: queda cerrada con la palabra del dueño, sin abrir ninguna
   // El título no es una pregunta: no entra a las preguntas que Peaje mide ni agenda seguimientos.
   assert.equal((await store.listFollowups(tenant.id, 50)).length, 0)
   assert.ok(!(await store.listCitationPrompts(tenant.id)).some((p) => p.text.startsWith('Get mentioned')))
+})
+
+// Con los cobros escondidos, las propuestas abiertas sobre cobrar a agentes se retiran por regla.
+test('reconoce las páginas sobre cobrar a agentes y no toca las demás', () => {
+  for (const t of ['¿Cuánto debo cobrar a un agente de IA por cada petición?', 'USDC en Arbitrum o pathUSD en Tempo: ¿con cuál cobro a los agentes?', '¿Qué es el mystery shopper de agentes y qué prueba en mi web?', 'x402 vs MPP: which payment protocol?']) assert.equal(esDeCobros(t), true, t)
+  for (const t of ['Peaje vs Semrush AI Visibility: ¿cuál necesita mi pyme?', '¿Debo tener mi web en inglés y español para que la IA me cite?', '¿Cuánto tarda ChatGPT en citarme después de arreglar mi web?', 'Improve /blog/how-do-i-show-up-in-google-ai-overviews', '¿Para qué sirve el openapi.json y qué agentes de IA lo leen?']) assert.equal(esDeCobros(t), false, t)
 })

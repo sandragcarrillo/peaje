@@ -9,6 +9,7 @@ import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { FormatosPanel } from '../citacion'
 import { CandadoReporte, MarcoReporte } from '../reporte-marco'
+import { armarHistorial, Evolucion, HistorialPreguntas, RONDAS_HISTORIAL } from './historia'
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
 
@@ -45,18 +46,33 @@ export default async function Citas({ params }: { params: Promise<{ slug: string
     )
   }
 
-  const [citacion, runs] = await Promise.all([leerCitacion(tenant.slug).catch(() => null), store.listCitationRuns(tenant.id, 1).catch((): CitationRun[] => [])])
+  const [citacion, todas] = await Promise.all([leerCitacion(tenant.slug).catch(() => null), store.listCitationRuns(tenant.id, RONDAS_HISTORIAL).catch((): CitationRun[] => [])])
   const s = citacion?.summary
+  // El detalle de abajo es solo de la última ronda; el historial usa las últimas seis.
+  const runs = todas.filter((r) => r.roundId === todas[0]?.roundId)
+  const historial = armarHistorial(todas, locale)
   const raiz = dominioVerificable(tenant.originUrl)
   const nombre = (id: string) => s?.engines.find((e) => e.id === id)?.name ?? id
   const preguntas = [...new Set(runs.map((r) => r.promptText))]
 
   return (
     <MarcoReporte slug={tenant.slug} d={d} titulo={t.ciTitulo} sub={t.ciSub}>
-      {!s?.measuredAt ? (
-        <p className="text-sm text-muted">{t.ciSinMedir}</p>
+      {historial.rondas.length === 0 ? (
+        <p className="text-sm text-muted">
+          {d.miAgente.histCero}{' '}
+          <Link href={`/t/${tenant.slug}/agente`} className="font-medium text-text underline decoration-border underline-offset-2 hover:decoration-text">
+            {d.miAgente.histCeroCta}
+          </Link>
+        </p>
+      ) : !s?.measuredAt ? (
+        <>
+          <Evolucion h={historial} d={d} />
+          <HistorialPreguntas h={historial} d={d} />
+        </>
       ) : (
         <>
+          <Evolucion h={historial} d={d} />
+
           <div className="border border-border p-4">
             <p className="text-lg font-semibold">
               {t.ciCuota(pct(s.share))} {s.previousShare !== null ? <span className="text-sm font-normal text-muted">{t.ciAntes(pct(s.previousShare))}</span> : null}
@@ -127,6 +143,8 @@ export default async function Citas({ params }: { params: Promise<{ slug: string
               ))}
             </div>
           </section>
+
+          <HistorialPreguntas h={historial} d={d} />
 
           {s.formats ? <FormatosPanel datos={s.formats} /> : null}
 

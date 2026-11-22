@@ -1,6 +1,5 @@
 export const nav = {
   es: {
-    mercado: 'Mercado',
     negocios: 'Mis sitios',
     agentes: 'Tu agente',
     wallet: 'Wallet',
@@ -24,7 +23,6 @@ export const nav = {
     evento: 'at Platanus Hack Bogotá 26',
   },
   en: {
-    mercado: 'Market',
     negocios: 'My sites',
     agentes: 'Your agent',
     wallet: 'Wallet',
