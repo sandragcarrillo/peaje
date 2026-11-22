@@ -15,7 +15,10 @@ import { novedadesChat } from './chat-novedades'
  * portada: la pregunta grande, el campo y sugerencias para empezar. Con
  * mensajes, la conversación ocupa la página y el campo queda abajo.
  */
-export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; inicial: AgentMessage[]; primerMensaje?: string | null }) {
+/** Una de las tareas que el agente propone para la semana, ya en el idioma del dueño. */
+export type Propuesta = { id: string; titulo: string; porQue: string; impacto: string; esfuerzo: string; url: string }
+
+export function Chat({ slug, inicial, primerMensaje = null, propuestas = [] }: { slug: string; inicial: AgentMessage[]; primerMensaje?: string | null; propuestas?: Propuesta[] }) {
   const { miAgente: t, agenteReportes: r } = useDict()
   const [mensajes, setMensajes] = useState(inicial)
   const [texto, setTexto] = useState('')
@@ -148,6 +151,34 @@ export function Chat({ slug, inicial, primerMensaje = null }: { slug: string; in
             ))}
           </div>
         </div>
+        {propuestas.length > 0 ? (
+          <div className="w-full max-w-2xl space-y-3">
+            <p className="text-sm font-medium">{t.chatPropuesta(propuestas.length)}</p>
+            <ol className="divide-y divide-border border border-border text-left text-sm">
+              {propuestas.map((p, i) => (
+                <li key={p.id} className="space-y-2 px-4 py-3">
+                  <p>
+                    <span className="font-medium">
+                      {i + 1}. {p.titulo}
+                    </span>
+                    <span className="ml-2 text-xs text-muted">
+                      · {t.impacto[p.impacto]} · {t.esfuerzo[p.esfuerzo]}
+                    </span>
+                  </p>
+                  <p className="text-muted">{p.porQue}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button disabled={pending} onClick={() => enviar(t.chatEmpezarPor(p.titulo))} className="btn btn-primario btn-chico">
+                      {t.chatEmpezar}
+                    </button>
+                    <a href={p.url} className="btn btn-secundario btn-chico">
+                      {t.chatVerTarea}
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
         <div className="flex w-full max-w-2xl flex-col items-center gap-3">
           <p className="font-mono text-[11px] tracking-[0.02em] text-faint">{t.chatEmpezarCon}</p>
           <div className="flex flex-wrap justify-center gap-2">

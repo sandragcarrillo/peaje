@@ -18,6 +18,8 @@ import { store } from '../store.js'
 import { urlCheckout, urlPlan } from './acceso.js'
 import { cryptoActivo, founderDisponible } from './founder.js'
 import { crearSesionPortal, webhookPaddle } from './paddle.js'
+import { idiomaDelDueno } from './bienvenida.js'
+import { arranquePro } from '../tareas/arranque.js'
 import { saldoCreditos, usoPublico } from '../tareas/creditos.js'
 
 /**
@@ -156,6 +158,12 @@ billingRouter.get('/_billing/:slug/:plan', async (c) => {
   if (!header) return c.json({ error: 'Payment settled without a receipt. Keep your transaction and contact support.' }, 502)
   const receipt = Receipt.deserialize(header)
   const r = await activar(tenant, plan, precio, 'x402', receipt.reference)
+  // Pro empieza (también pagando con cripto): el mismo arranque sin preguntas que con Paddle.
+  if (!r.repetido) {
+    void idiomaDelDueno(r.tenant)
+      .then((idioma) => arranquePro(r.tenant, idioma))
+      .catch((e) => console.warn('[arranque] pro', tenant.slug, e instanceof Error ? e.message : e))
+  }
   return result.withReceipt(c.json(confirmacion(r)))
 })
 

@@ -122,6 +122,10 @@ export const miAgente = {
     chatHeroTitulo: '¿En qué trabajamos hoy?',
     chatHeroSub: 'Tu agente responde con los datos de tu sitio: a quién cita la IA en tu lugar, qué publicar y cómo vas.',
     chatEmpezarCon: 'O empieza con una de estas',
+    chatPropuesta: (n: number) => (n === 1 ? 'Esta semana probemos con esto' : `Esta semana probemos con estas ${n}`),
+    chatEmpezar: 'Empecemos por esta',
+    chatEmpezarPor: (titulo: string) => `Empecemos por esta tarea: ${titulo}. Explícame qué hay que hacer y cómo la hago.`,
+    chatVerTarea: 'Ver la tarea',
     chatAtajos: [
       { label: 'Competidores', texto: '¿A quién cita la IA en vez de mí y por qué?' },
       { label: 'Oportunidades', texto: 'Búscame oportunidades: páginas para crear, arreglos en mi sitio y dónde conseguir menciones' },
@@ -545,6 +549,10 @@ export const miAgente = {
     chatHeroTitulo: 'What are we working on today?',
     chatHeroSub: 'Your agent answers with your site\'s data: who AI cites instead of you, what to publish and how you are doing.',
     chatEmpezarCon: 'Or start with one of these',
+    chatPropuesta: (n: number) => (n === 1 ? 'This week, let us try this' : `This week, let us try these ${n}`),
+    chatEmpezar: 'Start with this one',
+    chatEmpezarPor: (titulo: string) => `Let us start with this task: ${titulo}. Explain what needs to be done and how I do it.`,
+    chatVerTarea: 'See the task',
     chatAtajos: [
       { label: 'Competitors', texto: 'Who does AI cite instead of me, and why?' },
       { label: 'Opportunities', texto: 'Find me opportunities: pages to create, fixes on my site and where to get mentioned' },

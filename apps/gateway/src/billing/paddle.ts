@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { PRECIOS_USD, esPlanPago, extenderPlan, type PlanPago, type Tenant } from '@peaje/db'
 import type { Context } from 'hono'
 import { store } from '../store.js'
-import { programarBienvenida } from './bienvenida.js'
+import { idiomaDelDueno, programarBienvenida } from './bienvenida.js'
 import { founderDisponible } from './founder.js'
 
 /**
@@ -185,6 +185,12 @@ async function transaccionCompletada(ev: EventoPaddle, precios: PreciosPaddle): 
     // Bienvenida con el primer cobro de la suscripción, nunca con una renovación.
     if (d.origin !== 'subscription_recurring' && (await cobrosDeSuscripcion(tenant.id, d.subscription_id)).length === 1) {
       programarBienvenida({ tenant, plan, custom: custom as Record<string, unknown> | null })
+      // Pro empieza: Peaje elige las preguntas, arma el plan y busca qué hacer, sin esperar al dueño.
+      const conPlan = { ...tenant, plan, planUntil: hasta }
+      // Carga diferida: el arranque trae el monitor y los motores, que este módulo no necesita para cobrar.
+      void Promise.all([import('../tareas/arranque.js'), idiomaDelDueno(conPlan, custom as Record<string, unknown> | null)])
+        .then(([m, idioma]) => m.arranquePro(conPlan, idioma))
+        .catch((e) => console.warn('[arranque] pro', tenant.slug, e instanceof Error ? e.message : e))
     }
   }
   await store.setTenantPaddle(tenant.id, {

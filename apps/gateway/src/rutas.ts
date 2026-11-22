@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { env } from './env.js'
 import { avisarIndexNow } from './indexnow.js'
 import { asegurarDescripcion } from './describir.js'
+import { arranqueGratis } from './tareas/arranque.js'
 import { store } from './store.js'
 
 /**
@@ -65,6 +66,9 @@ rutasRouter.post('/:slug/describe', async (c) => {
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
   const description = await asegurarDescripcion(tenant)
+  // Negocio recién registrado: la primera revisión y las primeras tareas salen ya, sin esperar
+  // la corrida diaria. En segundo plano; no hace nada si el negocio ya tiene una revisión.
+  void arranqueGratis(tenant).catch((e) => console.warn('[arranque] registro', tenant.slug, e instanceof Error ? e.message : e))
   return c.json({ description })
 })
 
