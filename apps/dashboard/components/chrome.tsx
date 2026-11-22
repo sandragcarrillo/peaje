@@ -26,10 +26,10 @@ export function PageHeader({
   sub?: React.ReactNode
 }) {
   return (
+    // Sin etiqueta encima del título: el título lleva su propio peso. `eyebrow` y `dot` quedan por compatibilidad y no se pintan.
     <header>
-      {eyebrow ? <Eyebrow dot={dot}>{eyebrow}</Eyebrow> : null}
-      <h1 className="mt-2 text-2xl font-semibold">{titulo}</h1>
-      {sub ? <p className="mt-2 max-w-2xl text-sm text-muted">{sub}</p> : null}
+      <h1 className="text-balance text-3xl font-semibold tracking-tight">{titulo}</h1>
+      {sub ? <p className="mt-2 max-w-[65ch] text-sm text-muted">{sub}</p> : null}
     </header>
   )
 }

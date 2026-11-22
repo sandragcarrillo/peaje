@@ -74,20 +74,15 @@ export function Sidebar({
         <Link
           key={item.href}
           href={href}
-          className={`flex items-center justify-between py-2 pr-3 transition-colors ${item.sub ? 'pl-7' : 'pl-3'} ${
-            activo
-              ? 'border-l-2 border-accent bg-panel-2 font-bold text-text'
-              : 'border-l-2 border-transparent text-muted hover:bg-panel-2 hover:text-text'
+          aria-current={activo ? 'page' : undefined}
+          // El activo se marca con el fondo entero y el peso de la letra, sin barra al costado.
+          className={`flex items-center justify-between rounded-md py-2 pr-3 transition-colors ${item.sub ? 'pl-7' : 'pl-3'} ${
+            activo ? 'bg-panel-2 font-semibold text-text' : 'text-muted hover:bg-panel-2 hover:text-text'
           }`}
         >
-          <span className="flex items-center gap-2.5">
-            {activo ? <span aria-hidden className="h-1.5 w-1.5 bg-accent" /> : null}
-            <span>{item.label}</span>
-          </span>
+          <span>{item.label}</span>
           {item.valor ? (
-            <span className={`text-[10px] ${activo || item.acento ? 'font-bold text-accent' : 'text-muted/70'}`}>
-              {item.valor}
-            </span>
+            <span className={`text-xs tabular-nums ${activo || item.acento ? 'font-semibold text-accent' : 'text-faint'}`}>{item.valor}</span>
           ) : null}
         </Link>
       )
@@ -97,47 +92,42 @@ export function Sidebar({
     <aside className="scroll-thin sticky top-16 hidden h-[calc(100vh-5rem)] w-64 shrink-0 flex-col justify-between gap-6 self-start overflow-y-auto border-r border-border bg-panel p-4 md:flex">
       <div className="space-y-6">
         {/* Identidad del tenant */}
-        <div className="border border-border bg-bg p-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center bg-negro font-mono text-[10px] font-bold text-white">
-              {iniciales}
-            </div>
-            <div className="overflow-hidden">
-              <h2 className="truncate font-mono text-xs leading-none font-bold">{name}</h2>
-              <p className="mt-1 font-mono text-[10px] text-muted">ID: {slug}</p>
-            </div>
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-text text-xs font-semibold text-bg">{iniciales}</div>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold leading-tight">{name}</h2>
+            <Link href="/negocios" className="text-xs text-muted underline decoration-transparent underline-offset-2 transition-colors hover:text-text hover:decoration-current">
+              {d.panel.sidebarCambiar}
+            </Link>
           </div>
-          <Link href="/negocios" className="mt-2 block font-mono text-[10px] text-muted hover:text-text">
-            {d.panel.sidebarCambiar} →
-          </Link>
         </div>
 
-        <nav className="space-y-1 font-mono text-xs">{lista(principal)}</nav>
+        <nav className="space-y-0.5 text-sm">{lista(principal)}</nav>
 
         {/* El chat va aparte, como el punto de entrada principal: tiene su propia página. */}
         <Link
           href={`${base}/chat`}
           aria-current={pathname === `${base}/chat` ? 'page' : undefined}
-          className={`flex items-center gap-3 rounded-lg border p-2.5 text-sm transition-colors ${
-            pathname === `${base}/chat` ? 'border-accent bg-panel-2 font-bold' : 'border-border bg-bg hover:border-accent'
+          className={`flex items-center gap-3 rounded-lg border p-2.5 text-sm font-medium transition-colors ${
+            pathname === `${base}/chat` ? 'border-text bg-panel-2' : 'border-border bg-bg hover:border-text'
           }`}
         >
-          <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-panel-2 font-mono text-base leading-none">
-            +
-          </span>
+          <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent">
+            <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+          </svg>
           {d.miAgente.chatTitulo}
         </Link>
 
         {COBROS_VISIBLES ? (
-          <div className="space-y-1 font-mono text-xs">
-            <p className="border-t border-border px-3 pt-4 pb-1 text-[10px] text-muted">{d.panel.sidebarCobros}</p>
+          <div className="space-y-0.5 text-sm">
+            <p className="border-t border-border px-3 pt-4 pb-1 text-xs font-medium text-faint">{d.panel.sidebarCobros}</p>
             {lista(cobros)}
           </div>
         ) : null}
       </div>
 
       <div className="space-y-3 border-t border-border pt-4">
-        <Link href={pro ? `${base}/kit` : `${base}/agente#plan`} className="btn btn-primario btn-chico btn-ancho">
+        <Link href={pro ? `${base}/kit` : `${base}/agente#plan`} className="btn btn-primario btn-chico btn-suave btn-ancho">
           {pro ? d.panel.sidebarVerMejoras : d.panel.sidebarActivarAgente}
         </Link>
 
@@ -145,9 +135,9 @@ export function Sidebar({
           href={portalUrl}
           target="_blank"
           rel="noreferrer"
-          className="block px-3 py-1 font-mono text-[10px] text-muted transition-colors hover:text-text"
+          className="block px-3 py-1 text-xs text-muted underline decoration-transparent underline-offset-2 transition-colors hover:text-text hover:decoration-current"
         >
-          {d.panel.navPortal} ↗
+          {d.panel.navPortal}
         </a>
       </div>
     </aside>
