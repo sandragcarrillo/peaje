@@ -108,7 +108,8 @@ export async function correrSemanal() {
   const errores: { slug: string; error: string }[] = []
   for (const t of tenants) {
     try {
-      const actual = (await store.lastVerification(t.id)) ?? (await correrTenant(t))?.verificacion
+      // Escaneo nuevo cada semana: el reporte y el historial de `verificaciones` llevan el puntaje de hoy, no el del último escaneo a mano.
+      const actual = (await correrTenant(t, { escanear: true }).catch(() => null))?.verificacion ?? (await store.lastVerification(t.id))
       if (!actual) continue
       // Las sugerencias de contenido y las de Search Console entran como tareas
       // (una sola llamada a Opus); el mensaje abre con las de más prioridad.

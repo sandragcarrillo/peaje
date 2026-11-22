@@ -56,6 +56,29 @@ export async function scoreOra(domain: string): Promise<number | null> {
   return scores.sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))[0]?.score ?? null
 }
 
+/**
+ * Le pide a Ora un escaneo nuevo del sitio y devuelve su puntaje. `scoreOra`
+ * solo lee lo que Ora ya tiene guardado: sin esto, el puntaje de un negocio
+ * quedaba congelado en el último escaneo que alguien pidió a mano (el botón
+ * del Kit o el Radar). Tarda unos 30 s. Nunca tira: si Ora falla o el sitio no
+ * abre devuelve null y el llamador cae al puntaje guardado.
+ */
+export async function escanearOra(domain: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${ORA}/scan`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: domain }),
+      signal: AbortSignal.timeout(90_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { score?: number }
+    return typeof data.score === 'number' ? Math.round(data.score) : null
+  } catch {
+    return null
+  }
+}
+
 async function hashDe(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { 'user-agent': 'peaje-monitor/1.0' } })
@@ -68,7 +91,8 @@ async function hashDe(url: string): Promise<string | null> {
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-export async function correrTenant(tenant: Tenant): Promise<Corrida | null> {
+/** Con `escanear`, el puntaje sale de un escaneo nuevo de Ora y no del que tenía guardado (la corrida semanal). */
+export async function correrTenant(tenant: Tenant, opciones: { escanear?: boolean } = {}): Promise<Corrida | null> {
   const dominio = dominioVerificable(tenant.originUrl)
   if (!dominio) return null
 
@@ -88,7 +112,7 @@ export async function correrTenant(tenant: Tenant): Promise<Corrida | null> {
   }
 
   const [score, robotsHash, llmsHash] = await Promise.all([
-    scoreOra(dominio),
+    opciones.escanear ? escanearOra(dominio).then((s) => s ?? scoreOra(dominio)) : scoreOra(dominio),
     hashDe(`https://${dominio}/robots.txt`),
     hashDe(`https://${dominio}/llms.txt`),
   ])
