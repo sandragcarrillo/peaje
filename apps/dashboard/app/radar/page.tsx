@@ -13,6 +13,7 @@ import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
 import { CitasConEspera, Formulario, MandarInforme, Medir } from './partes'
 import { Cuenta, Fase, Revelado } from './revelado'
 import { Tope } from '@/components/tope'
+import { CtaInicio } from '../components/cta-inicio'
 import { Seccion, SeccionPlegable } from './seccion'
 import { textoLlanoDe, textoOk } from './textos'
 import { TuPanel } from './tu-panel'
@@ -428,6 +429,11 @@ function Resultado({
           </Link>
         </p>
       </Seccion>
+
+      {/* El cierre de las páginas públicas (cta-inicio.tsx), sin "Empezar gratis": acá llevaría al mismo Radar, y la cuenta ya la piden 05 y 06. */}
+      <div className="pt-6 pb-2">
+        <CtaInicio sinEmpezar locale={locale} />
+      </div>
     </div>
   )
 }

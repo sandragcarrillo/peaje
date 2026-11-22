@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ENLACE } from '../components/legal'
-import { getDict } from '@/lib/i18n'
+import { getDict, getLocale } from '@/lib/i18n'
 import { COBROS_VISIBLES } from '@/lib/config'
-import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD } from '@peaje/db'
+import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD, REGALO } from '@peaje/db'
 
 /**
  * Precios. Montos, cupos, prueba, límites y créditos salen de packages/db/src/planes.ts;
@@ -71,8 +71,24 @@ function Plan({
 }
 
 export default async function Precios() {
-  const d = await getDict()
+  const [d, locale] = await Promise.all([getDict(), getLocale()])
   const P = d.precios
+  const faq = P.faq({ pct: COMISION_PCT, dias: DIAS_REEMBOLSO })
+  // FAQPage con las mismas preguntas que se ven en la página.
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    inLanguage: locale,
+    url: 'https://usepeaje.com/precios',
+    mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.p, acceptedAnswer: { '@type': 'Answer', text: f.r } })),
+  }
+  const tabla = P.tabla({
+    ...PAQUETE_MENSUAL,
+    preguntas: LIMITES.pro.preguntas,
+    creditos: LIMITES.pro.creditos,
+    regaloInformes: REGALO.informes,
+    regaloRespuestas: REGALO.respuestas,
+  })
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -85,7 +101,7 @@ export default async function Precios() {
           nombre={P.gratisNombre}
           precio="US$0"
           texto={P.gratisTexto}
-          incluye={P.gratisIncluye}
+          incluye={[...P.gratisIncluye, P.gratisPaquete(REGALO.informes, REGALO.respuestas)]}
           nota={COBROS_VISIBLES ? P.kitComision(COMISION_PCT) : P.kitNota}
           cta={
             <Link href="/radar" className="btn btn-secundario btn-ancho whitespace-normal text-center">
@@ -109,6 +125,42 @@ export default async function Precios() {
           destacado
         />
       </div>
+
+      <section className="mt-12 border-t border-border pt-6">
+        <h2 className="text-xl font-semibold">{P.tablaTitulo}</h2>
+        <table className="mt-4 w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col />
+            <col className="w-[27%] sm:w-36" />
+            <col className="w-[27%] sm:w-36" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th scope="col" className="py-2.5 pr-3 font-medium text-muted">{P.tablaQue}</th>
+              <th scope="col" className="px-2 py-2.5 font-semibold">{P.gratisNombre}</th>
+              <th scope="col" className="px-2 py-2.5 font-semibold text-accent">{P.proNombre}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {tabla.map((f) => (
+              <tr key={f.que}>
+                <th scope="row" className="py-2.5 pr-3 text-left font-normal break-words">{f.que}</th>
+                <td className="px-2 py-2.5 tabular-nums break-words text-muted">{f.gratis}</td>
+                <td className="px-2 py-2.5 tabular-nums break-words">{f.pro}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-border">
+              <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted">{P.tablaPrecio}</th>
+              <td className="px-2 py-2.5 font-semibold tabular-nums">US$0</td>
+              <td className="px-2 py-2.5 font-semibold tabular-nums">
+                US${PRECIOS_USD.founder} <span className="font-normal text-muted">{P.alMes}</span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
 
       <section className="mt-12 border-t border-border pt-6">
         <h2 className="text-xl font-semibold">{P.creditosTitulo}</h2>
@@ -149,13 +201,18 @@ export default async function Precios() {
       <section className="mt-12 border-t border-border pt-6">
         <h2 className="text-xl font-semibold">{P.faqTitulo}</h2>
         <dl className="mt-2 divide-y divide-border">
-          {P.faq({ pct: COMISION_PCT, dias: DIAS_REEMBOLSO }).map((f) => (
+          {faq.map((f) => (
             <div key={f.p} className="py-4">
               <dt className="text-base font-semibold">{f.p}</dt>
               <dd className="mt-1.5 max-w-2xl text-sm text-muted">{f.r}</dd>
             </div>
           ))}
         </dl>
+        <p className="mt-2 text-sm">
+          <Link href={locale === 'es' ? '/preguntas' : '/faq'} className={ENLACE}>
+            {P.faqMas}
+          </Link>
+        </p>
       </section>
 
       <div className="mt-12 flex flex-wrap gap-3">
@@ -166,6 +223,12 @@ export default async function Precios() {
           {P.ctaRegistrar}
         </Link>
       </div>
+
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD de las preguntas de pago, sin datos de usuarios
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, '\\u003c') }}
+      />
     </div>
   )
 }

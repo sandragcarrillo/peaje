@@ -47,7 +47,7 @@ Lo que sí puedes hacer sin adivinar es tener una página por cada pregunta impo
 
 ## ¿Qué hace Peaje con Perplexity y qué no?
 
-Peaje no mide si Perplexity te cita. El plan Pro mide 20 preguntas de tus clientes cada semana solo en ChatGPT y Claude, y el [radar gratis](https://usepeaje.com/radar) les hace 3 preguntas a ChatGPT y a Claude, así que para Perplexity tienes que hacer tus propias búsquedas y revisar sus fuentes, como explicamos en [cómo sé si ChatGPT, Claude o Perplexity citan mi negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
+Peaje no mide si Perplexity te cita. El plan Pro mide 20 preguntas de tus clientes cada semana solo en ChatGPT y Claude, y el [radar gratis](https://usepeaje.com/radar) les hace 3 preguntas a ChatGPT y a Claude, así que para Perplexity tienes que hacer tus propias búsquedas y revisar sus fuentes, como explicamos en [cómo saber si ChatGPT recomienda tu negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
 
 Lo que Peaje sí hace es cuidar que PerplexityBot pueda entrar:
 

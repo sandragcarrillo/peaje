@@ -1,6 +1,7 @@
 import 'server-only'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fechaCorta, fechaValida, frontmatter, sinH1 } from './markdown'
 
 /**
  * Los artículos del blog: un .md por artículo en content/blog/. El nombre del
@@ -48,32 +49,14 @@ export type Articulo = {
   cuerpo: string
 }
 
-function frontmatter(texto: string): { datos: Record<string, string>; resto: string } {
-  const m = texto.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
-  if (!m) return { datos: {}, resto: texto }
-  const datos: Record<string, string> = {}
-  for (const linea of m[1]!.split(/\r?\n/)) {
-    const i = linea.indexOf(':')
-    if (i <= 0) continue
-    datos[linea.slice(0, i).trim().toLowerCase()] = linea
-      .slice(i + 1)
-      .trim()
-      .replace(/^["']|["']$/g, '')
-  }
-  return { datos, resto: texto.slice(m[0].length) }
-}
-
-const fechaValida = (x: string | undefined) => (x && /^\d{4}-\d{2}-\d{2}/.test(x) ? x.slice(0, 10) : null)
-
 /** Un hash chico y estable del slug, para que cada artículo tenga siempre la misma portada. */
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
 
 function leer(nombre: string, texto: string): Articulo | null {
   const { datos, resto } = frontmatter(texto)
   // Sin H1 en el cuerpo: el título se pinta aparte. Si no hay title, el H1 lo es.
-  const h1 = resto.match(/^\s*#\s+(.+)\s*$/m)
-  const cuerpo = resto.replace(/^\s*#\s+.+\r?\n+/, '').trim()
-  const titulo = datos.title?.trim() || h1?.[1]?.trim()
+  const { h1, cuerpo } = sinH1(resto)
+  const titulo = datos.title?.trim() || h1
   const fecha = fechaValida(datos.date)
   if (!titulo || !fecha || !cuerpo) return null
   const slug = (datos.slug || nombre.replace(/\.md$/, '')).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
@@ -119,9 +102,4 @@ export async function articulo(slug: string): Promise<Articulo | null> {
   return (await articulos()).find((a) => a.slug === slug) ?? null
 }
 
-/** "26 oct 2026" / "Oct 26, 2026". */
-export function fechaCorta(fecha: string, idioma: 'es' | 'en'): string {
-  return new Intl.DateTimeFormat(idioma === 'es' ? 'es' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(`${fecha}T12:00:00Z`),
-  )
-}
+export { fechaCorta }

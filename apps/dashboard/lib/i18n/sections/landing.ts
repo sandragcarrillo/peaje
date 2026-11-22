@@ -1,102 +1,134 @@
 import { asistentesMedidos } from '@peaje/shared/asistentes'
-import { COBROS_VISIBLES } from '@/lib/config'
 
 /**
- * Landing pública (copy final de San, 24 oct 2026). Solo Telegram como canal.
- * Protocolos y redes viven en el portal para desarrolladores, no acá.
- * Precios y cupos llegan como argumentos desde @peaje/db (planes.ts).
+ * Home pública (propuesta del 22 nov 2026, reports/Landing Peaje propuesta.md).
+ * Una sola acción principal en toda la página: "Empezar gratis" al Radar.
+ * Montos, cupos y paquetes llegan como argumentos desde @peaje/db; las
+ * preguntas salen de faq.ts (la misma fuente que /preguntas y /faq).
+ *
+ * Las piezas del producto que se ven en el home son un ejemplo rotulado como
+ * ejemplo: un negocio de muestra (tusitio.com), sin clientes reales y sin
+ * dominios ajenos inventados. A quién cita la IA se dice con palabras ("un
+ * estudio de la competencia"), no con sitios que existen.
  */
 
-/** Lo que trae Pro cada mes: PAQUETE_MENSUAL, LIMITES.pro.preguntas y CREDITOS_MENSUALES de planes.ts. */
-type Paquete = { paginas: number; preguntas: number; informes: number; respuestas: number; creditos: number }
+/** Lo que trae Pro cada mes: PAQUETE_MENSUAL y LIMITES.pro de planes.ts. */
+type Paquete = { paginas: number; preguntas: number; informes: number; respuestas: number }
+/** El paquete gratis (REGALO de regalo.ts) y los precios (PRECIOS_USD, CUPOS_FOUNDER). */
+type Precio = { founder: number; pro: number; cupos: number; regaloInformes: number; regaloRespuestas: number }
+
+/** Conversación de ejemplo del componente viejo del hero (app/components/chat-ejemplo.tsx, ya fuera del home). */
 export type MensajeChat = {
   de: 'dueno' | 'agente'
   texto: string
-  /** Tarjeta con enlace bajo la respuesta (como las de open_report). */
   tarjeta?: { titulo: string; accion: string }
-  /** Etiqueta chica: estado de una tarea o un reporte programado. */
   chip?: string
 }
 
 export const landing = {
   es: {
-    // CTAs de todo el sitio público (nav, hero y cierre).
+    // CTAs del sitio público.
     ctaAgente: 'Empezar con mi agente',
     ctaRadar: 'Revisar mi sitio gratis',
     ctaDashboard: 'Ir a mi panel',
-    campoDominio: 'Tu sitio',
-    placeholderDominio: 'tusitio.com',
+    // Bloque de CTAs (app/components/cta-inicio.tsx): home, Radar y otras páginas públicas.
+    cta: {
+      empezar: 'Empezar gratis',
+      demo: 'Agenda una demo',
+      configurar: 'Instala Peaje con',
+      configurarDominio: 'tu IA',
+      configurarPista: 'Copia una instrucción para pegarle a tu asistente de IA',
+      copiado: 'Copiado. Pégalo en ChatGPT, Claude o Cursor',
+    },
 
-    // Hero
-    h1: 'Los agentes de IA ya están recomendando a tu competencia. Arréglalo con Peaje.',
-    // Segunda opción de San, lista para cambiar:
-    // h1: 'Que la IA te encuentre, te entienda y te elija.',
-    sub: 'ChatGPT, Claude y otros agentes ya visitan tu sitio, pero no entienden bien qué vendes. Tu agente de Peaje te dice qué falta y lo arregla contigo en Telegram.',
+    // Hero. El h1 se parte para pintar el final en el acento.
+    h1Inicio: 'Tus clientes ya le preguntan a ChatGPT.',
+    h1Final: 'Haz que te recomiende a ti.',
+    sub: `Peaje es tu agente de visibilidad en IA. Trabaja cada semana para que ${asistentesMedidos('es')} te nombren: escribe las páginas que te faltan, deja tu sitio listo para que la IA lo lea y te ayuda a entrar en las listas que consulta. Tú apruebas, Peaje hace el resto.`,
 
-    // Conversación de ejemplo en el hero: solo ejemplo.com / example.com, números ilustrativos.
-    chatEjemplo: 'Ejemplo',
-    chatNegocio: 'ejemplo.com',
-    chatBot: 'Peaje',
-    chatSubtitulo: 'tu agente',
-    chatTu: 'Tú',
-    chat: [
-      { de: 'dueno', texto: '¿Qué me falta para que ChatGPT me recomiende?' },
-      {
-        de: 'agente',
-        texto: 'ChatGPT no sabe qué vendes ni a qué precio. Empezaría por ahí.',
-        tarjeta: { titulo: 'Tus 3 arreglos más importantes', accion: 'Ver' },
-      },
-      { de: 'dueno', texto: 'Hazlo con el primero.' },
-      {
-        de: 'agente',
-        texto: 'Listo, aquí tienes la página y todo lo que necesitas para implementarla. La reviso cuando esté en vivo.',
-        chip: 'Tarea en curso',
-      },
-      {
-        de: 'agente',
-        texto: 'Esta semana te visitaron 38 agentes: ChatGPT 21, Perplexity 9, Claude 8.',
-        chip: 'Cada lunes, 8:00',
-      },
-    ] as MensajeChat[],
-
-    // Lo que necesitan los agentes
-    necesitanTitulo: 'Lo que necesitan los agentes',
-    necesitan: [
-      { titulo: 'Que te encuentren', texto: 'Que ChatGPT y Claude puedan leer tu sitio cuando alguien pregunta por lo que vendes.' },
-      { titulo: 'Que te entiendan', texto: 'Que sepan qué vendes y a qué precio.' },
-      { titulo: 'Que te recomienden', texto: 'Que te nombren a ti cuando un cliente les pide una recomendación.' },
+    // Muestra del producto (hero y ciclo). Todo rotulado "Ejemplo".
+    ejemplo: 'Ejemplo',
+    ejemploNota: 'Así se ve una respuesta del Radar, con un negocio y resultados de ejemplo.',
+    muestraDominio: 'tusitio.com',
+    muestraPreguntas: [
+      '¿Qué estudio contable me recomiendas para una pyme en Bogotá?',
+      '¿Cuánto cobra un contador por llevar la contabilidad de una pyme?',
+      '¿Qué contador sabe de facturación electrónica en Colombia?',
     ],
-    necesitanCierre:
-      'Otras herramientas solo miden si la IA te recomienda. Peaje además te dice qué arreglar y lo arregla contigo.',
+    /** A quién citó cada asistente en la primera pregunta, con palabras (no son sitios reales). */
+    muestraCitoChatgpt: 'Un estudio de la competencia, un directorio de contadores',
+    muestraCitoClaude: 'Un estudio de la competencia',
+    muestraEnTuLugar: [
+      { quien: 'Un estudio de la competencia', veces: 4 },
+      { quien: 'Un directorio de contadores', veces: 3 },
+      { quien: 'Una revista de negocios', veces: 1 },
+    ],
+    muestraPreguntando: 'Preguntando',
+    muestraAgente: 'Tu agente ya tiene listos 3 arreglos para cambiarlo.',
 
-    // Cómo funciona
-    comoTitulo: 'Cómo funciona',
-    pasos: [
-      {
-        titulo: 'Mira dónde estás hoy',
-        texto:
-          'Pega la URL de tu sitio y en menos de un minuto ves qué te falta para que los agentes de IA te encuentren. Gratis, solo con tu email.',
-      },
-      {
-        titulo: 'Deja tu sitio listo para los agentes',
-        texto: 'Instala nuestro kit con un comando y tu web queda lista para que los agentes de IA la lean y la entiendan.',
-      },
-      {
-        titulo: 'Haz que te recomienden',
-        texto:
-          `Tu agente de Peaje, en Telegram, te pasa los arreglos listos para que ${asistentesMedidos('es')} te recomienden, y te cuenta cada semana cuánto vas mejorando.`,
-      },
+    // Qué hace por ti (franja fina).
+    mide: [
+      'Escribe las páginas que la IA cita: comparativas, precios y guías de lo que vendes',
+      'Deja tu sitio listo para que la IA lo lea y le avisa a Bing de cada cambio',
+      `Pregunta cada semana en ${asistentesMedidos('es')} lo que buscan tus clientes, y vuelve a medir cada arreglo`,
     ],
 
-    // Precio
-    precioTitulo: 'Precios',
-    // Tarjeta de Pro de la landing (referencia de San: boringmarketing.com). Montos y cupos llegan de @peaje/db.
-    precioGratis: 'El Radar y el kit son gratis, sin tarjeta. Solo pagas el agente, si lo quieres.',
-    precioUnidad: '/mes',
-    precioCreditos: (n: number) => `${n} créditos/mes`,
-    precioValor: `Un agente que trabaja tu sitio todo el mes para que ${asistentesMedidos('es')} te recomienden.`,
-    precioTodoTitulo: 'Un solo agente, todo incluido',
-    precioHabilidades: ['Diagnóstico', 'Contenido', 'Citas en IA', 'Arreglos', 'Monitor diario', 'Reportes'],
+    // El ciclo.
+    cicloTitulo: 'Tu agente mide, hace el arreglo y vuelve a medir.',
+    cicloSub: 'Cada semana repite lo mismo con tus preguntas. El trabajo lo hace Peaje, y tú solo apruebas qué se publica.',
+    ciclo: [
+      {
+        titulo: 'Mide a quién citan.',
+        texto: `Les hace tus preguntas a ${asistentesMedidos('es')} y anota, asistente por asistente, en cuántas respuestas sales.`,
+      },
+      {
+        titulo: 'Hace el arreglo.',
+        texto:
+          'Escribe la página que te falta, redacta el pedido para que te incluyan en una lista y prepara el cambio en el código de tu sitio, con el porqué de cada uno.',
+      },
+      {
+        titulo: 'Tú apruebas y se publica.',
+        texto:
+          'Revisas el arreglo y das el sí. Si usas Claude Code o Cursor, lo aplican desde Peaje en un paso; si no, se lo pasas a quien maneja tu web. Cuando está publicado, Peaje lo revisa en tu sitio.',
+      },
+      {
+        titulo: 'Vuelve a medir.',
+        texto: 'A las 2 y a las 6 semanas pregunta otra vez lo mismo y te muestra si cambió algo.',
+      },
+    ],
+    cicloPausa: 'Pausar',
+    // Pantallas del ciclo (ejemplo).
+    pantallaPreguntas: 'Preguntas de esta semana',
+    pantallaTareas: [
+      { titulo: 'Publicar la página "¿Qué estudio contable me recomiendas para una pyme en Bogotá?"', estado: 'verified' as const, nota: 'Peaje la encontró en tusitio.com/estudio-contable-pymes' },
+      { titulo: 'Pedir que te incluyan en un directorio de contadores', estado: 'done' as const, nota: 'Le mandaste el pedido al directorio' },
+      { titulo: 'Agregar tus precios a la página de servicios', estado: 'in_progress' as const, nota: 'La tomó Claude Code' },
+    ],
+    pantallaRondas: ['Primera', 'A las 2 semanas', 'A las 6 semanas'],
+    pantallaHistorialNota: 'Las respuestas de la IA cambian de una semana a otra, por eso mide más de una vez.',
+
+    // Dónde vive tu agente. Nombres sin logos.
+    vivoTitulo: 'Tu agente trabaja donde ya trabajas.',
+    vivoTexto: 'Le escribes por Telegram, Slack, el panel o tu asistente de IA. Hablar con él es gratis; los créditos son para el trabajo que hace.',
+    vivo: [
+      { clave: 'telegram' as const, nombre: 'Telegram', texto: 'Le escribes como a una persona y te contesta con los datos de tu negocio.' },
+      { clave: 'slack' as const, nombre: 'Slack', texto: 'Lo sumas al Slack de tu equipo y cualquiera del canal le pregunta mencionando a @Peaje.' },
+      { clave: 'panel' as const, nombre: 'El panel', texto: 'Ves tus tareas, cada medición y a quién cita la IA en tu lugar.' },
+      {
+        clave: 'asistente' as const,
+        nombre: 'Tu asistente de IA',
+        texto: 'Desde Claude, ChatGPT o Cursor le preguntas por tu negocio, y Claude Code o Cursor toman las tareas.',
+      },
+    ],
+
+    // Precio.
+    precioTitulo: (p: Precio) => `El Radar es gratis. El agente cuesta US$${p.founder} al mes.`,
+    precioTexto: (p: Precio) =>
+      `Es el precio de fundador para los primeros ${p.cupos} negocios, y lo mantienes mientras sigas suscrito. Después, Pro cuesta US$${p.pro} al mes.`,
+    precioGratis: (p: Precio) => `Con tu cuenta gratis tienes ${p.regaloInformes} informes y ${p.regaloRespuestas} respuestas para probar el agente.`,
+    precioPlan: 'Pro',
+    precioUnidad: 'al mes',
+    precioCosto: (p: Precio) => `US$${p.founder} al mes, precio de fundador`,
     // Lo que trae el plan por mes, en unidades (PAQUETE_MENSUAL y LIMITES en planes.ts). Copy de San, 29 oct 2026.
     precioPuntos: (p: Paquete) => [
       { fuerte: `${p.paginas} páginas al mes`, resto: ', escritas con los datos de tu sitio' },
@@ -106,147 +138,110 @@ export const landing = {
       { fuerte: `${p.respuestas} respuestas con datos`, resto: ' de tu agente, en el panel, Telegram o tu herramienta de IA' },
       { fuerte: 'Monitor diario, tareas de arreglo y reporte semanal', resto: ' sin límite' },
     ],
-    precioPie: (cupos: number) => [`Precio de fundador para los primeros ${cupos} negocios`, 'Cancelas cuando quieras'],
     verPrecios: 'Ver todos los detalles del precio',
 
-    // FAQ provisoria: reemplazar por la del Editor si San la pega.
-    // Los 7 días (DIAS_REEMBOLSO en packages/db/src/planes.ts) van escritos a
-    // mano; si cambian, cambiarlos acá (es y en). Créditos y paquete llegan en `p`.
+    // Preguntas (las respuestas salen de faq.ts).
     faqTitulo: 'Preguntas',
-    faq: (pct: number, p: Paquete) => [
-      {
-        p: '¿Qué es Peaje?',
-        r: `Un agente que deja tu sitio listo para la IA. Revisa cómo te ven ${asistentesMedidos('es')}, te dice qué falta y lo arregla contigo en Telegram.`,
-      },
-      {
-        p: '¿Qué recibo?',
-        r: 'Un agente en Telegram. Te dice qué falta, te pasa los arreglos listos y te cuenta cuántos agentes te visitaron, cada día, cada semana o cada mes, como prefieras.',
-      },
-      {
-        p: '¿Tengo que saber de código?',
-        r: 'No. Tu agente te explica cada arreglo en palabras simples, lo escribe y lo deja como tarea. Si usas Claude Code o Cursor, la toman desde Peaje; si no, se la pasas a quien maneje tu web. Cuando está publicada, Peaje la revisa en tu sitio.',
-      },
-      // Cobrarles a los agentes se explica cuando se prenda en mainnet (COBROS_VISIBLES).
-      ...(COBROS_VISIBLES
-        ? [
-      {
-        p: '¿Cómo me pagan los agentes?',
-        r: `Es opcional. x402 es una forma de cobrar por internet en la que tu sitio le pide un pago al agente antes de entregarle lo que pidió. MPP es otro estándar para lo mismo: el agente paga y recibe la respuesta en el mismo pedido. Los pagos son reales, en USDC en Arbitrum y en pathUSD en Tempo, y te llegan a la wallet en la misma transacción, menos el ${pct}% de Peaje. Vienen apagados y los activas desde tu panel cuando quieras.`,
-      },
-          ]
-        : []),
-      {
-        p: '¿Me cobran algo más?',
-        r: `Solo la suscripción mensual. El precio y los impuestos de tu país aparecen en el formulario de pago antes de que confirmes.${COBROS_VISIBLES ? ` Si decides cobrarles a los agentes de IA por tu contenido, Peaje se queda con el ${pct}% de cada pago de un agente y el resto llega directo a la wallet de tu negocio. Si no les cobras, no hay comisión.` : ''}`,
-      },
-      {
-        p: '¿Y si no me sirve?',
-        r: `En el peor caso, cancelas y te quedas con tu diagnóstico y los arreglos que tu agente ya te entregó. En el mejor caso, ${asistentesMedidos('es')} empiezan a citar tu sitio en las preguntas de tu negocio, y lo ves en la medición de tu agente.`,
-      },
-      {
-        p: '¿Puedo cancelar?',
-        r: `Sí. Cancelas cuando quieras desde tu panel, sin llamadas. Sigues con tu agente hasta el final del mes que ya pagaste, no se vuelve a cobrar y lo que tu agente ya te entregó sigue en tu panel. Si es tu primer pago y lo pides dentro de 7 días, te lo devolvemos completo.`,
-      },
-      {
-        p: '¿Qué pasa si se me acaban los créditos?',
-        r: `Cada mes tu plan trae ${p.creditos} créditos para el trabajo del agente. Alcanzan para ${p.paginas} páginas, ${p.informes} informes y ${p.respuestas} respuestas con datos, y los repartes como quieras. Hablar con tu agente es gratis. Si se acaban, tu agente sigue hablando contigo, pero no hace trabajo nuevo hasta el 1 del mes siguiente. Lo que ya te entregó sigue en tu panel y no se cobra nada extra.`,
-      },
-      {
-        p: '¿Qué datos usan?',
-        r: 'Lo que ya es público en tu sitio, tu correo, lo que le escribes a tu agente y las visitas de agentes de IA a tu sitio. No vendemos tus datos.',
-      },
-    ],
+    faqTodas: 'Ver todas las preguntas',
+    faqRuta: '/preguntas',
 
-    // Cierre
-    cierreTitulo: 'Mira cómo te ve la IA hoy.',
-    cierreTexto: 'Revisar tu sitio toma menos de un minuto. Si quieres que tu agente lo arregle contigo, empiezas cuando quieras.',
-
-    // Para devs
-    devsEtiqueta: 'Para devs',
-    devsTexto: 'Instala Peaje en tu proyecto con',
-    devsPortal: 'Portal para desarrolladores',
-
-    // Guías del blog (enlaces internos para buscadores y para quien llega)
-    guiasEtiqueta: 'Guías',
-    guias: [
-      { titulo: '¿Cómo aparezco en los AI Overviews de Google?', slug: 'como-aparezco-en-los-ai-overviews-de-google' },
-      { titulo: '¿Cómo aparezco en los resultados de búsqueda con IA?', slug: 'como-aparezco-en-los-resultados-de-busqueda-con-ia' },
-      { titulo: '¿Qué es MCP y en qué se diferencia de una API?', slug: 'que-es-mcp-y-en-que-se-diferencia-de-una-api' },
-      { titulo: '¿Cómo encuentran los agentes de IA mi API?', slug: 'como-encuentran-los-agentes-de-ia-mi-api' },
-    ],
-    guiasTodas: 'Todo el blog',
+    // Cierre.
+    cierreTitulo: 'Mira a quién recomienda la IA cuando preguntan por lo que vendes.',
+    cierreTexto: 'El Radar es gratis y no pide tarjeta, solo tu correo para mandarte el resultado.',
   },
   en: {
     ctaAgente: 'Start with my agent',
     ctaRadar: 'Check my site free',
     ctaDashboard: 'Go to my dashboard',
-    campoDominio: 'Your site',
-    placeholderDominio: 'yoursite.com',
+    cta: {
+      empezar: 'Start free',
+      demo: 'Book a demo',
+      configurar: 'Set me up with',
+      configurarDominio: 'usepeaje.com',
+      configurarPista: 'Copies an instruction to paste into your AI assistant',
+      copiado: 'Copied. Paste it into ChatGPT, Claude or Cursor',
+    },
 
-    h1: 'AI agents are already recommending your competitors. Fix it with Peaje.',
-    // San's second option, ready to swap in:
-    // h1: 'Get AI to find you, understand you and choose you.',
-    sub: 'ChatGPT, Claude and other agents already visit your site, but they do not really get what you sell. Your Peaje agent tells you what is missing and fixes it with you on Telegram.',
+    h1Inicio: 'Your customers already ask ChatGPT.',
+    h1Final: 'Make it recommend you.',
+    sub: `Peaje is your AI visibility agent. Every week it works to get ${asistentesMedidos('en')} to name you: it writes the pages you are missing, gets your site ready for AI to read and helps you land on the lists they check. You approve, Peaje does the rest.`,
 
-    chatEjemplo: 'Example',
-    chatNegocio: 'example.com',
-    chatBot: 'Peaje',
-    chatSubtitulo: 'your agent',
-    chatTu: 'You',
-    chat: [
-      { de: 'dueno', texto: 'What am I missing for ChatGPT to recommend me?' },
-      {
-        de: 'agente',
-        texto: 'ChatGPT does not know what you sell or at what price. I would start there.',
-        tarjeta: { titulo: 'Your top 3 fixes', accion: 'View' },
-      },
-      { de: 'dueno', texto: 'Do the first one.' },
-      {
-        de: 'agente',
-        texto: 'Done, here is the page and everything you need to implement it. I will check it once it is live.',
-        chip: 'Task in progress',
-      },
-      {
-        de: 'agente',
-        texto: 'This week 38 agents visited you: ChatGPT 21, Perplexity 9, Claude 8.',
-        chip: 'Every Monday, 8:00',
-      },
-    ] as MensajeChat[],
-
-    necesitanTitulo: 'What agents need',
-    necesitan: [
-      { titulo: 'To find you', texto: 'ChatGPT and Claude can read your site when someone asks about what you sell.' },
-      { titulo: 'To understand you', texto: 'They know what you sell and at what price.' },
-      { titulo: 'To recommend you', texto: 'They name you when a customer asks them for a recommendation.' },
+    ejemplo: 'Example',
+    ejemploNota: 'This is what a Radar answer looks like, with a sample business and sample results.',
+    muestraDominio: 'yoursite.com',
+    muestraPreguntas: [
+      'Which accounting firm would you recommend for a small business in Miami?',
+      'How much does an accountant charge to keep the books for a small business?',
+      'Which accountant knows e-invoicing for small businesses?',
     ],
-    necesitanCierre:
-      'Other tools only measure whether AI recommends you. Peaje also tells you what to fix and fixes it with you.',
+    muestraCitoChatgpt: 'A competing firm, an accountant directory',
+    muestraCitoClaude: 'A competing firm',
+    muestraEnTuLugar: [
+      { quien: 'A competing firm', veces: 4 },
+      { quien: 'An accountant directory', veces: 3 },
+      { quien: 'A business magazine', veces: 1 },
+    ],
+    muestraPreguntando: 'Asking',
+    muestraAgente: 'Your agent already has 3 fixes ready to change that.',
 
-    comoTitulo: 'How it works',
-    pasos: [
-      {
-        titulo: 'See where you stand today',
-        texto:
-          'Paste your site URL and in under a minute you see what you are missing for AI agents to find you. Free, just your email.',
-      },
-      {
-        titulo: 'Get your site ready for agents',
-        texto: 'Install our kit with one command and your site is ready for AI agents to read it and understand it.',
-      },
-      {
-        titulo: 'Get recommended',
-        texto:
-          `Your Peaje agent, on Telegram, hands you the fixes ready to go so ${asistentesMedidos('en')} recommend you, and tells you every week how much you are improving.`,
-      },
+    mide: [
+      'Writes the pages AI cites: comparisons, pricing and guides about what you sell',
+      'Gets your site ready for AI to read and tells Bing about every change',
+      `Asks ${asistentesMedidos('en')} what your customers search for every week, and measures each fix again`,
     ],
 
-    precioTitulo: 'Pricing',
-    precioGratis: 'The Radar and the kit are free, no card needed. You only pay for the agent, if you want it.',
-    precioUnidad: '/month',
-    precioCreditos: (n: number) => `${n} credits/mo`,
-    precioValor: `An agent that works on your site all month so ${asistentesMedidos('en')} recommend you.`,
-    precioTodoTitulo: 'One agent, everything included',
-    precioHabilidades: ['Diagnosis', 'Content', 'AI citations', 'Fixes', 'Daily monitor', 'Reports'],
+    cicloTitulo: 'Your agent measures, does the fix and measures again.',
+    cicloSub: 'It repeats this every week with your questions. Peaje does the work, and you only approve what goes live.',
+    ciclo: [
+      {
+        titulo: 'Measures who they cite.',
+        texto: `It asks ${asistentesMedidos('en')} your questions and notes, assistant by assistant, how many answers include you.`,
+      },
+      {
+        titulo: 'Does the fix.',
+        texto:
+          'It writes the page you are missing, drafts the request to be added to a list and prepares the change in your site code, with the reason for each.',
+      },
+      {
+        titulo: 'You approve and it goes live.',
+        texto:
+          'You review the fix and say yes. If you use Claude Code or Cursor, they apply it from Peaje in one step; if not, you pass it to whoever runs your website. Once it is live, Peaje checks it on your site.',
+      },
+      {
+        titulo: 'Measures again.',
+        texto: 'At 2 and 6 weeks it asks the same questions again and shows you whether anything changed.',
+      },
+    ],
+    cicloPausa: 'Pause',
+    pantallaPreguntas: "This week's questions",
+    pantallaTareas: [
+      { titulo: 'Publish the page "Which accounting firm would you recommend for a small business in Miami?"', estado: 'verified' as const, nota: 'Peaje found it at yoursite.com/small-business-accounting' },
+      { titulo: 'Ask to be added to an accountant directory', estado: 'done' as const, nota: 'You sent the request to the directory' },
+      { titulo: 'Add your prices to the services page', estado: 'in_progress' as const, nota: 'Claude Code picked it up' },
+    ],
+    pantallaRondas: ['First', 'At 2 weeks', 'At 6 weeks'],
+    pantallaHistorialNota: 'AI answers change from one week to the next, so it measures more than once.',
+
+    vivoTitulo: 'Your agent works where you already work.',
+    vivoTexto: 'You talk to it on Telegram, Slack, the dashboard or your AI assistant. Talking to it is free; credits pay for the work it does.',
+    vivo: [
+      { clave: 'telegram' as const, nombre: 'Telegram', texto: 'You text it like a person and it answers with your business data.' },
+      { clave: 'slack' as const, nombre: 'Slack', texto: "Add it to your team's Slack and anyone in the channel can ask by mentioning @Peaje." },
+      { clave: 'panel' as const, nombre: 'The dashboard', texto: 'See your tasks, every measurement and who AI cites instead of you.' },
+      {
+        clave: 'asistente' as const,
+        nombre: 'Your AI assistant',
+        texto: 'Ask about your business from Claude, ChatGPT or Cursor, and Claude Code or Cursor pick up the tasks.',
+      },
+    ],
+
+    precioTitulo: (p: Precio) => `The Radar is free. The agent costs US$${p.founder} a month.`,
+    precioTexto: (p: Precio) =>
+      `That is the founder price for the first ${p.cupos} businesses, and you keep it while you stay subscribed. After that, Pro costs US$${p.pro} a month.`,
+    precioGratis: (p: Precio) => `With a free account you get ${p.regaloInformes} reports and ${p.regaloRespuestas} answers to try the agent.`,
+    precioPlan: 'Pro',
+    precioUnidad: 'a month',
+    precioCosto: (p: Precio) => `US$${p.founder} a month, founder price`,
     precioPuntos: (p: Paquete) => [
       { fuerte: `${p.paginas} pages a month`, resto: ', written from the facts on your site' },
       { fuerte: `${p.preguntas} questions your customers ask`, resto: ` tracked in ${asistentesMedidos('en')}` },
@@ -255,68 +250,13 @@ export const landing = {
       { fuerte: `${p.respuestas} answers with your data`, resto: ' from your agent, in the dashboard, Telegram or your AI tool' },
       { fuerte: 'Daily monitor, fix tasks and weekly report', resto: ' with no limit' },
     ],
-    precioPie: (cupos: number) => [`Founder price for the first ${cupos} businesses`, 'Cancel anytime'],
     verPrecios: 'See the full pricing details',
 
     faqTitulo: 'Questions',
-    faq: (pct: number, p: Paquete) => [
-      {
-        p: 'What is Peaje?',
-        r: `An agent that gets your site ready for AI. It checks how ${asistentesMedidos('en')} see you, tells you what is missing and fixes it with you on Telegram.`,
-      },
-      {
-        p: 'What do I get?',
-        r: 'An agent on Telegram. It tells you what is missing, hands you the fixes ready to go and tells you how many agents visited you, daily, weekly or monthly, as you prefer.',
-      },
-      {
-        p: 'Do I need to know how to code?',
-        r: 'No. Your agent explains every fix in plain words, writes it and leaves it as a task. If you use Claude Code or Cursor, they pick it up from Peaje; if not, you pass it to whoever runs your website. Once it is live, Peaje checks it on your site.',
-      },
-      // Cobrarles a los agentes se explica cuando se prenda en mainnet (COBROS_VISIBLES).
-      ...(COBROS_VISIBLES
-        ? [
-      {
-        p: 'How do agents pay me?',
-        r: `It is optional. x402 is a way to charge on the web where your site asks the agent for a payment before handing over what it asked for. MPP is another standard for the same thing: the agent pays and gets the answer in the same request. Payments are real, in USDC on Arbitrum and pathUSD on Tempo, and they land in your wallet in the same transaction, minus Peaje's ${pct}%. They come turned off and you turn them on from your dashboard whenever you want.`,
-      },
-          ]
-        : []),
-      {
-        p: 'Do you charge anything else?',
-        r: `Only the monthly subscription. The price and your country's taxes appear in the checkout before you confirm.${COBROS_VISIBLES ? ` If you choose to charge AI agents for your content, Peaje keeps ${pct}% of each agent payment and the rest goes straight to your business wallet. If you do not charge them, there is no fee.` : ''}`,
-      },
-      {
-        p: 'What if it does not work for me?',
-        r: `Worst case, you cancel and keep your diagnosis and the fixes your agent already handed you. Best case, ${asistentesMedidos('en')} start citing your site for your business questions, and you see it in your agent's tracking.`,
-      },
-      {
-        p: 'Can I cancel?',
-        r: `Yes. Cancel anytime from your dashboard, no calls. You keep your agent until the end of the month you already paid for, you are not charged again and what your agent already handed you stays in your dashboard. If it is your first payment and you ask within 7 days, we refund it in full.`,
-      },
-      {
-        p: 'What happens if I run out of credits?',
-        r: `Each month your plan comes with ${p.creditos} credits for the agent's work. They cover ${p.paginas} pages, ${p.informes} reports and ${p.respuestas} answers with your data, split however you like. Talking to your agent is free. If you run out, your agent keeps talking with you, but it does no new work until the 1st of next month. What it already handed you stays in your dashboard and nothing extra is charged.`,
-      },
-      {
-        p: 'What data do you use?',
-        r: 'What is already public on your site, your email, what you write to your agent and the visits AI agents make to your site. We do not sell your data.',
-      },
-    ],
+    faqTodas: 'See all questions',
+    faqRuta: '/faq',
 
-    cierreTitulo: 'See how AI sees you today.',
-    cierreTexto: 'Checking your site takes under a minute. When you want your agent to fix it with you, start anytime.',
-
-    devsEtiqueta: 'For devs',
-    devsTexto: 'Install Peaje in your project with',
-    devsPortal: 'Developer portal',
-
-    guiasEtiqueta: 'Guides',
-    guias: [
-      { titulo: 'How to get in Google AI Overviews', slug: 'how-do-i-show-up-in-google-ai-overviews' },
-      { titulo: 'How do I show up in AI search results?', slug: 'how-do-i-show-up-in-ai-search-results' },
-      { titulo: 'What is MCP and how is it different from an API?', slug: 'what-is-mcp-and-how-is-it-different-from-an-api' },
-      { titulo: 'How do AI agents find my API?', slug: 'how-do-ai-agents-find-my-api' },
-    ],
-    guiasTodas: 'All guides',
+    cierreTitulo: 'See who AI recommends when people ask for what you sell.',
+    cierreTexto: 'The Radar is free and needs no card, just your email so we can send you the result.',
   },
 }

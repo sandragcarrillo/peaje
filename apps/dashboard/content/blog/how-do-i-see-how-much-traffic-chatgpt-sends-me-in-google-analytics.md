@@ -63,7 +63,7 @@ Because GA excludes traffic from known bots automatically, according to its [hel
 
 That is what Peaje's agent visit log is for, and it comes with the free plan. It counts requests to the kit files and, with the kit proxy installed, also the pages of your site that OAI-SearchBot, PerplexityBot, Googlebot, ClaudeBot and GPTBot read, each one by name, and the rest goes under "Other". It does not count visits from a browser as agent visits, so for the people who arrive from ChatGPT you still need GA. On usepeaje.com, the log counted 1108 bot visits in 30 days: 225 from Googlebot, 197 from ClaudeBot and 133 from GPTBot.
 
-The two numbers tell you different things. A bot reading you means you can appear in answers, and a person arriving from ChatGPT means you already appeared and someone clicked. If you want to know whether you get cited even when nobody clicks, see [how do I know if ChatGPT, Claude or Perplexity cite my business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business), and to let the bots in, [which AI bots visit my website](https://usepeaje.com/blog/which-ai-bots-visit-my-website-and-how-do-i-let-them-in).
+The two numbers tell you different things. A bot reading you means you can appear in answers, and a person arriving from ChatGPT means you already appeared and someone clicked. If you want to know whether you get cited even when nobody clicks, see [how to check if ChatGPT recommends your business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business), and to let the bots in, [which AI bots visit my website](https://usepeaje.com/blog/which-ai-bots-visit-my-website-and-how-do-i-let-them-in).
 
 ## Sources
 

@@ -47,7 +47,7 @@ What you can do without guessing is have one page for each important question yo
 
 ## What does Peaje do with Perplexity and what does it not do?
 
-Peaje does not measure whether Perplexity cites you. The Pro plan measures 20 of your customers' questions every week in ChatGPT and Claude only, and the [free radar](https://usepeaje.com/radar) asks ChatGPT and Claude 3 questions, so for Perplexity you have to run your own searches and check its sources, as we explain in [how do I know if ChatGPT, Claude or Perplexity cite my business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
+Peaje does not measure whether Perplexity cites you. The Pro plan measures 20 of your customers' questions every week in ChatGPT and Claude only, and the [free radar](https://usepeaje.com/radar) asks ChatGPT and Claude 3 questions, so for Perplexity you have to run your own searches and check its sources, as we explain in [how to check if ChatGPT recommends your business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
 
 What Peaje does is make sure PerplexityBot can get in:
 

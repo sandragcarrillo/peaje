@@ -63,7 +63,7 @@ Peaje no cuenta tus apariciones en los AI Overviews, porque ese dato lo tiene Se
 - **El radar gratis** revisa qué puede leer un agente de IA en tu sitio y te da tu puntaje en menos de un minuto. En la misma página te muestra lo que responden ChatGPT y Claude a tres preguntas de alguien que busca lo que ofreces.
 - **Pro** mide cada semana 20 preguntas de tus clientes en ChatGPT y Claude, te dice a quién citan en tu lugar y vuelve a medir cada página verificada a las 2 y a las 6 semanas.
 
-Nada de esto garantiza que Google te cite, porque eso también depende de tu contenido y de lo que otros sitios dicen de ti. Lo que Google pide para salir en los AI Overviews es SEO de siempre, y lo contamos en [cómo aparezco en los AI Overviews de Google](https://usepeaje.com/blog/como-aparezco-en-los-ai-overviews-de-google). Para ChatGPT, Claude y Perplexity, mira [cómo sé si ChatGPT, Claude o Perplexity citan mi negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
+Nada de esto garantiza que Google te cite, porque eso también depende de tu contenido y de lo que otros sitios dicen de ti. Lo que Google pide para salir en los AI Overviews es SEO de siempre, y lo contamos en [cómo aparezco en los AI Overviews de Google](https://usepeaje.com/blog/como-aparezco-en-los-ai-overviews-de-google). Para ChatGPT, Claude y Perplexity, mira [cómo saber si ChatGPT recomienda tu negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
 
 ## ¿Cómo veo cuántas visitas me traen los AI Overviews?
 

@@ -1,3 +1,5 @@
+import { agendador, CAL_EMBED_JS, CAL_FUENTE, CAL_IFRAME } from './demo'
+
 /**
  * Content Security Policy del dashboard (usepeaje.com), armada por request en
  * proxy.ts con un nonce nuevo. Next.js lee el nonce del header de la request
@@ -30,6 +32,11 @@
  *   en el build), así que alcanza con 'self' en script-src y connect-src. Solo
  *   en `next dev` el script de debug sale de va.vercel-scripts.com, y no manda nada.
  * - Fuentes: next/font las sirve desde el mismo origen.
+ * - Cal.com (agendador de /demo, lib/demo.ts): solo si NEXT_PUBLIC_DEMO_URL es
+ *   un enlace de cal.com. app.cal.com sirve embed.js y el iframe (embed.js
+ *   cambia cal.com por app.cal.com al armar el iframe); cal.com, la fuente de
+ *   títulos que embed.js declara. embed.js no hace fetch desde la página.
+ *   Verificado leyendo app.cal.com/embed/embed.js el 22 nov 2026.
  */
 
 const origen = (url: string | undefined): string | null => {
@@ -51,8 +58,10 @@ export function politicaCsp(nonce: string): string {
   const paddleCdn = sandbox ? ['https://cdn.paddle.com', 'https://sandbox-cdn.paddle.com'] : ['https://cdn.paddle.com']
   const gateways = [...new Set([origen(process.env.NEXT_PUBLIC_GATEWAY_URL), 'https://api.usepeaje.com'].filter((x): x is string => !!x))]
   const vercel = (...x: string[]) => (preview ? x : [])
+  const conCal = agendador().tipo === 'cal'
+  const cal = (...x: string[]) => (conCal ? x : [])
 
-  const marcos = ['https://auth.privy.io', 'https://challenges.cloudflare.com', paddleCheckout, ...vercel('https://vercel.live')]
+  const marcos = ['https://auth.privy.io', 'https://challenges.cloudflare.com', paddleCheckout, ...cal(CAL_IFRAME), ...vercel('https://vercel.live')]
 
   const directivas: Record<string, string[]> = {
     'default-src': ["'self'"],
@@ -61,6 +70,7 @@ export function politicaCsp(nonce: string): string {
       `'nonce-${nonce}'`,
       ...paddleCdn,
       'https://challenges.cloudflare.com',
+      ...cal(new URL(CAL_EMBED_JS).origin),
       // React usa eval en desarrollo para reconstruir los stacks del server; en producción no.
       ...(dev ? ["'unsafe-eval'"] : []),
       // El script de debug de Web Analytics en local; en producción es del mismo origen.
@@ -70,7 +80,7 @@ export function politicaCsp(nonce: string): string {
     // Privy, Paddle.js y Next ponen estilos inline: la guía de Privy pide 'unsafe-inline' acá.
     'style-src': ["'self'", "'unsafe-inline'", ...paddleCdn, ...vercel('https://vercel.live')],
     'img-src': ["'self'", 'data:', 'blob:', ...vercel('https://vercel.live', 'https://vercel.com')],
-    'font-src': ["'self'", ...vercel('https://vercel.live', 'https://assets.vercel.com')],
+    'font-src': ["'self'", ...cal(CAL_FUENTE), ...vercel('https://vercel.live', 'https://assets.vercel.com')],
     'connect-src': [
       "'self'",
       'https://auth.privy.io',

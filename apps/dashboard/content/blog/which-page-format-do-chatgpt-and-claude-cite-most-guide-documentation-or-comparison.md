@@ -16,7 +16,7 @@ It depends on the question, and the safest way to know is to look at which pages
 
 Updated: November 2026
 
-Across those 20 questions, usepeaje.com had 0% of citations in ChatGPT and Claude, and the source that showed up most in its place was developers.google.com, with technical documentation, in 4 answers. We explain how that measurement works in [how do I know if ChatGPT, Claude or Perplexity cite my business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
+Across those 20 questions, usepeaje.com had 0% of citations in ChatGPT and Claude, and the source that showed up most in its place was developers.google.com, with technical documentation, in 4 answers. We explain how that measurement works in [how to check if ChatGPT recommends your business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
 
 ## Who won the 20 questions Peaje measures?
 

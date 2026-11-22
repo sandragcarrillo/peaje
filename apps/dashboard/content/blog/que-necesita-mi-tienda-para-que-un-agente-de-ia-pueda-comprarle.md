@@ -50,7 +50,7 @@ El radar de Peaje agrupa sus chequeos en esas cuatro capas, es gratis y solo pid
 
 ## ¿Cómo te paga un agente?
 
-Hoy conviven varios protocolos, y cada asistente usa el suyo:
+Hoy conviven varios protocolos, y cada asistente usa el suyo. Si quieres saber cuál de ACP, UCP y AP2 te toca, lo explicamos en [qué protocolo de compra necesita mi tienda](https://usepeaje.com/blog/acp-ucp-y-ap2-que-protocolo-de-compra-con-agentes-de-ia-necesita-mi-tienda).
 
 | Protocolo | Quién lo creó | Para qué sirve |
 | --- | --- | --- |

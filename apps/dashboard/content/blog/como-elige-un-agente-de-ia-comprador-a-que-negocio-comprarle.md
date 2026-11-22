@@ -57,7 +57,7 @@ Ninguna de estas señales la controlas del todo. Lo que sí está en tus manos e
 
 ## ¿Qué pasa si el agente no puede pagarte?
 
-Elige a otro, aunque te haya encontrado primero. Si vendes productos físicos, el pago casi siempre llega por los protocolos de compra de tu plataforma de tienda (ACP en ChatGPT, UCP en Google). Si vendes datos, acceso a una API o contenido por uso, el agente espera una respuesta `402 Payment Required` que le diga cuánto cuesta y cómo pagar, y como cada agente habla x402 o MPP, conviene responder con los dos en el mismo 402 ([qué trae el 402](https://usepeaje.com/blog/que-es-el-codigo-402-payment-required-y-que-pasa-si-un-agente-pide-sin-pagar)). Un 402 sin las cabeceras de pago, o con un monto distinto al precio que publicaste, hace que un cliente estricto se detenga ahí.
+Elige a otro, aunque te haya encontrado primero. Si vendes productos físicos, el pago casi siempre llega por los protocolos de compra de tu plataforma de tienda (ACP en ChatGPT, UCP en Google), y en [esta comparativa de ACP, UCP y AP2](https://usepeaje.com/blog/acp-ucp-y-ap2-que-protocolo-de-compra-con-agentes-de-ia-necesita-mi-tienda) ves cuál le toca a tu tienda. Si vendes datos, acceso a una API o contenido por uso, el agente espera una respuesta `402 Payment Required` que le diga cuánto cuesta y cómo pagar, y como cada agente habla x402 o MPP, conviene responder con los dos en el mismo 402 ([qué trae el 402](https://usepeaje.com/blog/que-es-el-codigo-402-payment-required-y-que-pasa-si-un-agente-pide-sin-pagar)). Un 402 sin las cabeceras de pago, o con un monto distinto al precio que publicaste, hace que un cliente estricto se detenga ahí.
 
 ## ¿Cómo sé si un agente me elegiría?
 

@@ -49,7 +49,7 @@ The hard part is not skipping a week.
 - **Free:** the [radar](https://usepeaje.com/radar) asks ChatGPT and Claude up to 3 questions about your business and shows you whether they cite you, as a snapshot of that day. The daily monitor checks your site every day and leaves you a task when something fails.
 - **Pro:** your agent tracks 20 questions every week, tells you how many cite you and who gets cited instead, and measures each page again at 2 and 6 weeks. It tells you in your dashboard or on Telegram, with a weekly report by email. Perplexity is not part of that measurement today.
 
-We explain the difference between an agent visiting you and citing you in [how do I know if ChatGPT, Claude or Perplexity cite my business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
+We explain the difference between an agent visiting you and citing you in [how to check if ChatGPT recommends your business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
 
 ## Sources
 

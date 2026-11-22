@@ -17,7 +17,7 @@ export const nav = {
     cerrarMenu: 'Cerrar menú',
     metaTitulo: 'Peaje · que la IA te encuentre, te entienda y te recomiende',
     metaDescripcion:
-      'ChatGPT, Claude y otros agentes ya visitan tu sitio, pero no entienden bien qué vendes. Tu agente de Peaje te dice qué falta y lo arregla contigo en Telegram.',
+      'Mira si ChatGPT y Claude recomiendan tu negocio y a quién citan en tu lugar. Tu agente de Peaje te dice qué falta y te prepara el arreglo; tú decides qué se publica.',
     hechoPor: 'Made with love by',
     equipo: 'Team 33',
     evento: 'at Platanus Hack Bogotá 26',
@@ -40,7 +40,7 @@ export const nav = {
     cerrarMenu: 'Close menu',
     metaTitulo: 'Peaje · get AI to find you, understand you and recommend you',
     metaDescripcion:
-      'ChatGPT, Claude and other agents already visit your site, but they do not really get what you sell. Your Peaje agent tells you what is missing and fixes it with you on Telegram.',
+      'See whether ChatGPT and Claude recommend your business and who they cite instead. Your Peaje agent tells you what is missing and prepares the fix; you decide what goes live.',
     hechoPor: 'Made with love by',
     equipo: 'Team 33',
     evento: 'at Platanus Hack Bogotá 26',

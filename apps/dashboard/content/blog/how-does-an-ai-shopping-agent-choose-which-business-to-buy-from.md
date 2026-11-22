@@ -57,7 +57,7 @@ You do not fully control any of these signals. What is in your hands is that you
 
 ## What happens if the agent cannot pay you?
 
-It picks someone else, even if it found you first. If you sell physical products, payment almost always comes through your store platform's commerce protocols (ACP in ChatGPT, UCP at Google). If you sell data, API access or content per use, the agent expects a `402 Payment Required` response that tells it how much it costs and how to pay, and since each agent speaks x402 or MPP, it makes sense to answer with both in the same 402 ([what the 402 carries](https://usepeaje.com/blog/what-is-402-payment-required-and-what-happens-when-an-agent-asks-without-paying)). A 402 without the payment headers, or with an amount that differs from the price you published, makes a strict client stop right there.
+It picks someone else, even if it found you first. If you sell physical products, payment almost always comes through your store platform's commerce protocols (ACP in ChatGPT, UCP at Google), and [this comparison of ACP, UCP and AP2](https://usepeaje.com/blog/acp-ucp-and-ap2-which-ai-agent-shopping-protocol-does-my-store-need) shows which one applies to your store. If you sell data, API access or content per use, the agent expects a `402 Payment Required` response that tells it how much it costs and how to pay, and since each agent speaks x402 or MPP, it makes sense to answer with both in the same 402 ([what the 402 carries](https://usepeaje.com/blog/what-is-402-payment-required-and-what-happens-when-an-agent-asks-without-paying)). A 402 without the payment headers, or with an amount that differs from the price you published, makes a strict client stop right there.
 
 ## How do I know if an agent would pick me?
 

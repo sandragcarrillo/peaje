@@ -16,7 +16,19 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/blog": ["./content/blog/**/*"],
     "/blog/[slug]": ["./content/blog/**/*"],
-    "/sitemap.xml": ["./content/blog/**/*"],
+    "/sitemap.xml": ["./content/blog/**/*", "./content/comparar/**/*", "./content/para/**/*"],
+    // El pie del sitio (layout raíz) resuelve guías del blog en cada página pública.
+    "/**": ["./content/blog/**/*"],
+    // Las comparativas también se leen en cada request.
+    "/comparar": ["./content/comparar/**/*"],
+    "/comparar/[slug]": ["./content/comparar/**/*"],
+    "/compare": ["./content/comparar/**/*"],
+    "/compare/[slug]": ["./content/comparar/**/*"],
+    // Las páginas por tipo de negocio, igual.
+    "/para": ["./content/para/**/*"],
+    "/para/[slug]": ["./content/para/**/*"],
+    "/for": ["./content/para/**/*"],
+    "/for/[slug]": ["./content/para/**/*"],
   },
   async headers() {
     return [{ source: "/:path*", headers: seguridad }];

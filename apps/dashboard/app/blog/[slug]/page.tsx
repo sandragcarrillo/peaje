@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { articulo, fechaCorta } from '@/lib/blog'
 import { dictFor } from '@/lib/i18n/dict'
+import { CtaInicio } from '../../components/cta-inicio'
 import { Cuerpo } from '../cuerpo'
 
 const BASE = 'https://usepeaje.com'
@@ -85,7 +86,8 @@ export default async function ArticuloBlog({ params }: PageProps<'/blog/[slug]'>
       <aside className="mt-16 space-y-4 border border-border bg-panel p-6 text-center sm:p-8">
         <p className="text-2xl font-medium tracking-tight">{t.cierreTitulo}</p>
         <p className="mx-auto max-w-md text-sm text-muted">{t.cierreTexto}</p>
-        <Botones t={t} />
+        {/* El cierre de las páginas públicas (cta-inicio.tsx), en el idioma del artículo. */}
+        <CtaInicio locale={a.idioma} className="pt-3" />
       </aside>
 
       <script

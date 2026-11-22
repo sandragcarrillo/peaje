@@ -63,7 +63,7 @@ Peaje does not count your appearances in AI Overviews, because Search Console ha
 - **The free radar** checks what an AI agent can read on your site and gives you your score in less than a minute. On the same page it shows you what ChatGPT and Claude answer to three questions from someone looking for what you offer.
 - **Pro** measures 20 of your customers' questions in ChatGPT and Claude every week, tells you who they cite instead of you and measures each verified page again at 2 and 6 weeks.
 
-None of this guarantees that Google cites you, because that also depends on your content and on what other sites say about you. What Google asks for to show up in AI Overviews is regular SEO, and we cover it in [how do I show up in Google's AI Overviews](https://usepeaje.com/blog/how-do-i-show-up-in-google-ai-overviews). For ChatGPT, Claude and Perplexity, see [how do I know if ChatGPT, Claude or Perplexity cite my business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
+None of this guarantees that Google cites you, because that also depends on your content and on what other sites say about you. What Google asks for to show up in AI Overviews is regular SEO, and we cover it in [how do I show up in Google's AI Overviews](https://usepeaje.com/blog/how-do-i-show-up-in-google-ai-overviews). For ChatGPT, Claude and Perplexity, see [how to check if ChatGPT recommends your business](https://usepeaje.com/blog/how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business).
 
 ## How do I see how many visits AI Overviews bring me?
 

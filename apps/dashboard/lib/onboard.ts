@@ -68,7 +68,7 @@ You save nothing to disk for this. \`peaje_setup\` reads where things stand, so 
 
 Claude: this link opens the custom connector form with the name and URL filled in, the person confirms: ${conector}
 
-ChatGPT: in Settings, Apps and Connectors, Advanced settings, turn on developer mode, choose Create, paste the server URL and pick OAuth.
+ChatGPT (web, paid plans): go to Plugins, click + and choose Add custom MCP server, paste the server URL, pick OAuth, accept the warning and choose Create as a plugin. No developer mode needed.
 
 After connecting, the person can ask about their business (who AI cites instead of them, what to publish next). Installing on the site needs a coding agent opened in the site's project.
 

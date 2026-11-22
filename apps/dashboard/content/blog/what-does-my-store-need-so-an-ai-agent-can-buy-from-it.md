@@ -50,7 +50,7 @@ Peaje's radar groups its checks into those four layers, it is free and it only a
 
 ## How does an agent pay you?
 
-Several protocols coexist today, and each assistant uses its own:
+Several protocols coexist today, and each assistant uses its own. If you want to know which of ACP, UCP and AP2 applies to you, we explain it in [which shopping protocol my store needs](https://usepeaje.com/blog/acp-ucp-and-ap2-which-ai-agent-shopping-protocol-does-my-store-need).
 
 | Protocol | Who created it | What it is for |
 | --- | --- | --- |

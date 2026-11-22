@@ -111,7 +111,7 @@ test('POST tasks/generate con Pro: cobra informe; la espera de 10 minutos no cob
   const t = await negocio()
   const res = await tareasRouter.request(`/_internal/${t.slug}/tasks/generate`, interno({ language: 'es' }))
   assert.equal(res.status, 200)
-  assert.deepEqual(await res.json(), { creadas: 0, actualizadas: 0, cerradas: 0 })
+  assert.deepEqual(await res.json(), { creadas: 0, actualizadas: 0, cerradas: 0, repriorizadas: 0 })
   assert.equal(await usados(t.id), COSTOS_CREDITOS.informe)
 
   const otra = await tareasRouter.request(`/_internal/${t.slug}/tasks/generate`, interno({ language: 'es' }))
@@ -195,7 +195,7 @@ test('MCP del dueño: peaje_refresh_tasks cobra informe con Pro y avisa sin sald
   assert.match(tools.find((x) => x.name === 'peaje_refresh_tasks')!.description ?? '', new RegExp(`uses ${COSTOS_CREDITOS.informe} of the owner's monthly credits`))
   const r = await client.callTool({ name: 'peaje_refresh_tasks', arguments: {} })
   assert.equal(r.isError, undefined)
-  assert.deepEqual(JSON.parse(textoDe(r)), { creadas: 0, actualizadas: 0, cerradas: 0 })
+  assert.deepEqual(JSON.parse(textoDe(r)), { creadas: 0, actualizadas: 0, cerradas: 0, repriorizadas: 0 })
   assert.equal(await usados(t.id), COSTOS_CREDITOS.informe)
   await client.close()
 

@@ -16,7 +16,7 @@ Depende de la pregunta, y la forma más segura de saberlo es mirar qué páginas
 
 Actualizado: noviembre de 2026
 
-En esas 20 preguntas, usepeaje.com tuvo 0% de citas en ChatGPT y Claude, y la fuente que más apareció en su lugar fue developers.google.com, con documentación técnica, en 4 respuestas. Cómo se hace esa medición lo contamos en [cómo sé si ChatGPT, Claude o Perplexity citan mi negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
+En esas 20 preguntas, usepeaje.com tuvo 0% de citas en ChatGPT y Claude, y la fuente que más apareció en su lugar fue developers.google.com, con documentación técnica, en 4 respuestas. Cómo se hace esa medición lo contamos en [cómo saber si ChatGPT recomienda tu negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio).
 
 ## ¿Quién ganó las 20 preguntas que mide Peaje?
 

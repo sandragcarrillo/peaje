@@ -63,7 +63,7 @@ Porque GA deja fuera el tráfico de bots conocidos de forma automática, según 
 
 Para eso está el registro de visitas de agentes de Peaje, que viene en el plan gratis. Cuenta los pedidos a los archivos del kit y, con el proxy del kit instalado, también las páginas de tu sitio que leen OAI-SearchBot, PerplexityBot, Googlebot, ClaudeBot y GPTBot, cada uno por nombre, y el resto sale en "Otros". Las visitas desde un navegador no las cuenta como visitas de agentes, así que para las personas que llegan desde ChatGPT sigues necesitando GA. En usepeaje.com, el registro contó 1108 visitas de bots en 30 días: 225 de Googlebot, 197 de ClaudeBot y 133 de GPTBot.
 
-Las dos cifras te dicen cosas distintas. Que un bot te lea quiere decir que puedes aparecer en las respuestas, y que una persona llegue desde ChatGPT quiere decir que ya apareciste y alguien hizo clic. Si quieres saber si te citan aunque nadie haga clic, mira [cómo sé si ChatGPT, Claude o Perplexity citan mi negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio), y para dejar pasar a los bots, [qué bots de IA visitan mi web](https://usepeaje.com/blog/que-bots-de-ia-visitan-mi-web-y-como-los-dejo-pasar).
+Las dos cifras te dicen cosas distintas. Que un bot te lea quiere decir que puedes aparecer en las respuestas, y que una persona llegue desde ChatGPT quiere decir que ya apareciste y alguien hizo clic. Si quieres saber si te citan aunque nadie haga clic, mira [cómo saber si ChatGPT recomienda tu negocio](https://usepeaje.com/blog/como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio), y para dejar pasar a los bots, [qué bots de IA visitan mi web](https://usepeaje.com/blog/que-bots-de-ia-visitan-mi-web-y-como-los-dejo-pasar).
 
 ## Fuentes
 

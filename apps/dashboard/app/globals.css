@@ -490,6 +490,205 @@ h1, h2 {
   .radar-aparece { animation: none; }
 }
 
+/*
+ * CTAs del home y de las páginas públicas (app/components/cta-inicio.tsx).
+ * Van en la letra del texto, no en mono, y no tocan .btn (la usa el panel).
+ *   .cta-principal  el acento, con el borde de abajo más oscuro que da relieve
+ *   .cta-oscuro     tinta; en oscuro y sobre tinta, un tono más claro que el fondo
+ *   .cta-pastilla   la pastilla para copiar la instrucción de alta
+ */
+@layer components {
+  .cta-boton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.75rem 1.4rem 0.85rem;
+    border-radius: 10px;
+    font-family: var(--font-grotesca), system-ui, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    text-align: center;
+    transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+  }
+  .cta-boton:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .cta-boton:active {
+    transform: translateY(1px);
+  }
+  .cta-principal {
+    background: var(--accent);
+    color: var(--accent-text);
+    box-shadow:
+      inset 0 -3px 0 color-mix(in srgb, var(--accent) 58%, #000),
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 1px 2px rgb(28 27 25 / 0.08),
+      0 10px 22px -12px color-mix(in srgb, var(--accent) 80%, transparent);
+  }
+  .cta-principal:hover {
+    background: color-mix(in srgb, var(--accent) 90%, var(--text));
+  }
+  .cta-principal:active {
+    box-shadow:
+      inset 0 -1px 0 color-mix(in srgb, var(--accent) 58%, #000),
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 1px 2px rgb(28 27 25 / 0.08);
+  }
+  .cta-oscuro {
+    background: var(--tinta);
+    color: #f4f0e7;
+    box-shadow:
+      inset 0 -3px 0 #000,
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      0 1px 2px rgb(28 27 25 / 0.1);
+  }
+  .cta-oscuro:hover {
+    background: var(--tinta-suave);
+  }
+  .cta-oscuro:active {
+    box-shadow:
+      inset 0 -1px 0 #000,
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
+  }
+  .dark .cta-oscuro,
+  .isla-tinta .cta-oscuro {
+    background: #3a3833;
+    box-shadow:
+      inset 0 -3px 0 #121110,
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      0 0 0 1px rgb(255 255 255 / 0.04);
+  }
+  .dark .cta-oscuro:hover,
+  .isla-tinta .cta-oscuro:hover {
+    background: #45423c;
+  }
+  .cta-pastilla {
+    --pastilla-bg: #fff;
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 9999px;
+    padding: 0.4rem 0.95rem 0.4rem 0.45rem;
+    background: var(--pastilla-bg);
+    color: var(--text);
+    font-family: var(--font-grotesca), system-ui, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.25;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent),
+      0 1px 2px rgb(28 27 25 / 0.06),
+      0 6px 16px -8px rgb(28 27 25 / 0.18);
+    transition: box-shadow 160ms ease, transform 120ms ease;
+    cursor: pointer;
+  }
+  .cta-pastilla:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--text) 22%, transparent),
+      0 1px 2px rgb(28 27 25 / 0.06),
+      0 8px 20px -8px rgb(28 27 25 / 0.22);
+  }
+  .cta-pastilla:active {
+    transform: translateY(1px);
+  }
+  .cta-pastilla:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .dark .cta-pastilla,
+  .isla-tinta .cta-pastilla {
+    --pastilla-bg: var(--panel-2);
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.08),
+      0 8px 20px -10px rgb(0 0 0 / 0.6);
+  }
+  .dark .cta-pastilla:hover,
+  .isla-tinta .cta-pastilla:hover {
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.18),
+      0 8px 20px -10px rgb(0 0 0 / 0.6);
+  }
+  /* Los logos en círculos superpuestos: el anillo es del color de la pastilla. */
+  .cta-logo {
+    display: grid;
+    place-items: center;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 9999px;
+    background: #fff;
+    color: #1c1b19;
+    box-shadow: 0 0 0 2px var(--pastilla-bg), 0 0 0 3px color-mix(in srgb, #1c1b19 8%, transparent);
+  }
+  .cta-aviso {
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+}
+
+/*
+ * Muestra del Radar en el hero (app/components/landing/muestra-radar.tsx):
+ * cada asistente "contesta" una vez, en orden, en menos de 3 s. Primero late
+ * el punto con "Preguntando" y en --d aparece el resultado. Con movimiento
+ * reducido se ve el estado final de una.
+ */
+@keyframes muestra-sale {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+.muestra-espera {
+  animation: muestra-sale 160ms ease-out var(--d, 0ms) both;
+}
+.muestra-llega {
+  animation: radar-aparece 420ms cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) both;
+}
+@keyframes muestra-barra {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.muestra-barra {
+  transform-origin: left;
+  animation: muestra-barra 700ms cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms) both;
+}
+
+/*
+ * El ciclo del home (app/components/landing/ciclo.tsx): la barra del paso
+ * activo se llena en 6 s con transform y, al terminar, pasa al siguiente. Se
+ * pausa con animation-play-state. La pantalla entra con un fundido corto.
+ */
+@keyframes ciclo-llena {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.ciclo-barra {
+  transform-origin: left;
+  transform: scaleX(1);
+}
+.ciclo-barra[data-corre] {
+  animation: ciclo-llena 6s linear both;
+}
+@keyframes ciclo-entra {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.ciclo-pantalla {
+  animation: ciclo-entra 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .muestra-espera { display: none; }
+  .muestra-llega,
+  .muestra-barra,
+  .ciclo-pantalla,
+  .ciclo-barra[data-corre] { animation: none; }
+  .cta-boton,
+  .cta-pastilla,
+  .cta-aviso { transition: none; }
+}
+
 /* Portadas del blog (app/blog/portada.tsx): la textura de puntos de la marca sobre el degradado, más densa donde hay luz. */
 .portada-puntos {
   background-image: radial-gradient(rgb(255 255 255 / 0.2) 0.8px, transparent 1.25px);

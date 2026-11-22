@@ -1,24 +1,50 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { CUPOS_FOUNDER, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD } from '@peaje/db'
-import { getDict, type Dict } from '@/lib/i18n'
-import { COBROS_VISIBLES } from '@/lib/config'
+import { COSTOS_CREDITOS, CUPOS_FOUNDER, DIAS_REEMBOLSO, LIMITES, PAQUETE_MENSUAL, PRECIOS_USD, REGALO } from '@peaje/db'
+import { getDict, getLocale } from '@/lib/i18n'
+import type { DatosFaq } from '@/lib/i18n/sections/faq'
 import { currentTenant } from '@/lib/session'
-import { ChatEjemplo } from './components/chat-ejemplo'
+import { CtaInicio } from './components/cta-inicio'
+import { Ciclo } from './components/landing/ciclo'
+import { MuestraRadar } from './components/landing/muestra-radar'
+import { PantallaHace, PantallaMide, PantallaTarea, PantallaVuelve } from './components/landing/pantallas-ciclo'
+import { Icono, ICONOS } from './components/landing/piezas'
 
 /**
- * Landing pública (copy final de San, 24 oct 2026). Crema y tinta, etiquetas
- * mono, bordes de 6px y el punto verde. Dos CTAs en todo el sitio público:
- * "Empezar con mi agente" (alta) y "Revisar mi sitio gratis" (radar).
+ * Home pública (propuesta del 22 nov 2026, reports/Landing Peaje propuesta.md):
+ * hero centrado con una respuesta del Radar de ejemplo, qué mide hoy, el ciclo
+ * del agente, dónde vive, el precio, preguntas y el cierre. Una sola acción
+ * principal en toda la página: "Empezar gratis" al Radar (bloque de CtaInicio,
+ * en el hero y en el cierre). Sin números propios de usepeaje.com (San, 26 oct).
  */
-
-const COMISION_PCT = 2
 
 // Solo acá y no en el layout: las páginas hijas heredarían el canonical de la
 // portada. Sin esto Google ve usepeaje.com y www.usepeaje.com como duplicadas.
 export const metadata: Metadata = { alternates: { canonical: '/' } }
 
-type L = Dict['landing']
+const BASE = 'https://usepeaje.com'
+
+/**
+ * Las preguntas del home salen de faq.ts (la misma fuente que /preguntas y
+ * /faq), por posición: qué hace, qué asistentes mide, el Radar, dónde vive el
+ * agente, cuánto tarda y cancelar. Si faq.ts cambia de orden, revisar esto.
+ */
+const PREGUNTAS_HOME = [0, 1, 2, 8, 9, 7]
+
+const DATOS_FAQ: DatosFaq = {
+  founder: PRECIOS_USD.founder,
+  pro: PRECIOS_USD.pro,
+  cupos: CUPOS_FOUNDER,
+  creditos: LIMITES.pro.creditos,
+  dias: DIAS_REEMBOLSO,
+  regaloInformes: REGALO.informes,
+  regaloRespuestas: REGALO.respuestas,
+  paginas: PAQUETE_MENSUAL.paginas,
+  informes: PAQUETE_MENSUAL.informes,
+  respuestas: PAQUETE_MENSUAL.respuestas,
+  preguntas: LIMITES.pro.preguntas,
+  costos: COSTOS_CREDITOS,
+}
 
 /**
  * Sección a sangre completa: se escapa del max-w-5xl del layout. 100vw incluye
@@ -29,128 +55,123 @@ function Sangre({ children, className = '' }: { children: React.ReactNode; class
   return <div className={`mx-[calc(50%-50vw)] w-screen ${className}`}>{children}</div>
 }
 
+/** Titular de sección: peso medio, tracking negativo (el `!` le gana al h2 global de globals.css). */
+const H2 = 'text-[clamp(1.875rem,3.2vw,2.75rem)] leading-[1.08] font-medium tracking-[-0.03em]! text-balance'
+
+const ICONO_VIVO = { telegram: ICONOS.avion, slack: ICONOS.numeral, panel: ICONOS.panel, asistente: ICONOS.terminal } as const
+
 export default async function Landing() {
-  const [tenant, d] = await Promise.all([currentTenant(), getDict()])
+  const [tenant, d, locale] = await Promise.all([currentTenant(), getDict(), getLocale()])
   const t = d.landing
-  const P = d.precios
-  const agenteHref = tenant ? `/t/${tenant.slug}/agente` : '/nuevo'
-  const agenteTexto = tenant ? t.ctaDashboard : t.ctaAgente
-  const paquete = { ...PAQUETE_MENSUAL, preguntas: LIMITES.pro.preguntas, creditos: LIMITES.pro.creditos }
+  const precio = { founder: PRECIOS_USD.founder, pro: PRECIOS_USD.pro, cupos: CUPOS_FOUNDER, regaloInformes: REGALO.informes, regaloRespuestas: REGALO.respuestas }
+  const paquete = { ...PAQUETE_MENSUAL, preguntas: LIMITES.pro.preguntas }
+  const todas = d.faq.preguntas(DATOS_FAQ)
+  const preguntas = PREGUNTAS_HOME.map((i) => todas[i]).filter((q): q is NonNullable<typeof q> => !!q)
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    inLanguage: locale,
+    url: `${BASE}/`,
+    mainEntity: preguntas.map((q) => ({ '@type': 'Question', name: q.p, acceptedAnswer: { '@type': 'Answer', text: q.r } })),
+  }
 
   return (
     <div className="pb-4">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <Sangre className="isla-crema bg-bg text-text">
-        <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-16 lg:grid-cols-[1.15fr_1fr] lg:py-24">
-          <div>
-            <h1 className="max-w-xl text-4xl leading-[1.05] font-semibold sm:text-5xl">{t.h1}</h1>
-            <p className="mt-6 max-w-lg text-base text-muted">{t.sub}</p>
+      <section className="pt-8 text-center sm:pt-16">
+        <h1 className="mx-auto max-w-[22ch] text-[clamp(2.25rem,4.8vw,4rem)] leading-[1.02] font-medium tracking-[-0.035em]! text-balance">
+          {t.h1Inicio} <span className="text-accent sm:block">{t.h1Final}</span>
+        </h1>
+        <p className="mx-auto mt-6 max-w-[60ch] text-[17px] leading-relaxed text-pretty text-muted">{t.sub}</p>
+        <CtaInicio className="mt-9" />
+      </section>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link href={agenteHref} className="btn btn-primario">
-                {agenteTexto}
-              </Link>
-              <Link href="/radar" className="btn btn-secundario">
-                {t.ctaRadar}
-              </Link>
-            </div>
-          </div>
-
-          <ChatEjemplo
-            mensajes={t.chat}
-            ejemplo={t.chatEjemplo}
-            negocio={t.chatNegocio}
-            bot={t.chatBot}
-            subtitulo={t.chatSubtitulo}
-            tu={t.chatTu}
-          />
+      <Sangre className="relative mt-16 sm:mt-20">
+        {/* El motivo de puntos de la marca, solo detrás de la pieza. */}
+        <div
+          aria-hidden
+          className="dot-grid pointer-events-none absolute inset-x-0 -top-16 bottom-0 text-accent opacity-[0.2] [mask-image:radial-gradient(55%_60%_at_50%_42%,#000_0%,transparent_75%)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+          <MuestraRadar d={d} />
         </div>
       </Sangre>
 
-      {/* ── Lo que necesitan los agentes ─────────────────────── */}
-      <Sangre className="isla-crema border-t border-border bg-bg text-text">
-        <section id="producto" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
-          <h2 className="text-2xl font-semibold sm:text-3xl">{t.necesitanTitulo}</h2>
-          <div className="mt-10 grid gap-8 sm:grid-cols-3">
-            {t.necesitan.map((n) => (
-              <div key={n.titulo} className="border-t border-border pt-5">
-                <p className="etiqueta flex items-center gap-2 font-bold text-accent">
-                  <span aria-hidden className="h-1.5 w-1.5 bg-accent" />
-                  {n.titulo}
-                </p>
-                <p className="mt-3 text-base">{n.texto}</p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-12 max-w-2xl text-lg font-semibold leading-snug">{t.necesitanCierre}</p>
-        </section>
-      </Sangre>
-
-      {/* ── Cómo funciona ────────────────────────────────────── */}
-      <Sangre className="isla-tinta bg-bg text-text">
-        <section id="como-funciona" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
-          <h2 className="text-2xl font-semibold sm:text-3xl">{t.comoTitulo}</h2>
-          <ol className="mt-10 grid gap-10 sm:grid-cols-3">
-            {t.pasos.map((p, i) => (
-              <li key={p.titulo} className="border-t border-border pt-5">
-                <p className="font-mono text-[14px] font-bold tracking-[0.02em] text-accent">{String(i + 1).padStart(2, '0')}</p>
-                <h3 className="mt-3 text-lg font-semibold leading-snug">{p.titulo}</h3>
-                <p className="mt-2 text-sm text-muted">{p.texto}</p>
+      {/* ── Qué hace por ti ───────────────────────────────────── */}
+      <Sangre className="isla-crema mt-20 border-t border-border bg-bg text-text sm:mt-24">
+        <section className="mx-auto max-w-5xl px-6 py-12">
+          <ul className="grid gap-6 sm:grid-cols-3 sm:gap-10">
+            {t.mide.map((m, i) => (
+              <li key={m} className="flex items-start gap-3 text-[15px] leading-6">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-accent/10 text-accent">
+                  <Icono d={[ICONOS.panel, ICONOS.terminal, ICONOS.vuelta][i] ?? ICONOS.check} />
+                </span>
+                <span className="pt-1.5">{m}</span>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
       </Sangre>
 
-      {/* ── Precios ──────────────────────────────────────────── */}
-      <Sangre className="isla-crema bg-bg text-text">
-        <section id="precio" className="mx-auto max-w-5xl scroll-mt-28 px-6 py-20">
-          {/*
-            Como la tarjeta de precio de boringmarketing.com (referencia de San, 26 oct
-            2026): una sola tarjeta de Pro que cuenta qué hace el agente en palabras
-            de negocio. Lo gratis va al lado en una línea;
-            el detalle (créditos, cobro, reembolso) queda en /precios.
-          */}
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-[1fr_1.35fr] md:items-start">
-            <div>
-              <h2 className="text-2xl font-semibold sm:text-3xl">{t.precioTitulo}</h2>
-              <p className="mt-4 max-w-sm text-base text-muted">{t.precioGratis}</p>
-              {COBROS_VISIBLES ? <p className="mt-3 max-w-sm text-sm text-muted">{P.kitComision(COMISION_PCT)}</p> : null}
-              <div className="mt-6 flex flex-col items-start gap-4">
-                <Link href="/radar" className="btn btn-secundario">
-                  {t.ctaRadar}
-                </Link>
-                <Link href="/precios" className="-my-2.5 py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text">
-                  {t.verPrecios}
-                </Link>
-              </div>
-            </div>
+      {/* ── El ciclo ─────────────────────────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-28 px-6 py-24 sm:py-28">
+          <div className="max-w-2xl">
+            <h2 className={H2}>{t.cicloTitulo}</h2>
+            <p className="mt-4 max-w-[52ch] text-[17px] leading-relaxed text-muted">{t.cicloSub}</p>
+          </div>
+          <div className="mt-14">
+            <Ciclo
+              pasos={t.ciclo}
+              pantallas={[<PantallaMide key="mide" d={d} />, <PantallaTarea key="tarea" d={d} />, <PantallaHace key="hace" d={d} />, <PantallaVuelve key="vuelve" d={d} />]}
+            />
+          </div>
+        </section>
+      </Sangre>
 
-            <div className="rounded-lg border border-accent bg-panel p-5 sm:p-8">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-4xl font-semibold tabular-nums sm:text-5xl">US${PRECIOS_USD.founder}</span>
-                  <span className="text-lg text-muted line-through">US${PRECIOS_USD.pro}</span>
-                  <span className="font-mono text-sm text-muted">{t.precioUnidad}</span>
-                </p>
-                <p className="font-mono text-sm text-muted">{t.precioCreditos(LIMITES.pro.creditos)}</p>
-              </div>
-              <p className="mt-4 text-base">{t.precioValor}</p>
+      {/* ── Dónde vive tu agente ─────────────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <section className="mx-auto grid max-w-5xl gap-12 px-6 py-24 sm:py-28 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-16">
+          <div>
+            <h2 className={H2}>{t.vivoTitulo}</h2>
+            <p className="mt-4 max-w-[46ch] text-[17px] leading-relaxed text-muted">{t.vivoTexto}</p>
+          </div>
+          <ul className="divide-y divide-border border-y border-border">
+            {t.vivo.map((v) => (
+              <li key={v.clave} className="flex items-start gap-4 py-5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent/10 text-accent">
+                  <Icono d={ICONO_VIVO[v.clave]} />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-medium">{v.nombre}</p>
+                  <p className="mt-0.5 text-[15px] leading-6 text-muted">{v.texto}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </Sangre>
 
-              <p className="mt-7 text-sm font-semibold">{t.precioTodoTitulo}</p>
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {t.precioHabilidades.map((h) => (
-                  <li key={h} className="etiqueta rounded-md border border-border px-2.5 py-1 text-accent">
-                    {h}
-                  </li>
-                ))}
-              </ul>
+      {/* ── Precio ───────────────────────────────────────────── */}
+      <Sangre className="isla-crema border-t border-border bg-bg text-text">
+        <section id="precio" className="mx-auto grid max-w-5xl scroll-mt-28 gap-12 px-6 py-24 sm:py-28 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-16">
+          <div>
+            <h2 className={H2}>{t.precioTitulo(precio)}</h2>
+            <p className="mt-4 max-w-[46ch] text-[17px] leading-relaxed text-muted">{t.precioTexto(precio)}</p>
+            <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed">{t.precioGratis(precio)}</p>
+            <Link href="/precios" className="accion-texto mt-5 -ml-1 inline-block text-[15px]">
+              {t.verPrecios}
+            </Link>
+          </div>
 
-              <ul className="mt-7 space-y-3.5">
+          <div className="rounded-[18px] border border-border bg-panel p-1.5">
+            <div className="rounded-[13px] border border-border bg-bg p-5 sm:p-7">
+              <p className="text-lg font-semibold tracking-tight">{t.precioPlan}</p>
+              <ul className="mt-5 space-y-3.5">
                 {t.precioPuntos(paquete).map((p) => (
                   <li key={p.fuerte} className="flex gap-3 text-[15px] leading-6">
                     <svg className="mt-1 h-4 w-4 shrink-0 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="m5 12.5 4.5 4.5L19 7.5" />
+                      <path d={ICONOS.check} />
                     </svg>
                     <span>
                       <strong className="font-semibold">{p.fuerte}</strong>
@@ -159,12 +180,12 @@ export default async function Landing() {
                   </li>
                 ))}
               </ul>
-
-              <Link href={tenant ? agenteHref : '/nuevo?plan=1'} className="btn btn-primario btn-ancho mt-8 whitespace-normal text-center">
-                {agenteTexto}
-              </Link>
-
-              <p className="mt-6 font-mono text-xs leading-5 text-muted">{t.precioPie(CUPOS_FOUNDER).join(' · ')}</p>
+              <div className="mt-7 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted tabular-nums">{t.precioCosto(precio)}</p>
+                <Link href={tenant ? `/t/${tenant.slug}/agente` : '/nuevo?plan=1'} className="btn btn-secundario btn-suave">
+                  {tenant ? t.ctaDashboard : t.ctaAgente}
+                </Link>
+              </div>
             </div>
           </div>
         </section>
@@ -172,19 +193,41 @@ export default async function Landing() {
 
       {/* ── Preguntas ────────────────────────────────────────── */}
       <Sangre className="isla-crema border-t border-border bg-bg text-text">
-        <section className="mx-auto max-w-5xl px-6 py-20">
-          <h2 className="text-2xl font-semibold sm:text-3xl">{t.faqTitulo}</h2>
-          <div className="mt-8 divide-y divide-border border-y border-border">
-            {t.faq(COMISION_PCT, paquete).map((f) => (
-              <details key={f.p} className="group rounded-none py-4">
-                {/* -my-4 py-4: en el teléfono el toque abarca toda la fila, no solo la línea de texto; el diseño no se mueve. */}
-                <summary className="-my-4 flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+        <section className="mx-auto grid max-w-5xl gap-10 px-6 py-24 sm:py-28 md:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] md:gap-16">
+          <div>
+            <h2 className={H2}>{t.faqTitulo}</h2>
+            <Link href={t.faqRuta} className="accion-texto mt-4 -ml-1 inline-block text-[15px]">
+              {t.faqTodas}
+            </Link>
+          </div>
+          <div className="divide-y divide-border border-y border-border">
+            {preguntas.map((f) => (
+              <details key={f.p} className="group rounded-none">
+                {/* El toque abarca toda la fila; el ícono gira al abrir. */}
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[17px] font-medium [&::-webkit-details-marker]:hidden">
                   {f.p}
-                  <span aria-hidden className="font-mono text-sm text-muted group-open:rotate-45">
-                    +
-                  </span>
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    className="shrink-0 text-muted transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none"
+                  >
+                    <path d="M8 3v10M3 8h10" />
+                  </svg>
                 </summary>
-                <p className="mt-3 max-w-2xl text-sm text-muted">{f.r}</p>
+                <div className="-mt-1 pb-5">
+                  <p className="max-w-[62ch] text-[15px] leading-relaxed text-muted">{f.r}</p>
+                  {f.enlace ? (
+                    <Link href={f.enlace.href} className="accion-texto mt-2 -ml-1 inline-block">
+                      {f.enlace.texto}
+                    </Link>
+                  ) : null}
+                </div>
               </details>
             ))}
           </div>
@@ -192,53 +235,28 @@ export default async function Landing() {
       </Sangre>
 
       {/* ── Cierre ───────────────────────────────────────────── */}
-      <Sangre className="isla-tinta bg-bg text-text">
-        <section className="mx-auto max-w-5xl px-6 py-20">
-          <h2 className="max-w-2xl text-3xl font-semibold sm:text-4xl">{t.cierreTitulo}</h2>
-          <p className="mt-4 max-w-xl text-base text-muted">{t.cierreTexto}</p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href={agenteHref} className="btn btn-primario">
-              {agenteTexto}
-            </Link>
-            <Link href="/radar" className="btn btn-secundario">
-              {t.ctaRadar}
-            </Link>
-          </div>
-        </section>
-      </Sangre>
-
-      {/* ── Guías del blog ───────────────────────────────────── */}
       <Sangre className="isla-crema border-t border-border bg-bg text-text">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <span className="etiqueta font-bold text-accent">{t.guiasEtiqueta}</span>
-          <ul className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            {t.guias.map((g) => (
-              <li key={g.slug} className="min-w-0">
-                <Link href={`/blog/${g.slug}`} className="text-text underline underline-offset-4 hover:text-muted">
-                  {g.titulo}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <Link href="/blog" className="mt-4 inline-block py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text">
-            {t.guiasTodas} →
-          </Link>
+        {/* Sin padding abajo: el main del layout ya deja aire antes del pie. */}
+        <div className="mx-auto max-w-6xl px-4 pt-16 sm:px-6 sm:pt-20">
+          <section className="isla-tinta relative overflow-hidden rounded-[28px] bg-bg px-6 pt-16 pb-20 text-center text-text sm:px-12 sm:pt-20 sm:pb-24">
+            <div
+              aria-hidden
+              className="dot-grid pointer-events-none absolute inset-0 text-accent opacity-[0.16] [mask-image:radial-gradient(60%_70%_at_50%_0%,#000_0%,transparent_80%)]"
+            />
+            <div className="relative">
+              <h2 className={`mx-auto max-w-[22ch] ${H2}`}>{t.cierreTitulo}</h2>
+              <p className="mx-auto mt-4 max-w-[52ch] text-[17px] leading-relaxed text-muted">{t.cierreTexto}</p>
+              <CtaInicio className="mt-9" />
+            </div>
+          </section>
         </div>
       </Sangre>
 
-      {/* ── Para devs ────────────────────────────────────────── */}
-      <Sangre className="isla-tinta border-t border-border bg-bg text-text">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-sm">
-          <span className="etiqueta font-bold text-accent">{t.devsEtiqueta}</span>
-          <span className="text-muted">
-            {t.devsTexto} <code className="font-mono whitespace-nowrap text-text">npx @peaje/cli@1 init &lt;slug&gt;</code>
-          </span>
-          <a href="/developers" className="-my-2.5 py-2.5 text-muted underline underline-offset-4 hover:text-text">
-            {t.devsPortal} →
-          </a>
-        </div>
-      </Sangre>
+      <script
+        type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD de las preguntas del home, sin datos de usuarios
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, '\\u003c') }}
+      />
     </div>
   )
 }
-

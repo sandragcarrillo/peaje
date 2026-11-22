@@ -332,10 +332,12 @@ export function guardarLeadRadar(body: {
   locale: 'es' | 'en'
   marketingConsent: boolean
   acquisitionSource: string | null
+  /** Dónde dejó el correo: el Radar (por defecto) o el formulario de /demo. */
+  source?: 'radar' | 'demo'
 }) {
   return internal<{ lead: import('@peaje/db').RadarLead }>(`/radar/leads`, {
     method: 'POST',
-    body: JSON.stringify({ ...body, source: 'radar' }),
+    body: JSON.stringify({ ...body, source: body.source ?? 'radar' }),
   })
 }
 

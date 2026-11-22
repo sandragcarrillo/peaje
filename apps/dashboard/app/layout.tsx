@@ -13,6 +13,8 @@ import { currentTenant, listMyTenants } from '@/lib/session'
 import { CONTACTO } from '@/lib/legal'
 import { Logo } from './components/logo'
 import { RadarPill } from './components/radar-pill'
+import { Pie } from './components/pie'
+import { SoloPublico } from './components/solo-publico'
 import './globals.css'
 import { PeajeHead } from '@peaje/next/head'
 import { Analytics } from '@vercel/analytics/next'
@@ -120,21 +122,24 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
           <main className="mx-auto max-w-5xl px-6 pt-10 pb-20">{children}</main>
         </SeccionesProvider>
         </LocaleProvider>
-        <footer className="border-t border-border px-6 py-8">
-          {/* Paddle exige términos, privacidad, reembolsos y precios enlazados desde todo el sitio. */}
-          <nav
-            aria-label={d.legal.pieNav}
-            className="etiqueta mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 text-muted"
-          >
-            <Link href="/precios" className="hover:text-text">{d.legal.piePrecios}</Link>
-            <Link href="/blog" className="hover:text-text">{d.legal.pieBlog}</Link>
-            <Link href="/terms" className="hover:text-text">{d.legal.pieTerminos}</Link>
-            <Link href="/privacy" className="hover:text-text">{d.legal.piePrivacidad}</Link>
-            <Link href="/reembolsos" className="hover:text-text">{d.legal.pieReembolsos}</Link>
-            <a href={`mailto:${CONTACTO}`} className="hover:text-text">{d.legal.pieContacto}</a>
-          </nav>
-          <p className="etiqueta mx-auto mt-4 max-w-5xl text-center text-muted">Peaje · 2026</p>
-        </footer>
+        <SoloPublico
+          privado={
+            <footer className="border-t border-border px-6 py-6">
+              <nav
+                aria-label={d.legal.pieLegal}
+                className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-muted"
+              >
+                <Link href="/precios" className="hover:text-text">{d.legal.piePrecios}</Link>
+                <Link href="/terms" className="hover:text-text">{d.legal.pieTerminos}</Link>
+                <Link href="/privacy" className="hover:text-text">{d.legal.piePrivacidad}</Link>
+                <Link href="/reembolsos" className="hover:text-text">{d.legal.pieReembolsos}</Link>
+                <a href={`mailto:${CONTACTO}`} className="hover:text-text">{d.legal.pieContacto}</a>
+              </nav>
+            </footer>
+          }
+        >
+          <Pie locale={locale} />
+        </SoloPublico>
         </div>
         {/* Vercel Web Analytics: visitas y referrers, sin cookies. El script es del mismo origen (lib/csp.ts). */}
         <Analytics />

@@ -1,45 +1,87 @@
 ---
-title: ¿Cómo sé si ChatGPT, Claude o Perplexity citan mi negocio?
-description: La diferencia entre que un agente de IA visite tu sitio y que te cite, y cómo se mide cada una.
+title: Cómo saber si ChatGPT recomienda tu negocio
+description: Un método a mano para revisar si ChatGPT y Claude te citan, te nombran o recomiendan a otro, con una tabla para anotar lo que encuentras.
 date: 2026-10-27
+updated: 2026-11-22
 slug: como-se-si-chatgpt-claude-o-perplexity-citan-mi-negocio
 lang: es
 categoria: Guía
 portada: 4
-portada_titulo: ¿La IA te cita?
+portada_titulo: ¿ChatGPT te recomienda?
 traduccion: how-do-i-know-if-chatgpt-claude-or-perplexity-cite-my-business
 ---
 
-# ¿Cómo sé si ChatGPT, Claude o Perplexity citan mi negocio?
+# Cómo saber si ChatGPT recomienda tu negocio
 
-Hay dos cosas que puedes medir: si esos agentes visitan tu sitio y si te citan cuando alguien les hace las preguntas de tu negocio. Lo segundo solo se sabe preguntándole a cada asistente, una y otra vez, lo que preguntan tus clientes, y revisando si apareces. Peaje hace las dos cosas, registra las visitas de agentes a tu sitio y les pregunta a ChatGPT y a Claude si te citan. Perplexity no lo medimos hoy, aunque su bot sí aparece en tus visitas.
+La única forma de saberlo es preguntarle tú, como lo haría un cliente. Escribe entre 5 y 10 preguntas de compra sin el nombre de tu negocio, hazlas en ChatGPT y en Claude con la búsqueda activada y anota tres cosas: si te citan con enlace, si te nombran sin enlace y a quién citan en tu lugar. Después repítelas, porque la misma pregunta puede dar otra respuesta mañana.
 
-Actualizado: octubre de 2026
+Actualizado: noviembre de 2026
 
-En el plan Pro tu agente sigue **20 preguntas en asistentes de IA** y tiene **500 créditos al mes** para su trabajo, como dice la [página de precios](https://usepeaje.com/precios), y hablar con tu agente no gasta créditos.
+## 1. Escribe las preguntas como las haría un cliente
 
-## ¿Puedo verlo sin pagar nada?
+Piensa en lo que alguien escribe antes de conocerte. Deja fuera el nombre de tu negocio, porque con él solo mides si ya te conocen, y pon la ciudad o el país, la situación y lo que le preocupa. Por ejemplo:
 
-Sí, en parte. El [radar gratis](https://usepeaje.com/radar) te dice en menos de un minuto qué encuentra un agente cuando llega a tu sitio, y además les hace a ChatGPT y a Claude hasta 3 preguntas de alguien que busca lo que ofreces, para mostrarte si te citan y a quién citan en tu lugar. Solo pide tu correo y tu dominio, sin cuenta ni tarjeta. El registro de visitas de agentes también es gratis, con una cuenta y el kit instalado en tu sitio. Lo que se paga es el seguimiento, las 20 preguntas cada semana.
+- "¿Dónde compro pan de masa madre con domicilio en Medellín?"
+- "¿Qué contador me recomiendas para declarar renta como freelancer en Colombia?"
+- "¿Cuál es el mejor programa de reservas para un spa pequeño?"
+- "¿Cuánto cuesta una limpieza dental en Bogotá y dónde la hago?"
+- "Alternativas a [el competidor más conocido de tu categoría]"
 
-## ¿Qué diferencia hay entre una visita y una cita?
+Mezcla preguntas generales, de precio y de comparación. Las de comparación ("X o Y") son las que hace alguien que ya está por decidir.
 
-Una visita es un agente que entra a tu sitio a leerlo. Una cita es ese agente enlazando tu sitio cuando alguien le pregunta por lo que vendes, y si te nombra sin enlace, el radar lo marca aparte. Te pueden visitar mucho y no citarte nunca, por ejemplo si no entienden qué vendes ni a qué precio, por eso medimos las dos cosas por separado.
+## 2. Hazlas en ChatGPT y en Claude con la búsqueda activada
 
-## ¿Cómo mide Peaje si te citan?
+Los dos buscan en la web solo cuando creen que la pregunta lo necesita, así que conviene pedírselo:
 
-Tu agente les pregunta a ChatGPT y a Claude lo que preguntan tus clientes y revisa si tu sitio sale entre las fuentes de la respuesta. Después vuelve a medir a las 2 y a las 6 semanas, para que sepas si lo que cambiaste sirvió. Te lo cuenta en Telegram o en tu panel, y te manda un reporte semanal por correo. Perplexity no está en esa medición.
+- **ChatGPT:** elige la búsqueda en el menú de herramientas, o escribe / y elígela ahí. Está en todos los planes, también en el gratis, según la [ayuda de OpenAI](https://help.openai.com/en/articles/9237897-chatgpt-search). Las páginas que usó salen en el botón de fuentes.
+- **Claude:** activa la búsqueda web en el botón + de la conversación, o pídele en la misma pregunta que busque en la web. En la versión nueva de Claude no hay interruptor y busca cuando le sirve, según la [ayuda de Claude](https://support.claude.com/en/articles/10684626-enabling-and-using-web-search). Cada respuesta con búsqueda trae sus citas.
 
-## ¿Y si resulta que no me citan?
+Abre una conversación nueva para cada pregunta. Los dos usan tu ubicación aproximada según tu IP, así que ves más o menos lo que ve un cliente de tu país, y si vendes en otro país, allá pueden ver otra respuesta.
 
-Tu agente te dice qué falta y escribe los borradores completos de las páginas que te faltan, con los datos de tu propio sitio. Cada arreglo queda como tarea: si usas Claude Code o Cursor, tu herramienta la toma desde Peaje, y si no, se la pasas a quien lleva tu web. Cuando el arreglo está en línea, tu agente lo revisa en tu sitio.
+## 3. Anota tres cosas por respuesta
 
-## ¿Cuánto cuesta y me puedo salir?
+Una tabla basta, como este ejemplo inventado para una panadería:
 
-Pro cuesta US$30 al mes, precio de fundador para los primeros 50 negocios, y US$69 después, según la [página de precios](https://usepeaje.com/precios). Cancelas cuando quieras desde tu panel, sin llamadas, y si es tu primer pago y lo pides dentro de 7 días, te lo devolvemos completo. Si cancelas, te quedas con tu diagnóstico y con los arreglos que tu agente ya te entregó.
+| Pregunta | Asistente | Te cita con enlace | Te nombra sin enlace | A quién cita en tu lugar |
+| --- | --- | --- | --- | --- |
+| Pan de masa madre con domicilio en Medellín | ChatGPT | No | Sí | guia-ejemplo.com, competidor-ejemplo.com |
+| Pan de masa madre con domicilio en Medellín | Claude | No | No | directorio-ejemplo.com |
+| Panadería para pedir tortas de cumpleaños en El Poblado | ChatGPT | Sí | Sí | resenas-ejemplo.com |
+| Panadería para pedir tortas de cumpleaños en El Poblado | Claude | No | No | competidor-ejemplo.com |
+
+Te nombra sin enlace cuando sabe que existes pero no encontró una página tuya que respalde la respuesta. La última columna es la más útil: esos son tus competidores en la IA, y pueden ser otros negocios, guías, directorios o medios.
+
+## 4. Repite, porque las respuestas cambian
+
+Una respuesta es una foto de ese momento, y las fuentes cambian con el día y con cómo escribes la pregunta. Haz cada pregunta dos o tres veces y repite la lista cada semana, el mismo día. Lo que importa es en cuántas preguntas te citan y si eso sube o baja, como explicamos en [cada cuánto medir](https://usepeaje.com/blog/cada-cuanto-debo-medir-si-chatgpt-y-claude-citan-mi-negocio).
+
+## 5. Qué hacer con lo que encuentras
+
+- **No te citan en ninguna:** revisa que sus bots puedan entrar. OpenAI pide dejar pasar a OAI-SearchBot para salir en ChatGPT, y Anthropic dice que bloquear a Claude-SearchBot o a Claude-User puede bajar tu visibilidad en Claude. Lo explicamos en [qué bots de IA visitan tu web](https://usepeaje.com/blog/que-bots-de-ia-visitan-mi-web-y-como-los-dejo-pasar).
+- **Te nombran sin enlace:** te falta una página que responda esa pregunta con datos concretos, como precios, zona de entrega u horarios.
+- **Citan a otro:** abre esa página y mira qué responde que la tuya no. Suele ser una guía o una comparativa, como contamos en [qué formato de página citan más](https://usepeaje.com/blog/que-formato-de-pagina-citan-mas-chatgpt-y-claude-guia-documentacion-o-comparativa).
+- **Dicen algo equivocado de ti:** mira [por qué pasa y cómo se corrige](https://usepeaje.com/blog/por-que-chatgpt-da-informacion-equivocada-de-mi-negocio-y-como-la-corrijo).
+
+## La misma prueba, gratis, con el Radar
+
+El [Radar de Peaje](https://usepeaje.com/radar) hace esta prueba gratis. Lee tu sitio, escribe tres preguntas de compra sin tu marca para el país que elijas y se las hace a ChatGPT y a Claude con búsqueda web. Te muestra dónde te citan, dónde te nombran sin enlace y a quién citan en tu lugar, y revisa si los agentes pueden leer tu sitio. Pide tu dominio y tu correo, sin tarjeta.
+
+También es una foto, y si vuelves antes de una semana ves el mismo resultado. Usa la versión para desarrolladores de cada asistente, así que puede no coincidir palabra por palabra con la app. Para seguir 20 preguntas cada semana está Pro, a US$30 al mes para los primeros 50 negocios y US$69 después, según la [página de precios](https://usepeaje.com/precios).
+
+## Preguntas frecuentes
+
+**¿Sirve preguntar con el nombre de mi negocio?**
+Te dice qué saben de ti. Para saber si te recomiendan, la pregunta tiene que ser la de alguien que todavía no conoce tu nombre.
+
+**¿Qué diferencia hay entre que un bot me visite y que me cite?**
+Una visita es un bot que entra a leer tu sitio. Una cita es el asistente enlazando tu sitio cuando alguien le pregunta por lo que vendes. Te pueden visitar mucho y no citarte nunca, por ejemplo si no queda claro qué vendes ni a qué precio.
+
+**¿Y Perplexity o Gemini?**
+Puedes hacer lo mismo a mano en cualquier asistente que muestre sus fuentes. Peaje hoy mide solo ChatGPT y Claude.
 
 ## Fuentes
 
-- [Peaje](https://usepeaje.com/): qué mide el agente y el reporte semanal.
-- [Precios](https://usepeaje.com/precios): 20 preguntas seguidas, 500 créditos, US$30 y US$69, reembolso en 7 días.
-- [Radar gratis](https://usepeaje.com/radar): la revisión gratis en menos de un minuto y las preguntas a ChatGPT y Claude.
+- [ChatGPT search, ayuda de OpenAI](https://help.openai.com/en/articles/9237897-chatgpt-search): cuándo busca, cómo activarla, planes, ubicación por IP y OAI-SearchBot. Revisado el 22 de noviembre de 2026.
+- [Enabling and using web search, ayuda de Claude](https://support.claude.com/en/articles/10684626-enabling-and-using-web-search): cómo activarla, citas en cada respuesta y ubicación por IP. Revisado el 22 de noviembre de 2026.
+- [Bots de Anthropic, ayuda de Claude](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler): Claude-SearchBot y Claude-User. Revisado el 22 de noviembre de 2026.
+- [Radar gratis de Peaje](https://usepeaje.com/radar) y [precios](https://usepeaje.com/precios).

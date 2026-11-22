@@ -8,6 +8,8 @@ import { COBROS_VISIBLES } from '@/lib/config'
 
 /** Lo que trae Pro cada mes: PAQUETE_MENSUAL y LIMITES.pro.preguntas de planes.ts. */
 type Paquete = { paginas: number; preguntas: number; informes: number; respuestas: number }
+/** Números de la tabla Gratis y Pro: PAQUETE_MENSUAL, LIMITES.pro y REGALO. */
+type Tabla = Paquete & { creditos: number; regaloInformes: number; regaloRespuestas: number }
 export const precios = {
   es: {
     metaTitulo: 'Precios',
@@ -31,6 +33,9 @@ export const precios = {
       'Registro de visitas de agentes',
       'Monitor diario y tareas para arreglar lo que falla',
     ],
+    // El paquete gratis (regalo.ts): una vez por dominio, va aparte de gratisIncluye porque sus números llegan de @peaje/db.
+    gratisPaquete: (informes: number, respuestas: number) =>
+      `Paquete gratis para probar tu agente, una vez por sitio: ${informes} informes (tu plan y una medición de quién aparece en tu lugar) y ${respuestas} respuestas`,
     // Nota del plan gratis mientras cobrarles a los agentes está apagado (hasta mainnet).
     kitNota: 'No pide tarjeta y no vence.',
     kitComision: (pct: number) =>
@@ -108,6 +113,26 @@ export const precios = {
       },
     ],
 
+    faqMas: 'Más preguntas: qué mide Peaje, dónde vive el agente y qué no hace todavía',
+
+    // Tabla Gratis y Pro lado a lado. Números de planes.ts y regalo.ts.
+    tablaTitulo: 'Gratis y Pro, lado a lado',
+    tablaQue: 'Qué trae',
+    tablaPrecio: 'Precio',
+    tabla: (t: Tabla) => [
+      { que: 'Radar de tu sitio', gratis: 'Sí', pro: 'Sí' },
+      { que: 'Kit para que los agentes lean tu sitio', gratis: 'Sí', pro: 'Sí' },
+      { que: 'Monitor diario y tareas de arreglo', gratis: 'Sí', pro: 'Sí' },
+      { que: 'Registro de visitas de agentes', gratis: 'Sí', pro: 'Sí' },
+      { que: 'Informes a pedido (plan, medición de citas)', gratis: `${t.regaloInformes}, una vez`, pro: `${t.informes} al mes` },
+      { que: 'Respuestas de tu agente con tus datos', gratis: `${t.regaloRespuestas}, una vez`, pro: `${t.respuestas} al mes` },
+      { que: 'Páginas escritas por tu agente', gratis: 'No', pro: `${t.paginas} al mes` },
+      { que: `Preguntas de tus clientes medidas en ${asistentesMedidos('es')}`, gratis: 'No', pro: `${t.preguntas} al mes` },
+      { que: 'Nueva medición a las 2 y a las 6 semanas', gratis: 'No', pro: 'Sí' },
+      { que: 'Reporte semanal', gratis: 'No', pro: 'Sí' },
+      { que: 'Créditos para el trabajo del agente', gratis: 'No', pro: `${t.creditos} al mes` },
+    ],
+
     ctaRadar: 'Revisar mi sitio gratis',
     ctaRegistrar: 'Crear mi cuenta',
   },
@@ -132,6 +157,8 @@ export const precios = {
       'A log of agent visits',
       'A daily monitor and tasks to fix what breaks',
     ],
+    gratisPaquete: (informes: number, respuestas: number) =>
+      `A free package to try your agent, once per site: ${informes} reports (your plan and one measurement of who shows up instead of you) and ${respuestas} answers`,
     kitNota: 'No card needed, and it does not expire.',
     kitComision: (pct: number) =>
       `If you charge agents, Peaje keeps ${pct}% of each payment and credits the rest to your business wallet. Those payments are separate from the Pro subscription: they do not go through Paddle, which only processes the Pro card payment.`,
@@ -200,6 +227,25 @@ export const precios = {
         p: 'What happens if I run out of credits?',
         r: 'Your agent keeps talking with you, but it does no new work until the 1st of next month, when credits renew. What it already handed you stays in your dashboard and nothing extra is charged.',
       },
+    ],
+
+    faqMas: 'More questions: what Peaje measures, where the agent lives and what it does not do yet',
+
+    tablaTitulo: 'Free and Pro, side by side',
+    tablaQue: 'What you get',
+    tablaPrecio: 'Price',
+    tabla: (t: Tabla) => [
+      { que: 'Radar for your site', gratis: 'Yes', pro: 'Yes' },
+      { que: 'Kit so agents can read your site', gratis: 'Yes', pro: 'Yes' },
+      { que: 'Daily monitor and fix tasks', gratis: 'Yes', pro: 'Yes' },
+      { que: 'Log of agent visits', gratis: 'Yes', pro: 'Yes' },
+      { que: 'Reports on demand (plan, citation check)', gratis: `${t.regaloInformes}, once`, pro: `${t.informes} a month` },
+      { que: 'Answers from your agent with your data', gratis: `${t.regaloRespuestas}, once`, pro: `${t.respuestas} a month` },
+      { que: 'Pages written by your agent', gratis: 'No', pro: `${t.paginas} a month` },
+      { que: `Customer questions tracked in ${asistentesMedidos('en')}`, gratis: 'No', pro: `${t.preguntas} a month` },
+      { que: 'New measurement at 2 and 6 weeks', gratis: 'No', pro: 'Yes' },
+      { que: 'Weekly report', gratis: 'No', pro: 'Yes' },
+      { que: 'Credits for the agent work', gratis: 'No', pro: `${t.creditos} a month` },
     ],
 
     ctaRadar: 'Check my site free',
