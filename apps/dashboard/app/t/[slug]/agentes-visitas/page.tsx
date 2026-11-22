@@ -2,7 +2,8 @@ import Link from 'next/link'
 import type { AgentKind, QuienVisita } from '@peaje/db'
 import { COBROS_VISIBLES, money } from '@/lib/config'
 import { PageHeader } from '@/components/chrome'
-import { getDict } from '@/lib/i18n'
+import { Tope } from '@/components/tope'
+import { getDict, getLocale } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 
@@ -24,7 +25,7 @@ export default async function VisitasPage({
 }) {
   const { slug } = await params
   const { dias: diasParam } = await searchParams
-  const d = await getDict()
+  const [d, locale] = await Promise.all([getDict(), getLocale()])
   const t = d.visitas
   const tenant = await requireTenant(slug)
   const dias = diasParam === '30' ? 30 : 7
@@ -62,61 +63,53 @@ export default async function VisitasPage({
     o.tipo === 'navegador' ? t.otrosNavegador : o.tipo === 'sin-ua' ? t.otrosSinUa : o.tipo === 'script' ? t.otrosScript(o.nombre) : o.nombre
 
   return (
-    <div className="space-y-8">
-      <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
-
-      <div className="flex gap-2">
-        {[7, 30].map((n) => (
-          <Link
-            key={n}
-            href={n === 7 ? base : `${base}?dias=30`}
-            aria-current={dias === n ? 'page' : undefined}
-            className={`btn btn-secundario btn-chico ${dias === n ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
-          >
-            {n === 7 ? t.ventana7 : t.ventana30}
-          </Link>
-        ))}
+    <div className="space-y-6">
+      {/* Título, total y período en un solo bloque apretado: el número va en la misma línea que su frase y su selector. */}
+      <div className="space-y-4">
+        <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+          {stats.totals.visits > 0 ? (
+            <>
+              <span className="text-5xl font-semibold leading-none tracking-tight tabular-nums">{stats.totals.visits.toLocaleString(locale === 'es' ? 'es-CO' : 'en-US')}</span>
+              <span className="text-sm text-muted">{t.visitasEn}</span>
+            </>
+          ) : null}
+          <div className="flex gap-1.5 self-center">
+            {[7, 30].map((n) => (
+              <Link
+                key={n}
+                href={n === 7 ? base : `${base}?dias=30`}
+                aria-current={dias === n ? 'page' : undefined}
+                className={`btn btn-secundario btn-chico ${dias === n ? 'border-text bg-panel' : 'text-muted hover:text-text'}`}
+              >
+                {n === 7 ? t.ventana7 : t.ventana30}
+              </Link>
+            ))}
+          </div>
+          {COBROS_VISIBLES && stats.totals.paid > 0 ? (
+            <span className="text-sm text-muted">
+              · {stats.totals.paid} {t.metricaPagadas.toLowerCase()} · {money(stats.totals.revenue)} · {stats.agentWallets.length} {t.metricaWallets.toLowerCase()}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {stats.totals.visits === 0 ? (
         <p className="text-sm text-muted">{t.vacio}</p>
       ) : (
         <>
-          {/* Hasta mainnet solo las visitas: pagadas, ingresos y wallets son de cobros (ver COBROS_VISIBLES). */}
-          <div className={`grid border border-border bg-bg ${COBROS_VISIBLES ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'}`}>
-            {(COBROS_VISIBLES
-              ? [
-                  [t.metricaVisitas, String(stats.totals.visits)],
-                  [t.metricaPagadas, String(stats.totals.paid)],
-                  [t.metricaIngresos, money(stats.totals.revenue)],
-                  [t.metricaWallets, String(stats.agentWallets.length)],
-                ]
-              : [[t.metricaVisitas, String(stats.totals.visits)]]
-            ).map(([label, valor], i) => (
-              // En el celular van de a dos: divisor vertical en la columna izquierda y horizontal bajo la primera fila.
-              <div key={label} className={`border-border p-6 ${COBROS_VISIBLES ? ['border-r border-b md:border-b-0', 'border-b md:border-r md:border-b-0', 'border-r', ''][i] : ''}`}>
-                <span className="text-xs font-medium text-muted">{label}</span>
-                <div className="mt-4 text-3xl font-bold">{valor}</div>
-              </div>
-            ))}
-          </div>
-
           <section className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="flex flex-col gap-3">
               <Cabecera texto={t.porTipo} />
-              <ul className="divide-y divide-border border border-border">
-                {quien.map((q) => (
-                  <li key={q.clave} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                    <span className="min-w-0 truncate">{q.label}</span>
-                    <span className="shrink-0 font-mono text-xs text-muted">
-                      {q.visits}
-                      {q.noPagaron > 0 ? (
-                        <span className="ml-2 text-faint">· {q.noPagaron} {t.noPagaron}</span>
-                      ) : null}
-                    </span>
-                  </li>
-                ))}
-                {visitasSinNombre > 0 ? (
+              {/* Los 8 que más visitan; el resto, con un botón. "Otros" va siempre al final. */}
+              <Tope
+                visibles={8}
+                mas={t.verMas(Math.max(0, quien.length - 8))}
+                menos={t.verMenos}
+                className="tarjeta divide-y divide-border overflow-hidden"
+                fijo={
+                  <>
+                    {visitasSinNombre > 0 ? (
                   <li>
                     <details className="group">
                       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-panel-2 [&::-webkit-details-marker]:hidden">
@@ -142,7 +135,21 @@ export default async function VisitasPage({
                     </details>
                   </li>
                 ) : null}
-              </ul>
+                  </>
+                }
+              >
+                {quien.map((q) => (
+                  <li key={q.clave} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                    <span className="min-w-0 truncate">{q.label}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted">
+                      {q.visits}
+                      {q.noPagaron > 0 ? (
+                        <span className="ml-2 text-faint">· {q.noPagaron} {t.noPagaron}</span>
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </Tope>
               {stats.navegadores > 0 ? <p className="text-xs text-faint">{t.navegadoresNota(stats.navegadores)}</p> : null}
             </div>
 
@@ -160,12 +167,13 @@ export default async function VisitasPage({
                 {diario.map((x, i) => (
                   <div key={x.date} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${x.date}: ${x.visits}`}>
                     <div className="flex w-full flex-1 items-end border-b border-border">
-                      <div className="relative flex w-full flex-col justify-end bg-border" style={{ height: `${(x.visits / maxDia) * 100}%` }}>
+                      {/* La barra son las visitas, siempre en color. Lo pagado se marca encima, en tinta, solo cuando hubo. */}
+                      <div className="relative flex w-full flex-col justify-end rounded-t-sm bg-accent" style={{ height: `${(x.visits / maxDia) * 100}%` }}>
                         {/* Con 30 barras en el teléfono los números se pisan: ahí solo se ven desde sm. */}
                         {x.visits > 0 ? (
                           <span className={`absolute -top-4 left-1/2 -translate-x-1/2 font-mono text-[9px] text-muted ${dias === 30 ? 'hidden sm:inline' : ''}`}>{x.visits}</span>
                         ) : null}
-                        <div className="w-full bg-accent" style={{ height: `${!COBROS_VISIBLES ? 100 : x.visits ? (x.paid / x.visits) * 100 : 0}%` }} />
+                        {COBROS_VISIBLES && x.paid > 0 ? <div className="w-full bg-text" style={{ height: `${(x.paid / x.visits) * 100}%` }} /> : null}
                       </div>
                     </div>
                     <span className={`font-mono text-[9px] whitespace-nowrap text-faint ${dias === 7 || i % 5 === 0 || i === diario.length - 1 ? '' : 'invisible'}`}>
@@ -214,7 +222,8 @@ export default async function VisitasPage({
                 </>
               ) : null}
             </div>
-            <ul className="divide-y divide-border border border-border">
+            {/* Las 8 rutas más visitadas; el resto, con un botón. */}
+            <Tope visibles={8} mas={t.verMas(Math.max(0, stats.topPaths.length - 8))} menos={t.verMenos} className="divide-y divide-border border border-border">
               {stats.topPaths.map((p) => (
                 // En el celular, fila flex: 11 gaps de la grilla de 12 se comían la mitad del ancho.
                 <li key={p.path} className="flex gap-4 px-4 py-2.5 text-sm md:grid md:grid-cols-12">
@@ -229,7 +238,7 @@ export default async function VisitasPage({
                   ) : null}
                 </li>
               ))}
-            </ul>
+            </Tope>
           </section>
 
           <section className="flex flex-col gap-3">

@@ -89,7 +89,7 @@ export function Sidebar({
     })
 
   return (
-    <aside className="scroll-thin sticky top-16 hidden h-[calc(100vh-5rem)] w-64 shrink-0 flex-col justify-between gap-6 self-start overflow-y-auto border-r border-border bg-panel p-4 md:flex">
+    <aside className="scroll-thin sticky top-0 hidden h-dvh w-64 shrink-0 flex-col justify-between gap-6 self-start overflow-y-auto border-r border-border bg-panel p-4 pt-24 md:flex">
       <div className="space-y-6">
         {/* Identidad del tenant */}
         <div className="flex items-center gap-3 px-1">

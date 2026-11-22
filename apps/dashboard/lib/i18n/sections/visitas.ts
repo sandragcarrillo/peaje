@@ -10,6 +10,9 @@ export const visitas = {
     metricaIngresos: 'Ingresos',
     metricaWallets: 'Wallets que pagaron',
     porTipo: 'Quién te visita',
+    verMas: (n: number) => (n === 1 ? 'Ver 1 más' : `Ver ${n} más`),
+    verMenos: 'Ver menos',
+    visitasEn: 'visitas de agentes en los últimos',
     tipos: {
       'mpp-client': 'Cliente MPP',
       'x402-client': 'Cliente x402',
@@ -61,6 +64,9 @@ export const visitas = {
     metricaIngresos: 'Revenue',
     metricaWallets: 'Wallets that paid',
     porTipo: 'Who visits you',
+    verMas: (n: number) => `Show ${n} more`,
+    verMenos: 'Show less',
+    visitasEn: 'agent visits in the last',
     tipos: {
       'mpp-client': 'MPP client',
       'x402-client': 'x402 client',

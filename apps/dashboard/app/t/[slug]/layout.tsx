@@ -44,8 +44,9 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
   ])
 
   return (
-    <div className="mx-[calc(50%-50vw)] -mt-4 w-screen">
-      <div className="flex w-full">
+    // -mb-20: come el aire de abajo del layout raíz, para que el menú lateral llegue hasta el pie sin una franja suelta.
+    <div className="mx-[calc(50%-50vw)] -mt-4 -mb-20 w-screen">
+      <div className="flex min-h-dvh w-full">
         <Sidebar
           slug={tenant.slug}
           name={tenant.name}

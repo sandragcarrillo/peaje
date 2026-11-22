@@ -222,9 +222,10 @@ function EstaSemana({ datos, titulo }: { datos: Dato[]; titulo: string }) {
   return (
     <div className="space-y-3">
       <h2 className="text-sm font-semibold">{titulo}</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Tantas columnas como datos haya: con dos tarjetas no queda un tercio vacío a la derecha. */}
+      <div className={`grid grid-cols-1 gap-3 ${datos.length === 2 ? 'sm:grid-cols-2' : datos.length >= 3 ? 'sm:grid-cols-3' : ''}`}>
         {datos.map((x) => (
-          <div key={x.href} className="flex flex-col justify-between gap-3 border border-border bg-panel p-5">
+          <div key={x.href} className="tarjeta flex flex-col justify-between gap-3 p-5">
             <div>
               <p className="text-2xl font-bold tabular-nums">{x.valor}</p>
               <p className="mt-1 text-sm text-muted">{x.texto}</p>
