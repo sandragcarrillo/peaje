@@ -24,6 +24,23 @@ export function Seccion({
   )
 }
 
+/** Una sección que arranca cerrada: el encabezado es lo que se abre, sin otra caja ni otro título adentro. */
+export function SeccionPlegable({ n, titulo, cuenta, children }: { n: string; titulo: string; cuenta?: number; children: React.ReactNode }) {
+  return (
+    <details className="group border border-border bg-bg">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4 hover:bg-panel sm:px-6 [&::-webkit-details-marker]:hidden">
+        <span className="font-mono text-xs font-bold text-accent">{n}</span>
+        <h2 className="text-lg font-semibold">{titulo}</h2>
+        {cuenta ? <span className="text-sm tabular-nums text-muted">{cuenta}</span> : null}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="ml-auto shrink-0 text-muted transition-transform group-open:rotate-180">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="border-t border-border p-4 sm:p-6">{children}</div>
+    </details>
+  )
+}
+
 /** La barra de arriba de la sección 01: igual mientras se mide y en el resultado. */
 export function Barra01({ titulo, dominio }: { titulo: string; dominio: string }) {
   return (

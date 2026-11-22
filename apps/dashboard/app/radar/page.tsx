@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { ciudadLimpia, mercadoDe } from '@peaje/shared/mercados'
 import Link from 'next/link'
 import { cache } from 'react'
 import { getDict, getLocale, type Dict, type Locale } from '@/lib/i18n'
@@ -11,7 +12,8 @@ import { leer, principales, type Lectura, type Paso } from './datos'
 import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
 import { Formulario, MandarInforme, Medir } from './partes'
 import { Cuenta, Fase, Revelado } from './revelado'
-import { Barra01, Seccion } from './seccion'
+import { Tope } from '@/components/tope'
+import { Barra01, Seccion, SeccionPlegable } from './seccion'
 import { textoLlanoDe, textoOk } from './textos'
 
 /**
@@ -22,8 +24,11 @@ import { textoLlanoDe, textoOk } from './textos'
 
 const BASE = process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com'
 const COOKIE_CORREO = 'peaje_radar_email'
+/** La misma que escribe el formulario (partes.tsx). */
+const COOKIE_PAIS = 'peaje_radar_pais'
+const COOKIE_CIUDAD = 'peaje_radar_ciudad'
 
-type Props = { searchParams: Promise<{ d?: string; medir?: string }> }
+type Props = { searchParams: Promise<{ d?: string; medir?: string; p?: string; c?: string }> }
 type T = Dict['radar']
 
 /**
@@ -61,8 +66,15 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 }
 
 export default async function Radar({ searchParams }: Props) {
-  const [{ d: entrada, medir }, dict, locale, jar] = await Promise.all([searchParams, getDict(), getLocale(), cookies()])
+  const [{ d: entrada, medir, p, c }, dict, locale, jar, cabeceras] = await Promise.all([searchParams, getDict(), getLocale(), cookies(), headers()])
   const t = dict.radar
+  // El país de sus clientes: el del enlace, si no el que eligió en el formulario. Uno que no está en la lista no cuenta.
+  const elegido = p ?? jar.get(COOKIE_PAIS)?.value
+  const pais = mercadoDe(elegido)?.codigo ?? ''
+  // La ciudad viaja con el país: la del enlace si el enlace trae país, si no la del formulario.
+  const ciudad = pais ? (ciudadLimpia(p !== undefined ? c : decodeURIComponent(jar.get(COOKIE_CIUDAD)?.value ?? '')) ?? '') : ''
+  // Para el formulario: lo que ya eligió (aunque sea "varios países") o, la primera vez, el país desde donde entra.
+  const paisFormulario = elegido !== undefined ? pais : (mercadoDe(cabeceras.get('x-vercel-ip-country'))?.codigo ?? '')
   const correo = jar.get(COOKIE_CORREO)?.value ?? ''
   const conCorreo = correo !== ''
   const dominio = dominioDeRadar(entrada)
@@ -84,13 +96,13 @@ export default async function Radar({ searchParams }: Props) {
             <Medir key={dominio} dominio={dominio} auto conCorreo />
           </div>
         </section>
-        <SeccionCitas key={`citas-${dominio}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} />
+        <SeccionCitas key={`citas-${dominio}-${pais}-${ciudad}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
       </div>
     )
   }
 
   if (resultado) {
-    return <Resultado t={t} locale={locale} dominio={dominio} lectura={leer(score)} conCorreo={conCorreo} />
+    return <Resultado t={t} locale={locale} dominio={dominio} lectura={leer(score)} conCorreo={conCorreo} pais={pais} ciudad={ciudad} />
   }
 
   return (
@@ -101,6 +113,8 @@ export default async function Radar({ searchParams }: Props) {
       invalido={Boolean(entrada) && !dominio}
       pideCorreo={dominio}
       medir={pideMedir && score !== null}
+      pais={paisFormulario}
+      ciudad={ciudad}
     />
   )
 }
@@ -112,6 +126,8 @@ function Hero({
   invalido,
   pideCorreo,
   medir,
+  pais,
+  ciudad,
 }: {
   t: T
   dominio: string
@@ -119,6 +135,8 @@ function Hero({
   invalido: boolean
   pideCorreo: string | null
   medir: boolean
+  pais: string
+  ciudad: string
 }) {
   return (
     <div className="grid items-center gap-10 py-6 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-14">
@@ -132,7 +150,7 @@ function Hero({
         <p className="max-w-xl text-base text-muted">{t.texto}</p>
         {invalido ? <p className="text-sm text-red-600">{t.invalido}</p> : null}
         {pideCorreo ? <p className="max-w-xl border-l-2 border-accent pl-3 text-sm">{t.pideCorreo(pideCorreo)}</p> : null}
-        <Formulario dominioInicial={dominio} correoInicial={correo} medir={medir} />
+        <Formulario dominioInicial={dominio} correoInicial={correo} paisInicial={pais} ciudadInicial={ciudad} medir={medir} />
       </div>
       <Ejemplo t={t} />
     </div>
@@ -199,22 +217,11 @@ function fechaDe(iso: string | null, locale: Locale): { fecha: string; dias: num
   return { fecha, dias: Math.max(0, Math.floor((Date.now() - ms) / 86_400_000)) }
 }
 
-function Etiqueta({ children, tono }: { children: React.ReactNode; tono: 'accent' | 'muted' }) {
-  return (
-    <span
-      className={`inline-block border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.04em] ${
-        tono === 'accent' ? 'border-accent text-accent' : 'border-border text-muted'
-      }`}
-    >
-      {children}
-    </span>
-  )
-}
-
 /** Cada arreglo en palabras del dueño: qué falta, por qué importa y que se implementa con el kit. */
 function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
   return (
-    <ul className="divide-y divide-border/60 text-sm">
+    // Los cinco primeros a la vista: el resto, con un botón. Que se implementan con el kit ya lo dice la línea de arriba, una vez.
+    <Tope visibles={5} mas={t.verMasPasos(Math.max(0, pasos.length - 5))} menos={t.verMenosPasos} className="divide-y divide-border/60 text-sm">
       {pasos.map((p) => {
         const { titulo, detalle } = textoLlanoDe(p.check, locale)
         return (
@@ -227,11 +234,6 @@ function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
               <span className="min-w-0 space-y-1">
                 <span className="block">{titulo}</span>
                 {detalle ? <span className="block text-xs text-muted">{detalle}</span> : null}
-                {p.loArreglaElKit ? (
-                  <span className="flex flex-wrap gap-1.5 pt-0.5">
-                    <Etiqueta tono="accent">{t.implementaKit}</Etiqueta>
-                  </span>
-                ) : null}
               </span>
             </span>
             {p.puntos > 0 ? (
@@ -244,7 +246,7 @@ function Pasos({ t, locale, pasos }: { t: T; locale: Locale; pasos: Paso[] }) {
           </li>
         )
       })}
-    </ul>
+    </Tope>
   )
 }
 
@@ -254,15 +256,19 @@ function Resultado({
   dominio,
   lectura: l,
   conCorreo,
+  pais,
+  ciudad,
 }: {
   t: T
   locale: Locale
   dominio: string
   lectura: Lectura
   conCorreo: boolean
+  pais: string
+  ciudad: string
 }) {
   const margen = l.estimado - l.actual
-  const enlace = `${BASE}/radar?d=${encodeURIComponent(dominio)}`
+  const enlace = `${BASE}/radar?d=${encodeURIComponent(dominio)}${pais ? `&p=${pais}${ciudad ? `&c=${encodeURIComponent(ciudad)}` : ''}` : ''}`
   // Solo lo que se implementa con el kit; lo demás no se lista (ver principales en datos.ts).
   const lista = principales(l)
   const medicion = fechaDe(l.medido, locale)
@@ -334,7 +340,7 @@ function Resultado({
       </section>
 
       {/* 02: para las preguntas de compra, a quién cita la IA. Se carga sola desde el navegador. */}
-      <SeccionCitas key={`citas-${dominio}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} />
+      <SeccionCitas key={`citas-${dominio}-${pais}-${ciudad}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
 
       {/* 03 */}
       <Seccion n="03" titulo={t.s02} tono="bg-panel">
@@ -368,23 +374,22 @@ function Resultado({
       </Seccion>
 
       {/* 04 */}
-      <Seccion n="04" titulo={t.s03}>
-        {l.bien.length > 0 ? (
-          <details>
-            <summary className="-my-2.5 cursor-pointer py-2.5 text-sm font-semibold sm:my-0 sm:py-0">{t.yaBien(l.bien.length)}</summary>
-            <ul className="mt-3 divide-y divide-border/60 text-sm">
-              {l.bien.map((c) => (
-                <li key={c.id} className="flex items-start gap-2.5 py-2.5">
-                  <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-faint" />
-                  <span>{textoOk(c, locale)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : (
+      {l.bien.length > 0 ? (
+        <SeccionPlegable n="04" titulo={t.s03} cuenta={l.bien.length}>
+          <ul className="grid gap-x-10 text-sm md:grid-cols-2">
+            {l.bien.map((c) => (
+              <li key={c.id} className="flex items-start gap-2.5 border-b border-border/60 py-2.5">
+                <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 bg-faint" />
+                <span>{textoOk(c, locale)}</span>
+              </li>
+            ))}
+          </ul>
+        </SeccionPlegable>
+      ) : (
+        <Seccion n="04" titulo={t.s03}>
           <p className="text-sm text-muted">{t.nadaBien}</p>
-        )}
-      </Seccion>
+        </Seccion>
+      )}
 
       {/* 05: primero el agente (Pro); el kit solo, como enlace chico al final. */}
       <Seccion n="05" titulo={t.s04}>

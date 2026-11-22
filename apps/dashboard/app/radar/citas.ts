@@ -42,7 +42,7 @@ function vigenciaMs(r: RespuestaCitas): number {
 
 let avisoSinSecreto = false
 
-async function llamar(dominio: string, locale: 'es' | 'en', pais: string | null): Promise<RespuestaCitas> {
+async function llamar(dominio: string, locale: 'es' | 'en', pais: string | null, ciudad: string | null): Promise<RespuestaCitas> {
   // Marcado como ejemplo: la sección lo dice en grande para que nadie lo tome por un resultado real.
   if (STUB) return { ...(await stub(STUB, dominio, locale)), ejemplo: true }
   if (!secret) {
@@ -54,7 +54,7 @@ async function llamar(dominio: string, locale: 'es' | 'en', pais: string | null)
     const res = await fetch(`${base}/_internal/radar/citas`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
-      body: JSON.stringify({ domain: dominio, locale, ...(pais ? { country: pais } : {}) }),
+      body: JSON.stringify({ domain: dominio, locale, ...(pais ? { country: pais } : {}), ...(pais && ciudad ? { city: ciudad } : {}) }),
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
@@ -73,9 +73,10 @@ async function llamar(dominio: string, locale: 'es' | 'en', pais: string | null)
  * que ir al gateway (el tope por IP de la ruta); si dice que no, 'limit'.
  * Nunca lanza.
  */
-export function citasDe(dominio: string, locale: 'es' | 'en', o: { puedeLlamar: () => boolean; pais?: string | null }): Promise<RespuestaCitas> {
+export function citasDe(dominio: string, locale: 'es' | 'en', o: { puedeLlamar: () => boolean; pais?: string | null; ciudad?: string | null }): Promise<RespuestaCitas> {
   const pais = o.pais ?? null
-  const clave = `${dominio}|${locale}|${pais ?? ''}`
+  const ciudad = o.ciudad ?? null
+  const clave = `${dominio}|${locale}|${pais ?? ''}|${ciudad?.toLowerCase() ?? ''}`
   const ahora = Date.now()
   const hit = cache.get(clave)
   if (hit && hit.vence > ahora) return hit.promesa
@@ -83,7 +84,7 @@ export function citasDe(dominio: string, locale: 'es' | 'en', o: { puedeLlamar: 
   for (const [k, e] of cache) if (e.vence <= ahora) cache.delete(k)
   if (cache.size > 2_000) cache.clear()
   // Mientras está en curso vale hasta el timeout; cuando llega, lo que diga vigenciaMs.
-  const entrada: Entrada = { promesa: llamar(dominio, locale, pais), vence: ahora + TIMEOUT_MS + 5_000 }
+  const entrada: Entrada = { promesa: llamar(dominio, locale, pais, ciudad), vence: ahora + TIMEOUT_MS + 5_000 }
   cache.set(clave, entrada)
   void entrada.promesa.then((r) => {
     entrada.vence = Date.now() + vigenciaMs(r)
@@ -123,6 +124,7 @@ async function stub(modo: string, dominio: string, locale: 'es' | 'en'): Promise
         { domain: 'resenas-ejemplo.com', count: 2, kind: 'publisher' },
         { domain: 'otra-tienda-ejemplo.com', count: 2, kind: null },
       ],
+      failed: [],
     },
     true,
   )

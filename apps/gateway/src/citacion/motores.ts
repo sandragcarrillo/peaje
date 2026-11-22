@@ -18,7 +18,7 @@ import Anthropic from '@anthropic-ai/sdk'
 export type Pagina = { url: string | null; title: string | null; domain: string }
 export type Respuesta = { texto: string; dominios: string[]; paginas: Pagina[] }
 /** `pais` (ISO de dos letras): desde dónde se pregunta. Lo usan los motores cuya búsqueda acepta ubicación; el resto lo ignora. */
-export type OpcionesPregunta = { pais?: string | null }
+export type OpcionesPregunta = { pais?: string | null; /** Ciudad dentro de ese país, si la persona la dio. */ ciudad?: string | null }
 export type Motor = { id: string; nombre: string; disponible: () => boolean; preguntar: (q: string, o?: OpcionesPregunta) => Promise<Respuesta> }
 
 const TIMEOUT = 90_000
@@ -71,7 +71,7 @@ export const MOTORES: Motor[] = [
       const res = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ model: process.env.CITATION_OPENAI_MODEL ?? 'gpt-5.4-mini', input: q, tools: [{ type: 'web_search', ...(o?.pais ? { user_location: { type: 'approximate', country: o.pais } } : {}) }] }),
+        body: JSON.stringify({ model: process.env.CITATION_OPENAI_MODEL ?? 'gpt-5.4-mini', input: q, tools: [{ type: 'web_search', ...(o?.pais ? { user_location: { type: 'approximate', country: o.pais, ...(o.ciudad ? { city: o.ciudad } : {}) } } : {}) }] }),
         signal: AbortSignal.timeout(TIMEOUT),
       })
       const j = await json(res, 'OpenAI')
@@ -146,7 +146,7 @@ export const MOTORES: Motor[] = [
         {
           model: process.env.CITATION_CLAUDE_MODEL ?? 'claude-haiku-4-5',
           max_tokens: 2_000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3, ...(o?.pais ? { user_location: { type: 'approximate' as const, country: o.pais } } : {}) }],
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3, ...(o?.pais ? { user_location: { type: 'approximate' as const, country: o.pais, ...(o.ciudad ? { city: o.ciudad } : {}) } } : {}) }],
           messages: [{ role: 'user', content: q }],
         },
         { timeout: TIMEOUT },

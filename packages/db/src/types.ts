@@ -922,6 +922,8 @@ export type RadarCitas = {
   citedInstead: { domain: string; count: number; kind: RadarCitasKind }[]
   /** Los motores que contestaron, en orden: chatgpt, perplexity, claude, gemini. */
   engines: string[]
+  /** Los que se preguntaron y no contestaron ninguna. Sin el campo: contestaron todos. */
+  failed?: string[]
 }
 
 /** Una medición guardada. 'running' es el candado del dominio; las 'done' son el caché. */

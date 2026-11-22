@@ -130,7 +130,7 @@ radarRouter.post('/radar/report', async (c) => {
  * motores o ninguno contestó.
  */
 radarRouter.post('/radar/citas', async (c) => {
-  const body = (await c.req.json().catch(() => null)) as { domain?: unknown; locale?: unknown; country?: unknown } | null
+  const body = (await c.req.json().catch(() => null)) as { domain?: unknown; locale?: unknown; country?: unknown; city?: unknown } | null
   const r = await radarCitas(body && typeof body === 'object' ? body : {})
   if (r.status !== 200 && r.body.retryAfterSeconds) c.header('Retry-After', String(r.body.retryAfterSeconds))
   return c.json(r.body, r.status)

@@ -3,7 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import type { RadarCitas, RadarCitasCelda, RadarCitasKind } from '@peaje/db'
-import { mercadoDe, type Mercado } from '@peaje/shared'
+import { ciudadLimpia, mercadoDe, type Mercado } from '@peaje/shared'
 import { z } from 'zod'
 import { leerSitio } from '../monitor/reporte.js'
 import { store } from '../store.js'
@@ -48,7 +48,7 @@ export type DepsRadarCitas = {
   /** Hay con qué escribir las preguntas (la llave de Anthropic). */
   puedeGenerar: () => boolean
   leerSitio: (dominio: string) => Promise<string>
-  generar: (e: { dominio: string; sitio: string; locale: Locale; cantidad: number; mercado?: Mercado | null }) => Promise<Generadas>
+  generar: (e: { dominio: string; sitio: string; locale: Locale; cantidad: number; mercado?: Mercado | null; ciudad?: string | null }) => Promise<Generadas>
   /** Tipo de los dominios que las reglas no resolvieron. Lo que no viene queda en null. */
   clasificar: (e: { oferta: string; dominios: { domain: string; titles: string[] }[] }) => Promise<Map<string, RadarCitasKind>>
   /** El dominio resuelve, y solo a IPs públicas. */
@@ -198,7 +198,7 @@ const ordenarMotores = <T extends { id: string }>(ms: T[]) =>
   [...ms].sort((a, b) => (ORDEN_MOTORES.indexOf(a.id) + 1 || 99) - (ORDEN_MOTORES.indexOf(b.id) + 1 || 99))
 
 /** Cada pregunta a cada motor, todo a la vez, con un reloj total. Lo que no llega a tiempo cuenta como falla. */
-export async function preguntarTodo(motores: Motor[], preguntas: string[], timeoutMs: number, pais: string | null = null): Promise<Celda[]> {
+export async function preguntarTodo(motores: Motor[], preguntas: string[], timeoutMs: number, pais: string | null = null, ciudad: string | null = null): Promise<Celda[]> {
   let reloj: NodeJS.Timeout | undefined
   const vence = new Promise<'timeout'>((resolve) => {
     reloj = setTimeout(() => resolve('timeout'), timeoutMs)
@@ -209,7 +209,9 @@ export async function preguntarTodo(motores: Motor[], preguntas: string[], timeo
         motores.map(async (m): Promise<Celda> => {
           const r = await Promise.race([
             Promise.resolve()
-              .then(() => m.preguntar(q, { pais }))
+              .then(() => m.preguntar(q, { pais, ciudad }))
+              // Un error suelto (límite de pedidos, corte de red) se reintenta una vez; el reloj total sigue mandando.
+              .catch(() => m.preguntar(q, { pais, ciudad }))
               .then(
                 (respuesta) => ({ respuesta }),
                 (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }),
@@ -297,15 +299,18 @@ let anthropic: Anthropic | null = null
 
 const GeneradasSchema = z.object({ questions: z.array(z.string()), brand: z.array(z.string()), offering: z.string() })
 
-async function generarConHaiku(e: { dominio: string; sitio: string; locale: Locale; cantidad: number; mercado?: Mercado | null }): Promise<Generadas> {
+async function generarConHaiku(e: { dominio: string; sitio: string; locale: Locale; cantidad: number; mercado?: Mercado | null; ciudad?: string | null }): Promise<Generadas> {
   anthropic ??= new Anthropic()
   const idioma = e.mercado
-    ? { es: `Spanish, as people write it in ${e.mercado.en}`, pt: 'Brazilian Portuguese', en: 'English' }[e.mercado.idioma]
+    ? { es: `Spanish, as people write it in ${e.mercado.en}`, pt: 'Brazilian Portuguese', en: 'English', local: `the language most people use in ${e.mercado.en}` }[e.mercado.idioma]
     : e.locale === 'es'
       ? 'Spanish, as people write it in Latin America'
       : 'English'
   // Con mercado: el comprador está en ese país. Se le pide al modelo que la pregunta lo refleje sin forzar el nombre del país en cada una.
-  const mercado = e.mercado ? `\n\nMarket: the buyer is in ${e.mercado.en}. Write what someone there would type: local wording and currency, and name the country or one of its cities when a real person would. If the business clearly does not serve ${e.mercado.en}, still write the questions for a buyer there.` : ''
+  const donde = e.mercado ? (e.ciudad ? `${e.ciudad}, ${e.mercado.en}` : e.mercado.en) : ''
+  // Con ciudad: es un negocio local, así que la pregunta la nombra como lo haría alguien de ahí.
+  const local = e.ciudad ? ` The business sells locally: most questions should name ${e.ciudad} or say "near me" style wording a person there would use.` : ''
+  const mercado = e.mercado ? `\n\nMarket: the buyer is in ${donde}.${local} Write what someone there would type: local wording and currency, and name the country or one of its cities when a real person would. If the business clearly does not serve ${e.mercado.en}, still write the questions for a buyer there.` : ''
   const res = await anthropic.messages.parse(
     {
       model: MODELO,
@@ -424,7 +429,7 @@ const noDisponible = (retryAfterSeconds?: number): SalidaRadarCitas => ({
 const servir = (f: Omit<RadarCitas, 'cached'>, cached: boolean): SalidaRadarCitas => ({
   status: 200,
   // `market` solo cuando se midió para un país: sin país la respuesta es la de siempre.
-  body: { domain: f.domain, ...(f.market ? { market: f.market } : {}), measuredAt: f.measuredAt, cached, questions: f.questions, coverage: f.coverage, citedInstead: f.citedInstead, engines: f.engines },
+  body: { domain: f.domain, ...(f.market ? { market: f.market } : {}), measuredAt: f.measuredAt, cached, questions: f.questions, coverage: f.coverage, citedInstead: f.citedInstead, engines: f.engines, ...(f.failed?.length ? { failed: f.failed } : {}) },
 })
 
 const textoUtil = (sitio: string) => sitio.replace(/\[https?:\/\/[^\]\s]+\]/g, ' ').replace(/\s+/g, ' ').trim().length
@@ -447,15 +452,17 @@ let colaCupo: Promise<unknown> = Promise.resolve()
 const ENFRIAR_MS = 5 * 60_000
 const enfriando = new Map<string, number>()
 
-export async function radarCitas(entrada: { domain?: unknown; locale?: unknown; country?: unknown }, deps: DepsRadarCitas = DEPS_RADAR_CITAS): Promise<SalidaRadarCitas> {
+export async function radarCitas(entrada: { domain?: unknown; locale?: unknown; country?: unknown; city?: unknown }, deps: DepsRadarCitas = DEPS_RADAR_CITAS): Promise<SalidaRadarCitas> {
   const dominio = typeof entrada.domain === 'string' ? normalizarDominio(entrada.domain) : null
   if (!dominio) return invalido
   const locale: Locale = entrada.locale === 'es' ? 'es' : 'en'
   const mercado = mercadoDe(entrada.country)
-  const clave = `${dominio}|${locale}|${mercado?.codigo ?? ''}`
+  // La ciudad solo cuenta dentro de un país.
+  const ciudad = mercado ? ciudadLimpia(entrada.city) : null
+  const clave = `${dominio}|${locale}|${mercado?.codigo ?? ''}|${ciudad?.toLowerCase() ?? ''}`
   const previa = enCurso.get(clave)
   if (previa) return previa
-  const corrida = medir(dominio, locale, mercado, deps)
+  const corrida = medir(dominio, locale, mercado, ciudad, deps)
     .catch((error: unknown): SalidaRadarCitas => {
       // Un fallo del store no sale como 500 con el mensaje adentro: el contrato es { error }.
       console.error('[radar-citas] error', { domain: dominio, locale, motivo: error instanceof Error ? error.message : String(error) })
@@ -466,11 +473,12 @@ export async function radarCitas(entrada: { domain?: unknown; locale?: unknown; 
   return corrida
 }
 
-async function medir(dominio: string, locale: Locale, mercado: Mercado | null, deps: DepsRadarCitas): Promise<SalidaRadarCitas> {
+async function medir(dominio: string, locale: Locale, mercado: Mercado | null, ciudad: string | null, deps: DepsRadarCitas): Promise<SalidaRadarCitas> {
   const inicio = deps.ahora()
   // Cada país es una foto aparte. Va en la llave del store como `dominio@PAIS`: así el caché, el candado y el
   // índice único de radar_citation_runs sirven por mercado sin cambiar la tabla (un dominio nunca lleva @).
-  const llave = mercado ? `${dominio}@${mercado.codigo}` : dominio
+  // La ciudad, si hay, va detrás del país: `dominio@CO~medellin`.
+  const llave = mercado ? `${dominio}@${mercado.codigo}${ciudad ? `~${ciudad.toLowerCase().replace(/\s+/g, '-')}` : ''}` : dominio
   const guardada = await store.getRadarCitas(llave, locale, new Date(inicio.getTime() - CACHE_DIAS * 86_400_000).toISOString())
   const previo = guardada?.result ?? null
   const vigente = previo && (!guardada!.partial || previo.measuredAt >= new Date(inicio.getTime() - CACHE_PARCIAL_HORAS * 3_600_000).toISOString())
@@ -516,19 +524,23 @@ async function medir(dominio: string, locale: Locale, mercado: Mercado | null, d
   }
 
   try {
-    const generadas = await deps.generar({ dominio, sitio, locale, cantidad: CANDIDATAS, mercado })
+    const generadas = await deps.generar({ dominio, sitio, locale, cantidad: CANDIDATAS, mercado, ciudad })
     const terminos = terminosDeMarca(dominio, generadas.marcas)
     const preguntas = preguntasSinMarca(generadas.preguntas, terminos)
     if (preguntas.length === 0) throw new Error('no question left without the brand')
 
-    const celdas = await preguntarTodo(motores, preguntas, deps.timeoutMs, mercado?.codigo ?? null)
+    const celdas = await preguntarTodo(motores, preguntas, deps.timeoutMs, mercado?.codigo ?? null, ciudad)
     const { foto, candidatos } = armarFoto({ dominio, preguntas, celdas, marcas: terminos, measuredAt: deps.ahora().toISOString() })
     if (mercado) foto.market = mercado.codigo
     const fallas = celdas.filter((c) => !c.respuesta)
+    // Los motores que se preguntaron y no contestaron nada: la página lo dice, en vez de que el motor desaparezca.
+    const mudos = ordenarMotores(motores).map((m) => m.id).filter((id) => !foto.engines.includes(id))
+    if (mudos.length > 0) foto.failed = mudos
     console.log('[radar-citas] medición', {
       domain: dominio,
       locale,
       market: mercado?.codigo ?? null,
+      city: ciudad,
       engines: motores.map((m) => m.id),
       questions: preguntas.length,
       calls: celdas.length,

@@ -20,6 +20,8 @@ export type Citas = {
   coverage: Record<string, { cited: number; total: number }>
   citedInstead: { domain: string; count: number; kind: 'publisher' | 'competitor' | null }[]
   engines: string[]
+  /** Motores que se preguntaron y no contestaron ninguna pregunta. */
+  failed: string[]
   /** Solo lo pone el stub de desarrollo (citas.ts): la UI avisa que los datos son inventados. */
   ejemplo?: true
 }
@@ -114,5 +116,8 @@ export function normalizarCitas(data: unknown, ok: boolean): RespuestaCitas {
     coverage,
     citedInstead,
     engines,
+    failed: (Array.isArray(data.failed) ? data.failed : [])
+      .filter((e): e is string => typeof e === 'string' && ID_MOTOR.test(e) && !engines.includes(e))
+      .slice(0, 8),
   }
 }

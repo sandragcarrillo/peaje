@@ -192,13 +192,19 @@ test('un motor que falla no cuenta como "no citado": sale de engines y coverage'
   const chatgpt = motor('chatgpt', () => respuesta('Usa falla.com o Wompi.', ['falla.com', 'wompi.co']))
   const caido = motor('perplexity', () => Promise.reject(new Error('Perplexity 401: bad key')))
   // Claude falla en una de las tres: cuenta 2, no 3.
-  const aMedias = motor('claude', () => (++n === 2 ? Promise.reject(new Error('overloaded')) : respuesta('Wompi.', ['wompi.co'])))
+  // (Falla también en el reintento de esa pregunta: un error suelto se reintenta una vez.)
+  let caida: string | null = null
+  const aMedias = motor('claude', (q) => {
+    if (++n === 2) caida = q
+    return q === caida ? Promise.reject(new Error('overloaded')) : respuesta('Wompi.', ['wompi.co'])
+  })
   // Gemini no llega antes del reloj total.
   const lento = motor('gemini', () => new Promise<Respuesta>(() => {}))
   const r = await radarCitas({ domain: 'falla.com', locale: 'en' }, deps({ motores: [lento, caido, aMedias, chatgpt], timeoutMs: 200 }))
   assert.equal(r.status, 200)
   if (r.status !== 200) return
   assert.deepEqual(r.body.engines, ['chatgpt', 'claude'])
+  assert.deepEqual(r.body.failed, ['perplexity', 'gemini'], 'los que no contestaron nada se nombran')
   assert.deepEqual(r.body.coverage, { chatgpt: { cited: 3, total: 3 }, claude: { cited: 0, total: 2 } })
   assert.deepEqual(Object.keys(r.body.questions[1]!.engines), ['chatgpt'], 'la pregunta donde Claude falló no lo trae')
   for (const q of r.body.questions) {
@@ -216,10 +222,10 @@ test('si ningún motor contesta: 503, no queda foto y el dominio espera 5 minuto
   // Reintentar enseguida no vuelve a gastar consultas: espera 5 minutos.
   const otra = await radarCitas({ domain: 'nadie.com', locale: 'en' }, deps({ motores: [caido] }))
   assert.equal(otra.status, 503)
-  assert.equal(caido.llamadas, 3)
+  assert.equal(caido.llamadas, 6, 'tres preguntas, cada una con su reintento')
   reloj = new Date(reloj.getTime() + 5 * 60_000 + 1)
   await radarCitas({ domain: 'nadie.com', locale: 'en' }, deps({ motores: [caido] }))
-  assert.equal(caido.llamadas, 6)
+  assert.equal(caido.llamadas, 12)
 })
 
 // ---------------------------------------------------------------- citados en su lugar
