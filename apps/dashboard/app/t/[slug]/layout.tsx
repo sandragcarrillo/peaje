@@ -58,8 +58,9 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
           pro={accesoPro(tenant).activo}
           portalUrl={`${gatewayUrl}/${tenant.slug}/developers`}
         />
-        <main className="panel-negocio min-w-0 flex-1 space-y-8 px-4 py-6 sm:p-6 lg:p-10">
-          {children}
+        <main className="panel-negocio min-w-0 flex-1 px-4 py-6 sm:p-6 lg:p-10">
+          {/* Columna centrada con ancho tope. Una página con mucho contenido (Contenido) pide todo el ancho con data-ancho. */}
+          <div className="mx-auto max-w-5xl space-y-8 has-[[data-ancho]]:max-w-none">{children}</div>
         </main>
       </div>
     </div>

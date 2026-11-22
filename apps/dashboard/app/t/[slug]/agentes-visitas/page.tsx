@@ -64,17 +64,20 @@ export default async function VisitasPage({
 
   return (
     <div className="space-y-6">
-      {/* Título, total y período en un solo bloque apretado: el número va en la misma línea que su frase y su selector. */}
-      <div className="space-y-4">
-        <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
-          {stats.totals.visits > 0 ? (
-            <>
-              <span className="text-5xl font-semibold leading-none tracking-tight tabular-nums">{stats.totals.visits.toLocaleString(locale === 'es' ? 'es-CO' : 'en-US')}</span>
-              <span className="text-sm text-muted">{t.visitasEn}</span>
-            </>
-          ) : null}
-          <div className="flex gap-1.5 self-center">
+      {/* Columna centrada con ancho tope; el total vive en su tarjeta, con la etiqueta arriba y el período a la derecha. */}
+      <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
+      <div className="tarjeta p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-5xl font-semibold leading-none tracking-tight tabular-nums">
+                {stats.totals.visits.toLocaleString(locale === 'es' ? 'es-CO' : 'en-US')}
+              </span>
+              <span className="text-lg font-medium">{t.totalEtiqueta}</span>
+            </div>
+            <p className="mt-3 text-sm text-muted">{t.totalNota(dias, Math.round(stats.totals.visits / dias))}</p>
+          </div>
+          <div className="flex gap-1.5">
             {[7, 30].map((n) => (
               <Link
                 key={n}
@@ -86,12 +89,12 @@ export default async function VisitasPage({
               </Link>
             ))}
           </div>
-          {COBROS_VISIBLES && stats.totals.paid > 0 ? (
-            <span className="text-sm text-muted">
-              · {stats.totals.paid} {t.metricaPagadas.toLowerCase()} · {money(stats.totals.revenue)} · {stats.agentWallets.length} {t.metricaWallets.toLowerCase()}
-            </span>
-          ) : null}
         </div>
+        {COBROS_VISIBLES && stats.totals.paid > 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            {stats.totals.paid} {t.metricaPagadas.toLowerCase()} · {money(stats.totals.revenue)} · {stats.agentWallets.length} {t.metricaWallets.toLowerCase()}
+          </p>
+        ) : null}
       </div>
 
       {stats.totals.visits === 0 ? (

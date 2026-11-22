@@ -89,7 +89,9 @@ export function Sidebar({
     })
 
   return (
-    <aside className="scroll-thin sticky top-0 hidden h-dvh w-64 shrink-0 flex-col justify-between gap-6 self-start overflow-y-auto border-r border-border bg-panel p-4 pt-24 md:flex">
+    <aside className="hidden w-64 shrink-0 border-r border-border bg-panel md:block">
+      {/* El fondo y el borde ocupan todo el alto; lo que se queda fijo es el contenido, justo debajo de la barra de arriba. */}
+      <div className="scroll-thin sticky top-20 flex h-[calc(100dvh-5rem)] flex-col justify-between gap-6 overflow-y-auto p-4">
       <div className="space-y-6">
         {/* Identidad del tenant */}
         <div className="flex items-center gap-3 px-1">
@@ -140,6 +142,7 @@ export function Sidebar({
           {d.panel.navPortal}
         </a>
       </div>
+    </div>
     </aside>
   )
 }

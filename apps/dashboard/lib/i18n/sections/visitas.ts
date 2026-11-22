@@ -13,6 +13,8 @@ export const visitas = {
     verMas: (n: number) => (n === 1 ? 'Ver 1 más' : `Ver ${n} más`),
     verMenos: 'Ver menos',
     visitasEn: 'visitas de agentes en los últimos',
+    totalEtiqueta: 'visitas de agentes',
+    totalNota: (dias: number, porDia: number) => `En los últimos ${dias} días, unas ${porDia} al día.`,
     tipos: {
       'mpp-client': 'Cliente MPP',
       'x402-client': 'Cliente x402',
@@ -67,6 +69,8 @@ export const visitas = {
     verMas: (n: number) => `Show ${n} more`,
     verMenos: 'Show less',
     visitasEn: 'agent visits in the last',
+    totalEtiqueta: 'agent visits',
+    totalNota: (dias: number, porDia: number) => `In the last ${dias} days, about ${porDia} a day.`,
     tipos: {
       'mpp-client': 'MPP client',
       'x402-client': 'x402 client',

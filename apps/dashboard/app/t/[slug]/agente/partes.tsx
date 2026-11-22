@@ -15,9 +15,12 @@ export function Buscar({ slug }: { slug: string }) {
   const [msj, setMsj] = useState<string | null>(null)
   const [pending, start] = useTransition()
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    // El aviso de cada cuánto se puede buscar va de ayuda en el botón; al lado solo aparece el resultado.
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      {msj ? <span className="text-xs text-muted" role="status">{msj}</span> : null}
       <button
         disabled={pending}
+        title={t.buscarNota}
         className="btn btn-secundario btn-chico btn-suave"
         onClick={() =>
           start(async () => {
@@ -39,7 +42,6 @@ export function Buscar({ slug }: { slug: string }) {
       >
         {pending ? t.buscando : t.buscar}
       </button>
-      <span className="text-xs text-muted">{msj ?? t.buscarNota}</span>
     </div>
   )
 }
@@ -52,7 +54,7 @@ export function ListaTareas({
   seguimientos = [],
 }: {
   slug: string
-  titulo: string
+  titulo?: string
   tareas: AgentTask[]
   cerradas?: boolean
   seguimientos?: TaskFollowup[]
@@ -66,12 +68,17 @@ export function ListaTareas({
   const ocultas = tareas.length - tope
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="text-xs font-medium text-muted">{titulo}</h3>
+      <div>
+        {titulo ? <h3 className="text-xs font-medium text-muted">{titulo}</h3> : null}
         {/* Cómo se trabajan: una vez para toda la lista, no repetido en cada tarjeta. */}
         {cerradas ? null : (
-          <details className="border-0 text-xs">
-            <summary className="cursor-pointer text-muted hover:text-text">{t.tarjetaComo}</summary>
+          <details className="group border-0 text-sm">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+              {t.tarjetaComo}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden className="transition-transform group-open:rotate-180">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
             <div className="mt-2 max-w-[65ch] space-y-2 text-sm text-muted">
               {[...new Set(tareas.map((x) => x.kind))].map((k) => (
                 <p key={k}>

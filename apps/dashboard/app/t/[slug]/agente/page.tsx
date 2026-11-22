@@ -57,10 +57,20 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
 
       <section className="space-y-3">
-        <SectionBar label={t.tareas} meta={String(abiertas.length)} />
-        <Buscar slug={tenant.slug} />
+        {/* Una sola fila: el título con cuántas hay abiertas, y a la derecha la acción. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-lg font-semibold tracking-tight">{t.tareas}</h2>
+            {abiertas.length > 0 ? (
+              <span className="text-sm text-muted">
+                {abiertas.length} {t.grupoAbiertas.toLowerCase()}
+              </span>
+            ) : null}
+          </div>
+          <Buscar slug={tenant.slug} />
+        </div>
         {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
-        <ListaTareas slug={tenant.slug} titulo={t.grupoAbiertas} tareas={abiertas} />
+        <ListaTareas slug={tenant.slug} tareas={abiertas} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
       </section>
