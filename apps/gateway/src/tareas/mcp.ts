@@ -21,6 +21,9 @@ import { respuestaSetup } from './setup.js'
  * puede preguntar al agente lo mismo que el chat (peaje_ask). Nada acá cambia
  * el sitio: Peaje propone, la herramienta del dueño ejecuta, Peaje verifica.
  */
+/** Cuánto espera peaje_refresh_tasks antes de responder "sigo buscando". Los clientes MCP cortan cerca del minuto. */
+const esperaRefresh = () => Number(process.env.MCP_REFRESH_WAIT_MS ?? 25_000)
+
 function texto(obj: unknown) {
   return { content: [{ type: 'text' as const, text: typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2) }] }
 }
@@ -182,11 +185,23 @@ export function construir(tenant: Tenant): McpServer {
   server.registerTool(
     'peaje_refresh_tasks',
     {
-      description: `Ask Peaje to look for new tasks now (failing checks, pages answer engines would cite, routes agents asked for). At most once every 10 minutes. On the Pro plan it uses ${COSTOS_CREDITOS.informe} of the owner's monthly credits, the same as asking in the Peaje chat.`,
+      description: `Ask Peaje to look for new tasks now (failing checks, pages answer engines would cite, routes agents asked for). At most once every 10 minutes. It can take over a minute: if it answers that it is still working, list the tasks a minute later instead of calling it again. On the Pro plan it uses ${COSTOS_CREDITOS.informe} of the owner's monthly credits, the same as asking in the Peaje chat.`,
       inputSchema: {},
     },
     async () => {
-      const r = await buscarTareasDelDueno(tenant, 'en', 'owner-mcp')
+      // Buscar lee el sitio, Search Console y le pide páginas a un modelo: puede pasar del
+      // minuto, y el cliente MCP corta antes. Si no terminó a tiempo se responde igual, sin
+      // error: el trabajo sigue en el servidor y las tareas aparecen al listar. Un "falló"
+      // falso haría que el dueño lo repita y pague dos veces.
+      const trabajo = buscarTareasDelDueno(tenant, 'en', 'owner-mcp')
+      trabajo.catch((e) => console.warn('[mcp] refresh_tasks', tenant.slug, e instanceof Error ? e.message : e))
+      const r = await Promise.race([trabajo, new Promise<null>((ok) => setTimeout(() => ok(null), esperaRefresh()))])
+      if (r === null) {
+        return texto({
+          status: 'working',
+          message: 'Peaje is still looking for tasks; a full search takes a minute or two. Nothing failed, and it counts once. The new tasks show up in peaje_list_tasks in about a minute, so there is no need to run this again.',
+        })
+      }
       return 'error' in r && r.error === 'not-enough-credits' ? { ...texto(r), isError: true } : texto(r)
     },
   )

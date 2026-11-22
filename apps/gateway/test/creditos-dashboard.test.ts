@@ -216,3 +216,32 @@ test('MCP del dueño: peaje_refresh_tasks cobra informe con Pro y avisa sin sald
   assert.equal(await usados(gratis.id), 0)
   await libre.close()
 })
+
+test('MCP del dueño: si buscar tareas tarda más que el cliente, responde "sigo buscando" sin error y cobra una sola vez', async () => {
+  const t = await negocio()
+  const client = await mcpDelDueno(t)
+  process.env.MCP_REFRESH_WAIT_MS = '0'
+  // En memoria la búsqueda termina al instante: se la demora para simular el caso real.
+  const real = store.lastVerification.bind(store)
+  store.lastVerification = async (id) => {
+    await new Promise((ok) => setTimeout(ok, 60))
+    return real(id)
+  }
+  try {
+    const r = await client.callTool({ name: 'peaje_refresh_tasks', arguments: {} })
+    assert.equal(r.isError, undefined)
+    const j = JSON.parse(textoDe(r)) as { status: string; message: string }
+    assert.equal(j.status, 'working')
+    assert.match(j.message, /Nothing failed, and it counts once/)
+    assert.match(j.message, /no need to run this again/)
+    assert.match(j.message, /peaje_list_tasks/)
+  } finally {
+    delete process.env.MCP_REFRESH_WAIT_MS
+  }
+  // El trabajo sigue en el servidor y termina: un solo cobro.
+  for (let i = 0; i < 50 && (await usados(t.id)) === 0; i++) await new Promise((ok) => setTimeout(ok, 20))
+  await new Promise((ok) => setTimeout(ok, 100))
+  assert.equal(await usados(t.id), COSTOS_CREDITOS.informe)
+  store.lastVerification = real
+  await client.close()
+})
