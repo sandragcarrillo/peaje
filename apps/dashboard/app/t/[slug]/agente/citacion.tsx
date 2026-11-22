@@ -134,7 +134,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
           {/* Con varios motores la tabla no entra en el celular: se desliza de lado. */}
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left font-mono text-[10px] tracking-[0.02em] text-muted">
+              <thead className="text-left text-xs font-medium text-muted">
                 <tr>
                   <th className="pb-2 font-normal" />
                   {motores.map((m) => (

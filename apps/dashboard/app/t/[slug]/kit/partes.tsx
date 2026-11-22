@@ -261,7 +261,7 @@ export function ImplementarPeaje({
       </div>
 
       <div className="mt-4">
-        <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.capaTitulo}</p>
+        <p className="text-xs font-medium text-muted">{d.capaTitulo}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {chip('todo', d.capaTodo)}
           {chip('aeo', d.capaAeo)}
@@ -277,19 +277,32 @@ export function ImplementarPeaje({
         </p>
       ) : (
         <>
-          <div className="mt-5 grid grid-cols-1 gap-2.5 font-mono text-xs md:grid-cols-2">
+          {/* Cada revisión con su estado dibujado: un check o una equis, y el texto en la letra del panel. */}
+          <ul className="mt-5 grid grid-cols-1 gap-2.5 text-sm md:grid-cols-2">
             {propios.map((r) => (
-              <div key={r.id} className="flex items-start gap-2.5 border border-border bg-bg p-2">
-                <span className={`font-bold ${r.ok ? 'text-accent' : 'text-red-600'}`}>
-                  {r.ok ? '[x]' : '[ ]'}
-                </span>
+              <li key={r.id} className="flex items-start gap-2.5 rounded-lg border border-border bg-bg p-3">
+                <svg
+                  role="img"
+                  aria-label={r.ok ? 'ok' : 'falta'}
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.25"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`mt-0.5 shrink-0 ${r.ok ? 'text-accent' : 'text-red-600'}`}
+                >
+                  {r.ok ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <path d="M6 6l12 12M18 6L6 18" />}
+                </svg>
                 <span className="min-w-0">
-                  <span className="block">{r.label}</span>
-                  <span className="block truncate text-[10px] text-muted">{r.detalle}</span>
+                  <span className="block font-medium">{r.label}</span>
+                  <span className="block text-xs text-muted">{r.detalle}</span>
                 </span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {proxy ? <VersionKit instalado={proxy.kit} ultimas={ultimas} kitUrl={kitUrl} /> : null}
 

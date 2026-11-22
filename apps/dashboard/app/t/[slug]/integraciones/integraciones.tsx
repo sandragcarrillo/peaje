@@ -184,7 +184,7 @@ export function Integraciones({
                     onClick={() => elegir(c.id)}
                     aria-current={elegida ? 'true' : undefined}
                     aria-controls="integracion"
-                    className={`flex w-full items-center gap-3 border-l-2 px-4 py-3 text-left text-sm transition-colors ${elegida ? 'border-l-accent bg-panel-2 font-medium' : 'border-l-transparent hover:bg-panel'}`}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors ${elegida ? 'bg-panel-2 font-semibold' : 'text-muted hover:bg-panel hover:text-text'}`}
                   >
                     {c.id === 'otras' ? <IconoHerramienta /> : <Logo marca={c.marca} className="h-5 w-5 shrink-0" />}
                     <span className="min-w-0 truncate">{c.nombre}</span>
@@ -305,7 +305,7 @@ function Herramienta({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div>
-          <span className="font-mono text-[11px] tracking-[0.02em] text-muted">{t.claveTitulo}</span>
+          <span className="text-xs font-medium text-muted">{t.claveTitulo}</span>
           {clave ? null : <p className="mt-1 text-sm">{prefijo ? t.claveVieja(prefijo) : t.claveNinguna}</p>}
         </div>
         <button disabled={pending} className="btn btn-secundario btn-chico" onClick={() => start(async () => setClave(await crearClaveAgente(slug)))}>

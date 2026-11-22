@@ -224,8 +224,8 @@ function Resultado({ seguimientos }: { seguimientos: TaskFollowup[] }) {
   if (ultimo) {
     const texto = (locale === 'es' ? ultimo.after?.verdictEs : null) ?? ultimo.verdict
     return (
-      <p className="mt-2 border-l-2 border-border pl-2 text-xs">
-        <span className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.resultadoTras(ultimo.kind)}</span> {texto}
+      <p className="mt-2 text-xs">
+        <span className="text-xs font-medium text-muted">{t.resultadoTras(ultimo.kind)}</span> {texto}
       </p>
     )
   }

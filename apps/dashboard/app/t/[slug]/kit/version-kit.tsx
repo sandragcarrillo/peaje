@@ -44,7 +44,7 @@ export function VersionKit({
 
   return (
     <div className="mt-3 space-y-2">
-      {linea ? <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{linea}</p> : null}
+      {linea ? <p className="text-xs text-muted">{linea}</p> : null}
       {aviso && prompt ? (
         <div className="border border-border bg-bg p-3">
           <p className="text-sm">{aviso}</p>

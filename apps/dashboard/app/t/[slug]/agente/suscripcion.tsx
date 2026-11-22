@@ -343,7 +343,7 @@ function PagoCripto({ billing, planes }: { billing: EstadoBilling; planes: Plan[
     <div className="space-y-4">
       <p className="text-xs text-muted">{t.planCadaPago}</p>
       <div className="space-y-2">
-        <p className="font-mono text-[11px] text-muted">{t.planLinkTitulo}</p>
+        <p className="text-xs font-medium text-muted">{t.planLinkTitulo}</p>
         {planes.map((plan) => {
           const url = billing.checkout[plan]
           return url ? <Enlace key={plan} etiqueta={t.planNombres[plan] ?? plan} url={url} /> : null

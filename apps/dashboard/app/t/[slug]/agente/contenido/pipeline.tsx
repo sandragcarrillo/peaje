@@ -89,8 +89,8 @@ export function Pipeline({ slug, piezas, inicial, creditosPagina }: { slug: stri
                   type="button"
                   onClick={() => elegir(p.id, true)}
                   aria-current={p.id === elegida?.id ? 'true' : undefined}
-                  className={`flex w-full items-start gap-3 rounded-none border-l-2 px-4 py-3 text-left transition-colors ${
-                    p.id === elegida?.id ? 'border-accent bg-panel-2' : 'border-transparent hover:bg-panel'
+                  className={`flex w-full items-start gap-3 rounded-none px-4 py-3 text-left transition-colors ${
+                    p.id === elegida?.id ? 'bg-panel-2' : 'hover:bg-panel'
                   }`}
                 >
                   <span className="min-w-0 flex-1">
@@ -262,7 +262,7 @@ function Marca({ estado, n }: { estado: EstadoEtapa; n: number }) {
     )
   }
   return (
-    <span aria-hidden className={`${base} border border-border bg-bg font-mono text-[11px] text-muted`}>
+    <span aria-hidden className={`${base} border border-border bg-bg text-xs font-medium text-muted`}>
       {n}
     </span>
   )

@@ -250,7 +250,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           <p className="mt-1 text-xs text-muted">{d.yaActivoNota}</p>
           <ul className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <li className="rounded-lg border border-border bg-bg p-3">
-              <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{d.yaActivoDiscovery}</p>
+              <p className="text-xs font-medium text-muted">{d.yaActivoDiscovery}</p>
               <a
                 href={`${base}/openapi.json`}
                 target="_blank"
@@ -261,7 +261,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
               </a>
             </li>
             <li className="rounded-lg border border-border bg-bg p-3">
-              <p className="font-mono text-[11px] tracking-[0.02em] text-muted">llms.txt</p>
+              <p className="text-xs font-medium text-muted">llms.txt</p>
               <a
                 href={`${base}/llms.txt`}
                 target="_blank"
@@ -272,7 +272,7 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
               </a>
             </li>
             <li className="rounded-lg border border-border bg-bg p-3">
-              <p className="font-mono text-[11px] tracking-[0.02em] text-muted">MCP</p>
+              <p className="text-xs font-medium text-muted">MCP</p>
               <span className="mt-1 block truncate font-mono text-xs text-accent">/mcp</span>
             </li>
           </ul>

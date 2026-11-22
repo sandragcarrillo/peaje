@@ -41,7 +41,7 @@ export function RutasApiPanel({ slug, routes, dominio }: { slug: string; routes:
       {routes.length > 0 ? (
         <div className="mt-4 overflow-x-auto md:overflow-x-visible">
           <table className="w-full text-sm">
-            <thead className="text-left font-mono text-[11px] tracking-[0.02em] text-muted">
+            <thead className="text-left text-xs font-medium text-muted">
               <tr>
                 <th className="pb-2 font-normal" />
                 <th className="pb-2 font-normal">{d.rutasApiPath}</th>
@@ -82,7 +82,7 @@ export function RutasApiPanel({ slug, routes, dominio }: { slug: string; routes:
                 ) : (
                   <tr key={r.id} className="border-t border-border">
                     <td className="w-16 py-2.5 pr-2">
-                      <span className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{r.method}</span>
+                      <span className="rounded border border-border px-1.5 py-0.5 text-xs font-medium text-muted">{r.method}</span>
                     </td>
                     <td className="py-2.5 pr-4">
                       <span className="font-mono text-sm" title={`${dominio}${r.pathPattern}`}>{r.pathPattern}</span>

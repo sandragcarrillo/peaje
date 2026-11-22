@@ -85,7 +85,7 @@ export function GooglePanel({ slug, estado }: { slug: string; estado: EstadoGoog
   return (
     <div className="space-y-4 border border-border p-4">
       {mensaje ? (
-        <p role="status" className={`border-l-2 bg-panel-2 px-3 py-2 text-sm ${resultado === 'connected' ? 'border-l-accent' : 'border-l-red-600'}`}>
+        <p role="status" className={`rounded-md bg-panel-2 px-3 py-2 text-sm ${resultado === 'connected' ? '' : 'text-red-600'}`}>
           {mensaje}
         </p>
       ) : null}

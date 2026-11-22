@@ -39,7 +39,7 @@ export default async function Tarea({ params }: { params: Promise<{ slug: string
       <dl className="grid gap-2 border border-border p-4 text-sm md:grid-cols-[10rem_1fr]">
         <dt className="text-xs text-muted">{t.taEstado}</dt>
         <dd>
-          <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{m.tipos[tarea.kind] ?? tarea.kind}</span>
+          <span className="mr-2 rounded border border-border px-1.5 py-0.5 text-xs font-medium text-muted">{m.tipos[tarea.kind] ?? tarea.kind}</span>
           {m.estados[tarea.status] ?? tarea.status}
           {tarea.note ? <span className="text-muted"> · {tarea.note}</span> : null}
         </dd>

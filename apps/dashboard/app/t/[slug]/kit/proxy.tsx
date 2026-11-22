@@ -129,7 +129,7 @@ function Paso({
 }) {
   return (
     <div className={`mt-5 ${ultimo ? '' : 'border-b border-border pb-5'}`}>
-      <p className="font-mono text-[11px] tracking-[0.02em] text-muted">{titulo}</p>
+      <p className="text-xs font-medium text-muted">{titulo}</p>
       <div className="mt-2">{children}</div>
     </div>
   )

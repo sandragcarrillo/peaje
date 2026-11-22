@@ -234,6 +234,12 @@
     letter-spacing: 0;
     font-size: 0.8125rem;
   }
+  /* Todo el panel del negocio: los botones van en la letra del texto, sin pedirlo uno por uno. */
+  .panel-negocio .btn {
+    font-family: var(--font-grotesca), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
   /* Acción de tercer nivel: texto, sin caja. Para "ya la publiqué" o "no me sirve" al lado de un botón. */
   .accion-texto {
     padding: 0.4rem 0.25rem;
@@ -493,4 +499,16 @@ h1, h2 {
 }
 .portada-titulo {
   text-shadow: 0 1px 24px rgb(0 0 0 / 0.35);
+}
+
+/*
+ * Las etiquetas chicas dentro del panel del negocio van en la letra del texto.
+ * El mono queda para código, rutas y números. Va fuera de las capas: `etiqueta`
+ * es una utilidad y le ganaría a una regla de la capa de componentes.
+ */
+.panel-negocio .etiqueta {
+  font-family: var(--font-grotesca), system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
 }

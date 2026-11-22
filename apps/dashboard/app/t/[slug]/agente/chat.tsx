@@ -180,7 +180,7 @@ export function Chat({ slug, inicial, primerMensaje = null, propuestas = [] }: {
           </div>
         ) : null}
         <div className="flex w-full max-w-2xl flex-col items-center gap-3">
-          <p className="font-mono text-[11px] tracking-[0.02em] text-faint">{t.chatEmpezarCon}</p>
+          <p className="text-xs text-faint">{t.chatEmpezarCon}</p>
           <div className="flex flex-wrap justify-center gap-2">
             {t.sugerencias.map((x) => (
               <button key={x} disabled={pending} onClick={() => enviar(x)} className="btn btn-secundario btn-chico gap-2 whitespace-normal text-muted hover:text-text">
@@ -227,8 +227,8 @@ export function Chat({ slug, inicial, primerMensaje = null, propuestas = [] }: {
                 ))}
               </div>
             ) : null}
-            {pending ? <p className="pl-7 font-mono text-xs text-muted">{estado ?? t.pensando}</p> : null}
-            {!pending && trabajando ? <p className="pl-7 font-mono text-xs text-muted">{r.chatTrabajando}</p> : null}
+            {pending ? <p className="pl-7 text-xs text-muted">{estado ?? t.pensando}</p> : null}
+            {!pending && trabajando ? <p className="pl-7 text-xs text-muted">{r.chatTrabajando}</p> : null}
           </div>
         </div>
         {hayNueva ? (
@@ -276,7 +276,7 @@ function Campo({ texto, setTexto, enviar, pending, grande }: { texto: string; se
         className="block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-base outline-none placeholder:text-faint sm:text-sm"
       />
       <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
-        <span className="hidden font-mono text-[11px] text-faint sm:inline">{t.chatAyudaTeclas}</span>
+        <span className="hidden text-xs text-faint sm:inline">{t.chatAyudaTeclas}</span>
         <button disabled={pending || !texto.trim()} className="btn btn-primario btn-chico ml-auto">
           {t.enviar}
         </button>
@@ -292,7 +292,7 @@ function Hora({ fecha }: { fecha: string }) {
   useEffect(() => {
     setHora(new Date(fecha).toLocaleTimeString(locale === 'es' ? 'es-CO' : 'en-US', { hour: 'numeric', minute: '2-digit' }))
   }, [fecha, locale])
-  return hora ? <span className="font-mono text-[11px] text-faint">{hora}</span> : null
+  return hora ? <span className="text-xs tabular-nums text-faint">{hora}</span> : null
 }
 
 function Mensaje({ slug, mensaje }: { slug: string; mensaje: AgentMessage }) {
@@ -312,7 +312,7 @@ function Mensaje({ slug, mensaje }: { slug: string; mensaje: AgentMessage }) {
     <div>
       <div className="mb-2 flex items-center gap-2">
         <LogoMark className="h-5 w-5 text-accent" />
-        <span className="font-mono text-xs font-bold text-accent">Peaje</span>
+        <span className="text-xs font-semibold text-accent">Peaje</span>
         <Hora fecha={mensaje.createdAt} />
       </div>
       <div className="max-w-[92%] break-words pl-7 text-sm">
@@ -373,7 +373,7 @@ function Accion({ slug, messageId, accion, alCambiar }: { slug: string; messageI
     })
   return (
     <div className="mt-3 border border-border p-3">
-      <p className="font-mono text-xs">{accion.summary}</p>
+      <p className="text-xs">{accion.summary}</p>
       {accion.status === 'pending' ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">{t.propuesta}</span>
