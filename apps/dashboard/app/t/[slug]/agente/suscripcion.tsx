@@ -81,7 +81,7 @@ export function Suscripcion({
   // Suscrito con tarjeta: no se ofrece otro checkout (pagaría dos veces).
   if (viva) {
     return (
-      <div id="plan" className="space-y-3 border border-border p-4">
+      <div id="plan" className="tarjeta space-y-3 p-4 sm:p-5">
         <p className="text-sm">{estado}</p>
         {avisos}
         {gestionar}
@@ -100,7 +100,7 @@ export function Suscripcion({
   // El paquete gratis no es un plan: se muestra lo que queda y, abajo, los planes a la vista.
   if (acceso.activo && acceso.plan !== 'regalo') {
     return (
-      <div id="plan" className="space-y-3 border border-border p-4">
+      <div id="plan" className="tarjeta space-y-3 p-4 sm:p-5">
         <p className="text-sm">{estado}</p>
         {avisos}
         {gestionar}
@@ -115,7 +115,7 @@ export function Suscripcion({
     )
   }
   return (
-    <div id="plan" className="space-y-4 border border-border p-4">
+    <div id="plan" className="tarjeta space-y-5 p-4 sm:p-5">
       <div className="space-y-1">
         <p className="text-lg font-semibold">{estado}</p>
         <p className="text-sm text-muted">{acceso.plan === 'regalo' ? t.planRegaloNota : t.planGratisNota}</p>
@@ -145,11 +145,10 @@ function LoQueHace({ arranque, preguntas }: { arranque: Arranque | null; pregunt
   return (
     <div className="space-y-2">
       <p className="text-sm font-semibold">{t.arranqueTitulo}</p>
-      <ol className="divide-y divide-border border border-border">
+      <ol className="max-w-[70ch] list-decimal space-y-1.5 pl-5 text-sm text-muted marker:text-faint">
         {pasos.map((p, i) => (
-          <li key={i} className="flex gap-3 px-4 py-2.5 text-sm">
-            <span className="pt-0.5 font-mono text-xs text-muted tabular-nums">{String(i + 1).padStart(2, '0')}</span>
-            <span>{p}</span>
+          <li key={i} className="pl-1">
+            {p}
           </li>
         ))}
       </ol>
@@ -174,10 +173,10 @@ function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; bi
           const p = billing.prices[plan]
           const puede = planes.includes(plan) && disponible(plan)
           return (
-            <div key={plan} className={`flex flex-col justify-between gap-4 border border-border p-4 `}>
+            <div key={plan} className="flex flex-col justify-between gap-4 rounded-[10px] border border-border bg-bg p-4">
               <div className="space-y-2">
-                <p className="font-mono text-[11px] text-muted">{t.planNombres[plan]}</p>
-                <p className="text-lg font-semibold">{t.planPrecio(p.usd)}</p>
+                <p className="text-xs font-medium text-muted">{t.planNombres[plan]}</p>
+                <p className="text-2xl font-semibold tracking-tight">{t.planPrecio(p.usd)}</p>
                 <p className="text-sm">{t.planLimites(p.limits.preguntas, creditos)}</p>
                 {plan === 'founder' ? (
                   <p className="text-xs text-muted">
@@ -195,7 +194,7 @@ function Opciones({ slug, billing, paddle, fecha, creditos }: { slug: string; bi
                   type="button"
                   disabled={estado === 'abriendo'}
                   onClick={() => void abrir(plan)}
-                  className={`btn btn-ancho whitespace-normal ${planes.filter(disponible)[0] === plan ? 'btn-primario' : 'btn-secundario'}`}
+                  className={`btn btn-suave btn-ancho whitespace-normal ${planes.filter(disponible)[0] === plan ? 'btn-primario' : 'btn-secundario'}`}
                 >
                   {estado === 'abriendo' ? t.planAbriendo : t.planSuscribirmeCorto(t.planNombres[plan] ?? plan)}
                 </button>
@@ -305,7 +304,7 @@ function Gestionar({ slug }: { slug: string }) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={pending} onClick={abrir} className="btn btn-secundario btn-chico">
+        <button type="button" disabled={pending} onClick={abrir} className="btn btn-secundario btn-chico btn-suave">
           {pending ? t.planAbriendoPortal : t.planGestionar}
         </button>
         <span className="text-xs text-muted">{t.planGestionarNota}</span>
@@ -319,8 +318,8 @@ function Pagos({ pagos, fecha }: { pagos: BillingPayment[]; fecha: Fecha }) {
   const { miAgente: t } = useDict()
   return (
     <div className="space-y-2">
-      <p className="font-mono text-[11px] text-muted">{t.planPagos}</p>
-      <ul className="divide-y divide-border border border-border">
+      <p className="text-xs font-medium text-muted">{t.planPagos}</p>
+      <ul className="tarjeta divide-y divide-border">
         {pagos.map((p) => (
           <li key={p.id} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-sm">
             <span>

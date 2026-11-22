@@ -18,7 +18,7 @@ export function Buscar({ slug }: { slug: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <button
         disabled={pending}
-        className="btn btn-primario"
+        className="btn btn-secundario btn-chico btn-suave"
         onClick={() =>
           start(async () => {
             setMsj(null)
@@ -58,7 +58,12 @@ export function ListaTareas({
   seguimientos?: TaskFollowup[]
 }) {
   const { miAgente: t } = useDict()
+  // Pocas a la vista: las abiertas vienen en orden de prioridad, así que las primeras son las que importan.
+  const tope = cerradas ? 5 : 3
+  const [todas, setTodas] = useState(false)
   if (tareas.length === 0) return null
+  const visibles = todas ? tareas : tareas.slice(0, tope)
+  const ocultas = tareas.length - tope
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -80,11 +85,16 @@ export function ListaTareas({
       </div>
       {/* Las abiertas, una tarjeta cada una: se leen y se resuelven de a una. Las cerradas, una lista compacta. */}
       <ul className={cerradas ? 'tarjeta mt-2 divide-y divide-border' : 'mt-2 space-y-3'}>
-        {tareas.map((x, i) => (
+        {visibles.map((x, i) => (
           <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} primera={!cerradas && i === 0 && tareas.length > 1} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
         ))}
       </ul>
-      {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
+      {ocultas > 0 ? (
+        // Un botón de verdad, a todo el ancho de la lista: es la única forma de ver el resto.
+        <button type="button" className="btn btn-secundario btn-suave btn-ancho mt-3" aria-expanded={todas} onClick={() => setTodas(!todas)}>
+          {todas ? t.verMenos : t.verMas(ocultas)}
+        </button>
+      ) : null}
     </div>
   )
 }

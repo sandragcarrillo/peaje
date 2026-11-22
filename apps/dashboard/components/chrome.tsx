@@ -117,9 +117,10 @@ export function SectionBar({
   meta?: React.ReactNode
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-y border-text/70 py-2 font-mono text-[11px] tracking-[0.02em]">
-      <span className="text-text">{label}</span>
-      {meta ? <span className="text-muted normal-case tracking-normal">{meta}</span> : null}
+    // Un título de sección, sin barras ni mono: el aire entre secciones hace de separador.
+    <div className="flex items-baseline justify-between gap-4">
+      <h2 className="text-lg font-semibold tracking-tight">{label}</h2>
+      {meta ? <span className="text-sm tabular-nums text-muted">{meta}</span> : null}
     </div>
   )
 }

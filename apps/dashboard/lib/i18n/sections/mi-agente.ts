@@ -266,6 +266,8 @@ export const miAgente = {
     impacto: { high: 'impacto alto', medium: 'impacto medio', low: 'impacto bajo' } as Record<string, string>,
     esfuerzo: { small: 'poco trabajo', medium: 'trabajo medio', large: 'mucho trabajo' } as Record<string, string>,
     primeroEsta: 'Empieza por esta',
+    verMas: (n: number) => (n === 1 ? 'Ver 1 tarea más' : `Ver ${n} tareas más`),
+    verMenos: 'Ver menos',
     tarjetaEsperamos: 'Qué esperamos',
     tarjetaComo: 'Cómo hacerlo',
     porQueGenerico: {
@@ -697,6 +699,8 @@ export const miAgente = {
     impacto: { high: 'high impact', medium: 'medium impact', low: 'low impact' } as Record<string, string>,
     esfuerzo: { small: 'small effort', medium: 'medium effort', large: 'large effort' } as Record<string, string>,
     primeroEsta: 'Start with this one',
+    verMas: (n: number) => (n === 1 ? 'Show 1 more task' : `Show ${n} more tasks`),
+    verMenos: 'Show less',
     tarjetaEsperamos: 'What we expect',
     tarjetaComo: 'How to do it',
     porQueGenerico: {

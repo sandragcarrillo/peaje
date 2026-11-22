@@ -53,16 +53,17 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   const cerradas = tareas.filter((x) => x.status === 'verified' || x.status === 'dismissed').slice(0, 20)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.titulo} sub={t.descripcion} />
 
-      {/* ---- M9: plan ---- */}
       <section className="space-y-3">
-        <SectionBar label={t.planSeccion} />
-        <Suscripcion slug={tenant.slug} acceso={acceso} regalo={tenant.regalo ?? null} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
+        <SectionBar label={t.tareas} meta={String(abiertas.length)} />
+        <Buscar slug={tenant.slug} />
+        {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
+        <ListaTareas slug={tenant.slug} titulo={t.grupoAbiertas} tareas={abiertas} />
+        <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
+        <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
       </section>
-
-
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />
@@ -83,14 +84,10 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
         {pro || plan ? <Plan plan={plan} /> : <Bloqueado que="plan" />}
       </section>
 
-
+      {/* ---- M9: plan ---- */}
       <section className="space-y-3">
-        <SectionBar label={t.tareas} meta={String(abiertas.length)} />
-        <Buscar slug={tenant.slug} />
-        {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
-        <ListaTareas slug={tenant.slug} titulo={t.grupoAbiertas} tareas={abiertas} />
-        <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
-        <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
+        <SectionBar label={t.planSeccion} />
+        <Suscripcion slug={tenant.slug} acceso={acceso} regalo={tenant.regalo ?? null} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
       </section>
     </div>
   )
