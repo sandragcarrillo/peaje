@@ -61,7 +61,23 @@ export function ListaTareas({
   if (tareas.length === 0) return null
   return (
     <div>
-      <h3 className="text-xs font-medium text-muted">{titulo}</h3>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 className="text-xs font-medium text-muted">{titulo}</h3>
+        {/* Cómo se trabajan: una vez para toda la lista, no repetido en cada tarjeta. */}
+        {cerradas ? null : (
+          <details className="border-0 text-xs">
+            <summary className="cursor-pointer text-muted hover:text-text">{t.tarjetaComo}</summary>
+            <div className="mt-2 max-w-[65ch] space-y-2 text-sm text-muted">
+              {[...new Set(tareas.map((x) => x.kind))].map((k) => (
+                <p key={k}>
+                  <span className="font-medium text-text">{t.tipos[k] ?? k}.</span> {t.como[k]} {t.esperamos[k]}
+                </p>
+              ))}
+              <p>{t.comoMcp}</p>
+            </div>
+          </details>
+        )}
+      </div>
       {/* Las abiertas, una tarjeta cada una: se leen y se resuelven de a una. Las cerradas, una lista compacta. */}
       <ul className={cerradas ? 'tarjeta mt-2 divide-y divide-border' : 'mt-2 space-y-3'}>
         {tareas.map((x, i) => (
@@ -185,15 +201,6 @@ function Tarea({ slug, tarea, cerrada, primera = false, seguimientos }: { slug: 
         </div>
       ) : null}
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
-      {/* Qué esperar y cómo hacerlo: está, pero no compite con la acción. */}
-      <details className="border-0 text-sm">
-        <summary className="cursor-pointer text-xs text-muted hover:text-text">{t.tarjetaComo}</summary>
-        <div className="mt-2 max-w-[65ch] space-y-2 text-muted">
-          <p>{t.como[tarea.kind]}</p>
-          <p>{t.esperamos[tarea.kind]}</p>
-          <p>{t.comoMcp}</p>
-        </div>
-      </details>
     </li>
   )
 }
