@@ -79,7 +79,8 @@ export function FormatosPanel({ datos }: { datos: FormatosCitados }) {
   )
 }
 
-export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion | null }) {
+/** `costo`: lo que cuesta medir, ya en texto desde el server. Null si no hay nada que avisar. */
+export function CitacionPanel({ slug, datos, costo = null }: { slug: string; datos: Citacion | null; costo?: string | null }) {
   const { miAgente: t } = useDict()
   const [texto, setTexto] = useState('')
   const [msj, setMsj] = useState<string | null>(null)
@@ -99,10 +100,6 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
     }, 15_000)
     return () => clearInterval(id)
   }, [esperando, router])
-  if (!datos) return null
-  const s = datos.summary
-  const faltan = s.engines.filter((e) => !e.configured).map((e) => e.name)
-  const motores = s.engines.filter((e) => s.byEngine.some((b) => b.engine === e.id))
 
   const correr = (fn: () => Promise<unknown>) =>
     start(async () => {
@@ -113,6 +110,46 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
         setMsj(e instanceof Error ? e.message : String(e))
       }
     })
+
+  // La única acción principal de la sección: la misma medición a pedido, con o sin resultados previos.
+  const medir = (
+    <button
+      disabled={pending || midiendo}
+      onClick={() => {
+        setMidiendo(true)
+        correr(async () => {
+          try {
+            const r = await medirAhora(slug)
+            if (r.error === 'too-soon') setMsj(t.citEspera(Math.ceil((r.retryInSeconds ?? 0) / 3600)))
+            else if (r.error === 'not-enough-credits') setMsj(r.message ?? null)
+          } finally {
+            setMidiendo(false)
+          }
+        })
+      }}
+      className="btn btn-primario whitespace-normal"
+    >
+      {pending && midiendo ? t.citMidiendo : t.citMedir}
+    </button>
+  )
+
+  // Sin medición todavía (ni una en camino): qué hace y el botón, nada más.
+  if (!datos || (!datos.summary.measuredAt && !esperando)) {
+    return (
+      <div className="tarjeta space-y-3 p-4 sm:p-5">
+        <p className="max-w-[65ch] text-sm text-muted">{t.citVacio}</p>
+        {/* El costo a la izquierda y el botón a la derecha, separados del texto por una línea. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+          <span className="text-xs text-faint">{costo}</span>
+          {medir}
+        </div>
+        {msj ? <p className="text-sm text-red-600">{msj}</p> : null}
+      </div>
+    )
+  }
+  const s = datos.summary
+  const faltan = s.engines.filter((e) => !e.configured).map((e) => e.name)
+  const motores = s.engines.filter((e) => s.byEngine.some((b) => b.engine === e.id))
 
   return (
     <div className="space-y-4">
@@ -166,11 +203,7 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
 
       {s.measuredAt && s.formats ? <FormatosPanel datos={s.formats} /> : null}
 
-      {s.measuredAt ? null : esperando ? (
-        <p className="text-sm">{t.citMidiendoFondo}</p>
-      ) : (
-        <p className="text-sm text-muted">{t.citSinMedir}</p>
-      )}
+      {s.measuredAt ? null : <p className="text-sm">{t.citMidiendoFondo}</p>}
 
       {datos.prompts.length > 0 ? (
         <details className="border border-border p-3">
@@ -201,26 +234,13 @@ export function CitacionPanel({ slug, datos }: { slug: string; datos: Citacion |
         </details>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          disabled={pending || midiendo}
-          onClick={() => {
-            setMidiendo(true)
-            correr(async () => {
-              try {
-                const r = await medirAhora(slug)
-                if (r.error === 'too-soon') setMsj(t.citEspera(Math.ceil((r.retryInSeconds ?? 0) / 3600)))
-                else if (r.error === 'not-enough-credits') setMsj(r.message ?? null)
-              } finally {
-                setMidiendo(false)
-              }
-            })
-          }}
-          className="btn btn-primario whitespace-normal"
-        >
-          {pending && midiendo ? t.citMidiendo : t.citMedir}
-        </button>
-        {faltan.length ? <span className="text-xs text-muted">{t.citFaltan(faltan.join(', '))}</span> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+        <span className="text-xs text-faint">
+          {costo}
+          {costo && faltan.length ? ' · ' : null}
+          {faltan.length ? t.citFaltan(faltan.join(', ')) : null}
+        </span>
+        {medir}
       </div>
       {msj ? <p className="text-sm text-red-600">{msj}</p> : null}
     </div>

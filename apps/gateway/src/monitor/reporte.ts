@@ -70,6 +70,8 @@ const SugerenciasSchema = z.object({
       modelo: z.string(),
     }),
   ),
+  /** Propuestas abiertas que ya no encajan con el sitio de hoy: su título exacto, tal como se le pasó. */
+  obsoletas: z.array(z.string()),
 })
 
 let anthropic: Anthropic | null = null
@@ -118,17 +120,23 @@ function evidenciaDeFormatos(f: FormatosCitados | null): string {
 }
 
 /** Lo que ya existe, ya está pedido o el dueño descartó: páginas del sitemap y tareas de contenido. Texto para el prompt. */
-async function temasCubiertos(tenant: Tenant, dominio: string): Promise<string> {
+async function temasCubiertos(tenant: Tenant, dominio: string): Promise<{ texto: string; abiertas: string[] }> {
   const [sitio, tareas] = await Promise.all([
     paginasDelSitio(dominio).catch(() => ({ encontrado: false, paginas: [] })),
     store.listTasks(tenant.id, { statuses: ['open', 'in_progress', 'done', 'verified', 'dismissed'] }).catch(() => []),
   ])
   const paginas = sitio.paginas.map((p) => p.path).filter((p) => p !== '/')
-  const planeadas = tareas.filter((t) => t.kind === 'content').map((t) => t.title)
-  return [
+  // Las de "que te nombren" no son páginas del sitio: no cuentan como tema cubierto.
+  const deContenido = tareas.filter((t) => t.kind === 'content' && !t.key.startsWith('content:mention:'))
+  const planeadas = deContenido.map((t) => t.title)
+  // Las que el dueño todavía no tocó: se vuelven a mirar contra el sitio de hoy.
+  const abiertas = deContenido.filter((t) => t.status === 'open').map((t) => t.title)
+  const texto = [
     paginas.length ? `Pages the site already has (${paginas.length}):\n${paginas.map((p) => `- ${p}`).join('\n')}\n\n` : '',
     planeadas.length ? `Pages already planned, published through Peaje or turned down by the owner:\n${planeadas.map((t) => `- ${t}`).join('\n')}\n\n` : '',
+    abiertas.length ? `Open proposals the owner has not started (re-check these against the site text):\n${abiertas.map((t) => `- ${t}`).join('\n')}\n\n` : '',
   ].join('')
+  return { texto, abiertas }
 }
 
 /** Las búsquedas de Search Console como texto para el prompt; vacío si no hay conexión. */
@@ -139,10 +147,24 @@ function evidenciaDeBusquedas(b: { texto: string; impresiones: number; posicion:
 }
 
 export async function sugerirContenido(tenant: Tenant, dominio: string, evidencia: { busquedas?: { texto: string; impresiones: number; posicion: number }[] } = {}): Promise<Reporte['contenido']> {
-  if (!process.env.ANTHROPIC_API_KEY) return []
+  return (await sugerirYRevisar(tenant, dominio, evidencia)).paginas
+}
+
+/**
+ * Las páginas que conviene crear y, de paso, las propuestas abiertas que ya no encajan con el sitio de hoy.
+ * El sitio se lee de nuevo en cada corrida: si el negocio cambió lo que ofrece desde que se propuso una página
+ * (por ejemplo, dejó de hablar de algo), esa propuesta sale en `obsoletas` con su título exacto.
+ */
+export async function sugerirYRevisar(
+  tenant: Tenant,
+  dominio: string,
+  evidencia: { busquedas?: { texto: string; impresiones: number; posicion: number }[] } = {},
+): Promise<{ paginas: Reporte['contenido']; obsoletas: string[] }> {
+  const nada = { paginas: [], obsoletas: [] }
+  if (!process.env.ANTHROPIC_API_KEY) return nada
   try {
     const texto = await leerSitio(dominio)
-    if (texto.length < 200) return []
+    if (texto.length < 200) return nada
     const formatos = await formatosCitados(tenant).catch(() => null)
     const yaHechas = await temasCubiertos(tenant, dominio)
     anthropic ??= new Anthropic()
@@ -154,22 +176,31 @@ export async function sugerirContenido(tenant: Tenant, dominio: string, evidenci
         'Each page has a format: guide, roundup (best options, top N, alternatives), comparison (X vs Y), research (original data or a benchmark), docs, forum, video, news, product or other.',
         'You also get the pages the site already has (from its sitemap: the URL words say the topic) and the pages already planned or turned down. Never propose a page whose question one of them already answers, whatever the wording or language. Only new topics; if there are fewer than 3, return fewer.',
         'When you are given the Google searches where the site was shown, treat them as real demand: prefer questions close to a search that no existing page answers well (a search ranking past position 10 with no page built for it). Do not propose a page for a search an existing page already targets; improving that page is a separate task.',
+        'You may also get open proposals the owner has not started. The site text below is how the site reads today, and it may have changed since they were proposed. Return in "obsoletas" the exact titles of the open proposals that no longer fit: the site no longer offers or talks about what the page would cover, or the facts it would need are gone from the site. Be conservative: when unsure, leave it out of "obsoletas".',
+        ...(env.cobrosVisibles
+          ? []
+          : ['Charging AI agents is not offered to the public right now. Do not propose pages about charging AI agents, paid requests, prices per request, payment protocols or wallets, even if the site text still mentions them, and include in "obsoletas" any open proposal about those topics.']),
         'When you are given the formats AI assistants actually cite for this business\'s questions, prefer the questions where those formats win, pick the format that won for that question, and set "modelo" to the URL of one cited example to emulate. Without that evidence, pick the format that fits the question and leave "modelo" empty. Never put a URL in "modelo" that was not in the evidence.',
       ].join('\n'),
       messages: [
         {
           role: 'user',
-          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}${evidenciaDeBusquedas(evidencia.busquedas)}${yaHechas}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
+          content: `Business: ${tenant.name} (${dominio}).\n\n${evidenciaDeFormatos(formatos)}${evidenciaDeBusquedas(evidencia.busquedas)}${yaHechas.texto}Site text:\n\n${texto}\n\nReturn pages with: the exact question as the page title, a two-line outline of the answer, why an answer engine would cite it (entity data, prices, hours, a comparison, a number), the URL of the page on this site where you read the facts you used, the format and the example to emulate. Use only facts that appear in the text; never invent numbers.`,
         },
       ],
       output_config: { format: zodOutputFormat(SugerenciasSchema) },
     })
     const urlsCitadas = new Set(formatos?.formats.flatMap((f) => f.examples.map((e) => e.url)) ?? [])
     // El modelo de ejemplo solo vale si salió de la evidencia: nada de URLs inventadas.
-    return (res.parsed_output?.paginas.slice(0, 5) ?? []).map((p) => ({ ...p, modelo: urlsCitadas.has(p.modelo) ? p.modelo : '' }))
+    // Solo valen los títulos que de verdad estaban en la lista de abiertas: el modelo no cierra lo que no se le mostró.
+    const abiertas = new Set(yaHechas.abiertas)
+    return {
+      paginas: (res.parsed_output?.paginas.slice(0, 5) ?? []).map((p) => ({ ...p, modelo: urlsCitadas.has(p.modelo) ? p.modelo : '' })),
+      obsoletas: (res.parsed_output?.obsoletas ?? []).filter((t) => abiertas.has(t)),
+    }
   } catch (error) {
     console.warn('[monitor] sin sugerencias de contenido', error instanceof Error ? error.message : error)
-    return []
+    return nada
   }
 }
 

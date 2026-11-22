@@ -16,7 +16,7 @@ export const nav = {
     linkRadar: 'Radar gratis',
     menu: 'Menú',
     cerrarMenu: 'Cerrar menú',
-    metaTitulo: 'Peaje · que la IA te encuentre, te use y te compre',
+    metaTitulo: 'Peaje · que la IA te encuentre, te entienda y te recomiende',
     metaDescripcion:
       'ChatGPT, Claude y otros agentes ya visitan tu sitio, pero no entienden bien qué vendes. Tu agente de Peaje te dice qué falta y lo arregla contigo en Telegram.',
     hechoPor: 'Made with love by',
@@ -40,7 +40,7 @@ export const nav = {
     linkRadar: 'Free radar',
     menu: 'Menu',
     cerrarMenu: 'Close menu',
-    metaTitulo: 'Peaje · get AI to find you, use you and buy from you',
+    metaTitulo: 'Peaje · get AI to find you, understand you and recommend you',
     metaDescripcion:
       'ChatGPT, Claude and other agents already visit your site, but they do not really get what you sell. Your Peaje agent tells you what is missing and fixes it with you on Telegram.',
     hechoPor: 'Made with love by',

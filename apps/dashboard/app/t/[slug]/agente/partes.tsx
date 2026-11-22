@@ -10,14 +10,22 @@ const boton = 'btn btn-secundario btn-chico btn-suave'
 // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
 const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-base outline-none focus:border-text sm:text-sm'
 
-export function Buscar({ slug }: { slug: string }) {
+/** `nota`: lo que cuesta buscar, ya en texto desde el server. Null si no hay nada que avisar. */
+export function Buscar({ slug, nota = null }: { slug: string; nota?: string | null }) {
   const { miAgente: t } = useDict()
   const [msj, setMsj] = useState<string | null>(null)
   const [pending, start] = useTransition()
   return (
-    // El aviso de cada cuánto se puede buscar va de ayuda en el botón; al lado solo aparece el resultado.
-    <div className="flex flex-wrap items-center justify-end gap-3">
-      {msj ? <span className="text-xs text-muted" role="status">{msj}</span> : null}
+    // Una barra al pie de la lista: qué hace y cuánto cuesta a la izquierda, el botón a la derecha. Después de buscar, ahí va el resultado.
+    <div className="tarjeta flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3 sm:px-5">
+      <p className="min-w-0 text-sm text-muted" role={msj ? 'status' : undefined}>
+        {msj ?? (
+          <>
+            {t.buscarQue}
+            {nota ? <span className="mt-0.5 block text-xs text-faint">{nota}</span> : null}
+          </>
+        )}
+      </p>
       <button
         disabled={pending}
         title={t.buscarNota}

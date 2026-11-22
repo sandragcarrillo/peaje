@@ -2,12 +2,20 @@ import type { AgentTask, Tenant } from '@peaje/db'
 import { verificarIntegracion } from '@peaje/shared'
 import { agendarSeguimientos } from '../ciclo/seguimiento.js'
 
+/** La nota de una tarea que Peaje no puede revisar en el sitio del dueño. */
+export const SIN_CRITERIOS = 'Marked done. Peaje cannot check this one on the live site.'
+
+/** Las tareas de "que te nombren": pasan fuera del sitio del dueño. */
+export const esMencion = (t: Pick<AgentTask, 'key'>) => t.key.startsWith('content:mention:')
+
 /**
  * Revisa los criterios de aceptación de una tarea contra el sitio en vivo.
  * `url` (la que el coding agent reporta al marcarla hecha) reemplaza la URL
  * del primer criterio de tipo url: el agente pudo elegir otro slug.
  */
 export async function verificarTarea(tenant: Tenant, task: AgentTask, url?: string | null): Promise<{ ok: boolean; note: string }> {
+  // Sin criterios (pedir una mención en un sitio ajeno): Peaje no tiene qué abrir. Vale la palabra del dueño, y la nota lo dice.
+  if (task.acceptance.length === 0) return { ok: true, note: SIN_CRITERIOS }
   const fallas: string[] = []
   let urlUsada = false
   let chequeos: Awaited<ReturnType<typeof verificarIntegracion>> | null = null
@@ -54,6 +62,7 @@ export async function completarTarea(tenant: Tenant, task: AgentTask, url: strin
     verifiedAt: r.ok ? ahora : null,
   })
   // Ciclo cerrado: al quedar verificada, re-medir a las 2 y 6 semanas (idempotente).
-  if (r.ok) await agendarSeguimientos(tenant, actualizada)
+  // Las de mención no: el seguimiento toma el título como pregunta a medir, y el de estas no es una pregunta.
+  if (r.ok && !esMencion(task)) await agendarSeguimientos(tenant, actualizada)
   return actualizada
 }

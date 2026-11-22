@@ -142,15 +142,31 @@ export const MOTORES: Motor[] = [
     disponible: () => !!process.env.ANTHROPIC_API_KEY,
     async preguntar(q, o) {
       anthropic ??= new Anthropic()
-      const res = await anthropic.messages.create(
-        {
-          model: process.env.CITATION_CLAUDE_MODEL ?? 'claude-haiku-4-5',
-          max_tokens: 2_000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3, ...(o?.pais ? { user_location: { type: 'approximate' as const, country: o.pais, ...(o.ciudad ? { city: o.ciudad } : {}) } } : {}) }],
-          messages: [{ role: 'user', content: q }],
-        },
-        { timeout: TIMEOUT },
-      )
+      const cliente = anthropic
+      const pedir = (conLugar: boolean) =>
+        cliente.messages.create(
+          {
+            model: process.env.CITATION_CLAUDE_MODEL ?? 'claude-haiku-4-5',
+            max_tokens: 2_000,
+            tools: [
+              {
+                type: 'web_search_20250305',
+                name: 'web_search',
+                max_uses: 3,
+                ...(conLugar && o?.pais ? { user_location: { type: 'approximate' as const, country: o.pais, ...(o.ciudad ? { city: o.ciudad } : {}) } } : {}),
+              },
+            ],
+            messages: [{ role: 'user', content: q }],
+          },
+          { timeout: TIMEOUT },
+        )
+      // Anthropic rechaza con 400 los países que su búsqueda no soporta. En vez de quedarse sin respuesta,
+      // se pregunta sin ubicación: la pregunta ya está escrita para ese país.
+      const res = await pedir(true).catch((e: unknown) => {
+        if (!o?.pais || !(e instanceof Anthropic.BadRequestError)) throw e
+        console.warn('[citacion] Claude no aceptó la ubicación; se pregunta sin ella', { pais: o.pais, ciudad: o.ciudad ?? null, motivo: e.message.slice(0, 200) })
+        return pedir(false)
+      })
       const textos = res.content.filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
       return respuesta(
         textos.map((b) => b.text).join(''),

@@ -6,21 +6,24 @@ import { asistentesMedidos, dominioVerificable } from '@peaje/shared'
 import { store } from '../store.js'
 import { env } from '../env.js'
 import { NOMBRE_CHEQUEO, TEXTO_MOTIVO } from '../monitor/email.js'
-import { leerSitio, sugerirContenido } from '../monitor/reporte.js'
+import { leerSitio, sugerirYRevisar } from '../monitor/reporte.js'
 import { completarTarea } from './verificar.js'
+import { preguntasSinCita, type PreguntaSinCita } from '../citacion/competidores.js'
 import { revisarAcceso } from '../acceso/revisar.js'
 import { cuerpoConBorrador, MAX_BORRADORES, redactarBorrador, slugDePregunta, tieneBorrador } from '../ciclo/borrador.js'
 import { agendarSeguimientos } from '../ciclo/seguimiento.js'
 import { datosDeBusqueda } from '../google/consola.js'
 import { oportunidades, type Oportunidad } from '../google/oportunidades.js'
-import { prioridadBloqueo, prioridadBusqueda, prioridadFix, prioridadFrescura, prioridadPagina, prioridadRuta } from './prioridad.js'
+import { prioridadBloqueo, prioridadBusqueda, prioridadFix, prioridadFrescura, prioridadMencion, prioridadPagina, prioridadRuta } from './prioridad.js'
 
 /**
  * Las tareas que el agente deja para el coding agent del dueño. Tres tipos:
  *
  *   fix      un chequeo del verificador que falla (proxy, robots, bots...)
  *   content  una página que los motores de respuesta citarían y el sitio no
- *            tiene, o una que Google ya muestra y no rinde (Search Console)
+ *            tiene, o una que Google ya muestra y no rinde (Search Console),
+ *            o pedir que nombren al negocio en las páginas de terceros que la
+ *            IA ya cita para una pregunta de compra (clave content:mention:)
  *   route    un path que los agentes pidieron y el origen no tiene (404)
  *
  * Cada una lleva su prioridad (tareas/prioridad.ts): con eso la cola se ordena
@@ -207,6 +210,61 @@ function promptMejorar(o: Oportunidad): string {
   ].join('\n')
 }
 
+const normal = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ')
+
+/**
+ * Que te nombren: las páginas de terceros que la IA cita para una pregunta de
+ * compra donde el negocio no sale, y qué mandarles. Pasa fuera del sitio del
+ * dueño: el coding agent prepara el pedido y el dueño lo manda.
+ */
+export function promptMencion(tenant: Tenant, dominio: string, m: PreguntaSinCita): string {
+  return [
+    `# Get mentioned: ${m.question}`,
+    '',
+    `AI assistants like ${asistentesMedidos('en', 'o')} get asked this and answer without citing ${tenant.name}. These are the third-party pages they cited instead in Peaje's latest measurement. An assistant recommends what the pages it reads name, so the goal is to be named on them.`,
+    '',
+    '## Where to ask',
+    '',
+    ...m.publishers.flatMap((p) => [
+      `- ${p.domain} (cited in ${p.citations} ${p.citations === 1 ? 'answer' : 'answers'})`,
+      ...p.pages.map((x) => `  - ${x.title ? `"${x.title}"` : 'Untitled page'}${x.url ? `: ${x.url}` : ''}`),
+    ]),
+    '',
+    '## What to do',
+    '',
+    '1. Open each page and confirm it lists or discusses options for this question. Skip any page that belongs to a direct competitor.',
+    '2. Find the right way in for each one: the author or editor of a list or review, the "suggest an edit" or "submit a listing" form of a directory, the thread itself on a forum.',
+    '3. Draft one short request per page and show the drafts to the owner. The owner sends them: do not send anything on your own.',
+    '',
+    '## What to send',
+    '',
+    'A short, honest inclusion request, under 120 words, in the language of the page:',
+    '',
+    `- Who you are: ${tenant.name}, and your role there.`,
+    '- What you offer, in one sentence, in the words a customer would use.',
+    '- One concrete fact that can be checked on the site (a price, a limit, a count, a city you serve). Use only real facts; never invent numbers.',
+    `- The URL: https://${dominio}/ or the page that best answers the question.`,
+    '- The page you are writing about and where on it the business would fit.',
+    '',
+    'On a forum, do not ask anyone to add you: answer the question in the thread, be useful first, and say that you work at the business.',
+    '',
+    '## Never',
+    '',
+    '- Never pay or offer anything in exchange for being included.',
+    '- Never write reviews of your own business, and never ask anyone to post a review they did not write from their own experience.',
+    '- Never claim something the site does not show.',
+    '',
+    '## When done',
+    '',
+    'Mark this task done once the requests are sent, and note which pages you wrote to. Peaje cannot check this on your site, so it takes your word. The next citation measurements show whether assistants start naming the business for this question.',
+  ].join('\n')
+}
+
+/** Cuántas tareas de "que te nombren" hay abiertas a la vez, y como mucho cuántas por corrida. */
+export const MAX_MENCIONES = 2
+
+export const claveDeMencion = (pregunta: string) => `content:mention:${slugDePregunta(pregunta)}`
+
 /** Cuántas tareas de Search Console pueden estar abiertas a la vez: más que eso es una lista que nadie hace. */
 const MAX_BUSQUEDA_ABIERTAS = 6
 /** Cuántas propone por corrida. */
@@ -267,10 +325,15 @@ export async function reverificarHechas(tenant: Tenant): Promise<number> {
   return verificadas
 }
 
+/** La nota de una propuesta que Peaje retiró sola al volver a leer el sitio. */
+const NOTA_OBSOLETA = 'Peaje read the site again and this page no longer fits what it offers today.'
+
 export async function generarTareas(tenant: Tenant, opciones: { conContenido?: boolean } = {}): Promise<{ creadas: number; actualizadas: number; cerradas: number }> {
   const dominio = dominioVerificable(tenant.originUrl)
   let creadas = 0
   let actualizadas = 0
+  // Propuestas abiertas que se retiraron porque el sitio de hoy ya no las respalda.
+  let retiradas = 0
 
   const fixes = await sincronizarFixes(tenant)
   creadas += fixes.creadas
@@ -326,6 +389,37 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
       r.created ? (creadas += 1) : (actualizadas += 1)
     }
 
+    // Que te nombren: preguntas de compra donde la IA no cita al negocio y sí cita listas, reseñas, directorios o foros.
+    const sinCita = await preguntasSinCita(tenant).catch(() => [] as PreguntaSinCita[])
+    const conTerceros = sinCita.filter((m) => m.publishers.length > 0)
+    if (conTerceros.length > 0) {
+      const previas = new Map((await store.listTasks(tenant.id)).map((t) => [t.key, t]))
+      let abiertas = conTerceros.filter((m) => previas.get(claveDeMencion(m.question))?.status === 'open').length
+      for (const m of conTerceros) {
+        const previa = previas.get(claveDeMencion(m.question))
+        // Tomada, hecha o descartada: no se vuelve a proponer.
+        if (previa && previa.status !== 'open') continue
+        if (!previa && abiertas >= MAX_MENCIONES) continue
+        const sitios = m.publishers.map((p) => p.domain)
+        const r = await store.upsertTask({
+          tenantId: tenant.id,
+          key: claveDeMencion(m.question),
+          kind: 'content',
+          title: `Get mentioned: ${m.question}`,
+          summary: `AI assistants answer this citing ${sitios.slice(0, 3).join(', ')} and not ${tenant.name}. Ask those pages to include you.`,
+          body: promptMencion(tenant, dominio, m),
+          // Pasa en sitios ajenos: no hay nada que Peaje pueda abrir para comprobarlo. La marca hecha el dueño.
+          acceptance: [],
+          priority: prioridadMencion({ pregunta: m.question, sitios, citas: m.publisherCitations }),
+          source: 'citation',
+        })
+        if (r.created) {
+          creadas += 1
+          abiertas += 1
+        } else actualizadas += 1
+      }
+    }
+
     // Search Console: páginas que Google ya muestra y no rinden. Sin conexión no hay filas y sigue.
     const busqueda = await datosDeBusqueda(tenant).catch(() => null)
     if (busqueda) {
@@ -358,8 +452,20 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
 
     if (opciones.conContenido) {
       // Las búsquedas donde Google ya muestra el sitio le dicen al modelo qué pregunta la gente de verdad.
-      const sugerencias = await sugerirContenido(tenant, dominio, { busquedas: busqueda?.consultas.map((f) => ({ texto: f.keys[0] ?? '', impresiones: f.impressions, posicion: Math.round(f.position * 10) / 10 })) })
+      const { paginas: sugerencias, obsoletas } = await sugerirYRevisar(tenant, dominio, { busquedas: busqueda?.consultas.map((f) => ({ texto: f.keys[0] ?? '', impresiones: f.impressions, posicion: Math.round(f.position * 10) / 10 })) })
       const previas = new Map((await store.listTasks(tenant.id)).map((t) => [t.key, t]))
+      // El sitio cambió desde que se propusieron: las abiertas que ya no encajan se retiran solas, con la razón a la vista.
+      // Solo las que el dueño no empezó; una tomada o hecha no se toca.
+      for (const t of previas.values()) {
+        if (t.kind !== 'content' || t.status !== 'open' || !obsoletas.includes(t.title)) continue
+        await store.updateTask(tenant.id, t.id, { status: 'dismissed', note: NOTA_OBSOLETA })
+        t.status = 'dismissed'
+        retiradas += 1
+      }
+      // Sale de la medición de citas: la pregunta es una donde la IA no cita al negocio, o imita una página citada ahí.
+      const preguntasSin = new Set(sinCita.map((m) => normal(m.question)))
+      const paginasSin = new Set(sinCita.flatMap((m) => m.pageUrls))
+      const esSinCita = (s: Reporte['contenido'][number]) => preguntasSin.has(normal(s.pregunta)) || (!!s.modelo && paginasSin.has(s.modelo))
       // Borrador completo para hasta MAX_BORRADORES preguntas nuevas (o abiertas
       // sin borrador), en paralelo; el resto queda con instrucciones.
       const conBorrador = sugerencias
@@ -398,7 +504,7 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
           summary: s.porQue,
           body,
           acceptance: [{ type: 'url', url: `https://${dominio}/${slug}` }],
-          priority: prioridadPagina(s, !!b || (!!previa && tieneBorrador(previa))),
+          priority: prioridadPagina(s, !!b || (!!previa && tieneBorrador(previa)), esSinCita(s)),
           source: 'agent',
         })
         r.created ? (creadas += 1) : (actualizadas += 1)
@@ -406,5 +512,5 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
     }
   }
 
-  return { creadas, actualizadas, cerradas: fixes.cerradas }
+  return { creadas, actualizadas, cerradas: fixes.cerradas + retiradas }
 }

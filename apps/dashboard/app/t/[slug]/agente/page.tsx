@@ -2,7 +2,7 @@ import type { AgentTask } from '@peaje/db'
 import { redirect } from 'next/navigation'
 import { COBROS_VISIBLES } from '@/lib/config'
 import { PageHeader, SectionBar } from '@/components/chrome'
-import { getDict } from '@/lib/i18n'
+import { getDict, getLocale } from '@/lib/i18n'
 import { requireTenant } from '@/lib/session'
 import { store } from '@/lib/store'
 import { Buscar, ListaTareas } from './partes'
@@ -12,7 +12,7 @@ import { CitacionPanel } from './citacion'
 // ---- M7 ----
 import { CompradorPanel } from './comprador'
 // ---- M9: plan y cobro del agente Pro ----
-import { accesoPro, CREDITOS_MENSUALES } from '@peaje/db'
+import { accesoPro, COSTOS_CREDITOS, CREDITOS_MENSUALES } from '@peaje/db'
 import { billingDeRespaldo, leerBilling } from '@/lib/gateway'
 import { Bloqueado, Suscripcion, type Arranque } from './suscripcion'
 import { paddleDelNegocio } from '@/lib/paddle'
@@ -28,7 +28,7 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   const [{ slug }, { m: primerMensaje }] = await Promise.all([params, searchParams])
   // Enlaces viejos con ?m= (mandaban al chat de esta página): el chat ahora tiene la suya.
   if (typeof primerMensaje === 'string') redirect(`/t/${slug}/chat?m=${encodeURIComponent(primerMensaje)}`)
-  const [tenant, d] = await Promise.all([requireTenant(slug), getDict()])
+  const [tenant, d, locale] = await Promise.all([requireTenant(slug), getDict(), getLocale()])
   const t = d.miAgente
   const [tareas, plan] = await Promise.all([
     store.listTasks(tenant.id).catch((): AgentTask[] => []),
@@ -47,6 +47,13 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
   // reales de este sitio (los mismos que /t/[slug]/listo). Sin score, sin números.
   const arranque = pro ? null : await arranqueDe(tenant.originUrl)
 
+  // Lo que cuesta cada acción y lo que queda, ya en texto: los componentes cliente no reciben funciones.
+  // Buscar tareas y medir cuestan un `informe` (COSTOS_CREDITOS, igual que cobra el gateway).
+  const enRegalo = acceso.plan === 'regalo' ? (tenant.regalo ?? null) : null
+  const dePago = pro && !enRegalo
+  // Sin plan pago ni prueba, buscar tareas es gratis y no toca el paquete gratis.
+  const notaBuscar = dePago ? t.costoBusqueda(COSTOS_CREDITOS.informe) : enRegalo ? t.buscarSinCosto : null
+  const notaMedir = dePago ? t.costoMedicion(COSTOS_CREDITOS.informe) : enRegalo ? t.costoRegaloInforme(enRegalo.informes) : null
   // En el orden en que conviene hacerlas: la prioridad la pone el agente con lo que midió.
   const abiertas = tareas.filter((x) => x.status === 'open' || x.status === 'in_progress').sort((a, b) => (b.priority?.score ?? 50) - (a.priority?.score ?? 50))
   const esperando = tareas.filter((x) => x.status === 'done')
@@ -58,26 +65,25 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
 
       <section className="space-y-3">
         {/* Una sola fila: el título con cuántas hay abiertas, y a la derecha la acción. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-lg font-semibold tracking-tight">{t.tareas}</h2>
-            {abiertas.length > 0 ? (
-              <span className="text-sm text-muted">
-                {abiertas.length} {t.grupoAbiertas.toLowerCase()}
-              </span>
-            ) : null}
-          </div>
-          <Buscar slug={tenant.slug} />
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="text-lg font-semibold tracking-tight">{t.tareas}</h2>
+          {abiertas.length > 0 ? (
+            <span className="text-sm text-muted">
+              {abiertas.length} {t.grupoAbiertas.toLowerCase()}
+            </span>
+          ) : null}
         </div>
         {tareas.length === 0 ? <p className="text-sm text-muted">{t.vacio}</p> : null}
         <ListaTareas slug={tenant.slug} tareas={abiertas} />
+        {/* Buscar más va justo debajo de las abiertas, con su costo, antes de las que esperan y las cerradas. */}
+        <Buscar slug={tenant.slug} nota={notaBuscar} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoEsperando} tareas={esperando} />
         <ListaTareas slug={tenant.slug} titulo={t.grupoCerradas} tareas={cerradas} cerradas seguimientos={seguimientos} />
       </section>
 
       <section className="space-y-3">
         <SectionBar label={t.citTitulo} />
-        {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} /> : <Bloqueado que="citacion" />}
+        {pro ? <CitacionPanel slug={tenant.slug} datos={citacion} costo={notaMedir} /> : <Bloqueado que="citacion" />}
       </section>
 
       {/* ---- M7: comprador misterioso, oculto hasta mainnet (busca en mercados de agentes y prueba el pago) ---- */}

@@ -24,6 +24,11 @@ export const panel = {
     pasoLabel: (n: number) => `Paso 0${n}`,
     sidebarActivarAgente: 'Activar mi agente',
     sidebarVerMejoras: 'Ver el kit',
+    saldoTitulo: 'Créditos',
+    saldoDe: (quedan: number, total: number) => `${quedan} de ${total}`,
+    saldoRenueva: (fecha: string) => `Se renuevan el ${fecha}`,
+    saldoRegaloTitulo: 'Paquete gratis',
+    saldoRegalo: (informes: number, respuestas: number) => `${informes} ${informes === 1 ? 'informe' : 'informes'} y ${respuestas} ${respuestas === 1 ? 'respuesta' : 'respuestas'}`,
     sidebarCobros: 'Cobros (opcional)',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje está conectado: tu sitio pasó de ${antes} a ${ahora} para agentes.`,
@@ -205,6 +210,11 @@ export const panel = {
     pasoLabel: (n: number) => `Step 0${n}`,
     sidebarActivarAgente: 'Turn on my agent',
     sidebarVerMejoras: 'See the kit',
+    saldoTitulo: 'Credits',
+    saldoDe: (quedan: number, total: number) => `${quedan} of ${total}`,
+    saldoRenueva: (fecha: string) => `Renew on ${fecha}`,
+    saldoRegaloTitulo: 'Free package',
+    saldoRegalo: (informes: number, respuestas: number) => `${informes} ${informes === 1 ? 'report' : 'reports'} and ${respuestas} ${respuestas === 1 ? 'answer' : 'answers'}`,
     sidebarCobros: 'Getting paid (optional)',
     scoreMejora: (antes: number, ahora: number) =>
       `Peaje is connected: your site went from ${antes} to ${ahora} for agents.`,

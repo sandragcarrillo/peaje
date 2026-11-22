@@ -62,12 +62,12 @@ export const landing = {
     // Lo que necesitan los agentes
     necesitanTitulo: 'Lo que necesitan los agentes',
     necesitan: [
-      { titulo: 'Que te encuentren', texto: 'Que ChatGPT y Claude te recomienden.' },
-      { titulo: 'Que te usen', texto: 'Que un agente pueda registrarse, reservar o comprar sin trabarse.' },
-      { titulo: 'Que te compren', texto: 'Que un agente pueda comprarte sin que nadie tenga que intervenir.' },
+      { titulo: 'Que te encuentren', texto: 'Que ChatGPT y Claude puedan leer tu sitio cuando alguien pregunta por lo que vendes.' },
+      { titulo: 'Que te entiendan', texto: 'Que sepan qué vendes y a qué precio.' },
+      { titulo: 'Que te recomienden', texto: 'Que te nombren a ti cuando un cliente les pide una recomendación.' },
     ],
     necesitanCierre:
-      'Otras herramientas solo miden si la IA te recomienda. Peaje te deja listo para que te encuentren, te usen y te compren.',
+      'Otras herramientas solo miden si la IA te recomienda. Peaje además te dice qué arreglar y lo arregla contigo.',
 
     // Cómo funciona
     comoTitulo: 'Cómo funciona',
@@ -79,7 +79,7 @@ export const landing = {
       },
       {
         titulo: 'Deja tu sitio listo para los agentes',
-        texto: 'Instala nuestro kit con un comando y tu web queda lista para que los agentes la entiendan, la usen y te compren.',
+        texto: 'Instala nuestro kit con un comando y tu web queda lista para que los agentes de IA la lean y la entiendan.',
       },
       {
         titulo: 'Haz que te recomienden',
@@ -215,12 +215,12 @@ export const landing = {
 
     necesitanTitulo: 'What agents need',
     necesitan: [
-      { titulo: 'To find you', texto: 'ChatGPT and Claude recommend you.' },
-      { titulo: 'To use you', texto: 'An agent can sign up, book or buy without getting stuck.' },
-      { titulo: 'To buy from you', texto: 'An agent can buy from you without anyone stepping in.' },
+      { titulo: 'To find you', texto: 'ChatGPT and Claude can read your site when someone asks about what you sell.' },
+      { titulo: 'To understand you', texto: 'They know what you sell and at what price.' },
+      { titulo: 'To recommend you', texto: 'They name you when a customer asks them for a recommendation.' },
     ],
     necesitanCierre:
-      'Other tools only measure whether AI recommends you. Peaje gets you ready to be found, used and bought from.',
+      'Other tools only measure whether AI recommends you. Peaje also tells you what to fix and fixes it with you.',
 
     comoTitulo: 'How it works',
     pasos: [
@@ -231,7 +231,7 @@ export const landing = {
       },
       {
         titulo: 'Get your site ready for agents',
-        texto: 'Install our kit with one command and your site is ready for agents to understand it, use it and buy from you.',
+        texto: 'Install our kit with one command and your site is ready for AI agents to read it and understand it.',
       },
       {
         titulo: 'Get recommended',

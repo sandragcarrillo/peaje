@@ -9,9 +9,13 @@ import { ARREGLO } from '../reportes/visitas.js'
  * 3 de esta semana" que Peaje propone sin que nadie pregunte.
  *
  * El orden de fondo: primero lo que impide que la IA lea el sitio (sin eso
- * nada más sirve), después lo que Google ya muestra y no rinde, después
- * páginas nuevas, y al final el mantenimiento. El impacto nunca es un
- * pronóstico: dice cuánto pesa la causa dentro del propio sitio.
+ * nada más sirve), después las preguntas de compra donde la IA no cita al
+ * negocio (que lo nombren donde ella ya busca, y la página que falta),
+ * después lo que Google ya muestra y no rinde, después páginas nuevas, y al
+ * final el mantenimiento. Una página informativa (una guía del blog) que
+ * Google muestra pesa la mitad que una de compra: trae lecturas, no
+ * recomendaciones. El impacto nunca es un pronóstico: dice cuánto pesa la
+ * causa dentro del propio sitio.
  */
 
 type Idioma = 'es' | 'en'
@@ -95,17 +99,56 @@ export function prioridadRuta(r: { path: string; visitas: number }): TaskPriorit
   }
 }
 
-/** Una página nueva que propuso el agente. Con el borrador listo, publicar es corto. */
-export function prioridadPagina(s: { pregunta: string; porQue: string }, conBorrador: boolean): TaskPriority {
+/** Lo que suma una página que responde una pregunta de compra donde la IA hoy no cita al negocio. */
+const POR_PREGUNTA_SIN_CITA = 20
+
+/**
+ * Una página nueva que propuso el agente. Con el borrador listo, publicar es
+ * corto. `sinCita`: sale de la medición de citas, para una pregunta de compra
+ * donde la IA no cita al negocio; va antes que retocar una guía del blog.
+ */
+export function prioridadPagina(s: { pregunta: string; porQue: string }, conBorrador: boolean, sinCita = false): TaskPriority {
   return {
-    score: conBorrador ? 55 : 50,
-    impact: 'medium',
+    score: (conBorrador ? 55 : 50) + (sinCita ? POR_PREGUNTA_SIN_CITA : 0),
+    impact: sinCita ? 'high' : 'medium',
     effort: conBorrador ? 'small' : 'medium',
     label: { es: `Publicar la página "${s.pregunta}"`, en: `Publish the page "${s.pregunta}"` },
     // La razón la escribe el modelo en el idioma del sitio: va igual en los dos.
     why: { es: s.porQue, en: s.porQue },
   }
 }
+
+/** Pedir que te nombren en las páginas de terceros que la IA ya cita para una pregunta de compra. */
+export function prioridadMencion(m: { pregunta: string; sitios: string[]; citas: number }): TaskPriority {
+  const lista = m.sitios.slice(0, 3).join(', ')
+  return {
+    // Arriba de la página nueva para la misma pregunta: la IA ya lee esas páginas.
+    score: Math.min(80, 72 + m.citas),
+    impact: 'high',
+    effort: 'medium',
+    label: { es: `Pedir que te incluyan donde la IA busca "${m.pregunta}"`, en: `Ask to be included where AI looks for "${m.pregunta}"` },
+    why: {
+      es: `Para esta pregunta los asistentes de IA no citan tu sitio y sí citan páginas de otros (${lista}). Si esas páginas te nombran, la IA tiene de dónde leer sobre tu negocio.`,
+      en: `For this question AI assistants do not cite your site and do cite third-party pages (${lista}). If those pages name you, AI has somewhere to read about your business.`,
+    },
+  }
+}
+
+/** Palabras de quien está por decidir una compra: comparar, alternativas, precio, "el mejor". */
+const DE_COMPRA = /(^|[^a-záéíóúñ])(vs|versus|compar[a-z]*|alternativ[a-z]*|precios?|pricing|prices?|planes|plans|tarifas?|cu[aá]nto cuesta|costos?|costs?|mejor(es)?|best|rese[ñn]as?|reviews?|opiniones|comprar|buy|cotiza[a-z]*)(?![a-záéíóúñ])/i
+
+/**
+ * Si una página que Google muestra es de compra o informativa. De compra: la
+ * portada, o la ruta o alguna de sus búsquedas habla de comparar, precio o
+ * alternativas. El resto (guías del blog) es informativa.
+ */
+export function esDeCompra(o: Pick<Oportunidad, 'ruta' | 'consultas'>): boolean {
+  if (o.ruta === '/' || o.ruta === '') return true
+  return DE_COMPRA.test(o.ruta.replace(/[-_/]+/g, ' ')) || o.consultas.some((c) => DE_COMPRA.test(c.texto))
+}
+
+/** El puntaje de Search Console. Una página informativa conserva su orden entre las suyas, pero lo que suma sobre la base (45) vale la mitad: queda entre 45 y 65. */
+const puntajeDeBusqueda = (o: Oportunidad) => (esDeCompra(o) ? o.puntaje : Math.round(45 + (o.puntaje - 45) / 2))
 
 const busquedas = (o: Oportunidad, idioma: Idioma) => {
   const top = o.consultas.slice(0, 2).map((c) => `"${c.texto}"`)
@@ -126,7 +169,7 @@ export function prioridadBusqueda(o: Oportunidad): TaskPriority {
   const pct = Math.max(1, Math.round(o.parte * 100))
   if (o.tipo === 'titulo') {
     return {
-      score: o.puntaje,
+      score: puntajeDeBusqueda(o),
       impact,
       effort: 'small',
       label: { es: `Cambiar el título y la descripción de ${o.ruta}`, en: `Rewrite the title and description of ${o.ruta}` },
@@ -138,7 +181,7 @@ export function prioridadBusqueda(o: Oportunidad): TaskPriority {
   }
   const pagina = paginaDeGoogle(o.posicion)
   return {
-    score: o.puntaje,
+    score: puntajeDeBusqueda(o),
     impact,
     effort: 'medium',
     label: { es: `Mejorar ${o.ruta}`, en: `Improve ${o.ruta}` },
@@ -160,6 +203,7 @@ export function prioridadDe(t: Pick<AgentTask, 'key' | 'kind' | 'title' | 'summa
   if (t.kind === 'fix') return { score: 88, impact: 'high', effort: 'small', ...base }
   if (t.kind === 'route') return { score: 42, impact: 'medium', effort: 'medium', ...base }
   if (t.key.startsWith('content:refresh:')) return { score: 28, impact: 'low', effort: 'small', ...base }
+  if (t.key.startsWith('content:mention:')) return { score: 72, impact: 'high', effort: 'medium', ...base }
   return { score: 50, impact: 'medium', effort: 'medium', ...base }
 }
 

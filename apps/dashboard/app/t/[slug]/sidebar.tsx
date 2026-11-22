@@ -25,6 +25,7 @@ export function Sidebar({
   valores,
   pro,
   portalUrl,
+  saldo = null,
 }: {
   slug: string
   name: string
@@ -32,6 +33,8 @@ export function Sidebar({
   valores: { score?: string; rutas?: string; ingresos?: string }
   pro: boolean
   portalUrl: string
+  /** Lo que le queda para usar al agente, ya en texto. Null: no se muestra (plan sin créditos o dato no disponible). */
+  saldo?: { titulo: string; valor: string; nota: string | null; parte: number | null } | null
 }) {
   const pathname = usePathname()
   const d = useDict()
@@ -129,6 +132,21 @@ export function Sidebar({
       </div>
 
       <div className="space-y-3 border-t border-border pt-4">
+        {/* El saldo vive acá, en todas las pantallas del panel: lo que cuesta cada cosa se dice junto a su botón. */}
+        {saldo ? (
+          <Link href={`${base}/agente#plan`} className="block rounded-md px-3 py-2 transition-colors hover:bg-panel-2">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-xs text-muted">{saldo.titulo}</span>
+              <span className="text-sm font-medium tabular-nums">{saldo.valor}</span>
+            </span>
+            {saldo.parte !== null ? (
+              <span aria-hidden className="mt-2 block h-1 rounded-full bg-border">
+                <span className="block h-1 rounded-full bg-accent" style={{ width: `${Math.round(saldo.parte * 100)}%` }} />
+              </span>
+            ) : null}
+            {saldo.nota ? <span className="mt-1.5 block text-xs text-faint">{saldo.nota}</span> : null}
+          </Link>
+        ) : null}
         <Link href={pro ? `${base}/kit` : `${base}/agente#plan`} className="btn btn-primario btn-chico btn-suave btn-ancho">
           {pro ? d.panel.sidebarVerMejoras : d.panel.sidebarActivarAgente}
         </Link>

@@ -95,6 +95,16 @@ export const miAgente = {
     buscarNota: 'Revisa los chequeos, las páginas que te citarían y los paths que los agentes piden. Una vez cada 10 minutos.',
     buscarResultado: (n: number, a: number, c: number) => `${n} nuevas, ${a} actualizadas, ${c} cerradas.`,
     buscarEspera: (s: number) => `Espera ${Math.ceil(s / 60)} min para buscar de nuevo.`,
+    // Lo que cuesta cada acción, al lado de su botón, y el saldo arriba de la página.
+    costoBusqueda: (n: number) => `${n} ${n === 1 ? 'crédito' : 'créditos'} por búsqueda`,
+    costoMedicion: (n: number) => `${n} ${n === 1 ? 'crédito' : 'créditos'} por medición`,
+    buscarQue: 'Peaje vuelve a revisar tu sitio y lo que la IA cita, y deja tareas nuevas si las hay.',
+    costoRegaloInforme: (quedan: number) =>
+      quedan === 0 ? 'Ya usaste los informes de tu paquete gratis.' : `Usa 1 informe de tu paquete gratis. Te ${quedan === 1 ? 'queda 1' : `quedan ${quedan}`}.`,
+    buscarSinCosto: 'No gasta tu paquete gratis.',
+    saldoCreditos: (quedan: number, total: number, fecha: string | null) =>
+      `Te ${quedan === 1 ? 'queda 1 crédito' : `quedan ${quedan} créditos`} de ${total} este mes.${fecha ? ` Se renuevan el ${fecha}.` : ''}`,
+    citVacio: 'Peaje les pregunta a los asistentes de IA lo que preguntarían tus clientes y te muestra si te recomiendan a ti o a otro negocio.',
     vacio: 'No hay tareas abiertas. Busca tareas o espera el reporte semanal.',
     grupoAbiertas: 'Abiertas',
     grupoEsperando: 'Hechas, esperando el deploy',
@@ -528,6 +538,16 @@ export const miAgente = {
     buscarNota: 'Checks the verifier, pages answer engines would cite, and paths agents ask for. Once every 10 minutes.',
     buscarResultado: (n: number, a: number, c: number) => `${n} new, ${a} updated, ${c} closed.`,
     buscarEspera: (s: number) => `Wait ${Math.ceil(s / 60)} min to look again.`,
+    // What each action costs, next to its button, and the balance at the top of the page.
+    costoBusqueda: (n: number) => `${n} ${n === 1 ? 'credit' : 'credits'} per search`,
+    costoMedicion: (n: number) => `${n} ${n === 1 ? 'credit' : 'credits'} per measurement`,
+    buscarQue: 'Peaje checks your site and what AI cites again, and leaves new tasks if there are any.',
+    costoRegaloInforme: (quedan: number) =>
+      quedan === 0 ? 'You already used the reports in your free package.' : `Uses 1 report from your free package. You have ${quedan} left.`,
+    buscarSinCosto: 'Does not use your free package.',
+    saldoCreditos: (quedan: number, total: number, fecha: string | null) =>
+      `You have ${quedan} of ${total} credits left this month.${fecha ? ` They renew on ${fecha}.` : ''}`,
+    citVacio: 'Peaje asks AI assistants what your customers would ask and shows you whether they recommend you or another business.',
     vacio: 'No open tasks. Look for tasks or wait for the weekly report.',
     grupoAbiertas: 'Open',
     grupoEsperando: 'Done, waiting for the deploy',

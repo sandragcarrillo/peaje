@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Eyebrow, SectionBar, StatTile } from '@/components/chrome'
 import { domainLabel, fetchMarketAgents, type MarketAgent } from '@/lib/agent0-market'
+import { COBROS_VISIBLES } from '@/lib/config'
 import { getDict, type Dict } from '@/lib/i18n'
 import { Calculadora } from './calculadora'
 
@@ -121,7 +122,8 @@ export default async function Mercado({ searchParams }: PageProps<'/mercado'>) {
         </>
       )}
 
-      {todos.length > 0 ? (
+      {/* La calculadora proyecta lo que pagarían los agentes: solo con los cobros a la vista. */}
+      {COBROS_VISIBLES && todos.length > 0 ? (
         <Calculadora
           sharePagoReady={todos.filter((a) => a.x402).length / todos.length}
           crecimientoMensual={crecimientoMensual(todos)}

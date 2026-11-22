@@ -2,6 +2,7 @@ import type { PageFormat, Tenant } from '@peaje/db'
 import { store } from '../store.js'
 import { COMO_SE_ARMA } from './formatos.js'
 import { esPropio, raizDe } from './medir.js'
+import { raizRegistrable, tipoPorReglas } from './radar.js'
 
 /** Un sitio que la IA cita en vez del negocio, con las páginas que le ganan. */
 export type Competidor = {
@@ -69,4 +70,63 @@ export async function competidoresCitados(tenant: Tenant, limite = 5) {
 export async function paginasCitadas(tenant: Tenant): Promise<Set<string>> {
   const runs = await store.listCitationRuns(tenant.id, 3)
   return new Set(runs.flatMap((r) => r.pages.map((p) => p.url).filter((u): u is string => !!u)))
+}
+
+/** Una pregunta donde la IA no cita al negocio y sí cita páginas de terceros (listas, reseñas, directorios, foros). */
+export type PreguntaSinCita = {
+  question: string
+  /** Direcciones de todas las páginas citadas para la pregunta, de quien sean. */
+  pageUrls: string[]
+  /** Los sitios de terceros citados, el más citado primero, con hasta tres páginas de ejemplo. */
+  publishers: { domain: string; citations: number; pages: { title: string | null; url: string | null }[] }[]
+  /** Suma de citas a esos sitios: ordena las preguntas. */
+  publisherCitations: number
+}
+
+/** Formatos que casi siempre son de un tercero que lista o comenta opciones. */
+const FORMATO_DE_TERCERO = new Set<PageFormat>(['roundup', 'forum'])
+
+/**
+ * Las preguntas de la última ronda donde ningún asistente citó al negocio, con
+ * los sitios de terceros que sí citaron. Un sitio cuenta como tercero por las
+ * reglas del radar (medios, reseñas, directorios, foros, redes) o porque la
+ * página citada es una lista o un foro. Sin modelo: lo dudoso queda afuera.
+ * Primero la pregunta con más citas a terceros.
+ */
+export async function preguntasSinCita(tenant: Tenant): Promise<PreguntaSinCita[]> {
+  const runs = (await store.listCitationRuns(tenant.id, 1)).filter((r) => !r.error)
+  const raiz = raizDe(tenant)
+  const porPregunta = new Map<string, typeof runs>()
+  for (const r of runs) porPregunta.set(r.promptText, [...(porPregunta.get(r.promptText) ?? []), r])
+  const salida: PreguntaSinCita[] = []
+  for (const [question, rs] of porPregunta) {
+    if (rs.some((r) => r.cited)) continue
+    const sitios = new Map<string, { citations: number; pages: Map<string, { title: string | null; url: string | null; n: number }> }>()
+    const pageUrls = new Set<string>()
+    for (const r of rs) {
+      const contados = new Set<string>()
+      for (const p of r.pages) {
+        if (p.url) pageUrls.add(p.url)
+        const d = raizRegistrable(p.domain)
+        if (!d || (raiz && esPropio(p.domain, raiz))) continue
+        if (tipoPorReglas(d) !== 'publisher' && !(p.format && FORMATO_DE_TERCERO.has(p.format))) continue
+        const s = sitios.get(d) ?? { citations: 0, pages: new Map() }
+        // Una respuesta que cita dos páginas del mismo sitio cuenta una vez.
+        if (!contados.has(d)) s.citations += 1
+        contados.add(d)
+        const clave = p.url ?? p.title ?? ''
+        if (clave) {
+          const e = s.pages.get(clave) ?? { title: p.title, url: p.url, n: 0 }
+          e.n += 1
+          s.pages.set(clave, e)
+        }
+        sitios.set(d, s)
+      }
+    }
+    const publishers = [...sitios.entries()]
+      .sort((a, b) => b[1].citations - a[1].citations || a[0].localeCompare(b[0]))
+      .map(([domain, s]) => ({ domain, citations: s.citations, pages: [...s.pages.values()].sort((a, b) => b.n - a.n).slice(0, 3).map(({ title, url }) => ({ title, url })) }))
+    salida.push({ question, pageUrls: [...pageUrls], publishers, publisherCitations: publishers.reduce((n, x) => n + x.citations, 0) })
+  }
+  return salida.sort((a, b) => b.publisherCitations - a.publisherCitations)
 }

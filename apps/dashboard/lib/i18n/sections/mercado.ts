@@ -32,10 +32,10 @@ export const mercado = {
     porRedTitulo: 'Por red',
     porRedNota: 'dónde viven las identidades',
 
-    ctaTitulo: 'Estos agentes ya están comprando',
+    ctaTitulo: 'Haz que la IA te recomiende',
     ctaCuerpo:
-      'Cada vez más agentes tienen wallet, identidad y presupuesto. Peaje hace que tu web o tu API puedan cobrarles por pedido, sin API keys, con un comando en tu proyecto.',
-    ctaBoton: 'Ponle un peaje a tu web →',
+      'Tu agente de Peaje te dice qué le falta a tu sitio para que ChatGPT y Claude te recomienden, y lo arregla contigo donde ya trabajas: Telegram, Slack o tu asistente de IA.',
+    ctaBoton: 'Empezar con mi agente →',
 
     fuenteInicio: 'Fuente: Subgraphs de ',
     fuenteLink: 'Agent0 (ERC-8004)',
@@ -94,10 +94,10 @@ export const mercado = {
     porRedTitulo: 'By network',
     porRedNota: 'where the identities live',
 
-    ctaTitulo: 'These agents are already buying',
+    ctaTitulo: 'Get AI to recommend you',
     ctaCuerpo:
-      'More and more agents have a wallet, an identity and a budget. Peaje lets your site or your API charge them per request, with no API keys and one command in your project.',
-    ctaBoton: 'Use Peaje on your site →',
+      'Your Peaje agent tells you what your site is missing for ChatGPT and Claude to recommend you, and fixes it with you where you already work: Telegram, Slack or your AI assistant.',
+    ctaBoton: 'Start with my agent →',
 
     fuenteInicio: 'Source: Subgraphs from ',
     fuenteLink: 'Agent0 (ERC-8004)',
