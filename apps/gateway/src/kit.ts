@@ -85,7 +85,7 @@ export function entidadDe(tenant: Tenant): Entidad {
   }
 }
 
-async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: boolean, layers?: string | null) {
+export async function armarKit(tenant: Tenant, host: string | null, soloFaltantes: boolean, layers?: string | null) {
   const [resources, routes, chequeos] = await Promise.all([
     store.listResources(tenant.id),
     store.listRoutes(tenant.id),

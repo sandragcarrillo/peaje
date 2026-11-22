@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { COBROS_VISIBLES, gatewayUrl, TESTNET } from '@/lib/config'
 import { PageHeader } from '@/components/chrome'
-import { getDict } from '@/lib/i18n'
+import { getDict, getLocale } from '@/lib/i18n'
 import { cachedScore, checkStatus, scannableDomain } from '@/lib/ora'
 import { tenantIfMine } from '@/lib/session'
 import { store } from '@/lib/store'
 import { ultimasVersionesKit } from '@/lib/versiones-kit'
+import { FRASE_ONBOARD, FRASE_ONBOARD_EN } from '@/lib/onboard'
 import {
   construirBloques,
   primeraRutaPaga,
@@ -22,7 +23,8 @@ import { generarProxy, RUTAS_DINAMICAS, RUTAS_PROXY, secretoOrigen, type Entidad
 
 export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
   const { slug } = await params
-  const dict = await getDict()
+  const [dict, locale] = await Promise.all([getDict(), getLocale()])
+  const frase = locale === 'es' ? FRASE_ONBOARD : FRASE_ONBOARD_EN
   const d = dict.kit
   const tenant = await tenantIfMine(slug)
   if (!tenant) {
@@ -106,7 +108,15 @@ export default async function Kit({ params }: PageProps<'/t/[slug]/kit'>) {
           agente={
             <section className="space-y-4 border border-accent/40 bg-panel p-5">
               <div>
-                <h2 className="font-medium">{d.agenteTitulo}</h2>
+                <h2 className="font-medium">{d.porMiTitulo}</h2>
+                <p className="mt-1 max-w-2xl text-sm text-muted">{d.porMiIntro}</p>
+              </div>
+              <Copiable texto={frase} />
+              <a href={`https://cursor.com/link/prompt?text=${encodeURIComponent(frase)}`} target="_blank" rel="noreferrer" className="btn btn-secundario btn-chico">
+                {d.porMiCursor}
+              </a>
+              <div className="border-t border-border pt-4">
+                <h3 className="text-sm font-medium">{d.porMiOtro}</h3>
                 <p className="mt-1 max-w-2xl text-sm text-muted">{d.agenteIntro}</p>
               </div>
               {/* El secreto no va en el prompt: el coding agent no lo necesita y así no

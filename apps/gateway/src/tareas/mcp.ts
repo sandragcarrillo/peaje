@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { COSTOS_CREDITOS, type Tenant } from '@peaje/db'
-import { dominioVerificable } from '@peaje/shared'
+import { dominioVerificable, installMd } from '@peaje/shared'
 import { z } from 'zod'
 import { env } from '../env.js'
 import { ICONO_DATA_URI } from '../oauth.js'
@@ -12,6 +12,8 @@ import { completarTarea } from './verificar.js'
 import { ordenar } from './prioridad.js'
 import { planConAvance } from './plan.js'
 import { conversar } from './agente.js'
+import { armarKit, verificarConMemo } from '../kit.js'
+import { respuestaSetup } from './setup.js'
 
 /**
  * MCP del dueño: el coding agent del negocio (Claude Code, Cursor, Codex,
@@ -36,6 +38,32 @@ export function construir(tenant: Tenant): McpServer {
     },
     {
       instructions: `You are connected to Peaje for ${tenant.name} (${dominio}). Peaje's agent watches how answer engines and AI agents see this business and leaves tasks for you. When the owner asks something about their business (who AI cites instead of them, what to publish next, what else to improve, their visits), call peaje_ask with their question and relay the answer. Start with peaje_plan to see the owner's goal and priorities. Then work through the tasks in this repo: list open tasks, read one with peaje_get_task, implement it here following its prompt, deploy, then call peaje_complete_task with the live URL. Peaje checks the acceptance criteria on the live site. If a task does not make sense for this business, call peaje_dismiss_task with the reason. Never invent facts about the business: use what is in the repo and on the site.`,
+    },
+  )
+
+  server.registerTool(
+    'peaje_setup',
+    {
+      title: 'Peaje setup',
+      description:
+        'Where the Peaje install stands for this business and how to finish it: which checks pass on the live site, the install steps for this repo, and the one thing only the owner can do. Read-only: it changes nothing. Call it first when setting Peaje up, and again after the deploy is live to verify.',
+      inputSchema: {
+        host: z.enum(['next', 'vercel', 'cloudflare', 'nginx', 'caddy']).optional().describe('Where the site is hosted, if you know it from the repo. Steps are tailored to it.'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ host }) => {
+      const [chequeos, kit] = await Promise.all([verificarConMemo(tenant), armarKit(tenant, host ?? null, false)])
+      return texto(
+        respuestaSetup({
+          nombre: tenant.name,
+          dominio: dominioVerificable(tenant.originUrl),
+          chequeos,
+          pasos: installMd(kit),
+          panelKit: `${env.dashboardUrl}/t/${tenant.slug}/kit`,
+          verifyUrl: kit.verifyUrl,
+        }),
+      )
     },
   )
 
