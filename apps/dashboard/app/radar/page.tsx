@@ -392,6 +392,17 @@ function Resultado({
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>
         </div>
+        <div className="max-w-2xl space-y-2">
+          <p className="text-sm font-medium">{t.primerosTitulo}</p>
+          <ol className="space-y-1.5 text-sm">
+            {t.primeros.map((p) => (
+              <li key={p.cuando} className="flex gap-3">
+                <span className="w-20 shrink-0 text-muted">{p.cuando}</span>
+                <span>{p.que}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
         <div className="flex flex-wrap items-start gap-3">
           {/* plan=1: después del alta, /nuevo lleva directo a la sección del plan con el checkout de Paddle. En el teléfono, a todo el ancho y en dos líneas si hace falta. */}
           <Link href={`/nuevo?url=${encodeURIComponent(dominio)}&plan=1`} className="btn btn-primario w-full whitespace-normal text-center sm:w-auto sm:whitespace-nowrap">

@@ -178,7 +178,13 @@ export const radar = {
     s04: 'Arreglémoslo',
     cierreTitulo: 'Tu agente trabaja para que la IA te recomiende.',
     cierreTexto:
-      `El agente de Peaje vive en tu Telegram. Mide si ${asistentesMedidos('es')} te citan cuando preguntan por lo que ofreces, te dice qué publicar, te escribe las páginas y te cuenta cada semana cuánto vas mejorando. Precio de fundador: US$30 al mes para los primeros 50 negocios. Precio normal: US$69 al mes.`,
+      `El agente de Peaje vive donde ya trabajas: Telegram, Slack, tu panel o tu asistente de IA (Claude, ChatGPT, Cursor). Mide si ${asistentesMedidos('es')} te citan cuando preguntan por lo que ofreces, te dice qué publicar, te escribe las páginas y te cuenta cada semana cuánto vas mejorando. Precio de fundador: US$30 al mes para los primeros 50 negocios, y se queda en US$30 mientras sigas suscrito. Precio normal: US$69 al mes.`,
+    primerosTitulo: 'Tus primeros 30 días',
+    primeros: [
+      { cuando: 'Día 1', que: 'Tu plan y la primera medición de quién aparece en tu lugar.' },
+      { cuando: 'Semana 1', que: 'Tus primeras tareas. Cada arreglo que publiques, Peaje lo revisa en tu sitio.' },
+      { cuando: 'Día 30', que: 'El antes y el después, medidos con las mismas preguntas.' },
+    ],
     cta: (usd: number) => `Activar mi agente: US$${usd}`,
     ctaNota: 'Creas tu cuenta con tu correo y pagas en el paso siguiente. Cancelas cuando quieras desde tu panel, sin llamadas.',
     soloTecnico: '¿Solo quieres lo técnico?',
@@ -346,7 +352,13 @@ export const radar = {
     s04: "Let's fix it",
     cierreTitulo: 'Your agent works on getting AI to recommend you.',
     cierreTexto:
-      `The Peaje agent lives in your Telegram. It tracks whether ${asistentesMedidos('en')} cite you when people ask about what you offer, tells you what to publish, writes the pages and tells you every week how much you are improving. Founder price: US$30 a month for the first 50 businesses. Regular price: US$69 a month.`,
+      `The Peaje agent lives where you already work: Telegram, Slack, your dashboard or your AI assistant (Claude, ChatGPT, Cursor). It tracks whether ${asistentesMedidos('en')} cite you when people ask about what you offer, tells you what to publish, writes the pages and tells you every week how much you are improving. Founder price: US$30 a month for the first 50 businesses, and it stays at US$30 while you remain subscribed. Regular price: US$69 a month.`,
+    primerosTitulo: 'Your first 30 days',
+    primeros: [
+      { cuando: 'Day 1', que: 'Your plan and the first measurement of who shows up instead of you.' },
+      { cuando: 'Week 1', que: 'Your first tasks. Every fix you publish, Peaje checks on your site.' },
+      { cuando: 'Day 30', que: 'Before and after, measured with the same questions.' },
+    ],
     cta: (usd: number) => `Turn on my agent: US$${usd}`,
     ctaNota: 'You create your account with your email and pay in the next step. Cancel anytime from your dashboard, no calls.',
     soloTecnico: 'Just want the technical part?',
