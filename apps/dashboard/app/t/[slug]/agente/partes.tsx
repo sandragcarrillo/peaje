@@ -6,7 +6,7 @@ import { useDict, useLocale } from '@/lib/i18n/client'
 import { buscarTareasAhora, descartarTarea, tareaHecha } from './actions'
 
 const pre = 'overflow-x-auto whitespace-pre-wrap break-all bg-panel-2 px-3 py-2 font-mono text-xs'
-const boton = 'btn btn-secundario btn-chico'
+const boton = 'btn btn-secundario btn-chico btn-suave'
 // 16px en el celular: con menos, iOS hace zoom al enfocar el campo.
 const input = 'w-full border border-border bg-bg px-3 py-1.5 font-mono text-base outline-none focus:border-text sm:text-sm'
 
@@ -61,8 +61,9 @@ export function ListaTareas({
   if (tareas.length === 0) return null
   return (
     <div>
-      <span className="font-mono text-[10px] tracking-[0.02em] text-muted">{titulo}</span>
-      <ul className="mt-2 divide-y divide-border border border-border">
+      <h3 className="text-xs font-medium text-muted">{titulo}</h3>
+      {/* Las abiertas, una tarjeta cada una: se leen y se resuelven de a una. Las cerradas, una lista compacta. */}
+      <ul className={cerradas ? 'tarjeta mt-2 divide-y divide-border' : 'mt-2 space-y-3'}>
         {tareas.map((x, i) => (
           <Tarea key={x.id} slug={slug} tarea={x} cerrada={cerradas} primera={!cerradas && i === 0 && tareas.length > 1} seguimientos={seguimientos.filter((f) => f.taskId === x.id)} />
         ))}
@@ -106,53 +107,66 @@ function Tarea({ slug, tarea, cerrada, primera = false, seguimientos }: { slug: 
   if (cerrada) {
     return (
       <li className="px-4 py-3 text-sm">
-        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
         <span className="font-medium">{tarea.title}</span>
-        <p className="mt-1 text-xs text-muted">{t.estados[tarea.status] ?? tarea.status}{tarea.note ? ` · ${tarea.note}` : ''}</p>
+        <p className="mt-1 text-xs text-muted">
+          {t.tipos[tarea.kind] ?? tarea.kind} · {t.estados[tarea.status] ?? tarea.status}
+          {tarea.note ? ` · ${tarea.note}` : ''}
+        </p>
         {tarea.status === 'verified' ? <Resultado seguimientos={seguimientos} /> : null}
       </li>
     )
   }
 
+  const porQue = p?.why[locale] || tarea.summary || t.porQueGenerico[tarea.kind]
+  const meta = [t.tipos[tarea.kind] ?? tarea.kind, ...(p ? [t.impacto[p.impact], t.esfuerzo[p.effort]] : []), ...(tarea.status !== 'open' ? [t.estados[tarea.status] ?? tarea.status] : [])]
+
   return (
-    <li className="space-y-3 px-4 py-4 text-sm">
-      <div>
-        <span className="mr-2 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted">{t.tipos[tarea.kind] ?? tarea.kind}</span>
-        <span className="font-medium">{p?.label[locale] ?? tarea.title}</span>
-        {p ? (
-          <span className="ml-2 text-xs text-muted">
-            · {t.impacto[p.impact]} · {t.esfuerzo[p.effort]}
-          </span>
-        ) : null}
-        {primera ? <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-xs">{t.primeroEsta}</span> : null}
-        {tarea.status !== 'open' ? <span className="ml-2 text-xs text-muted">· {t.estados[tarea.status] ?? tarea.status}</span> : null}
+    <li className="tarjeta space-y-4 p-4 text-sm sm:p-5">
+      <div className="space-y-1.5">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          {primera ? <span className="font-medium text-accent">{t.primeroEsta}</span> : null}
+          {meta.map((m, i) => (
+            <span key={m} className="flex items-center gap-2">
+              {i > 0 || primera ? <span aria-hidden className="h-0.5 w-0.5 rounded-full bg-faint" /> : null}
+              {m}
+            </span>
+          ))}
+        </p>
+        <h4 className="text-balance text-base font-semibold leading-snug">{p?.label[locale] ?? tarea.title}</h4>
+        <p className="max-w-[65ch] text-muted">{porQue}</p>
       </div>
-      <dl className="grid gap-2 text-sm md:grid-cols-[10rem_1fr]">
-        <dt className="text-xs text-muted">{t.tarjetaPorQue}</dt>
-        <dd>{p?.why[locale] || tarea.summary || t.porQueGenerico[tarea.kind]}</dd>
-        <dt className="text-xs text-muted">{t.tarjetaEsperamos}</dt>
-        <dd>{t.esperamos[tarea.kind]}</dd>
-        <dt className="text-xs text-muted">{t.tarjetaComo}</dt>
-        <dd>
-          {t.como[tarea.kind]} <span className="text-muted">{t.comoMcp}</span>
-        </dd>
-      </dl>
       {tarea.note ? <p className="text-xs text-muted">{tarea.note}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primario btn-chico" onClick={copiar}>
-          {copiado ? t.copiado : t.copiarIA}
-        </button>
-        <button className={boton} onClick={() => setAbierto(!abierto)}>
-          {abierto ? t.ocultar : borrador ? t.verPagina : t.verInstrucciones}
-        </button>
-        <button className={boton} onClick={() => setModo(modo === 'hecha' ? 'nada' : 'hecha')}>
-          {t.yaEsta[tarea.kind] ?? t.marcarHecha}
-        </button>
-        <button className={boton} onClick={() => setModo(modo === 'descartar' ? 'nada' : 'descartar')}>
-          {t.noSirve}
-        </button>
+      {/* Una acción principal; copiar para la IA al lado; lo demás, como texto. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        {borrador ? (
+          <>
+            <button className="btn btn-primario btn-chico btn-suave" aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
+              {abierto ? t.ocultar : t.verPagina}
+            </button>
+            <button className={boton} onClick={copiar}>
+              {copiado ? t.copiado : t.copiarIA}
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-primario btn-chico btn-suave" onClick={copiar}>
+              {copiado ? t.copiado : t.copiarIA}
+            </button>
+            <button className={boton} aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
+              {abierto ? t.ocultar : t.verInstrucciones}
+            </button>
+          </>
+        )}
+        <span className="ml-auto flex flex-wrap items-center gap-x-3">
+          <button className="accion-texto" aria-pressed={modo === 'hecha'} onClick={() => setModo(modo === 'hecha' ? 'nada' : 'hecha')}>
+            {t.yaEsta[tarea.kind] ?? t.marcarHecha}
+          </button>
+          <button className="accion-texto" aria-pressed={modo === 'descartar'} onClick={() => setModo(modo === 'descartar' ? 'nada' : 'descartar')}>
+            {t.noSirve}
+          </button>
+        </span>
       </div>
-      {abierto ? <pre className={pre}>{borrador ?? tarea.body}</pre> : null}
+      {abierto ? <pre className={`${pre} rounded-md`}>{borrador ?? tarea.body}</pre> : null}
       {modo !== 'nada' ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -163,7 +177,7 @@ function Tarea({ slug, tarea, cerrada, primera = false, seguimientos }: { slug: 
           />
           <button
             disabled={pending}
-            className="btn btn-primario btn-chico"
+            className="btn btn-primario btn-chico btn-suave"
             onClick={() => correr(() => (modo === 'hecha' ? tareaHecha(slug, tarea.id, valor) : descartarTarea(slug, tarea.id, valor)))}
           >
             {modo === 'hecha' ? t.verificar : t.noSirve}
@@ -171,6 +185,15 @@ function Tarea({ slug, tarea, cerrada, primera = false, seguimientos }: { slug: 
         </div>
       ) : null}
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {/* Qué esperar y cómo hacerlo: está, pero no compite con la acción. */}
+      <details className="border-0 text-sm">
+        <summary className="cursor-pointer text-xs text-muted hover:text-text">{t.tarjetaComo}</summary>
+        <div className="mt-2 max-w-[65ch] space-y-2 text-muted">
+          <p>{t.como[tarea.kind]}</p>
+          <p>{t.esperamos[tarea.kind]}</p>
+          <p>{t.comoMcp}</p>
+        </div>
+      </details>
     </li>
   )
 }

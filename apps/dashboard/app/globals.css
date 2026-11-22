@@ -223,6 +223,55 @@
       min-height: 2.5rem;
     }
   }
+  /*
+   * Dentro del panel del negocio: el mismo botón, en la letra del texto. El
+   * mono queda para el Radar y la landing; en una tarjeta con varias acciones
+   * se leía como herramienta técnica. Se suma a .btn (y a .btn-chico).
+   */
+  .btn-suave {
+    font-family: var(--font-grotesca), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-size: 0.8125rem;
+  }
+  /* Acción de tercer nivel: texto, sin caja. Para "ya la publiqué" o "no me sirve" al lado de un botón. */
+  .accion-texto {
+    padding: 0.4rem 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--muted) 40%, transparent);
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color 120ms, text-decoration-color 120ms;
+  }
+  .accion-texto:hover {
+    color: var(--text);
+    text-decoration-color: var(--text);
+  }
+  .accion-texto:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  .accion-texto[aria-pressed='true'] {
+    color: var(--text);
+  }
+  @media (max-width: 639px) {
+    .accion-texto {
+      min-height: 2.5rem;
+    }
+  }
+  /* Tarjeta del panel: una superficie con borde fino. Sin filos de color al costado. */
+  .tarjeta {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+    transition: border-color 150ms;
+  }
+  .tarjeta:hover {
+    border-color: color-mix(in srgb, var(--text) 28%, var(--border));
+  }
   .btn-ancho {
     width: 100%;
   }
