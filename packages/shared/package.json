@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./kit/rutas": "./src/kit/rutas.ts",
     "./asistentes": "./src/asistentes.ts",
+    "./mercados": "./src/mercados.ts",
     "./herramientas": "./src/herramientas.ts"
   },
   "scripts": {

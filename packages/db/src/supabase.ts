@@ -987,6 +987,15 @@ export class SupabaseStore implements Store {
     return data.reduce((n, r) => n + Number(r.credits ?? 0), 0)
   }
 
+  async creditCharges(tenantId: string): Promise<{ credits: number; reason: string }[]> {
+    const data = await this.#todas(
+      'creditCharges',
+      (desde, hasta) => this.#db.from('agent_credit_charges').select('credits, reason').eq('tenant_id', tenantId).order('id').range(desde, hasta),
+      5_000,
+    )
+    return data.map((r) => ({ credits: Number(r.credits ?? 0), reason: String(r.reason ?? '') }))
+  }
+
   // ---- trabajos largos del agente ----
   async createJob(input: NewAgentJob): Promise<AgentJob> {
     const { data, error } = await this.#db

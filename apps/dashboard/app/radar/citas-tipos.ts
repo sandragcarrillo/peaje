@@ -12,6 +12,8 @@ export type Celda = { cited: boolean; mentioned: boolean; sources: string[] }
 
 export type Citas = {
   domain: string
+  /** País para el que se midió (ISO de dos letras), o null. */
+  market?: string | null
   measuredAt: string | null
   cached: boolean
   questions: { text: string; engines: Record<string, Celda> }[]

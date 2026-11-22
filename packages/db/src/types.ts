@@ -53,6 +53,11 @@ export type Tenant = {
   planUntil: string | null
   /** Fin de la prueba de 14 días de Pro. */
   trialUntil: string | null
+  /**
+   * Lo que le queda del paquete gratis (ver regalo.ts). No es una columna: lo
+   * calcula `conRegalo` al cargar el negocio. Sin el campo, no hay paquete.
+   */
+  regalo?: { informes: number; respuestas: number } | null
   // ---- fin M9 ----
   // ---- Paddle: suscripción Pro con tarjeta ----
   /** Cliente de Paddle (ctm_...). Lo deja el webhook tras el primer checkout; abre el portal de Paddle. */
@@ -904,6 +909,8 @@ export type RadarCitasCelda = { cited: boolean; mentioned: boolean; sources: str
  * citan en su lugar. Es el cuerpo de POST /_internal/radar/citas.
  */
 export type RadarCitas = {
+  /** País para el que se midió (ISO de dos letras). Sin el campo o null: sin país. */
+  market?: string | null
   domain: string
   measuredAt: string
   cached: boolean
@@ -1007,6 +1014,8 @@ export interface Store {
   addCreditCharge(c: CreditCharge): Promise<void>
   /** Créditos usados desde una fecha: la suma de cargos menos devoluciones. */
   creditsUsedSince(tenantId: string, since: string): Promise<number>
+  /** Todos los cargos del negocio (positivos y devoluciones), para el paquete gratis. */
+  creditCharges(tenantId: string): Promise<{ credits: number; reason: string }[]>
   // ---- trabajos largos del agente ----
   createJob(input: NewAgentJob): Promise<AgentJob>
   getJob(id: string): Promise<AgentJob | null>

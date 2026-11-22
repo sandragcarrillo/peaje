@@ -502,6 +502,7 @@ export function slugify(name: string): string {
 
 // ---- asistentes de IA que Peaje mide ----
 export * from './asistentes'
+export * from './mercados'
 
 // ---- kit de instalación (proxy, bloques HTML, verificador) ----
 export * from './kit/index'

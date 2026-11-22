@@ -1,4 +1,4 @@
-import { accesoPro, COSTOS_CREDITOS, periodoCreditos, type AccionCreditos, type Tenant } from '@peaje/db'
+import { accesoPro, conRegalo, COSTOS_CREDITOS, periodoCreditos, REGALO, type AccionCreditos, type Regalo, type Tenant } from '@peaje/db'
 import { store } from '../store.js'
 
 /**
@@ -13,9 +13,23 @@ import { store } from '../store.js'
 
 type Idioma = 'es' | 'en'
 
-export type Saldo = { total: number; usados: number; quedan: number; renueva: string }
+/** `regalo`: el saldo es el paquete gratis (no se renueva); trae lo que queda de cada cosa y dónde suscribirse. */
+export type Saldo = { total: number; usados: number; quedan: number; renueva: string; regalo?: Regalo & { planUrl: string } }
 
-export async function saldoCreditos(tenant: Tenant, ahora = new Date()): Promise<Saldo> {
+// Igual que billing/acceso.ts (urlPlan); copiado para no traer ese módulo y su env a los tests de créditos.
+const DASHBOARD = (process.env.DASHBOARD_PUBLIC_URL ?? 'https://usepeaje.com').replace(/\/$/, '')
+const urlPlan = (slug: string) => `${DASHBOARD}/t/${slug}/agente#plan`
+
+const creditosDe = (r: Regalo) => r.informes * COSTOS_CREDITOS.informe + r.respuestas * COSTOS_CREDITOS.consulta
+
+export async function saldoCreditos(sinRegalo: Tenant, ahora = new Date()): Promise<Saldo> {
+  // El paquete gratis se lee siempre fresco: lo que haya usado otro negocio del mismo dominio también cuenta.
+  const tenant = await conRegalo(store, sinRegalo, ahora)
+  if (accesoPro(tenant, ahora).plan === 'regalo' && tenant.regalo) {
+    const total = creditosDe(REGALO)
+    const quedan = creditosDe(tenant.regalo)
+    return { total, usados: total - quedan, quedan, renueva: '', regalo: { ...tenant.regalo, planUrl: urlPlan(tenant.slug) } }
+  }
   const total = accesoPro(tenant, ahora).limites.creditos
   const { desde, renueva } = periodoCreditos(ahora)
   let usados = 0
@@ -39,6 +53,38 @@ export async function anotarCreditos(tenantId: string, creditos: number, motivo:
   }
 }
 
+/**
+ * Qué del paquete gratis cubre una acción. Null si la cubre; si no, por qué.
+ * `yaInformes`: informes que esta misma respuesta ya entregó.
+ */
+export function fueraDelRegalo(s: Saldo, accion: AccionCreditos, yaInformes = 0): 'no-incluido' | 'agotado' | null {
+  if (!s.regalo) return null
+  if (accion === 'consulta') return s.regalo.respuestas > 0 ? null : 'agotado'
+  if (accion !== 'informe') return 'no-incluido'
+  return s.regalo.informes - yaInformes > 0 ? null : 'agotado'
+}
+
+/** La línea bajo la respuesta cuando el paquete gratis no cubre lo pedido. */
+export function lineaRegalo(s: Saldo, motivo: 'no-incluido' | 'agotado', idioma: Idioma): string {
+  const url = s.regalo?.planUrl ?? ''
+  if (motivo === 'no-incluido') {
+    return idioma === 'es'
+      ? `Eso no entra en el paquete gratis: es parte del plan. Lo activas en ${url}`
+      : `That is not in the free package: it is part of the plan. Turn it on at ${url}`
+  }
+  return idioma === 'es'
+    ? `Ya usaste esa parte de tu paquete gratis. Con el plan, Peaje sigue midiendo y trabajando cada semana: ${url}`
+    : `You already used that part of your free package. With the plan, Peaje keeps measuring and working every week: ${url}`
+}
+
+/** Lo que queda del paquete gratis, en una línea. */
+export function restoRegalo(r: Regalo, idioma: Idioma): string {
+  const n = (k: number, uno: string, varios: string) => `${k} ${k === 1 ? uno : varios}`
+  return idioma === 'es'
+    ? `Paquete gratis: te quedan ${n(r.informes, 'informe', 'informes')} y ${n(r.respuestas, 'respuesta', 'respuestas')} del agente.`
+    : `Free package: ${n(r.informes, 'report', 'reports')} and ${n(r.respuestas, 'agent answer', 'agent answers')} left.`
+}
+
 /** "1 de noviembre" / "November 1": el día en que vuelve el cupo, en UTC. */
 export function fechaRenovacion(iso: string, idioma: Idioma): string {
   return new Intl.DateTimeFormat(idioma === 'es' ? 'es-CO' : 'en-US', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(new Date(iso))
@@ -54,6 +100,7 @@ export function lineaSinCreditos(o: { costo: number; quedan: number; renueva: st
 
 /** Desde el 80 % del cupo usado, una línea con lo que queda. Null antes. */
 export function avisoCreditos(s: Saldo, idioma: Idioma): string | null {
+  if (s.regalo) return restoRegalo(s.regalo, idioma)
   if (s.total <= 0 || s.usados < Math.ceil(s.total * 0.8)) return null
   const fecha = fechaRenovacion(s.renueva, idioma)
   if (s.quedan === 0) {
@@ -80,7 +127,8 @@ export type SinCreditos = {
   retryInSeconds: number
 }
 
-export function sinCreditos(s: Saldo, costo: number, idioma: Idioma, ahora = new Date()): SinCreditos {
+export function sinCreditos(s: Saldo, costo: number, idioma: Idioma, ahora = new Date(), motivo: 'no-incluido' | 'agotado' = 'agotado'): SinCreditos {
+  if (s.regalo) return { error: 'not-enough-credits', message: lineaRegalo(s, motivo, idioma), cost: costo, remaining: s.quedan, renewsAt: '', retryInSeconds: 0 }
   return {
     error: 'not-enough-credits',
     message: lineaSinCreditos({ costo, quedan: s.quedan, renueva: s.renueva }, idioma),
@@ -107,6 +155,8 @@ export async function cobrarAccion<T>(
 ): Promise<{ sinCreditos: SinCreditos } | { valor: T }> {
   const costo = COSTOS_CREDITOS[accion]
   const saldo = await saldoCreditos(tenant)
+  const fuera = fueraDelRegalo(saldo, accion)
+  if (fuera) return { sinCreditos: sinCreditos(saldo, costo, o.idioma, new Date(), fuera) }
   if (costo > saldo.quedan) return { sinCreditos: sinCreditos(saldo, costo, o.idioma) }
   const cobrado = await anotarCreditos(tenant.id, costo, o.motivo)
   const devolver = () => (cobrado ? anotarCreditos(tenant.id, -costo, `devolución:${o.motivo}`) : Promise.resolve(true))

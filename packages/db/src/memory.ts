@@ -464,6 +464,10 @@ export class MemoryStore implements Store {
     return this.#creditos.filter((c) => c.tenantId === tenantId && c.createdAt >= since).reduce((n, c) => n + c.credits, 0)
   }
 
+  async creditCharges(tenantId: string): Promise<{ credits: number; reason: string }[]> {
+    return this.#creditos.filter((c) => c.tenantId === tenantId).map((c) => ({ credits: c.credits, reason: c.reason }))
+  }
+
   // ---- trabajos largos del agente ----
   #jobs: AgentJob[] = []
 

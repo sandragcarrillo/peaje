@@ -16,7 +16,7 @@ import { conversar } from './agente.js'
 import { correrRonda, maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir.js'
 // ---- M9: lo Pro pregunta a un solo lugar ----
 import { accesoPro, sinPro } from '../billing/acceso.js'
-import { PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
+import { conRegalo, PLAN_CADENCES, PLAN_CAPACITIES, PLAN_GOALS } from '@peaje/db'
 import { cobrarAccion } from './creditos.js'
 import { ordenar, prioridadDe } from './prioridad.js'
 
@@ -66,7 +66,7 @@ tareasRouter.use('/_owner/*', async (c, next) => {
     c.header('WWW-Authenticate', desafio(!!token))
     return c.json({ error: 'Missing or invalid credentials. Sign in, or create an agent key in the Peaje dashboard, Integrations page.' }, 401)
   }
-  c.set('tenant', tenant)
+  c.set('tenant', await conRegalo(store, tenant))
   c.set('oauth', oauth)
   await next()
 })
@@ -151,7 +151,8 @@ tareasRouter.use('/_internal/:slug/tasks/*', async (c, next) => {
   if (c.req.header('authorization') !== `Bearer ${env.internalSecret}`) return c.json({ error: 'No autorizado' }, 401)
   const tenant = await store.getTenantBySlug(c.req.param('slug'))
   if (!tenant) return c.json({ error: 'Tenant no encontrado' }, 404)
-  c.set('tenant', tenant)
+  // Con lo que le queda del paquete gratis: las rutas Pro de abajo lo dejan pasar mientras tenga.
+  c.set('tenant', await conRegalo(store, tenant))
   await next()
 })
 
@@ -166,7 +167,7 @@ export async function buscarTareas(tenant: Tenant) {
   }
   ultimaBusqueda.set(tenant.id, Date.now())
   // M9: las tareas de arreglo son gratis; las de contenido (Opus y borradores) son Pro.
-  return { ...(await generarTareas(tenant, { conContenido: accesoPro(tenant).activo })) }
+  return { ...(await generarTareas(tenant, { conContenido: esPago(tenant) })) }
 }
 
 /**
@@ -174,8 +175,12 @@ export async function buscarTareas(tenant: Tenant) {
  * agent). Con Pro es la búsqueda con contenido y cuesta `informe`, como
  * refresh_tasks en el chat; sin Pro es la de arreglos, gratis.
  */
+/** Plan pago o prueba: el paquete gratis no cuenta. */
+const esPago = (t: Tenant) => accesoPro({ ...t, regalo: null }).activo
+
 export async function buscarTareasDelDueno(tenant: Tenant, idioma: 'es' | 'en', canal: 'dashboard' | 'owner-mcp') {
-  if (!accesoPro(tenant).activo) return buscarTareas(tenant)
+  // Buscar tareas de arreglo es gratis para quien no paga, y no gasta el paquete gratis.
+  if (!esPago(tenant)) return buscarTareas(tenant)
   const r = await cobrarAccion(tenant, 'informe', { idioma, motivo: `${canal}:refresh_tasks`, entrego: (x) => !('error' in x) }, () => buscarTareas(tenant))
   return 'sinCreditos' in r ? r.sinCreditos : r.valor
 }

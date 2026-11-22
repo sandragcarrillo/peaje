@@ -308,3 +308,56 @@ test('los asistentes que nombra la copy (ASISTENTES_MEDIDOS) son motores del gat
   assert.equal(asistentesMedidos('es'), 'ChatGPT y Claude')
   assert.equal(asistentesMedidos('en', 'o'), 'ChatGPT or Claude')
 })
+
+// ---------------------------------------------------------------- por país
+
+test('con país: las preguntas se escriben para ese mercado, el motor recibe el país y cada mercado es una foto aparte', async () => {
+  const { mercadoDe } = await import('@peaje/shared')
+  assert.equal(mercadoDe('co')?.en, 'Colombia')
+  assert.equal(mercadoDe('ZZ'), null)
+  assert.equal(mercadoDe(undefined), null)
+
+  const paises: (string | null | undefined)[] = []
+  const m: Motor & { llamadas: number } = {
+    id: 'chatgpt',
+    nombre: 'chatgpt',
+    disponible: () => true,
+    llamadas: 0,
+    async preguntar(_q, o) {
+      m.llamadas++
+      paises.push(o?.pais)
+      return respuesta('Prueba con mercadopais.co', ['mercadopais.co'])
+    },
+  }
+  const mercados: (string | undefined)[] = []
+  const d = deps({
+    motores: [m],
+    generar: async (e) => {
+      mercados.push(e.mercado?.codigo)
+      return { preguntas: ['¿Qué pasarela de pagos sirve para una tienda online?', '¿Cómo cobrar con PSE en mi ecommerce?', '¿Cuál es la mejor forma de recibir pagos con tarjeta?'], marcas: ['Mercado País'], oferta: 'Payments.' }
+    },
+  })
+
+  const sinPais = await radarCitas({ domain: 'mercadopais.co', locale: 'es' }, d)
+  assert.equal(sinPais.status, 200)
+  const co = await radarCitas({ domain: 'mercadopais.co', locale: 'es', country: 'co' }, d)
+  assert.equal(co.status, 200)
+  assert.equal(co.status === 200 && co.body.market, 'CO')
+  assert.equal(co.status === 200 && co.body.domain, 'mercadopais.co')
+  assert.equal(co.status === 200 && co.body.cached, false)
+  assert.deepEqual(mercados, [undefined, 'CO'])
+  assert.deepEqual([...new Set(paises.slice(0, 3))], [null])
+  assert.deepEqual([...new Set(paises.slice(3))], ['CO'])
+
+  // El mismo país otra vez sale del caché; otro país mide de nuevo; uno inventado cae a "sin país" (caché).
+  const antes = m.llamadas
+  const coOtraVez = await radarCitas({ domain: 'mercadopais.co', locale: 'es', country: 'CO' }, d)
+  assert.equal(coOtraVez.status === 200 && coOtraVez.body.cached, true)
+  const inventado = await radarCitas({ domain: 'mercadopais.co', locale: 'es', country: 'ZZ' }, d)
+  assert.equal(inventado.status === 200 && inventado.body.cached, true)
+  assert.equal(inventado.status === 200 && inventado.body.market, undefined)
+  assert.equal(m.llamadas, antes)
+  const mx = await radarCitas({ domain: 'mercadopais.co', locale: 'es', country: 'MX' }, d)
+  assert.equal(mx.status === 200 && mx.body.cached, false)
+  assert.ok(m.llamadas > antes)
+})

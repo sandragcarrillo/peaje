@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
 import type { Dict } from '@/lib/i18n/dict'
 import { pedirCitas } from './citas-cliente'
+import { MERCADOS } from '@peaje/shared/mercados'
 import { MOTORES_POR_DEFECTO, nombreMotor, type Celda, type Citas, type ErrorCitas, type RespuestaCitas } from './citas-tipos'
 import { Seccion } from './seccion'
 
@@ -31,12 +32,13 @@ const REINTENTO_MAX_S = 45
 
 const esError = (r: RespuestaCitas): r is ErrorCitas => 'error' in r
 
-function useCitas(dominio: string, locale: string): { r: RespuestaCitas | null; segundos: number } {
+function useCitas(dominio: string, locale: string, pais: string): { r: RespuestaCitas | null; segundos: number } {
   const [r, setR] = useState<RespuestaCitas | null>(null)
   const [segundos, setSegundos] = useState(0)
   useEffect(() => {
     let vivo = true
-    const pedido = pedirCitas(dominio, locale)
+    setR(null)
+    const pedido = pedirCitas(dominio, locale, { pais })
     const tic = () => setSegundos(Math.max(0, Math.floor((Date.now() - pedido.desde) / 1000)))
     tic()
     const reloj = setInterval(tic, 1000)
@@ -46,7 +48,7 @@ function useCitas(dominio: string, locale: string): { r: RespuestaCitas | null; 
       if (vivo && espera > 0 && espera <= REINTENTO_MAX_S) {
         await new Promise((ok) => setTimeout(ok, espera * 1000))
         if (!vivo) return
-        res = await pedirCitas(dominio, locale, { nuevo: true }).promesa
+        res = await pedirCitas(dominio, locale, { nuevo: true, pais }).promesa
       }
       if (!vivo) return
       clearInterval(reloj)
@@ -56,7 +58,7 @@ function useCitas(dominio: string, locale: string): { r: RespuestaCitas | null; 
       vivo = false
       clearInterval(reloj)
     }
-  }, [dominio, locale])
+  }, [dominio, locale, pais])
   return { r, segundos }
 }
 
@@ -126,11 +128,25 @@ export function SeccionCitas({ dominio, n, usd }: { dominio: string; n: string; 
   const { radar } = useDict()
   const t = radar.citas
   const locale = useLocale()
-  const { r, segundos } = useCitas(dominio, locale)
+  // '' es sin país. Cambiarlo pide otra medición: las preguntas se escriben para ese mercado.
+  const [pais, setPais] = useState('')
+  const { r, segundos } = useCitas(dominio, locale, pais)
   const datos = r && !esError(r) ? r : null
 
   return (
     <Seccion n={n} titulo={tituloDe(datos, t)}>
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">{t.mercado}</span>
+        <select value={pais} onChange={(e) => setPais(e.target.value)} className="border border-border bg-panel px-2 py-1 text-sm">
+          <option value="">{t.mercadoTodos}</option>
+          {MERCADOS.map((m) => (
+            <option key={m.codigo} value={m.codigo}>
+              {locale === 'es' ? m.es : m.en}
+            </option>
+          ))}
+        </select>
+        {pais ? <span className="text-xs text-muted">{t.mercadoNota}</span> : null}
+      </label>
       {r?.ejemplo ? (
         // Solo con RADAR_CITAS_STUB en desarrollo: que nadie confunda estos datos con un resultado real.
         <p role="note" className="border-2 border-dashed border-text px-3 py-2 font-mono text-sm font-bold">

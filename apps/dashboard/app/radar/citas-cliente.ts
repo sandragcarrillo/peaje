@@ -11,14 +11,14 @@ type Pedido = { promesa: Promise<RespuestaCitas>; desde: number }
 
 const pedidos = new Map<string, Pedido>()
 
-export function pedirCitas(dominio: string, locale: string, o: { nuevo?: boolean } = {}): Pedido {
-  const clave = `${dominio}|${locale}`
+export function pedirCitas(dominio: string, locale: string, o: { nuevo?: boolean; pais?: string } = {}): Pedido {
+  const clave = `${dominio}|${locale}|${o.pais ?? ''}`
   const hay = pedidos.get(clave)
   if (hay && !o.nuevo) return hay
   const promesa = fetch('/api/radar/citas', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ dominio, locale }),
+    body: JSON.stringify({ dominio, locale, ...(o.pais ? { pais: o.pais } : {}) }),
   })
     .then(async (r) => (await r.json()) as RespuestaCitas)
     .catch((err: unknown): RespuestaCitas => {

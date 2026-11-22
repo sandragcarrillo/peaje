@@ -11,6 +11,7 @@ import { maxPreguntas, resumenCitacion, sugerirPrompts } from '../citacion/medir
 import { competidoresCitados, paginasCitadas } from '../citacion/competidores.js'
 // ---- M9 ----
 import { accesoPro, mensajeSinPro } from '../billing/acceso.js'
+import { conRegalo } from '@peaje/db'
 import { LIMITES } from '@peaje/db'
 import { paginasDelSitio, revisarAcceso } from '../acceso/revisar.js'
 // ---- M6 ----
@@ -29,7 +30,7 @@ import { avisoDeTrabajo, encolarTrabajo } from './trabajos.js'
 import { guardarPerfilDeVoz, perfilDeVoz, type CambioDeVoz } from '../ciclo/voz.js'
 // ---- créditos y filtro de tema ----
 import { COSTOS_CREDITOS, type AccionCreditos } from '@peaje/db'
-import { anotarCreditos, avisoCreditos, lineaSinCreditos, saldoCreditos, usoPublico, type Saldo } from './creditos.js'
+import { anotarCreditos, avisoCreditos, fueraDelRegalo, lineaRegalo, lineaSinCreditos, saldoCreditos, usoPublico, type Saldo } from './creditos.js'
 import { clasificarTema } from './tema.js'
 import { completarTarea } from './verificar.js'
 import { env } from '../env.js'
@@ -936,7 +937,15 @@ export const COBRO: Record<string, Cobro> = {
 }
 
 /** Lo que va pagando una respuesta mientras corre. `consultasGratis`: un reporte programado no paga sus consultas. */
-type Cuenta = { saldo: Saldo; entregas: { accion: AccionCreditos; herramienta: string }[]; consulto: boolean; consultasGratis: boolean; sinCredito: number | null }
+type Cuenta = { saldo: Saldo; entregas: { accion: AccionCreditos; herramienta: string }[]; consulto: boolean; consultasGratis: boolean; sinCredito: number | null; fuera?: 'no-incluido' | 'agotado' | null }
+
+/** Qué acción de créditos es una herramienta. Null si no cuesta. */
+function accionDe(c: Pick<Cuenta, 'consultasGratis'>, herramienta: string): AccionCreditos | null {
+  const cobro = COBRO[herramienta]
+  if (cobro === 'gratis') return null
+  if (cobro) return cobro.accion
+  return c.consultasGratis ? null : 'consulta'
+}
 
 export function cargoDeRespuesta(c: Pick<Cuenta, 'entregas' | 'consulto' | 'consultasGratis'>): number {
   const entregas = c.entregas.reduce((n, e) => n + COSTOS_CREDITOS[e.accion], 0)
@@ -1018,7 +1027,8 @@ export async function conversar(
   },
 ): Promise<AgentMessage> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set on the gateway')
-  // ---- M9: el chat es Pro ----
+  // ---- M9: el chat es Pro, o del paquete gratis mientras quede algo ----
+  tenant = await conRegalo(store, tenant)
   if (!accesoPro(tenant).activo) throw new Error(mensajeSinPro(tenant, opciones.idioma))
   if (!dentroDelLimite(tenant.id)) throw new Error(opciones.idioma === 'es' ? 'Muchos mensajes en esta hora. Prueba en un rato.' : 'Too many messages this hour. Try again later.')
   const canal = opciones.canal ?? 'dashboard'
@@ -1079,6 +1089,19 @@ export async function conversar(
     for (const u of usos) {
       // Sin saldo para lo que cuesta esta herramienta: no corre, y el dueño ve una línea abajo.
       const costo = siUsa(cuenta, u.name)
+      // Paquete gratis: solo cubre informes y respuestas, y cada cosa tiene su tope.
+      const accion = accionDe(cuenta, u.name)
+      const fuera = accion ? fueraDelRegalo(cuenta.saldo, accion, cuenta.entregas.filter((e) => e.accion === 'informe').length) : null
+      if (fuera) {
+        cuenta.fuera = cuenta.fuera === 'no-incluido' ? 'no-incluido' : fuera
+        resultados.push({
+          type: 'tool_result',
+          tool_use_id: u.id,
+          is_error: true,
+          content: JSON.stringify({ error: fuera === 'no-incluido' ? 'not-in-free-package' : 'free-package-used', note: 'The owner is on the free package and this is not covered. Do not call it again. A line under your reply tells them how to get it with the plan; answer with what you already know.' }),
+        })
+        continue
+      }
       if (costo && costo.total > cuenta.saldo.quedan) {
         cuenta.sinCredito = Math.max(cuenta.sinCredito ?? 0, costo.precio)
         resultados.push({
@@ -1116,8 +1139,18 @@ export async function conversar(
   respuesta = respuesta.replace(/\s+—\s+/g, ': ').replace(/—/g, ', ')
   // Créditos: lo que paga esta respuesta, y una línea si algo no alcanzó o si ya va por el 80 %.
   const cargo = cargoDeRespuesta(cuenta)
-  const despues: Saldo = { ...cuenta.saldo, usados: cuenta.saldo.usados + cargo, quedan: Math.max(0, cuenta.saldo.quedan - cargo) }
-  const linea = cuenta.sinCredito
+  const hechos = cuenta.entregas.filter((e) => e.accion === 'informe').length
+  const despues: Saldo = {
+    ...cuenta.saldo,
+    usados: cuenta.saldo.usados + cargo,
+    quedan: Math.max(0, cuenta.saldo.quedan - cargo),
+    ...(cuenta.saldo.regalo
+      ? { regalo: { ...cuenta.saldo.regalo, informes: Math.max(0, cuenta.saldo.regalo.informes - hechos), respuestas: Math.max(0, cuenta.saldo.regalo.respuestas - (cargo > 0 && hechos === 0 ? 1 : 0)) } }
+      : {}),
+  }
+  const linea = cuenta.fuera
+    ? [lineaRegalo(despues, cuenta.fuera, opciones.idioma), avisoCreditos(despues, opciones.idioma)].filter(Boolean).join(' ')
+    : cuenta.sinCredito
     ? lineaSinCreditos({ costo: cuenta.sinCredito, quedan: despues.quedan, renueva: despues.renueva }, opciones.idioma)
     : cargo > 0
       ? avisoCreditos(despues, opciones.idioma)

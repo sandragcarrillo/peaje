@@ -152,6 +152,9 @@ export const radar = {
       tituloTe: 'Cuando tus clientes preguntan, la IA te cita',
       cargando: (motores: string[]) => `Preguntándole a ${listaCompleta('es', motores)}…`,
       cargandoNota: 'Puede tardar hasta un minuto. Mientras, sigue leyendo tu resultado.',
+      mercado: 'Preguntar desde',
+      mercadoTodos: 'Sin país',
+      mercadoNota: 'Las preguntas se escriben para ese país. ChatGPT y Claude buscan desde ahí.',
       intro: (n: number, motores: string[]) =>
         `Les hicimos a ${listaCompleta('es', motores)} ${n === 1 ? 'una pregunta' : `${n} preguntas`} de alguien que busca lo que ofreces.`,
       cobertura: (p: number) => `Te cita en el ${p}\u00a0%`,
@@ -328,6 +331,9 @@ export const radar = {
       tituloTe: 'When your buyers ask, AI cites you',
       cargando: (motores: string[]) => `Asking ${listaCompleta('en', motores)}…`,
       cargandoNota: 'It can take up to a minute. Meanwhile, keep reading your result.',
+      mercado: 'Ask from',
+      mercadoTodos: 'No country',
+      mercadoNota: 'Questions are written for that country. ChatGPT and Claude search from there.',
       intro: (n: number, motores: string[]) =>
         `We asked ${listaCompleta('en', motores)} ${n === 1 ? 'one question' : `${n} questions`} from someone looking for what you offer.`,
       cobertura: (p: number) => `Cites you ${p}% of the time`,

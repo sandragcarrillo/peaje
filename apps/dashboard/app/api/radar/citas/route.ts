@@ -1,6 +1,7 @@
 import { getLocale } from '@/lib/i18n'
 import { citasDe } from '@/app/radar/citas'
 import { dominioDeRadar } from '@/app/radar/dominio'
+import { mercadoDe } from '@peaje/shared/mercados'
 
 /**
  * La sección "la IA recomienda a otros" del radar la pide desde el navegador
@@ -29,11 +30,12 @@ function dentroDelLimite(ip: string): boolean {
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as { dominio?: unknown; locale?: unknown } | null
+  const body = (await req.json().catch(() => null)) as { dominio?: unknown; locale?: unknown; pais?: unknown } | null
   const dominio = dominioDeRadar(typeof body?.dominio === 'string' ? body.dominio : undefined)
   if (!dominio) return Response.json({ error: 'invalid-domain' }, { status: 400 })
   const locale = body?.locale === 'es' || body?.locale === 'en' ? body.locale : await getLocale()
   const ip = req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'desconocida'
-  const r = await citasDe(dominio, locale, { puedeLlamar: () => dentroDelLimite(ip) })
+  // Solo un país de la lista: cada mercado es una medición nueva contra el tope del día.
+  const r = await citasDe(dominio, locale, { puedeLlamar: () => dentroDelLimite(ip), pais: mercadoDe(body?.pais)?.codigo ?? null })
   return Response.json(r, { headers: { 'cache-control': 'no-store' } })
 }

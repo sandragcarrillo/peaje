@@ -8,10 +8,12 @@ import type { Tenant } from './types'
  * - founder: US$30/mes, solo los primeros 50 negocios que se suscriben (precio desde el 24 oct 2026).
  * - pro: US$69/mes.
  * - trial: 14 días de Pro para todo negocio nuevo (y los que ya existían al migrar).
+ * - regalo: el paquete gratis, una vez por dominio (regalo.ts): un plan, una
+ *   medición de citas y unas respuestas del agente. Sin páginas ni trabajo semanal.
  */
 
 export type PlanPago = 'founder' | 'pro'
-export type PlanVigente = 'free' | 'trial' | PlanPago
+export type PlanVigente = 'free' | 'regalo' | 'trial' | PlanPago
 
 export const PRECIOS_USD: Record<PlanPago, number> = { founder: 30, pro: 69 }
 
@@ -31,6 +33,8 @@ export type Limites = {
 
 export const LIMITES: Record<PlanVigente, Limites> = {
   free: { preguntas: 0, creditos: 0, mensajes: 0 },
+  // El paquete gratis: 2 informes (el plan y una medición de citas) y 10 respuestas. Decisión de San, 21 nov 2026.
+  regalo: { preguntas: 10, creditos: 80, mensajes: 0 },
   trial: { preguntas: 20, creditos: CREDITOS_MENSUALES, mensajes: 150 },
   // Founder es Pro con descuento: mismos límites, otro precio (decisión del 24 oct 2026).
   founder: { preguntas: 20, creditos: CREDITOS_MENSUALES, mensajes: 150 },
@@ -101,12 +105,16 @@ export type AccesoPro = {
 const vigente = (fecha: string | null | undefined, ahora: Date) => !!fecha && new Date(fecha).getTime() > ahora.getTime()
 
 /** Activo = plan pago vigente, o prueba vigente. El plan pago manda sobre la prueba. */
-export function accesoPro(tenant: Pick<Tenant, 'plan' | 'planUntil' | 'trialUntil'>, ahora = new Date()): AccesoPro {
+export function accesoPro(tenant: Pick<Tenant, 'plan' | 'planUntil' | 'trialUntil' | 'regalo'>, ahora = new Date()): AccesoPro {
   if (esPlanPago(tenant.plan) && vigente(tenant.planUntil, ahora)) {
     return { activo: true, plan: tenant.plan, hasta: tenant.planUntil, limites: LIMITES[tenant.plan] }
   }
   if (vigente(tenant.trialUntil, ahora)) {
     return { activo: true, plan: 'trial', hasta: tenant.trialUntil, limites: LIMITES.trial }
+  }
+  // El paquete gratis mientras le quede algo. Solo lo trae un negocio cargado con `conRegalo`.
+  if (tenant.regalo && (tenant.regalo.informes > 0 || tenant.regalo.respuestas > 0)) {
+    return { activo: true, plan: 'regalo', hasta: null, limites: LIMITES.regalo }
   }
   return { activo: false, plan: 'free', hasta: null, limites: LIMITES.free }
 }

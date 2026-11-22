@@ -3,6 +3,7 @@ export { MemoryStore } from './memory'
 export { SupabaseStore } from './supabase'
 // ---- M9 ----
 export * from './planes'
+export * from './regalo'
 // ---- app de Privy propia ----
 export * from './wallet-dueno'
 export { grupoDe, noEsVisita, quienEs } from './visits'
