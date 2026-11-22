@@ -1,4 +1,5 @@
 import 'server-only'
+import { conRegalo } from '@peaje/db'
 import type { Tenant } from '@peaje/db'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
@@ -107,7 +108,8 @@ export async function tenantIfMine(slug: string): Promise<Tenant | null> {
   if (!userId) return null
   const tenant = await store.getTenantBySlug(slug)
   if (!tenant || tenant.privyUserId !== userId) return null
-  return tenant
+  // Con lo que le queda del paquete gratis: así el panel le abre el agente mientras tenga (ver @peaje/db regalo.ts).
+  return conRegalo(store, tenant)
 }
 
 /** Igual que tenantIfMine pero lanza si no corresponde. Para server actions. */

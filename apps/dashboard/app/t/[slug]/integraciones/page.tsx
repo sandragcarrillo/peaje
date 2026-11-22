@@ -33,7 +33,8 @@ export default async function IntegracionesPage({ params }: { params: Promise<{ 
       <PageHeader eyebrow={`${d.panel.eyebrowNegocio} / ${tenant.slug}`} titulo={t.integracionesTitulo} sub={t.integracionesDescripcion} />
       <Integraciones
         slug={tenant.slug}
-        pro={accesoPro(tenant).activo}
+        // Telegram, Slack y Google son del plan pago: el paquete gratis no los abre.
+        pro={accesoPro({ ...tenant, regalo: null }).activo}
         telegram={telegram}
         reportes={reportes}
         slack={slack}

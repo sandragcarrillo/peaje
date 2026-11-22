@@ -41,7 +41,7 @@ export function desdeParaVentana(dias: number, ahora = new Date()): string {
 /** Pro pagado hoy: founder o pro vigente. La prueba no es una suscripción. */
 export function tienePro(t: Pick<Tenant, 'plan' | 'planUntil' | 'trialUntil'>, ahora = new Date()): boolean {
   const acceso = accesoPro(t, ahora)
-  return acceso.activo && acceso.plan !== 'trial'
+  return acceso.activo && acceso.plan !== 'trial' && acceso.plan !== 'regalo'
 }
 
 const cero = (): Cuenta => ({ leads: 0, altas: 0, pro: 0 })

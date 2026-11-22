@@ -42,9 +42,11 @@ export function Suscripcion({
   paddle,
   creditos,
   arranque,
+  regalo,
 }: {
   slug: string
   acceso: AccesoPro
+  regalo?: { informes: number; respuestas: number } | null
   billing: EstadoBilling | null
   paddle: PaddleCliente
   creditos: number
@@ -57,7 +59,9 @@ export function Suscripcion({
   const nombre = t.planNombres[acceso.plan] ?? acceso.plan
 
   const estado =
-    acceso.plan === 'trial'
+    acceso.plan === 'regalo' && regalo
+      ? t.planRegalo(regalo.informes, regalo.respuestas)
+      : acceso.plan === 'trial'
       ? t.planPrueba(fecha(acceso.hasta))
       : acceso.activo
         ? viva && !paddle.cancelAt
@@ -93,7 +97,8 @@ export function Suscripcion({
 
   const opciones = billing ? <Opciones slug={slug} billing={billing} paddle={paddle} fecha={fecha} creditos={creditos} /> : <p className="text-sm text-muted">{t.planSinDatos}</p>
 
-  if (acceso.activo) {
+  // El paquete gratis no es un plan: se muestra lo que queda y, abajo, los planes a la vista.
+  if (acceso.activo && acceso.plan !== 'regalo') {
     return (
       <div id="plan" className="space-y-3 border border-border p-4">
         <p className="text-sm">{estado}</p>
@@ -113,7 +118,7 @@ export function Suscripcion({
     <div id="plan" className="space-y-4 border border-border p-4">
       <div className="space-y-1">
         <p className="text-lg font-semibold">{estado}</p>
-        <p className="text-sm text-muted">{t.planGratisNota}</p>
+        <p className="text-sm text-muted">{acceso.plan === 'regalo' ? t.planRegaloNota : t.planGratisNota}</p>
       </div>
       <LoQueHace arranque={arranque} preguntas={billing?.prices.pro.limits.preguntas ?? null} />
       {avisos}

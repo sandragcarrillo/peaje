@@ -59,7 +59,7 @@ export default async function MiAgente({ params, searchParams }: { params: Promi
       {/* ---- M9: plan ---- */}
       <section className="space-y-3">
         <SectionBar label={t.planSeccion} />
-        <Suscripcion slug={tenant.slug} acceso={acceso} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
+        <Suscripcion slug={tenant.slug} acceso={acceso} regalo={tenant.regalo ?? null} billing={billing} paddle={paddleDelNegocio(tenant)} creditos={CREDITOS_MENSUALES} arranque={arranque} />
       </section>
 
 

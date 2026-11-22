@@ -350,7 +350,11 @@ export const miAgente = {
     // ---- fin M6 ----
     // ---- M9: plan y cobro del agente Pro ----
     planSeccion: 'Tu suscripción',
-    planNombres: { founder: 'Founder', pro: 'Pro', trial: 'prueba de Pro', free: 'gratis' } as Record<string, string>,
+    planNombres: { founder: 'Founder', pro: 'Pro', trial: 'prueba de Pro', free: 'gratis', regalo: 'paquete gratis' } as Record<string, string>,
+    planRegalo: (informes: number, respuestas: number) =>
+      `Estás probando el agente gratis. Te ${informes === 1 ? 'queda 1 informe' : `quedan ${informes} informes`} y ${respuestas === 1 ? '1 respuesta' : `${respuestas} respuestas`} del agente.`,
+    planRegaloNota:
+      'Un informe es tu plan o una medición de quién aparece en tu lugar. Con el plan, Peaje vuelve a medir cada semana, te dice qué funcionó, te escribe las páginas y te manda el resumen.',
     planPrueba: (fecha: string) => `Estás en la prueba de Pro hasta el ${fecha}.`,
     planActivo: (nombre: string, fecha: string) => `Plan ${nombre} activo hasta el ${fecha}.`,
     planGratis: 'Estás en el plan gratis.',
@@ -777,7 +781,11 @@ export const miAgente = {
     // ---- fin M6 ----
     // ---- M9: plan and billing of the Pro agent ----
     planSeccion: 'Your subscription',
-    planNombres: { founder: 'Founder', pro: 'Pro', trial: 'Pro trial', free: 'free' } as Record<string, string>,
+    planNombres: { founder: 'Founder', pro: 'Pro', trial: 'Pro trial', free: 'free', regalo: 'free package' } as Record<string, string>,
+    planRegalo: (informes: number, respuestas: number) =>
+      `You are trying the agent for free. You have ${informes === 1 ? '1 report' : `${informes} reports`} and ${respuestas === 1 ? '1 agent answer' : `${respuestas} agent answers`} left.`,
+    planRegaloNota:
+      'A report is your plan or one measurement of who shows up instead of you. With the plan, Peaje measures again every week, tells you what worked, writes the pages and sends you the summary.',
     planPrueba: (fecha: string) => `You are on the Pro trial until ${fecha}.`,
     planActivo: (nombre: string, fecha: string) => `${nombre} plan active until ${fecha}.`,
     planGratis: 'You are on the free plan.',
