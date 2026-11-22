@@ -101,6 +101,7 @@ const S = {
     semanaPie: 'Están en el orden en que conviene hacerlas. Si alguna no va, descártala desde su página y la próxima semana te propongo otra.',
     ver: 'Ver la tarea',
     orden: 'No hay nada que te convenga cambiar esta semana. Sigo midiendo y te aviso cuando algo se mueva.',
+    sinCambios: 'Esta semana no cambió nada importante. Sigo mirando y te escribo cuando haya algo que hacer.',
     movido: 'Qué se hizo',
     nadaHecho: 'Esta semana no se verificó ningún cambio en tu sitio.',
     cambio: 'Qué cambió esta semana',
@@ -137,6 +138,7 @@ const S = {
     semanaPie: 'They are in the order worth doing them. If one does not fit, dismiss it from its page and I will propose another next week.',
     ver: 'See the task',
     orden: 'There is nothing worth changing this week. I keep measuring and will tell you when something moves.',
+    sinCambios: 'Nothing meaningful changed this week. I keep watching and will write when there is something to do.',
     movido: 'What got done',
     nadaHecho: 'No change on your site was verified this week.',
     cambio: 'What changed this week',
@@ -179,10 +181,19 @@ function lineaCambio(r: Reporte): string {
   return partes.length ? `${s.cambio}: ${partes.join('. ')}.` : ''
 }
 
+/** Nada se movió contra la semana anterior: mismo puntaje, misma cuota de citas (como se muestran) y nada verificado. Sin dato previo cuenta como sin cambio. */
+function sinCambios(r: Reporte): boolean {
+  const puntajeIgual = typeof r.score !== 'number' || r.scorePrevio === null || r.scorePrevio === undefined || r.scorePrevio === r.score
+  const citasIgual = !r.citacion || r.citacion.previa === null || pct(r.citacion.previa) === pct(r.citacion.share)
+  return puntajeIgual && citasIgual && !r.movido?.length
+}
+
 /** Las propuestas de la semana como texto corto (Telegram, Slack): markdown mínimo. */
 export function textoSemana(r: Reporte): string {
   const s = S[r.idioma]
   const cambio = lineaCambio(r)
+  // Sin propuestas y sin movimiento: una sola línea, sin repetir números que no cambiaron.
+  if (r.semana.length === 0 && sinCambios(r)) return s.sinCambios
   if (r.semana.length === 0) return cambio ? `${s.orden}\n\n${cambio}` : s.orden
   return [
     `**${s.semana(r.semana.length)}**`,

@@ -15,6 +15,8 @@ const rutaRadar = (dominio: string, medir: boolean, pais: string, ciudad = '') =
 
 /** Valor del desplegable para "Otro país": ahí se escribe el nombre. */
 const OTRO = 'otro'
+/** "En varios países": se mide sin país. Vacío es que todavía no eligió. */
+const VARIOS = 'varios'
 
 /** El país de los clientes, para que la medición en vivo y el resultado lo encuentren sin pasarlo por cada enlace. */
 export const COOKIE_PAIS = 'peaje_radar_pais'
@@ -26,12 +28,15 @@ const COOKIE_CIUDAD = 'peaje_radar_ciudad'
  */
 function Desplegable({
   etiqueta,
+  vacio,
   valor,
   opciones,
   onChange,
   className,
 }: {
   etiqueta: string
+  /** Lo que se lee mientras no hay nada elegido. */
+  vacio: string
   valor: string
   opciones: { valor: string; texto: string }[]
   onChange: (v: string) => void
@@ -40,7 +45,15 @@ function Desplegable({
   const [abierto, setAbierto] = useState(false)
   const [foco, setFoco] = useState(0)
   const caja = useRef<HTMLDivElement>(null)
-  const actual = Math.max(0, opciones.findIndex((o) => o.valor === valor))
+  // Lo que va tecleando para saltar a un país ("c", "co"...): se borra si para de escribir.
+  const tecleado = useRef({ texto: '', reloj: 0 })
+  const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  // La opción enfocada siempre a la vista dentro de la lista.
+  useEffect(() => {
+    if (abierto) caja.current?.querySelector(`[data-indice="${foco}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [abierto, foco])
+  // -1: nada elegido todavía; se muestra el texto de invitación.
+  const actual = opciones.findIndex((o) => o.valor === valor)
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => {
@@ -61,7 +74,7 @@ function Desplegable({
         aria-expanded={abierto}
         aria-label={etiqueta}
         onClick={() => {
-          setFoco(actual)
+          setFoco(Math.max(0, actual))
           setAbierto(!abierto)
         }}
         onKeyDown={(e) => {
@@ -69,17 +82,35 @@ function Desplegable({
           else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
             if (!abierto) {
-              setFoco(actual)
+              setFoco(Math.max(0, actual))
               setAbierto(true)
             } else setFoco((f) => (f + (e.key === 'ArrowDown' ? 1 : opciones.length - 1)) % opciones.length)
           } else if (e.key === 'Enter' && abierto) {
             e.preventDefault()
             elegir(foco)
+          } else if (e.key.length === 1 && /\p{L}/u.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+            // Teclear letras lleva al primer país que empieza así: "c" a Chile, "co" a Colombia.
+            // La misma letra repetida pasa al siguiente que empieza con ella.
+            e.preventDefault()
+            const t = tecleado.current
+            window.clearTimeout(t.reloj)
+            const letra = sinTildes(e.key)
+            const repetida = t.texto !== '' && [...t.texto].every((c) => c === letra)
+            t.texto = repetida ? t.texto : t.texto + letra
+            t.reloj = window.setTimeout(() => (t.texto = ''), 700)
+            const empieza = (i: number) => sinTildes(opciones[i]!.texto).startsWith(repetida ? letra : t.texto)
+            const desde = abierto ? foco : Math.max(0, actual)
+            const orden = opciones.map((_, i) => (desde + (repetida ? 1 : 0) + i) % opciones.length)
+            const hallado = orden.find(empieza)
+            if (hallado !== undefined) {
+              setFoco(hallado)
+              setAbierto(true)
+            }
           }
         }}
         className={`${className} flex items-center justify-between gap-3 text-left font-sans`}
       >
-        <span>{opciones[actual]!.texto}</span>
+        <span className={actual < 0 ? 'text-faint' : ''}>{actual < 0 ? vacio : opciones[actual]!.texto}</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className={`shrink-0 text-muted transition-transform ${abierto ? 'rotate-180' : ''}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -90,6 +121,7 @@ function Desplegable({
             <li
               key={o.valor || 'varios'}
               role="option"
+              data-indice={i}
               aria-selected={i === actual}
               onMouseEnter={() => setFoco(i)}
               onMouseDown={(e) => {
@@ -142,7 +174,7 @@ export function Formulario({
   const [email, setEmail] = useState(correoInicial)
   const [sitio, setSitio] = useState(dominioInicial)
   // Un país que no está en la lista llega como "Otro" con su nombre escrito.
-  const fuera = paisInicial !== '' && !MERCADOS.some((m) => m.codigo === paisInicial)
+  const fuera = paisInicial !== '' && paisInicial !== VARIOS && !MERCADOS.some((m) => m.codigo === paisInicial)
   const [pais, setPais] = useState(fuera ? OTRO : paisInicial)
   const [otroPais, setOtroPais] = useState(() => {
     const m = fuera ? mercadoDe(paisInicial) : null
@@ -173,7 +205,7 @@ export function Formulario({
     if (!correo) return setError(d.faltaCorreo)
     if (!dominio) return setError(d.faltaSitio)
     // "Otro": el nombre que escribió tiene que ser un país que reconozcamos.
-    const codigo = pais === OTRO ? paisPorNombre(otroPais) : pais
+    const codigo = pais === OTRO ? paisPorNombre(otroPais) : pais === VARIOS ? '' : pais
     if (codigo === null) return setError(d.paisNoReconocido)
     const lugar = codigo ? (ciudadLimpia(ciudad) ?? '') : ''
     if (codigo && ciudad.trim() && !lugar) return setError(d.ciudadInvalida)
@@ -203,10 +235,12 @@ export function Formulario({
     setEnviando(false)
   }
 
+  // Hay un país elegido (de la lista u otro): ahí tiene sentido pedir la ciudad.
+  const conPais = pais !== '' && pais !== VARIOS
   const campo =
-    'w-full min-w-0 border border-border bg-bg px-4 py-3 font-mono text-base outline-none focus:border-text sm:text-sm'
+    'w-full min-w-0 border border-border bg-bg px-3.5 py-2.5 font-mono text-base outline-none focus:border-text sm:text-sm'
   return (
-    <form onSubmit={enviar} className="w-full max-w-xl space-y-4">
+    <form onSubmit={enviar} className="w-full space-y-3.5">
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">{d.correo}</span>
         <input
@@ -233,17 +267,21 @@ export function Formulario({
           className={campo}
         />
       </label>
-      <div className="space-y-1.5">
+      {/* País y ciudad lado a lado: el formulario entero cabe sin bajar la página. */}
+      <div className="grid items-start gap-3.5 sm:grid-cols-[3fr_2fr]">
+      <div className={`space-y-1.5 ${conPais ? '' : 'sm:col-span-2'}`}>
         <span className="block text-sm font-medium">{d.pais}</span>
         <Desplegable
           etiqueta={d.pais}
+          vacio={d.paisVacio}
           valor={pais}
           onChange={setPais}
           className={campo}
           opciones={[
-            ...MERCADOS.map((m) => ({ valor: m.codigo, texto: locale === 'es' ? m.es : m.en })),
+            // En orden alfabético en el idioma de la página: ningún país va primero por ser el nuestro.
+            ...MERCADOS.map((m) => ({ valor: m.codigo, texto: locale === 'es' ? m.es : m.en })).sort((a, b) => a.texto.localeCompare(b.texto, locale)),
             { valor: OTRO, texto: d.paisOtro },
-            { valor: '', texto: d.paisVarios },
+            { valor: VARIOS, texto: d.paisVarios },
           ]}
         />
         {pais === OTRO ? (
@@ -258,9 +296,9 @@ export function Formulario({
         ) : null}
         <span className="block text-xs text-muted">{d.paisNota}</span>
       </div>
-      {pais !== '' ? (
+      {conPais ? (
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium">
+          <span className="block text-sm font-medium">
             {d.ciudad} <span className="font-normal text-muted">{d.opcional}</span>
           </span>
           <input
@@ -273,6 +311,7 @@ export function Formulario({
           <span className="block text-xs text-muted">{d.ciudadNota}</span>
         </label>
       ) : null}
+      </div>
       <label className="flex items-start gap-3 text-sm text-muted">
         <input
           type="checkbox"

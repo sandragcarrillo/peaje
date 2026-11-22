@@ -19,17 +19,15 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div
-      className={`flex items-center gap-1 ${pending ? 'opacity-50' : ''}`}
-    >
+    <div className={`inline-flex items-center rounded-full border border-border p-0.5 ${pending ? 'opacity-50' : ''}`}>
       {LOCALES.map((l) => (
         <button
           key={l}
           type="button"
           onClick={() => elegir(l)}
           aria-pressed={l === locale}
-          className={`btn btn-secundario btn-chico btn-icono ${
-            l === locale ? 'border-text bg-panel' : 'text-muted hover:text-text'
+          className={`etiqueta rounded-full px-2 py-0.5 text-xs transition-colors ${
+            l === locale ? 'bg-text font-bold text-bg' : 'text-muted hover:text-text'
           }`}
         >
           {LOCALE_LABELS[l]}

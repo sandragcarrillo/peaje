@@ -16,7 +16,6 @@ import { RadarPill } from './components/radar-pill'
 import './globals.css'
 import { PeajeHead } from '@peaje/next/head'
 import { Analytics } from '@vercel/analytics/next'
-import { salir } from './salir/actions'
 
 // Grotesca para titulares y body, mono para todo el chrome técnico.
 // Ver design/direccion-visual.md §3.
@@ -72,25 +71,17 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
             className="pointer-events-none fixed inset-x-0 top-0 z-30 h-24 bg-gradient-to-b from-bg via-bg/90 to-transparent"
           />
           <header className="isla-tinta sticky top-4 z-40 mx-auto max-w-5xl px-3 sm:px-6">
-            <div className="flex items-center justify-between gap-2 rounded-full border border-border bg-panel px-3 py-2.5 shadow-lg sm:px-5 shadow-black/30">
+            <div className="flex h-14 items-center justify-between gap-2 rounded-full border border-border bg-panel pr-2.5 pl-4 shadow-lg shadow-black/30 sm:pr-3 sm:pl-6">
               <Link href="/" className="flex items-center">
                 <Logo />
               </Link>
               {tenant ? (
                 <>
                 <nav className="hidden items-center gap-3 text-sm md:flex">
-                  {/* Salir junto al correo: los dos son de la cuenta; tema e idioma van al final. */}
-                  <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} conWallet={walletVisible(misNegocios)} />
-                  <form action={salir}>
-                    <button
-                      type="submit"
-                      className="btn btn-secundario btn-chico"
-                    >
-                      {d.nav.salir}
-                    </button>
-                  </form>
+                  {/* Tema e idioma, y al final la cuenta: el correo y Salir van dentro de su menú. */}
                   <ThemeToggle />
                   <LanguageToggle locale={locale} />
+                  <AccountMenu slug={tenant.slug} email={tenant.email ?? tenant.name} conWallet={walletVisible(misNegocios)} />
                 </nav>
                 {/* En el teléfono el correo, Salir, tema e idioma no entran en la píldora: van al menú. */}
                 <MenuMovil cuenta={{ email: tenant.email ?? tenant.name }} className="md:hidden" />

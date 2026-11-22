@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { ciudadLimpia, mercadoDe } from '@peaje/shared/mercados'
 import Link from 'next/link'
 import { cache } from 'react'
@@ -66,15 +66,15 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 }
 
 export default async function Radar({ searchParams }: Props) {
-  const [{ d: entrada, medir, p, c }, dict, locale, jar, cabeceras] = await Promise.all([searchParams, getDict(), getLocale(), cookies(), headers()])
+  const [{ d: entrada, medir, p, c }, dict, locale, jar] = await Promise.all([searchParams, getDict(), getLocale(), cookies()])
   const t = dict.radar
   // El país de sus clientes: el del enlace, si no el que eligió en el formulario. Uno que no está en la lista no cuenta.
   const elegido = p ?? jar.get(COOKIE_PAIS)?.value
   const pais = mercadoDe(elegido)?.codigo ?? ''
   // La ciudad viaja con el país: la del enlace si el enlace trae país, si no la del formulario.
   const ciudad = pais ? (ciudadLimpia(p !== undefined ? c : decodeURIComponent(jar.get(COOKIE_CIUDAD)?.value ?? '')) ?? '') : ''
-  // Para el formulario: lo que ya eligió (aunque sea "varios países") o, la primera vez, el país desde donde entra.
-  const paisFormulario = elegido !== undefined ? pais : (mercadoDe(cabeceras.get('x-vercel-ip-country'))?.codigo ?? '')
+  // Para el formulario: lo que ya eligió ("varios" si eligió varios países). La primera vez llega vacío: "Selecciona un país".
+  const paisFormulario = elegido === undefined ? '' : pais || 'varios'
   const correo = jar.get(COOKIE_CORREO)?.value ?? ''
   const conCorreo = correo !== ''
   const dominio = dominioDeRadar(entrada)
@@ -139,20 +139,22 @@ function Hero({
   ciudad: string
 }) {
   return (
-    <div className="grid items-center gap-10 py-6 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-14">
-      <div className="space-y-6">
+    // Dos columnas a la misma altura: el mensaje a la izquierda y el formulario a la derecha, en su tarjeta, entero sin bajar.
+    <div className="grid items-center gap-8 py-2 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] md:py-10 lg:gap-16">
+      <div className="space-y-5">
         <p className="inline-block border border-border px-2.5 py-1 font-mono text-[11px] tracking-[0.04em] text-muted">
           {t.eyebrow}
         </p>
-        <h1 className="max-w-2xl text-3xl font-semibold leading-tight sm:text-5xl sm:leading-[1.05]">
+        <h1 className="max-w-xl text-3xl font-semibold leading-tight sm:text-[2.75rem] sm:leading-[1.08]">
           {t.tituloA} <span className="text-accent">{t.tituloB}</span>
         </h1>
-        <p className="max-w-xl text-base text-muted">{t.texto}</p>
+        <p className="max-w-lg text-base text-muted">{t.texto}</p>
         {invalido ? <p className="text-sm text-red-600">{t.invalido}</p> : null}
         {pideCorreo ? <p className="max-w-xl border-l-2 border-accent pl-3 text-sm">{t.pideCorreo(pideCorreo)}</p> : null}
+      </div>
+      <div className="border border-border bg-panel p-5 sm:p-6">
         <Formulario dominioInicial={dominio} correoInicial={correo} paisInicial={pais} ciudadInicial={ciudad} medir={medir} />
       </div>
-      <Ejemplo t={t} />
     </div>
   )
 }

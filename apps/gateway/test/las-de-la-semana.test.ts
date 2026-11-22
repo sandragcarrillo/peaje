@@ -169,6 +169,19 @@ test('el correo abre con la propuesta, en el idioma del dueño, con el enlace a 
   assert.match(vacio.html, /No hay nada que te convenga cambiar esta semana/)
 })
 
+test('sin propuestas y sin cambios, el mensaje corto es una sola línea; si algo se movió, sigue saliendo el cambio', () => {
+  type R = Parameters<typeof textoSemana>[0]
+  const base = { idioma: 'es', semana: [], score: 80, scorePrevio: 80, citacion: { share: 0.5, previa: 0.5, competidores: [], medido: null }, movido: [] }
+  assert.equal(textoSemana(base as unknown as R), 'Esta semana no cambió nada importante. Sigo mirando y te escribo cuando haya algo que hacer.')
+  assert.equal(textoSemana({ ...base, idioma: 'en', scorePrevio: null, citacion: null } as unknown as R), 'Nothing meaningful changed this week. I keep watching and will write when there is something to do.')
+  // Subió el puntaje: el texto de siempre con la línea de cambio.
+  const subio = textoSemana({ ...base, scorePrevio: 70 } as unknown as R)
+  assert.match(subio, /^No hay nada que te convenga cambiar esta semana/)
+  assert.match(subio, /Qué cambió esta semana: Puntaje: 80 \(\+10/)
+  // Cambió la cuota de citas: igual.
+  assert.match(textoSemana({ ...base, citacion: { ...base.citacion, previa: 0.33 } } as unknown as R), /Te citan en 50% de las respuestas \(antes 33%\)/)
+})
+
 test('Telegram: la propuesta sale en el idioma del chat y "No va" descarta solo esa tarea', async () => {
   const { bandeja } = await import('../src/telegram/api.js')
   const { procesarUpdate, proponerPorTelegram } = await import('../src/telegram/bot.js')

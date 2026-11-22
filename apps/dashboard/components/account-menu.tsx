@@ -4,6 +4,7 @@ import { railLabel } from '@peaje/shared'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { salir } from '@/app/salir/actions'
 import { resumenWallet, type ResumenWallet } from '@/app/t/[slug]/actions'
 import { money, shortWallet } from '@/lib/config'
 import { useDict } from '@/lib/i18n/client'
@@ -59,9 +60,13 @@ export function AccountMenu({ slug, email, conWallet }: { slug: string; email: s
       <button
         type="button"
         onClick={toggle}
-        className="btn btn-secundario btn-chico max-w-56 gap-1.5"
+        aria-label={email}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 rounded-full py-0.5 pr-2 pl-0.5 text-muted transition-colors hover:bg-panel-2 hover:text-text"
       >
-        <span className="truncate">{email}</span>
+        <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-full bg-text text-xs font-semibold uppercase text-bg">
+          {email.trim().charAt(0) || '?'}
+        </span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -75,7 +80,8 @@ export function AccountMenu({ slug, email, conWallet }: { slug: string; email: s
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-panel text-text shadow-xl shadow-black/40 ${conWallet ? 'w-80 p-5' : 'w-56 p-2'}`}>
+          <div className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-panel text-text shadow-xl shadow-black/40 ${conWallet ? 'w-80 p-5' : 'w-64 p-2'}`}>
+            <p className={`truncate text-xs text-muted ${conWallet ? 'pb-3' : 'px-3 pt-2 pb-2'}`}>{email}</p>
             {!conWallet ? (
               // Sin cobros activos la wallet existe pero no se muestra (ver walletVisible).
               <nav>
@@ -170,6 +176,11 @@ export function AccountMenu({ slug, email, conWallet }: { slug: string; email: s
 
               </div>
             )}
+            <form action={salir} className={`border-t border-border ${conWallet ? 'mt-4 pt-3' : 'mt-1 pt-1'}`}>
+              <button type="submit" className={`block w-full rounded-lg py-2 text-left text-sm text-muted hover:bg-panel-2 hover:text-text ${conWallet ? 'px-0' : 'px-3'}`}>
+                {nav.salir}
+              </button>
+            </form>
           </div>
         </>
       ) : null}
