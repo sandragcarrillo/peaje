@@ -1,5 +1,5 @@
 import type { Chequeo } from '@peaje/shared'
-import type { NewAgentTask, PageFormat, Tenant } from '@peaje/db'
+import type { NewAgentTask, PageFormat, TaskPriority, Tenant } from '@peaje/db'
 import type { Reporte } from '../monitor/reporte.js'
 import { COMO_SE_ARMA } from '../citacion/formatos.js'
 import { asistentesMedidos, dominioVerificable } from '@peaje/shared'
@@ -14,7 +14,7 @@ import { cuerpoConBorrador, MAX_BORRADORES, redactarBorrador, slugDePregunta, ti
 import { agendarSeguimientos } from '../ciclo/seguimiento.js'
 import { datosDeBusqueda } from '../google/consola.js'
 import { oportunidades, type Oportunidad } from '../google/oportunidades.js'
-import { prioridadBloqueo, prioridadBusqueda, prioridadFix, prioridadFrescura, prioridadMencion, prioridadPagina, prioridadRuta } from './prioridad.js'
+import { prioridadBloqueo, prioridadBusqueda, prioridadFix, prioridadFrescura, prioridadMencion, prioridadPagina, prioridadRuta, prioridadVigente } from './prioridad.js'
 
 /**
  * Las tareas que el agente deja para el coding agent del dueño. Tres tipos:
@@ -334,10 +334,12 @@ const NOTA_COBROS = 'Charging AI agents is not offered to the public right now, 
 /** La nota de una propuesta que Peaje retiró sola al volver a leer el sitio. */
 const NOTA_OBSOLETA = 'Peaje read the site again and this page no longer fits what it offers today.'
 
-export async function generarTareas(tenant: Tenant, opciones: { conContenido?: boolean } = {}): Promise<{ creadas: number; actualizadas: number; cerradas: number }> {
+export async function generarTareas(tenant: Tenant, opciones: { conContenido?: boolean } = {}): Promise<{ creadas: number; actualizadas: number; cerradas: number; repriorizadas: number }> {
   const dominio = dominioVerificable(tenant.originUrl)
   let creadas = 0
   let actualizadas = 0
+  // Abiertas cuya prioridad cambió con las reglas de hoy.
+  let repriorizadas = 0
   // Propuestas abiertas que se retiraron porque el sitio de hoy ya no las respalda.
   let retiradas = 0
 
@@ -526,7 +528,32 @@ export async function generarTareas(tenant: Tenant, opciones: { conContenido?: b
         r.created ? (creadas += 1) : (actualizadas += 1)
       }
     }
+
+    // La cola con las reglas de hoy: una tarea abierta no se queda con el puntaje del día en que se creó.
+    repriorizadas = await repriorizar(tenant, sinCita)
   }
 
-  return { creadas, actualizadas, cerradas: fixes.cerradas + retiradas }
+  return { creadas, actualizadas, cerradas: fixes.cerradas + retiradas, repriorizadas }
+}
+
+/** Campo por campo: jsonb devuelve las claves en otro orden, así que comparar el JSON entero siempre daría distinto. */
+const mismaPrioridad = (a: TaskPriority, b: TaskPriority | null) =>
+  !!b && a.score === b.score && a.impact === b.impact && a.effort === b.effort && a.label.es === b.label?.es && a.label.en === b.label?.en && a.why.es === b.why?.es && a.why.en === b.why?.en
+
+/**
+ * Recalcula la prioridad de todas las tareas abiertas con las reglas de hoy y
+ * guarda solo las que cambiaron. Hoy eso alcanza a las páginas nuevas (del
+ * agente o del chat); el resto se refresca cuando su evidencia vuelve a
+ * proponerla en la misma corrida. Devuelve cuántas cambiaron.
+ */
+export async function repriorizar(tenant: Tenant, sinCita: Pick<PreguntaSinCita, 'question'>[]): Promise<number> {
+  const preguntasSin = new Set(sinCita.map((m) => normal(m.question)))
+  let cambiadas = 0
+  for (const t of await store.listTasks(tenant.id, { statuses: ['open'] })) {
+    const nueva = prioridadVigente(t, { conBorrador: tieneBorrador(t), sinCita: preguntasSin.has(normal(t.title)) })
+    if (!nueva || mismaPrioridad(nueva, t.priority)) continue
+    await store.setTaskPriority(tenant.id, t.id, nueva)
+    cambiadas += 1
+  }
+  return cambiadas
 }

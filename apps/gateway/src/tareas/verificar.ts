@@ -62,7 +62,7 @@ export async function completarTarea(tenant: Tenant, task: AgentTask, url: strin
     verifiedAt: r.ok ? ahora : null,
   })
   // Ciclo cerrado: al quedar verificada, re-medir a las 2 y 6 semanas (idempotente).
-  // Las de mención no: el seguimiento toma el título como pregunta a medir, y el de estas no es una pregunta.
-  if (r.ok && !esMencion(task)) await agendarSeguimientos(tenant, actualizada)
+  // Las de mención también: el seguimiento mide la pregunta sin el prefijo "Get mentioned:" (preguntaDe).
+  if (r.ok) await agendarSeguimientos(tenant, actualizada)
   return actualizada
 }

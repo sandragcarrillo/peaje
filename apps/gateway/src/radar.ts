@@ -124,8 +124,8 @@ radarRouter.post('/radar/report', async (c) => {
 })
 
 /**
- * Body { domain, locale: 'es' | 'en' }. 200 con la foto (cached: true si es la
- * guardada); 400 invalid-domain; 422 unavailable si el sitio no se pudo leer;
+ * Body { domain, locale: 'es' | 'en', country?, city? }. 200 con la foto
+ * (cached: true si es la guardada); 400 invalid-domain; 422 unavailable si el sitio no se pudo leer;
  * 429 budget con Retry-After hasta las 00:00 UTC; 503 unavailable si no hay
  * motores o ninguno contestó.
  */

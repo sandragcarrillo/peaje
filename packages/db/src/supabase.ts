@@ -819,6 +819,12 @@ export class SupabaseStore implements Store {
     return taskFrom(data as Row)
   }
 
+  async setTaskPriority(tenantId: string, id: string, priority: TaskPriority): Promise<void> {
+    // Sin updated_at: recalcular el orden no es un cambio que el dueño tenga que ver en la tarea.
+    const { error } = await this.#db.from('agent_tasks').update({ priority }).eq('tenant_id', tenantId).eq('id', id)
+    this.#fail('setTaskPriority', error)
+  }
+
   async listMessages(tenantId: string, limit: number): Promise<AgentMessage[]> {
     const { data, error } = await this.#db
       .from('agent_messages')
@@ -2339,6 +2345,21 @@ export class SupabaseStore implements Store {
       .maybeSingle()
     this.#fail('getRadarCitas', error)
     return data ? radarCitasFrom(data as Row) : null
+  }
+
+  async getRadarCitasDelDominio(domain: string, since: string): Promise<RadarCitasRun | null> {
+    // Dos consultas en vez de un or(): la llave sin país y las de cada mercado (`domain@...`).
+    // Un dominio válido no lleva _ ni %, así que el patrón de like no tiene comodines escondidos.
+    const terminadas = () => this.#db.from('radar_citation_runs').select().eq('status', 'done').gte('measured_at', since)
+    const [sinPais, conPais] = await Promise.all([
+      terminadas().eq('domain', domain).order('measured_at', { ascending: false }).limit(1).maybeSingle(),
+      terminadas().like('domain', `${domain}@%`).order('measured_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    this.#fail('getRadarCitasDelDominio', sinPais.error)
+    this.#fail('getRadarCitasDelDominio', conPais.error)
+    const filas = [sinPais.data, conPais.data].filter((r): r is Row => !!r).map(radarCitasFrom)
+    const [primera] = filas.sort((a, b) => (b.measuredAt ?? '').localeCompare(a.measuredAt ?? ''))
+    return primera ?? null
   }
 
   async claimRadarCitas(input: { domain: string; locale: string; at: string; dayStart: string; maxPerDay: number; staleBefore: string }): Promise<RadarCitasClaim> {

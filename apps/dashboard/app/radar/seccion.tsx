@@ -41,13 +41,3 @@ export function SeccionPlegable({ n, titulo, cuenta, children }: { n: string; ti
   )
 }
 
-/** La barra de arriba de la sección 01: igual mientras se mide y en el resultado. */
-export function Barra01({ titulo, dominio }: { titulo: string; dominio: string }) {
-  return (
-    <div className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2.5 font-mono text-[11px] tracking-[0.04em] text-muted sm:px-6">
-      <span className="font-bold text-accent">01</span>
-      <span className="truncate text-text">{titulo}</span>
-      <span className="hidden truncate sm:inline">· {dominio}</span>
-    </div>
-  )
-}

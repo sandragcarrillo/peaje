@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
 import type { Dict } from '@/lib/i18n/dict'
 import { pedirCitas } from './citas-cliente'
@@ -32,12 +32,45 @@ const REINTENTO_MAX_S = 45
 
 const esError = (r: RespuestaCitas): r is ErrorCitas => 'error' in r
 
+/**
+ * El resultado final de cada medición (con el reintento ya hecho), para que
+ * otro bloque de la misma página lo lea sin pedirlo de nuevo: "Así se vería tu
+ * panel" (tu-panel.tsx). Lo publica useCitas al terminar.
+ */
+const finales = new Map<string, RespuestaCitas>()
+const oyentes = new Set<() => void>()
+const claveCitas = (dominio: string, locale: string, pais: string, ciudad: string) => `${dominio}|${locale}|${pais}|${ciudad}`
+function publicar(clave: string, r: RespuestaCitas | null) {
+  if (r) finales.set(clave, r)
+  else finales.delete(clave)
+  for (const f of oyentes) f()
+}
+const suscribir = (f: () => void) => {
+  oyentes.add(f)
+  return () => {
+    oyentes.delete(f)
+  }
+}
+
+/** Lo que terminó de responder la IA para este sitio, o null mientras SeccionCitas espera. Mismos argumentos que SeccionCitas. */
+export function useCitasListas(dominio: string, pais = '', ciudad = ''): RespuestaCitas | null {
+  const locale = useLocale()
+  const clave = claveCitas(dominio, locale, pais, mercadoDe(pais) ? ciudad : '')
+  return useSyncExternalStore(
+    suscribir,
+    () => finales.get(clave) ?? null,
+    () => null,
+  )
+}
+
 function useCitas(dominio: string, locale: string, pais: string, ciudad: string): { r: RespuestaCitas | null; segundos: number } {
   const [r, setR] = useState<RespuestaCitas | null>(null)
   const [segundos, setSegundos] = useState(0)
   useEffect(() => {
     let vivo = true
+    const clave = claveCitas(dominio, locale, pais, ciudad)
     setR(null)
+    publicar(clave, null)
     const pedido = pedirCitas(dominio, locale, { pais, ciudad })
     const tic = () => setSegundos(Math.max(0, Math.floor((Date.now() - pedido.desde) / 1000)))
     tic()
@@ -53,6 +86,7 @@ function useCitas(dominio: string, locale: string, pais: string, ciudad: string)
       if (!vivo) return
       clearInterval(reloj)
       setR(res)
+      publicar(clave, res)
     })()
     return () => {
       vivo = false
@@ -154,7 +188,9 @@ export function SeccionCitas({
   return (
     <Seccion n={n} titulo={tituloDe(datos, t)}>
       {/* El país se elige en el formulario de entrada: acá solo se dice desde dónde se preguntó. */}
-      {mercado ? <p className="text-sm text-muted">{t.mercadoDesde(ciudad ? `${ciudad}, ${nombrePais}` : nombrePais)}</p> : null}
+      {mercado ? (
+        <p className="text-sm text-muted">{t.mercadoDesde(ciudad ? `${ciudad}, ${nombrePais}` : nombrePais)}</p>
+      ) : null}
       {r?.ejemplo ? (
         // Solo con RADAR_CITAS_STUB en desarrollo: que nadie confunda estos datos con un resultado real.
         <p role="note" className="border-2 border-dashed border-text px-3 py-2 font-mono text-sm font-bold">
@@ -281,13 +317,16 @@ function Resultado({ c, dominio, usd, t, locale }: { c: Citas; dominio: string; 
                 const celda = q.engines[id]
                 const ajenos = (celda?.sources ?? []).filter((d) => !propio(d))
                 return (
-                  <li key={id} className={`grid grid-cols-1 gap-x-4 gap-y-1.5 px-5 py-3 sm:grid-cols-[9rem_13rem_1fr] sm:items-center ${celda?.cited ? 'bg-accent/[0.06]' : ''}`}>
-                    <span className="flex items-center gap-2 text-sm font-medium">
+                  // En el teléfono: asistente y resultado en la misma línea (se leen solos) y, debajo, las fuentes con su título,
+                  // porque ahí no se ve la fila de títulos. Desde sm, las tres columnas alineadas.
+                  <li key={id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 px-5 py-3 sm:grid-cols-[9rem_13rem_1fr] ${celda?.cited ? 'bg-accent/[0.06]' : ''}`}>
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
                       <Punto id={id} />
-                      {nombreMotor(id)}
+                      <span className="truncate">{nombreMotor(id)}</span>
                     </span>
                     <Estado celda={celda} t={t} />
-                    <span className="min-w-0 break-words font-mono text-xs leading-5 text-muted">
+                    <span className={`col-span-2 min-w-0 break-words font-mono text-xs leading-5 text-muted sm:col-span-1 ${celda ? '' : 'hidden sm:block'}`}>
+                      {celda?.cited || ajenos.length > 0 ? <span className="font-sans text-faint sm:hidden">{t.colFuentes}: </span> : null}
                       {celda?.cited ? <span className="text-accent">{dominio}</span> : null}
                       {celda?.cited && ajenos.length > 0 ? ', ' : null}
                       {ajenos.slice(0, 4).join(', ')}

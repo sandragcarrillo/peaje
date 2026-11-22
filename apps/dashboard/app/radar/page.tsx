@@ -10,11 +10,12 @@ import { SeccionCitas } from './citas-vista'
 import { Copiar } from './compartir'
 import { leer, principales, type Lectura, type Paso } from './datos'
 import { COOKIE_FRESCO, dominioDeRadar, dominiosFrescos } from './dominio'
-import { Formulario, MandarInforme, Medir } from './partes'
+import { CitasConEspera, Formulario, MandarInforme, Medir } from './partes'
 import { Cuenta, Fase, Revelado } from './revelado'
 import { Tope } from '@/components/tope'
-import { Barra01, Seccion, SeccionPlegable } from './seccion'
+import { Seccion, SeccionPlegable } from './seccion'
 import { textoLlanoDe, textoOk } from './textos'
+import { TuPanel } from './tu-panel'
 
 /**
  * Radar público: cualquier dominio. Ver un resultado ya medido es abierto
@@ -86,17 +87,16 @@ export default async function Radar({ searchParams }: Props) {
   const resultado = dominio !== null && score !== null && !pideMedir
 
   if (midiendo) {
-    // La caja de "Hoy" pasa a ser la medición en vivo; las citas arrancan en paralelo y se ven abajo.
+    // Mismo orden que el resultado: arriba las citas (con su espera) y debajo la medición en vivo, que pasa a ser el puntaje.
     return (
       <div className="space-y-6 py-6">
-        <Cabecera t={t} />
-        <section className="border border-border bg-bg">
-          <Barra01 titulo={t.s01} dominio={dominio} />
-          <div className="p-4 sm:p-6 lg:p-8">
-            <Medir key={dominio} dominio={dominio} auto conCorreo />
-          </div>
-        </section>
-        <SeccionCitas key={`citas-${dominio}-${pais}-${ciudad}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
+        <Cabecera t={t} dominio={dominio} />
+        <CitasConEspera key={`citas-${dominio}-${pais}-${ciudad}`} n="01" dominio={dominio} pais={pais} ciudad={ciudad} mientras="midiendo">
+          <SeccionCitas dominio={dominio} n="01" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
+        </CitasConEspera>
+        <Seccion n="02" titulo={t.s01}>
+          <Medir key={dominio} dominio={dominio} auto conCorreo />
+        </Seccion>
       </div>
     )
   }
@@ -194,12 +194,11 @@ function Ejemplo({ t }: { t: T }) {
   )
 }
 
-function Cabecera({ t }: { t: T }) {
+/** Arriba del resultado: de qué sitio es, y cómo medir otro. */
+function Cabecera({ t, dominio }: { t: T; dominio: string }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="inline-block border border-border px-2.5 py-1 font-mono text-[11px] tracking-[0.04em] text-muted">
-        {t.eyebrow}
-      </p>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+      <h1 className="min-w-0 break-all text-2xl font-semibold tracking-tight sm:text-3xl">{dominio}</h1>
       <Link href="/radar" className="-my-2.5 py-2.5 text-sm text-muted underline underline-offset-4 hover:text-text sm:my-0 sm:py-0">
         {t.otroSitio}
       </Link>
@@ -277,72 +276,73 @@ function Resultado({
 
   return (
     <div className="space-y-6 py-6">
-      <Cabecera t={t} />
+      <Cabecera t={t} dominio={dominio} />
 
-      {/* 01 */}
-      <section className="border border-border bg-bg">
-        <Barra01 titulo={t.s01} dominio={dominio} />
-        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-          <div className="flex flex-col items-start gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="max-w-2xl text-sm text-muted">
-              {medicion ? <span className="text-text">{t.medido(medicion.fecha)}</span> : null}
-              {medicion && medicion.dias > DIAS_VIEJA ? <span> {t.medicionVieja(medicion.dias)}</span> : null}
-            </p>
-            <Medir dominio={dominio} conCorreo={conCorreo} />
-          </div>
+      {/* 01: lo primero que se ve es a quién recomienda la IA. Se carga sola desde el navegador; mientras, la espera (partes.tsx). */}
+      <CitasConEspera key={`citas-${dominio}-${pais}-${ciudad}`} n="01" dominio={dominio} pais={pais} ciudad={ciudad} mientras="puntaje">
+        <SeccionCitas dominio={dominio} n="01" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
+      </CitasConEspera>
 
-          {/* Recién medido: el número cuenta desde 0, aparece la nota y al final lo que puede llegar a ser (revelado.tsx). */}
-          <Revelado dominio={dominio}>
-            <div className="space-y-2">
-              <p className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl">
-                {t.frase(l.bien.length, l.total, dominio)}
-              </p>
-              <Fase desde={2} como="p" className="font-mono text-sm text-muted">
-                {t.hoyFrase(l.actual, l.max, gradeDe(l.actual))}
-                {margen > 0 ? <span className="text-accent"> {t.conPeajeFrase(l.estimado, gradeDe(l.estimado))}</span> : null}
-              </Fase>
-            </div>
-
-            <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
-              <div className="flex flex-wrap items-end gap-3 sm:gap-8">
-                <div>
-                  <p className="font-mono text-[10px] tracking-[0.08em] text-muted">{t.hoy}</p>
-                  <p className="text-5xl font-bold tabular-nums tracking-tight sm:text-6xl lg:text-[72px] lg:leading-[72px]">
-                    <Cuenta valor={l.actual} />
-                  </p>
-                  <Fase desde={1} como="p" className="mt-1 font-mono text-xs text-muted">
-                    {gradeDe(l.actual)}
-                  </Fase>
-                </div>
-                {margen > 0 ? (
-                  <Fase desde={2} className="flex items-end gap-3 sm:gap-8">
-                    <span aria-hidden className="pb-6 text-3xl text-border">→</span>
-                    <div>
-                      <p className="font-mono text-[10px] tracking-[0.08em] text-accent">{t.conPeaje}</p>
-                      <p className="text-5xl font-bold tracking-tight text-accent sm:text-6xl lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
-                      <p className="mt-1 font-mono text-xs text-muted">{gradeDe(l.estimado)}</p>
-                    </div>
-                  </Fase>
-                ) : null}
-              </div>
-              <Fase desde={2} como="p" className="max-w-sm text-sm">
-                {margen > 0 ? t.puedeLlegar(l.estimado, margen) : t.yaAlto}
-              </Fase>
-            </div>
-          </Revelado>
-
-          {l.parcial ? <p className="border-l-2 border-border pl-3 text-sm text-muted">{t.parcial}</p> : null}
-
-          <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted">{t.compartirTexto}</p>
-            <Copiar texto={enlace} etiqueta={t.copiarEnlace} copiado={t.enlaceCopiado} />
-          </div>
-          <p className="text-xs text-muted">{t.nota}</p>
+      {/* 02: el puntaje de Ora, en resumen. */}
+      <Seccion n="02" titulo={t.s01}>
+        <div className="flex flex-col items-start gap-3 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-sm text-muted">
+            {medicion ? <span className="text-text">{t.medido(medicion.fecha)}</span> : null}
+            {medicion && medicion.dias > DIAS_VIEJA ? <span> {t.medicionVieja(medicion.dias)}</span> : null}
+          </p>
+          <Medir dominio={dominio} conCorreo={conCorreo} />
         </div>
-      </section>
 
-      {/* 02: para las preguntas de compra, a quién cita la IA. Se carga sola desde el navegador. */}
-      <SeccionCitas key={`citas-${dominio}-${pais}-${ciudad}`} dominio={dominio} n="02" usd={PRECIOS_USD.founder} pais={pais} ciudad={ciudad} />
+        {/* Recién medido: el número cuenta desde 0, aparece la nota y al final lo que puede llegar a ser (revelado.tsx). */}
+        <Revelado dominio={dominio}>
+          <div className="space-y-2">
+            <p className="max-w-3xl text-2xl font-semibold leading-tight sm:text-3xl">
+              {t.frase(l.bien.length, l.total, dominio)}
+            </p>
+            <Fase desde={2} como="p" className="text-sm tabular-nums text-muted">
+              {t.hoyFrase(l.actual, l.max, gradeDe(l.actual))}
+              {margen > 0 ? <span className="text-accent"> {t.conPeajeFrase(l.estimado, gradeDe(l.estimado))}</span> : null}
+            </Fase>
+          </div>
+
+          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
+            <div className="flex flex-wrap items-end gap-3 sm:gap-8">
+              <div>
+                <p className="text-xs text-muted">{t.hoy}</p>
+                <p className="text-5xl font-bold tabular-nums tracking-tight sm:text-6xl lg:text-[72px] lg:leading-[72px]">
+                  <Cuenta valor={l.actual} />
+                </p>
+                <Fase desde={1} como="p" className="mt-1 text-xs font-medium text-muted">
+                  {gradeDe(l.actual)}
+                </Fase>
+              </div>
+              {margen > 0 ? (
+                <Fase desde={2} className="flex items-end gap-3 sm:gap-8">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="mb-8 shrink-0 text-faint">
+                    <path d="M4 12h15M13 6l6 6-6 6" />
+                  </svg>
+                  <div>
+                    <p className="text-xs text-accent">{t.conPeaje}</p>
+                    <p className="text-5xl font-bold tabular-nums tracking-tight text-accent sm:text-6xl lg:text-[72px] lg:leading-[72px]">~{l.estimado}</p>
+                    <p className="mt-1 text-xs font-medium text-muted">{gradeDe(l.estimado)}</p>
+                  </div>
+                </Fase>
+              ) : null}
+            </div>
+            <Fase desde={2} como="p" className="max-w-sm text-sm">
+              {margen > 0 ? t.puedeLlegar(l.estimado, margen) : t.yaAlto}
+            </Fase>
+          </div>
+        </Revelado>
+
+        {l.parcial ? <p className="text-sm text-muted">{t.parcial}</p> : null}
+
+        <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted">{t.compartirTexto}</p>
+          <Copiar texto={enlace} etiqueta={t.copiarEnlace} copiado={t.enlaceCopiado} />
+        </div>
+        <p className="text-xs text-muted">{t.nota}</p>
+      </Seccion>
 
       {/* 03 */}
       <Seccion n="03" titulo={t.s02} tono="bg-panel">
@@ -393,8 +393,11 @@ function Resultado({
         </Seccion>
       )}
 
-      {/* 05: primero el agente (Pro); el kit solo, como enlace chico al final. */}
-      <Seccion n="05" titulo={t.s04}>
+      {/* 05: así se vería su panel, con lo que el Radar ya encontró. Solo lectura; los botones llevan al registro. */}
+      <TuPanel n="05" dominio={dominio} pais={pais} ciudad={ciudad} usd={PRECIOS_USD.founder} faltan={lista.map((p) => textoLlanoDe(p.check, locale).titulo)} />
+
+      {/* 06: primero el agente (Pro); el kit solo, como enlace chico al final. */}
+      <Seccion n="06" titulo={t.s04}>
         <div className="space-y-3">
           <p className="max-w-2xl text-2xl font-semibold leading-tight">{t.cierreTitulo}</p>
           <p className="max-w-2xl text-sm">{t.cierreTexto}</p>

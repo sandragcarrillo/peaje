@@ -1,13 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { randomUUID } from 'node:crypto'
-import { accesoPro, type CitationRun, type NewCitationRun, type Tenant } from '@peaje/db'
+import { accesoPro, type CitationPrompt, type CitationRun, type NewCitationRun, type Tenant } from '@peaje/db'
 import { dominioVerificable } from '@peaje/shared'
 import { z } from 'zod'
 import { store } from '../store.js'
 import { leerSitio, MODEL } from '../monitor/reporte.js'
 import { MOTORES, motoresDisponibles, type Pagina } from './motores.js'
 import { clasificarPaginas, formatosCitados, type FormatosCitados } from './formatos.js'
+import { claveDePregunta, competidoresConocidos, cupoDecision, elegirPreguntas, idiomaDePreguntas, preguntasDeDecision } from './decision.js'
+import { terminosDeMarca } from './radar.js'
 
 /**
  * Una ronda de citación: cada pregunta del negocio a cada motor disponible,
@@ -38,14 +40,57 @@ export function marcas(tenant: Tenant, raiz: string | null): string[] {
   return [tenant.name, base].filter((x): x is string => !!x && x.length >= 4).map((x) => x.toLowerCase())
 }
 
+/** Rondas anteriores de las que salen los competidores para las preguntas de decisión. */
+const RONDAS_COMPETIDORES = 3
+/** Hasta cuándo vale lo que el radar clasificó como competidor del dominio. */
+const RADAR_COMPETIDORES_DIAS = 90
+
+/**
+ * Las preguntas de decisión de esta ronda ("alternativas a X", "X vs Y") con
+ * los competidores que la IA ya citó en lugar del negocio (decision.ts). Sin
+ * modelo y sin preguntas extra por encima del tope. Si algo falla, ninguna.
+ */
+async function preguntasDeDecisionDe(tenant: Tenant, guardadas: CitationPrompt[], raiz: string | null): Promise<string[]> {
+  if (!raiz) return []
+  const sinWww = raiz.replace(/^www\./, '')
+  const desde = new Date(Date.now() - RADAR_COMPETIDORES_DIAS * 86_400_000).toISOString()
+  const [runs, radar, plan] = await Promise.all([
+    store.listCitationRuns(tenant.id, RONDAS_COMPETIDORES),
+    store.getRadarCitasDelDominio(sinWww, desde).catch(() => null),
+    store.getPlan(tenant.id).catch(() => null),
+  ])
+  const competidores = competidoresConocidos({ runs, raiz: sinWww, marcas: terminosDeMarca(sinWww, [tenant.name]), radar: radar?.result?.citedInstead ?? [] })
+  const idioma = idiomaDePreguntas(
+    guardadas.map((p) => p.text),
+    plan?.language?.startsWith('es') ? 'es' : plan?.language?.startsWith('pt') ? 'pt' : 'en',
+  )
+  return preguntasDeDecision(
+    competidores.map((c) => c.nombre),
+    idioma,
+    cupoDecision(maxPreguntas(tenant)),
+  )
+}
+
+/** Las preguntas que siguen una tarea verificada (ciclo/seguimiento.ts): las de decisión no las sacan de la ronda. */
+async function preguntasDeSeguimiento(tenant: Tenant): Promise<Set<string>> {
+  const seguimientos = await store.listFollowups(tenant.id, 500)
+  return new Set(seguimientos.filter((f) => !f.doneAt && f.before.question).map((f) => claveDePregunta(f.before.question!)))
+}
+
 export async function correrRonda(tenant: Tenant): Promise<{ roundId: string; runs: number; engines: string[] }> {
-  // Si bajó de plan (pro → founder) se miden las primeras del nuevo tope; las otras quedan guardadas.
-  const prompts = (await store.listCitationPrompts(tenant.id)).slice(0, maxPreguntas(tenant))
+  const guardadas = await store.listCitationPrompts(tenant.id)
   const motores = motoresDisponibles()
-  if (prompts.length === 0) throw new Error('No prompts yet')
+  if (guardadas.length === 0) throw new Error('No prompts yet')
   if (motores.length === 0) throw new Error('No answer engine is configured on the gateway')
   const raiz = raizDe(tenant)
   const nombres = marcas(tenant, raiz)
+  // Si bajó de plan (pro → founder) se miden las del nuevo tope; las otras quedan guardadas. Las de decisión
+  // entran en su cupo sin pasar el tope: primero en el lugar libre, después en el de las últimas del agente.
+  const [decision, protegidas] = await Promise.all([
+    preguntasDeDecisionDe(tenant, guardadas, raiz).catch((e) => (console.warn('[citación] preguntas de decisión', tenant.slug, e instanceof Error ? e.message : e), [] as string[])),
+    preguntasDeSeguimiento(tenant).catch(() => new Set<string>()),
+  ])
+  const prompts = elegirPreguntas(guardadas, decision, maxPreguntas(tenant), protegidas)
   const roundId = randomUUID()
   const trabajos = prompts.flatMap((p) => motores.map((m) => ({ p, m })))
   const filas: (NewCitationRun & { paginas: Pagina[] })[] = []
@@ -150,7 +195,7 @@ export async function sugerirPrompts(tenant: Tenant, cantidad = 10): Promise<str
     model: MODEL,
     max_tokens: 6_000,
     system:
-      'You write the questions a real customer would type into ChatGPT or Perplexity when looking for what this business offers, to measure whether the business gets recommended. Rules: do not include the business name (we measure whether engines bring it up unprompted); mix discovery questions ("best free weather API for Latin America"), comparisons ("X vs Y"), and concrete jobs ("how do I get hourly forecasts for Bogotá in JSON"); write each in the language its customers would use, mixing Spanish and English if the market is Latin America; under 15 words each.',
+      'You write the questions a real customer would type into ChatGPT or Perplexity when looking for what this business offers, to measure whether the business gets recommended. Rules: do not include the business name (we measure whether engines bring it up unprompted); mix discovery questions ("best free weather API for Latin America"), comparisons ("X vs Y"), and concrete jobs ("how do I get hourly forecasts for Bogotá in JSON"); at least one in five must be a decision question a buyer asks while choosing ("alternatives to <a well-known competitor>", "<competitor> vs <competitor>", "best <category> for <kind of customer>"), naming only competitors that really exist in this category and using the category itself when you are not sure of any; write each in the language its customers would use, mixing Spanish and English if the market is Latin America; under 15 words each.',
     messages: [
       {
         role: 'user',

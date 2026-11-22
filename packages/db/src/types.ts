@@ -924,7 +924,10 @@ export type RadarCitas = {
   engines: string[]
   /** Los que se preguntaron y no contestaron ninguna. Sin el campo: contestaron todos. */
   failed?: string[]
+  /** La ciudad para la que se midió, como la escribió la persona. Solo se guarda; no sale en la respuesta. */
+  city?: string | null
 }
+
 
 /** Una medición guardada. 'running' es el candado del dominio; las 'done' son el caché. */
 export type RadarCitasRun = {
@@ -1003,6 +1006,8 @@ export interface Store {
   listTasks(tenantId: string, opts?: { statuses?: TaskStatus[] }): Promise<AgentTask[]>
   getTask(tenantId: string, id: string): Promise<AgentTask | null>
   updateTask(tenantId: string, id: string, patch: AgentTaskPatch): Promise<AgentTask>
+  /** Cambia solo la prioridad de una tarea (la cola se recalcula con las reglas de hoy). No toca el estado ni el contenido. */
+  setTaskPriority(tenantId: string, id: string, priority: TaskPriority): Promise<void>
   /** Últimos mensajes, del más viejo al más nuevo. */
   listMessages(tenantId: string, limit: number): Promise<AgentMessage[]>
   addMessage(m: NewAgentMessage): Promise<AgentMessage>
@@ -1296,6 +1301,12 @@ export interface Store {
   // ---- radar público: foto de citación ----
   /** La última medición terminada del dominio e idioma con measured_at >= since, o null. */
   getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null>
+  /**
+   * La última medición terminada del dominio en cualquier mercado e idioma con
+   * measured_at >= since: la llave es `domain` (sin país) o `domain@PAIS[~ciudad]`.
+   * Es lo que fija el mercado del dominio por 30 días en el radar público.
+   */
+  getRadarCitasDelDominio(domain: string, since: string): Promise<RadarCitasRun | null>
   /**
    * Toma una medición nueva: si ya van `maxPerDay` desde `dayStart` (UTC), 'budget';
    * si hay otra 'running' del mismo dominio e idioma empezada después de

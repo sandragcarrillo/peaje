@@ -58,8 +58,10 @@ test('el orden: la mención y la página de una pregunta sin cita van antes que 
   const pagina = prioridadPagina({ pregunta, porQue: 'La IA cita listas y tu sitio no tiene una.' }, false, true)
   assert.equal(pagina.score, 70)
   assert.equal(pagina.impact, 'high')
-  // Sin la medición de citas detrás, una página nueva queda donde estaba.
-  assert.equal(prioridadPagina({ pregunta, porQue: 'x' }, false).score, 50)
+  // Sin la medición de citas detrás, una pregunta de decisión ("el mejor") igual sube, menos que con la medición.
+  assert.equal(prioridadPagina({ pregunta, porQue: 'x' }, false).score, 65)
+  // Una informativa sin la medición queda donde estaba.
+  assert.equal(prioridadPagina({ pregunta: '¿Qué es la nómina electrónica?', porQue: 'x' }, false).score, 50)
   const mencion = prioridadMencion({ pregunta, sitios: ['capterra.co', 'reddit.com'], citas: 3 })
   assert.equal(mencion.score, 75)
 
@@ -210,8 +212,10 @@ test('marcarla hecha: queda cerrada con la palabra del dueño, sin abrir ninguna
   assert.equal(hecha.note, SIN_CRITERIOS)
   assert.doesNotMatch(hecha.note ?? '', /pass on the live site/)
   assert.deepEqual(pedidos, [])
-  // El título no es una pregunta: no entra a las preguntas que Peaje mide ni agenda seguimientos.
-  assert.equal((await store.listFollowups(tenant.id, 50)).length, 0)
+  // Agenda los dos seguimientos y mide la pregunta real, sin el prefijo "Get mentioned:".
+  const seguimientos = (await store.listFollowups(tenant.id, 50)).filter((f) => f.taskId === t.id)
+  assert.equal(seguimientos.length, 2)
+  assert.equal(seguimientos[0]!.before.question, Q2)
   assert.ok(!(await store.listCitationPrompts(tenant.id)).some((p) => p.text.startsWith('Get mentioned')))
 })
 

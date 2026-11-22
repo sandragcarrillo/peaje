@@ -6,9 +6,12 @@ import Link from 'next/link'
 import { MERCADOS, ciudadLimpia, mercadoDe, paisPorNombre } from '@peaje/shared/mercados'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useDict, useLocale } from '@/lib/i18n/client'
+import { pedirCitas } from './citas-cliente'
+import { MOTORES_POR_DEFECTO, nombreMotor } from './citas-tipos'
 import { enviarReporte, registrarLead } from './correo-actions'
 import { MedicionEnVivo } from './en-vivo'
 import { leerRecarga, recargarUnaVez } from './recarga'
+import { Seccion } from './seccion'
 
 const rutaRadar = (dominio: string, medir: boolean, pais: string, ciudad = '') =>
   `/radar?d=${encodeURIComponent(dominio)}${pais ? `&p=${pais}${ciudad ? `&c=${encodeURIComponent(ciudad)}` : ''}` : ''}${medir ? '&medir=1' : ''}`
@@ -471,5 +474,192 @@ export function MandarInforme({ dominio, conCorreo }: { dominio: string; conCorr
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {recargada && !error ? <Recargada texto={d.recargada} /> : null}
     </div>
+  )
+}
+
+/** Lo más que tardan las citas: la barra de espera llega al final ahí. */
+const CITAS_MAX_S = 70
+/** El mismo tope que citas-vista.tsx: si el gateway pide esperar menos que esto, la sección vuelve a preguntar. */
+const CITAS_REINTENTO_MAX_S = 45
+/** Las preguntas que hace el gateway: las tarjetas de espera tienen la misma forma que el resultado. */
+const CITAS_PREGUNTAS = 3
+
+/** Los mismos colores por motor que citas-vista.tsx, para que la espera y el resultado se vean iguales. */
+const ACENTO_MOTOR: Record<string, string> = {
+  chatgpt: 'var(--text)',
+  perplexity: 'var(--accent)',
+  claude: 'var(--lila)',
+  gemini: 'var(--verde)',
+}
+const COLS_MOTORES: Record<number, string> = { 1: 'sm:grid-cols-1', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-2 lg:grid-cols-4' }
+
+function PuntoMotor({ id }: { id: string }) {
+  return <span aria-hidden className="h-2 w-2 shrink-0" style={{ background: ACENTO_MOTOR[id] ?? 'var(--faint)' }} />
+}
+
+/** Un hueco gris donde va a ir un dato. Late suave salvo con prefers-reduced-motion. */
+function Hueco({ className, retraso = 0 }: { className: string; retraso?: number }) {
+  return <span className={`block bg-border/70 motion-safe:animate-pulse ${className}`} style={retraso ? { animationDelay: `${retraso}ms` } : undefined} />
+}
+
+/**
+ * La sección de citas mientras llega la respuesta (hasta ~70 s). Dice qué
+ * estamos haciendo, cuánto lleva y cuánto tarda; debajo, los motores y las
+ * preguntas con la misma forma que el resultado, para que nada salte.
+ */
+function EsperaCitas({ n, segundos, mientras, pais, ciudad }: { n: string; segundos: number; mientras: 'puntaje' | 'midiendo'; pais: string; ciudad: string }) {
+  const { radar } = useDict()
+  const t = radar.espera
+  const c = radar.citas
+  const locale = useLocale()
+  const mercado = mercadoDe(pais)
+  const nombrePais = mercado ? (locale === 'es' ? mercado.es : mercado.en) : ''
+  const motores = MOTORES_POR_DEFECTO
+  const lento = segundos > CITAS_MAX_S
+  const avance = Math.min(1, segundos / CITAS_MAX_S)
+  return (
+    <Seccion n={n} titulo={c.tituloNeutro}>
+      {mercado ? <p className="text-sm text-muted">{c.mercadoDesde(ciudad ? `${ciudad}, ${nombrePais}` : nombrePais)}</p> : null}
+
+      <div className="space-y-3 border border-border bg-panel p-5">
+        <div className="flex items-start justify-between gap-4">
+          <p role="status" className="flex items-start gap-3 font-medium leading-6">
+            <span aria-hidden className="radar-latido mt-2 h-2 w-2 shrink-0 rounded-full bg-accent" />
+            {t.titulo(motores.map(nombreMotor))}
+          </p>
+          <span aria-hidden className="shrink-0 font-mono text-sm leading-6 tabular-nums text-muted">
+            {radar.vivo.segundos(segundos)}
+          </span>
+        </div>
+        <p className="max-w-2xl text-sm text-muted">{t.que}</p>
+        <div
+          role="progressbar"
+          aria-label={t.progreso}
+          aria-valuemin={0}
+          aria-valuemax={CITAS_MAX_S}
+          aria-valuenow={Math.min(segundos, CITAS_MAX_S)}
+          className="h-1 overflow-hidden rounded-full bg-border/70"
+        >
+          <div
+            className={`h-full origin-left rounded-full bg-accent motion-safe:transition-transform motion-safe:duration-1000 motion-safe:ease-linear ${lento ? 'motion-safe:animate-pulse' : ''}`}
+            style={{ transform: `scaleX(${avance})` }}
+          />
+        </div>
+        <p aria-live="polite" className="text-xs text-muted">
+          {lento ? t.lento : `${t.tarda} ${mientras === 'puntaje' ? t.mientrasPuntaje : t.mientrasMidiendo}`}
+        </p>
+      </div>
+
+      {/* Un tablero por motor, como en el resultado: el número y la barra de preguntas todavía vacíos. */}
+      <ul aria-hidden className={`grid grid-cols-1 gap-3 ${COLS_MOTORES[Math.min(motores.length, 4)] ?? COLS_MOTORES[4]}`}>
+        {motores.map((id, i) => (
+          <li key={id} className="space-y-4 border border-border bg-panel p-5">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <PuntoMotor id={id} />
+              {nombreMotor(id)}
+            </p>
+            <div>
+              <Hueco className="h-12 w-20" retraso={i * 150} />
+              <Hueco className="mt-3 h-3.5 w-44 max-w-full" retraso={i * 150} />
+            </div>
+            <div className="flex gap-1.5">
+              {Array.from({ length: CITAS_PREGUNTAS }, (_, k) => (
+                <span key={k} className="h-1.5 flex-1 rounded-full bg-border" />
+              ))}
+            </div>
+            <p className="hidden text-xs leading-4 sm:block sm:min-h-8" />
+          </li>
+        ))}
+      </ul>
+
+      {/* Las preguntas: el número de cada una a la vista y, por motor, el hueco del resultado y de a quién citó. */}
+      <ol aria-hidden className="space-y-3">
+        {Array.from({ length: CITAS_PREGUNTAS }, (_, i) => (
+          <li key={i} className="border border-border">
+            <div className="space-y-1 px-5 pt-5 pb-4">
+              <p className="text-xs text-muted">{c.preguntaN(i + 1, CITAS_PREGUNTAS)}</p>
+              <Hueco className="my-1 h-5 w-4/5" retraso={i * 200} />
+            </div>
+            <div className="hidden grid-cols-[9rem_13rem_1fr] gap-4 border-t border-border/60 px-5 py-2 text-xs text-faint sm:grid">
+              <span>{c.colAsistente}</span>
+              <span>{c.colResultado}</span>
+              <span>{c.colFuentes}</span>
+            </div>
+            <ul className="divide-y divide-border/60 border-t border-border/60">
+              {motores.map((id) => (
+                <li key={id} className="grid grid-cols-1 gap-x-4 gap-y-2 px-5 py-3.5 sm:grid-cols-[9rem_13rem_1fr] sm:items-center">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <PuntoMotor id={id} />
+                    {nombreMotor(id)}
+                  </span>
+                  <Hueco className="h-3.5 w-24" retraso={i * 200} />
+                  <Hueco className="h-3 w-3/5" retraso={i * 200} />
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </Seccion>
+  )
+}
+
+/**
+ * Envuelve la sección de citas (citas-vista.tsx): mientras no hay respuesta
+ * muestra EsperaCitas y deja la sección montada pero escondida, así pide lo
+ * suyo desde ya. Las dos comparten el mismo pedido (citas-cliente.ts), sin
+ * pedir dos veces. `mientras`: qué dice la espera que pasa más abajo.
+ */
+export function CitasConEspera({
+  n,
+  dominio,
+  pais,
+  ciudad,
+  mientras,
+  children,
+}: {
+  n: string
+  dominio: string
+  pais: string
+  ciudad: string
+  mientras: 'puntaje' | 'midiendo'
+  children: React.ReactNode
+}) {
+  const locale = useLocale()
+  // La misma clave que usa la sección: la ciudad solo cuenta con un país de la lista.
+  const lugar = mercadoDe(pais) ? ciudad : ''
+  const [listo, setListo] = useState(false)
+  const [segundos, setSegundos] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    setListo(false)
+    const pedido = pedirCitas(dominio, locale, { pais, ciudad: lugar })
+    const tic = () => setSegundos(Math.max(0, Math.floor((Date.now() - pedido.desde) / 1000)))
+    tic()
+    const reloj = setInterval(tic, 1000)
+    void (async () => {
+      const r = await pedido.promesa
+      const espera = 'error' in r && r.error === 'unavailable' ? (r.retryAfterSeconds ?? 0) : 0
+      if (vivo && espera > 0 && espera <= CITAS_REINTENTO_MAX_S) {
+        // La sección vuelve a preguntar pasado ese tiempo; un momento después se toma ese mismo pedido.
+        await new Promise((ok) => setTimeout(ok, espera * 1000 + 300))
+        if (!vivo) return
+        await pedirCitas(dominio, locale, { pais, ciudad: lugar }).promesa
+      }
+      if (!vivo) return
+      clearInterval(reloj)
+      setListo(true)
+    })()
+    return () => {
+      vivo = false
+      clearInterval(reloj)
+    }
+  }, [dominio, locale, pais, lugar])
+
+  return (
+    <>
+      {listo ? null : <EsperaCitas n={n} segundos={segundos} mientras={mientras} pais={pais} ciudad={lugar} />}
+      <div hidden={!listo}>{children}</div>
+    </>
   )
 }

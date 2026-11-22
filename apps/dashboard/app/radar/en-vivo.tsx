@@ -7,7 +7,6 @@ import { useDict, useLocale } from '@/lib/i18n/client'
 import type { Dict } from '@/lib/i18n/dict'
 import { PASOS_SONDA, type EventoSonda, type Hallazgo, type PasoSonda, type Tono } from '@/lib/radar/sondas-tipos'
 import { medirDominio } from './actions'
-import { pedirCitas } from './citas-cliente'
 import { enviarReporte } from './correo-actions'
 import { leerRecarga, recargarUnaVez } from './recarga'
 import { marcarRevelado, useMenosMovimiento } from './revelado'
@@ -204,8 +203,7 @@ export function MedicionEnVivo({ dominio }: { dominio: string }) {
     arrancado.current = true
     inicio.current = Date.now()
     leerRecarga('medir') // si venimos de una recarga por deploy, se limpia: la URL ya pide medir
-    // En paralelo con Ora: las citas (la sección del resultado retoma este pedido) y las sondas.
-    pedirCitas(dominio, locale)
+    // En paralelo con Ora, las sondas. Las citas las pide CitasConEspera (arriba en la página), con país y ciudad.
     void leerSondas()
     void medir()
     // eslint-disable-next-line react-hooks/exhaustive-deps

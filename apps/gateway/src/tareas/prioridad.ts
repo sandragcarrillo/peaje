@@ -101,15 +101,23 @@ export function prioridadRuta(r: { path: string; visitas: number }): TaskPriorit
 
 /** Lo que suma una página que responde una pregunta de compra donde la IA hoy no cita al negocio. */
 const POR_PREGUNTA_SIN_CITA = 20
+/**
+ * Lo que suma una página de comparación o decisión ("X vs Y", "alternativas a
+ * X", "mejor X para Y") sin la medición de citas detrás. Queda arriba de las
+ * guías y debajo de las de mención (72 a 80). Con la medición detrás ya suma
+ * POR_PREGUNTA_SIN_CITA: las dos no se acumulan.
+ */
+const POR_DECISION = 15
 
 /**
  * Una página nueva que propuso el agente. Con el borrador listo, publicar es
  * corto. `sinCita`: sale de la medición de citas, para una pregunta de compra
- * donde la IA no cita al negocio; va antes que retocar una guía del blog.
+ * donde la IA no cita al negocio; va antes que retocar una guía del blog. Una
+ * pregunta de comparación o decisión también sube, aunque no se haya medido.
  */
 export function prioridadPagina(s: { pregunta: string; porQue: string }, conBorrador: boolean, sinCita = false): TaskPriority {
   return {
-    score: (conBorrador ? 55 : 50) + (sinCita ? POR_PREGUNTA_SIN_CITA : 0),
+    score: (conBorrador ? 55 : 50) + (sinCita ? POR_PREGUNTA_SIN_CITA : esDeDecision(s.pregunta) ? POR_DECISION : 0),
     impact: sinCita ? 'high' : 'medium',
     effort: conBorrador ? 'small' : 'medium',
     label: { es: `Publicar la página "${s.pregunta}"`, en: `Publish the page "${s.pregunta}"` },
@@ -134,8 +142,14 @@ export function prioridadMencion(m: { pregunta: string; sitios: string[]; citas:
   }
 }
 
-/** Palabras de quien está por decidir una compra: comparar, alternativas, precio, "el mejor". */
-const DE_COMPRA = /(^|[^a-záéíóúñ])(vs|versus|compar[a-z]*|alternativ[a-z]*|precios?|pricing|prices?|planes|plans|tarifas?|cu[aá]nto cuesta|costos?|costs?|mejor(es)?|best|rese[ñn]as?|reviews?|opiniones|comprar|buy|cotiza[a-z]*)(?![a-záéíóúñ])/i
+/**
+ * Palabras de quien está por decidir una compra: comparar, alternativas,
+ * precio, "el mejor", cuál conviene o elegir entre opciones.
+ */
+const DE_COMPRA = /(^|[^a-záéíóúñ])(vs\.?|versus|compar[a-z]*|alternativ[a-z]*|precios?|pricing|prices?|planes|plans|tarifas?|cu[aá]nto cuesta|costos?|costs?|mejor(es)?|best|rese[ñn]as?|reviews?|opiniones|comprar|buy|cotiza[a-z]*|conviene|elegir|escoger|choos(e|ing)|frente a|en vez de|en lugar de|instead of|better than)(?![a-záéíóúñ])/i
+
+/** Si el título o la pregunta de una tarea es de comparación o decisión de compra. */
+export const esDeDecision = (texto: string) => DE_COMPRA.test(texto.replace(/[-_/]+/g, ' '))
 
 /**
  * Si una página que Google muestra es de compra o informativa. De compra: la
@@ -205,6 +219,27 @@ export function prioridadDe(t: Pick<AgentTask, 'key' | 'kind' | 'title' | 'summa
   if (t.key.startsWith('content:refresh:')) return { score: 28, impact: 'low', effort: 'small', ...base }
   if (t.key.startsWith('content:mention:')) return { score: 72, impact: 'high', effort: 'medium', ...base }
   return { score: 50, impact: 'medium', effort: 'medium', ...base }
+}
+
+/** Claves de contenido que no son una página nueva: menciones, frescura y Search Console. */
+const NO_ES_PAGINA = ['content:mention:', 'content:refresh:', 'content:snippet:', 'content:improve:']
+
+/** Una página nueva (del agente o del chat): el título es la pregunta que responde. */
+export const esPaginaNueva = (t: Pick<AgentTask, 'key' | 'kind'>) => t.kind === 'content' && !NO_ES_PAGINA.some((p) => t.key.startsWith(p))
+
+/**
+ * La prioridad de una tarea guardada con las reglas de hoy. Se recalcula lo que
+ * sale solo de lo guardado: las páginas nuevas (título, razón, si tienen
+ * borrador). `sinCita` es la medición de citas de esta corrida; una página que
+ * ya subió por la medición la conserva aunque esta corrida no la traiga (si la
+ * medición falló, la tarea no baja). Null: la tarea no se recalcula acá
+ * (arreglos, rutas, menciones, Search Console se refrescan al volver a
+ * proponerse, con la evidencia nueva).
+ */
+export function prioridadVigente(t: Pick<AgentTask, 'key' | 'kind' | 'title' | 'summary' | 'priority'>, o: { conBorrador: boolean; sinCita: boolean }): TaskPriority | null {
+  if (!esPaginaNueva(t)) return null
+  const yaSinCita = t.priority?.impact === 'high'
+  return prioridadPagina({ pregunta: t.title, porQue: t.summary }, o.conBorrador, o.sinCita || yaSinCita)
 }
 
 /** La cola en el orden en que conviene trabajarla; a igual puntaje, la más nueva. */

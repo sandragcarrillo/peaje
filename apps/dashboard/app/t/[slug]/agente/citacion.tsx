@@ -15,25 +15,27 @@ const POCAS_RESPUESTAS = 12
 export function FormatosPanel({ datos }: { datos: FormatosCitados }) {
   const { miAgente: t } = useDict()
   return (
-    <div className="border border-border p-4">
+    <div className="tarjeta p-4 sm:p-5">
       <p className="font-semibold">{t.fmtTitulo}</p>
       <p className="mt-1 text-sm text-muted">{t.fmtIntro}</p>
       {datos.formats.length === 0 ? (
         <p className="mt-3 text-sm text-muted">{t.fmtSinDatos}</p>
       ) : (
         <>
-          <p className="mt-2 font-mono text-xs text-muted">
+          <p className="mt-2 text-xs tabular-nums text-muted">
             {t.fmtBase(datos.answers, datos.rounds)} {datos.answers < POCAS_RESPUESTAS ? t.fmtPoco : null}
           </p>
-          <div className="mt-3 divide-y divide-border border border-border">
+          <div className="-mx-4 mt-3 divide-y divide-border border-t border-border sm:-mx-5">
             {datos.formats.map((f, i) => (
-              <details key={f.format} open={i === 0} className="group px-4 py-3">
-                <summary className="flex cursor-pointer list-none items-baseline justify-between gap-3">
-                  <span className="font-medium">
-                    <span className="mr-2 inline-block text-muted transition-transform group-open:rotate-90">›</span>
+              <details key={f.format} open={i === 0} className="group px-4 py-3 sm:px-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2 font-medium">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden className="shrink-0 text-muted transition-transform group-open:rotate-90">
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
                     {t.fmtNombres[f.format] ?? f.format}
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-muted">{t.fmtConteo(f.citations, f.sources)}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted">{t.fmtConteo(f.citations, f.sources)}</span>
                 </summary>
                 <div className="mt-3 space-y-3 text-sm">
                   <p>{t.fmtPara[f.format]}</p>

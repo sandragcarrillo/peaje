@@ -283,6 +283,8 @@ export type EstadoBilling = {
   /** Links del 402 en USDC. Null con el cobro en USDC apagado. */
   checkout: { founder: string | null; pro: string | null }
   upgradeUrl: string
+  /** Créditos del agente este mes (usoPublico en el gateway). Falta en el respaldo: sin gateway no se sabe el saldo. */
+  usage?: { credits: number; remaining: number; renewsAt: string }
   /** Armado en el dashboard porque el gateway no contestó: no se sabe si quedan cupos founder. */
   respaldo?: boolean
 }

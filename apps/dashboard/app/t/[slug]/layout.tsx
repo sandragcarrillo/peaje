@@ -51,7 +51,7 @@ export default async function TenantLayout({ children, params }: LayoutProps<'/t
   const ejemplo = process.env.NODE_ENV === 'development' ? process.env.PANEL_SALDO_STUB?.match(/^(\d+)\/(\d+)$/) : null
   const uso = ejemplo
     ? { remaining: Number(ejemplo[1]), credits: Number(ejemplo[2]), renewsAt: new Date(Date.now() + 9 * 86_400_000).toISOString() }
-    : (billing as { usage?: { credits?: unknown; remaining?: unknown; renewsAt?: unknown } } | null)?.usage
+    : billing?.usage
   const renueva = typeof uso?.renewsAt === 'string' && !Number.isNaN(Date.parse(uso.renewsAt)) ? new Date(uso.renewsAt) : null
   const saldo =
     acceso.plan === 'regalo' && tenant.regalo

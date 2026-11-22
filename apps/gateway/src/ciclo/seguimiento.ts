@@ -16,10 +16,23 @@ import { verificarTarea } from '../tareas/verificar.js'
 
 const NOMBRE_MOTOR = Object.fromEntries(MOTORES.map((m) => [m.id, m.nombre])) as Record<string, string>
 
-/** La pregunta que responde una tarea de contenido. Las de frescura ("Refresh /x") no tienen. */
-export function preguntaDe(task: AgentTask): string | null {
-  if (task.kind !== 'content' || task.key.startsWith('content:refresh:')) return null
-  return task.title.trim() || null
+/**
+ * El prefijo de las tareas de "que te nombren" (tareas/generar.ts) y de sus
+ * etiquetas para el dueño (tareas/prioridad.ts), en los dos idiomas, para
+ * quedarse con la pregunta real.
+ */
+const PREFIJO_MENCION = /^\s*(get mentioned|pedir que te (incluyan|nombren)( donde la ia busca)?|ask to be (included|mentioned)( where ai looks for)?)\s*:?\s*/i
+
+/**
+ * La pregunta que responde una tarea de contenido, la que se vuelve a medir.
+ * Las de frescura ("Refresh /x") y las de Search Console ("Improve /x",
+ * "Rewrite the title...") no tienen. En las de mención, sin el prefijo.
+ */
+export function preguntaDe(task: Pick<AgentTask, 'kind' | 'key' | 'title'>): string | null {
+  if (task.kind !== 'content') return null
+  if (['content:refresh:', 'content:snippet:', 'content:improve:'].some((p) => task.key.startsWith(p))) return null
+  const pregunta = task.title.replace(PREFIJO_MENCION, '').replace(/^["“'](.*)["”']$/s, '$1').trim()
+  return pregunta || null
 }
 
 const normal = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ')

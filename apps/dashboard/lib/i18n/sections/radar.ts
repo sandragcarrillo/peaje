@@ -203,6 +203,17 @@ export const radar = {
       errorOtro: 'Ahora no pudimos preguntarle a la IA por tu sitio. Tu agente se lo pregunta cada semana.',
     },
 
+    // Mientras llegan las citas (EsperaCitas en app/radar/partes.tsx)
+    espera: {
+      titulo: (motores: string[]) => `Le estamos preguntando a ${listaCompleta('es', motores)}`,
+      que: 'Les hacemos tres preguntas como las haría alguien que busca lo que ofreces. Anotamos si te citan y a quién recomiendan en tu lugar.',
+      tarda: 'Tarda hasta 70 segundos.',
+      mientrasPuntaje: 'Mientras, tu puntaje ya está más abajo.',
+      mientrasMidiendo: 'Mientras, más abajo medimos tu sitio.',
+      lento: 'Está tardando más de lo normal. Seguimos esperando la respuesta.',
+      progreso: 'Tiempo de espera',
+    },
+
     // 03
     s03: 'Lo que ya haces bien',
     yaBien: (n: number) => `Lo que ya haces bien (${n})`,
@@ -411,6 +422,16 @@ export const radar = {
       fecha: (fecha: string) => `What AI answered on ${fecha}. Its answers change from one day to the next.`,
       errorBudget: 'The free radar already asked AI all the questions it could today. Your agent asks them for you every week.',
       errorOtro: 'We could not ask AI about your site right now. Your agent asks every week.',
+    },
+
+    espera: {
+      titulo: (motores: string[]) => `We are asking ${listaCompleta('en', motores)}`,
+      que: 'We ask them three questions the way someone looking for what you offer would. We note whether they cite you and who they recommend instead.',
+      tarda: 'It takes up to 70 seconds.',
+      mientrasPuntaje: 'Meanwhile, your score is already further down.',
+      mientrasMidiendo: 'Meanwhile, we measure your site further down.',
+      lento: 'This is taking longer than usual. We are still waiting for the answer.',
+      progreso: 'Waiting time',
     },
 
     s03: 'What you already do well',

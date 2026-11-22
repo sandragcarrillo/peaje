@@ -40,7 +40,7 @@ import type {
   TelegramLink,
 } from './types'
 // ---- M6 ----
-import type { FollowupSnapshot, TaskFollowup } from './types'
+import type { FollowupSnapshot, TaskFollowup, TaskPriority } from './types'
 import { registroTestnet } from './red'
 import { aggregateVisits } from './visits'
 // ---- M7 ----
@@ -394,6 +394,12 @@ export class MemoryStore implements Store {
     if (!t) throw new Error('Tarea no encontrada')
     Object.assign(t, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)), { updatedAt: new Date().toISOString() })
     return t
+  }
+
+  async setTaskPriority(tenantId: string, id: string, priority: TaskPriority): Promise<void> {
+    const t = this.#tasks.find((x) => x.tenantId === tenantId && x.id === id)
+    if (!t) throw new Error('Tarea no encontrada')
+    t.priority = priority
   }
 
   #messages: AgentMessage[] = []
@@ -1374,6 +1380,12 @@ export class MemoryStore implements Store {
 
   async getRadarCitas(domain: string, locale: string, since: string): Promise<RadarCitasRun | null> {
     const filas = this.#radarCitas.filter((r) => r.domain === domain && r.locale === locale && r.status === 'done' && !!r.measuredAt && r.measuredAt >= since)
+    const [ultima] = filas.sort((a, b) => b.measuredAt!.localeCompare(a.measuredAt!))
+    return ultima ? structuredClone(ultima) : null
+  }
+
+  async getRadarCitasDelDominio(domain: string, since: string): Promise<RadarCitasRun | null> {
+    const filas = this.#radarCitas.filter((r) => (r.domain === domain || r.domain.startsWith(`${domain}@`)) && r.status === 'done' && !!r.measuredAt && r.measuredAt >= since)
     const [ultima] = filas.sort((a, b) => b.measuredAt!.localeCompare(a.measuredAt!))
     return ultima ? structuredClone(ultima) : null
   }

@@ -429,8 +429,23 @@ const noDisponible = (retryAfterSeconds?: number): SalidaRadarCitas => ({
 const servir = (f: Omit<RadarCitas, 'cached'>, cached: boolean): SalidaRadarCitas => ({
   status: 200,
   // `market` solo cuando se midió para un país: sin país la respuesta es la de siempre.
-  body: { domain: f.domain, ...(f.market ? { market: f.market } : {}), measuredAt: f.measuredAt, cached, questions: f.questions, coverage: f.coverage, citedInstead: f.citedInstead, engines: f.engines, ...(f.failed?.length ? { failed: f.failed } : {}) },
+  body: {
+    domain: f.domain,
+    ...(f.market ? { market: f.market } : {}),
+    measuredAt: f.measuredAt,
+    cached,
+    questions: f.questions,
+    coverage: f.coverage,
+    citedInstead: f.citedInstead,
+    engines: f.engines,
+    ...(f.failed?.length ? { failed: f.failed } : {}),
+  },
 })
+
+/** La llave del store por mercado: `dominio`, `dominio@CO` o `dominio@CO~medellín` (la ciudad en minúsculas y con guiones). */
+export function llaveDeMercado(dominio: string, pais: string | null, ciudad: string | null): string {
+  return pais ? `${dominio}@${pais}${ciudad ? `~${ciudad.toLowerCase().replace(/\s+/g, '-')}` : ''}` : dominio
+}
 
 const textoUtil = (sitio: string) => sitio.replace(/\[https?:\/\/[^\]\s]+\]/g, ' ').replace(/\s+/g, ' ').trim().length
 
@@ -478,7 +493,7 @@ async function medir(dominio: string, locale: Locale, mercado: Mercado | null, c
   // Cada país es una foto aparte. Va en la llave del store como `dominio@PAIS`: así el caché, el candado y el
   // índice único de radar_citation_runs sirven por mercado sin cambiar la tabla (un dominio nunca lleva @).
   // La ciudad, si hay, va detrás del país: `dominio@CO~medellin`.
-  const llave = mercado ? `${dominio}@${mercado.codigo}${ciudad ? `~${ciudad.toLowerCase().replace(/\s+/g, '-')}` : ''}` : dominio
+  const llave = llaveDeMercado(dominio, mercado?.codigo ?? null, ciudad)
   const guardada = await store.getRadarCitas(llave, locale, new Date(inicio.getTime() - CACHE_DIAS * 86_400_000).toISOString())
   const previo = guardada?.result ?? null
   const vigente = previo && (!guardada!.partial || previo.measuredAt >= new Date(inicio.getTime() - CACHE_PARCIAL_HORAS * 3_600_000).toISOString())
@@ -532,6 +547,7 @@ async function medir(dominio: string, locale: Locale, mercado: Mercado | null, c
     const celdas = await preguntarTodo(motores, preguntas, deps.timeoutMs, mercado?.codigo ?? null, ciudad)
     const { foto, candidatos } = armarFoto({ dominio, preguntas, celdas, marcas: terminos, measuredAt: deps.ahora().toISOString() })
     if (mercado) foto.market = mercado.codigo
+    if (ciudad) foto.city = ciudad
     const fallas = celdas.filter((c) => !c.respuesta)
     // Los motores que se preguntaron y no contestaron nada: la página lo dice, en vez de que el motor desaparezca.
     const mudos = ordenarMotores(motores).map((m) => m.id).filter((id) => !foto.engines.includes(id))

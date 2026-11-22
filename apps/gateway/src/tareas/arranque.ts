@@ -43,11 +43,14 @@ export async function preguntasDelRadar(tenant: Tenant, ahora = new Date()): Pro
   const raiz = dominio.replace(/^www\./, '')
   const desde = new Date(ahora.getTime() - RADAR_DIAS * 86_400_000).toISOString()
   const vistas: string[] = []
+  // La última medición del Radar en cualquier mercado (con país la llave es `dominio@PAIS~ciudad`).
   for (const d of new Set([raiz, dominio])) {
-    for (const locale of ['es', 'en']) {
-      const run = await store.getRadarCitas(d, locale, desde).catch(() => null)
-      for (const q of run?.result?.questions ?? []) if (q.text && !vistas.includes(q.text)) vistas.push(q.text)
-    }
+    // Primero las sin país (orden fijo es, en) y al final la última de cualquier mercado: así el orden no depende de empates de fecha.
+    const runs = await Promise.all([
+      ...['es', 'en'].map((locale) => store.getRadarCitas(d, locale, desde).catch(() => null)),
+      store.getRadarCitasDelDominio(d, desde).catch(() => null),
+    ])
+    for (const run of runs) for (const q of run?.result?.questions ?? []) if (q.text && !vistas.includes(q.text)) vistas.push(q.text)
   }
   return vistas
 }
