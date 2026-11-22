@@ -150,6 +150,10 @@ test('el correo abre con la propuesta, en el idioma del dueño, con el enlace a 
   const cuerpo = html.slice(html.indexOf('Esta semana probemos con estas 3'))
   assert.ok(cuerpo.indexOf('Dejar que ChatGPT lea tu sitio') < cuerpo.indexOf('Cambiar el título y la descripción de /developers'))
   assert.ok(html.indexOf('Esta semana probemos') < html.indexOf('Qué tan listo está tu sitio'))
+  // El resumen: qué sigue, qué se hizo, qué cambió, y después el detalle.
+  assert.ok(html.indexOf('Esta semana probemos') < html.indexOf('Qué se hizo'))
+  assert.ok(html.indexOf('Qué se hizo') < html.indexOf('Qué cambió esta semana'))
+  assert.ok(html.indexOf('Qué cambió esta semana') < html.indexOf('El detalle'))
   assert.match(html, /impacto alto · poco trabajo/)
   assert.match(html, new RegExp(`https://usepeaje.com/t/semana-prueba/agente/(tareas/|contenido\\?id=)`))
   assert.doesNotMatch(html, /Content to create|this week/)

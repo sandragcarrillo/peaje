@@ -101,7 +101,12 @@ const S = {
     semanaPie: 'Están en el orden en que conviene hacerlas. Si alguna no va, descártala desde su página y la próxima semana te propongo otra.',
     ver: 'Ver la tarea',
     orden: 'No hay nada que te convenga cambiar esta semana. Sigo midiendo y te aviso cuando algo se mueva.',
-    movido: 'Qué se movió',
+    movido: 'Qué se hizo',
+    nadaHecho: 'Esta semana no se verificó ningún cambio en tu sitio.',
+    cambio: 'Qué cambió esta semana',
+    detalle: 'El detalle',
+    cortoPuntaje: (p: string) => `Puntaje: ${p}`,
+    cortoCitas: (c: string, previa: string | null) => `Te citan en ${c} de las respuestas${previa ? ` (antes ${previa})` : ''}`,
     plan: 'Tu plan',
     sinPlan: (url: string) => `<strong>Todavía no tienes un plan.</strong> <a href="${url}">Cuéntale tu objetivo al agente</a> y arma uno para tu negocio.`,
     puntaje: 'Qué tan listo está tu sitio para los agentes',
@@ -132,7 +137,12 @@ const S = {
     semanaPie: 'They are in the order worth doing them. If one does not fit, dismiss it from its page and I will propose another next week.',
     ver: 'See the task',
     orden: 'There is nothing worth changing this week. I keep measuring and will tell you when something moves.',
-    movido: 'What moved',
+    movido: 'What got done',
+    nadaHecho: 'No change on your site was verified this week.',
+    cambio: 'What changed this week',
+    detalle: 'The detail',
+    cortoPuntaje: (p: string) => `Score: ${p}`,
+    cortoCitas: (c: string, previa: string | null) => `Cited in ${c} of the answers${previa ? ` (was ${previa})` : ''}`,
     plan: 'Your plan',
     sinPlan: (url: string) => `<strong>No plan yet.</strong> <a href="${url}">Tell the agent your goal</a> and it builds one for this business.`,
     puntaje: 'Agent-readiness score',
@@ -157,13 +167,27 @@ const S = {
   },
 }
 
+const pct = (x: number | null) => (x === null ? 'n/a' : `${Math.round(x * 100)}%`)
+const conDelta = (r: Reporte, vs: string) => `${r.score}${r.scorePrevio !== null && r.scorePrevio !== undefined ? ` (${r.score! - r.scorePrevio >= 0 ? '+' : ''}${r.score! - r.scorePrevio} ${vs})` : ''}`
+
+/** Qué cambió, en una línea para el chat: puntaje y citas con su comparación. Vacío si no hay ninguno de los dos. */
+function lineaCambio(r: Reporte): string {
+  const s = S[r.idioma]
+  const partes: string[] = []
+  if (typeof r.score === 'number') partes.push(s.cortoPuntaje(conDelta(r, s.vsSemana)))
+  if (r.citacion) partes.push(s.cortoCitas(pct(r.citacion.share), r.citacion.previa !== null ? pct(r.citacion.previa) : null))
+  return partes.length ? `${s.cambio}: ${partes.join('. ')}.` : ''
+}
+
 /** Las propuestas de la semana como texto corto (Telegram, Slack): markdown mínimo. */
 export function textoSemana(r: Reporte): string {
   const s = S[r.idioma]
-  if (r.semana.length === 0) return s.orden
+  const cambio = lineaCambio(r)
+  if (r.semana.length === 0) return cambio ? `${s.orden}\n\n${cambio}` : s.orden
   return [
     `**${s.semana(r.semana.length)}**`,
     ...r.semana.map((p, i) => `${i + 1}. **${p.titulo}** (${TEXTO_IMPACTO[r.idioma][p.impacto]}, ${TEXTO_ESFUERZO[r.idioma][p.esfuerzo]})\n${p.porQue}`),
+    ...(cambio ? [cambio] : []),
   ].join('\n\n')
 }
 
@@ -195,7 +219,6 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
   const plan = r.plan
     ? `<p><strong>${s.plan}</strong>: ${esc(r.plan.resumen)}</p><ol>${r.plan.pasos.map((p) => `<li>${p.hecho ? '✓ ' : ''}${esc(p.titulo)} <br><span style="color:#666">${esc(p.avance)}</span></li>`).join('')}</ol>`
     : `<p>${s.sinPlan(esc(r.agenteUrl))}</p>`
-  const pct = (x: number | null) => (x === null ? 'n/a' : `${Math.round(x * 100)}%`)
   const citacion = r.citacion
     ? `<p>${s.citas(pct(r.citacion.share), r.citacion.previa !== null ? pct(r.citacion.previa) : null)}${r.citacion.competidores.length ? s.enLugar(esc(r.citacion.competidores.join(', '))) : ''}</p>`
     : ''
@@ -205,22 +228,24 @@ export function htmlSemanal(tenant: Tenant, r: Reporte): { subject: string; html
   // ---- M6: qué se publicó o arregló y qué movió ----
   const movido = r.movido?.length
     ? `<p><strong>${s.movido}</strong></p><ul>${r.movido.map((m) => `<li><strong>${m.url ? `<a href="${esc(m.url)}">${esc(m.titulo)}</a>` : esc(m.titulo)}</strong><br>${esc(m.linea)}</li>`).join('')}</ul>`
-    : ''
+    : `<p><strong>${s.movido}</strong></p><p>${s.nadaHecho}</p>`
   // ---- M7: comprador misterioso, un párrafo ----
   const comprador = r.comprador
     ? `<p><strong>${s.comprador}</strong> ${esc(r.comprador.resumen)}${r.comprador.veredictos[0] ? ` ${esc(r.comprador.veredictos.find((v) => !v.includes('would buy from you')) ?? r.comprador.veredictos[0])}` : ''}${r.comprador.problemas[0] ? ` ${esc(r.comprador.problemas[0])}` : ''}</p>`
     : ''
-  const score = r.score !== null ? `${r.score}${r.scorePrevio !== null ? ` (${r.score - r.scorePrevio >= 0 ? '+' : ''}${r.score - r.scorePrevio} ${s.vsSemana})` : ''}` : s.sinPuntaje
+  const score = r.score !== null ? conDelta(r, s.vsSemana) : s.sinPuntaje
   const html = `<div style="${estilo}">
 <p>${s.hola(esc(r.dominio))}</p>
 ${semana}
 ${movido}
-${plan}
+<p style="font-size:17px"><strong>${s.cambio}</strong></p>
 <p><strong>${s.puntaje}</strong>: ${score}.</p>
-${fallando}
-${r.cobros ? `<p>${s.pagos(r.pagos.count, r.pagos.revenue)}${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}` : ''}
-${visitas}
 ${citacion}
+${visitas}
+${r.cobros ? `<p>${s.pagos(r.pagos.count, r.pagos.revenue)}${r.pagos.porRuta.length ? `:</p><table style="border-collapse:collapse;font-size:14px">${filasRutas}</table>` : '.</p>'}` : ''}
+<p style="font-size:17px"><strong>${s.detalle}</strong></p>
+${plan}
+${fallando}
 ${comprador}
 ${tareas}
 <p>${s.pie(esc(r.kitUrl))}</p>
